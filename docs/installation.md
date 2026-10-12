@@ -26,6 +26,14 @@ Set `CONNECTION_STRING["main"]`, `HOUR_SPAN`, `AS_OF_DATE`, and `EXECUTION_COUNT
 
 For tests or programmatic construction, `create_app({...})` uses defaults plus that mapping and skips automatic environment/root-file loading. `create_app({...}, config_path=...)` explicitly loads the selected file before applying the mapping. Each app owns its configuration; monitoring reads the active Flask app context.
 
+### Database timeouts and query resources
+
+`DB_LOGIN_TIMEOUT_SECONDS` defaults to **10** and is passed to `pyodbc.connect(..., timeout=...)`. `DB_QUERY_TIMEOUT_SECONDS` defaults to **30** and is set on the connection before creating its cursor. Both must be positive integers from 1 to 2,147,483,647; zero (an unbounded timeout), booleans, strings, and fractions are rejected at application construction and by the standalone query operation. These are initial configurable limits to tune with the real catalog, not measured performance targets.
+
+The limits are driver-level login/query settings, not an end-to-end HTTP deadline. Actual timeout enforcement must be checked with the deployed ODBC driver and SSISDB. See pyodbc's [connection timeout](https://github.com/mkleehammer/pyodbc/wiki/The-pyodbc-Module#connect) and [query timeout](https://github.com/mkleehammer/pyodbc/wiki/Connection#timeout) documentation.
+
+SQL loads from package-relative `dashboard/query` resources, using UTF-8 with optional BOM, before opening a connection. Only flat `.sql` resource names are accepted. Each query explicitly attempts cursor and connection closing, including after execution/fetch failures; a cleanup error does not replace the original operation error. Transaction defaults, parameter binding, SQL text, and legacy dictionary/list/empty-result shapes are preserved. Request-level input allowlists and HTTP error mapping are the next milestone.
+
 ## Run locally
 
 ```bat

@@ -19,8 +19,8 @@ These milestones implement roadmap item 1 and delivery phases 0–1. Phases 0 an
 | P0a | Phase 0: workflow baseline | In progress | Add synthetic workflow fixtures as each backend slice needs them; maintain a field/workflow parity checklist and distinguish known bugs from intended behaviour. B1 establishes route/template coverage, not complete query parity. |
 | P0b | Phase 0: real-data baseline | Planned | With an approved SSISDB test configuration, record representative list/metrics/events/values/history/children behaviour, query timings, and execution plans. |
 | B1 | Phase 1: startup/configuration | Complete | Independent application factory, deterministic configuration loading, per-app monitoring configuration, explicit entry points, debug-off defaults, and database-free legacy page tests. Existing URLs and template endpoint names are preserved; the evidence and integration limits are recorded below. |
-| B2 | Phase 1: database query boundary | Planned; next | Move SQL loading/execution behind a small operation boundary; use package-relative query resources, explicit connection/cursor closing on success/failure, and login/query timeouts. Verify with fake ODBC resources, including execute/fetch failures and non-project working directories. Preserve existing row shapes and SQL semantics. |
-| B3 | Phase 1: inputs and errors | Planned | Validate event/status/detail inputs; return correct HTTP statuses; make 404 handling independent of SSISDB; keep database details and secrets out of client errors. Add error-path regression tests. |
+| B2 | Phase 1: database query boundary | Complete | Package-relative SQL loading and a standalone parameterized query operation own each connection/cursor. Positive login/query timeouts are validated and applied; fake-ODBC tests cover acquisition, execution/fetch/mapping, cleanup, and non-project working directories. Legacy shapes and checked-in SQL are preserved; native integration remains P0b/B5a work. |
+| B3 | Phase 1: inputs and errors | Planned; next | Validate event/status/detail inputs; return correct HTTP statuses; make 404 handling independent of SSISDB; keep database details and secrets out of client errors. Add error-path regression tests. |
 | B4 | Phases 0–1: legacy query usage | Planned | Stop loading resources unused by the active screen; separate aggregate and execution-specific KPI calls and fix the `0`/`-1` mismatch. Record deliberate behaviour changes and test exact query arguments. Cohort/pagination/typed JSON changes belong to the API phase. |
 | B5a | Phase 1: runtime/dependency baseline | Planned | Select and constrain Python/dependency versions and validate the Python 3.14 target, pyodbc wheel, and required driver combination. Record local versus integration evidence. |
 | B5b | Phase 1: operational timing | Planned | Add focused request/query timing and safe error logging without exposing SQL parameters, credentials, or connection strings; verify representative success/failure paths. |
@@ -58,7 +58,7 @@ Validation environment: Windows, Python **3.11.4**, Flask **3.1.2**, pyodbc **5.
 | `python -m flask --app dashboard/__init__.py routes` | Passed | Legacy Flask app-path discovery still finds the factory |
 | `python -m pip check` | Passed | The installed local runtime dependency graph is consistent |
 
-The tests validate application construction and server-rendered HTML, not browser JavaScript or real SQL results. No real SSISDB connection, Windows/SQL authentication, Python 3.14, container, IIS host, production server, or stream integration was validated. The remaining database/filter/error/runtime work belongs to B2–B5c and the API phase; B1 does not mark those issues fixed.
+The B1 tests validate application construction and server-rendered HTML, not browser JavaScript or real SQL results. No real SSISDB connection, Windows/SQL authentication, Python 3.14, container, IIS host, production server, or stream integration was validated. At B1 completion, the remaining database/filter/error/runtime work was assigned to B2–B5c and the API phase; later milestone records below track that work separately.
 
 ## Workflow baseline coverage
 
@@ -72,6 +72,28 @@ This checklist is the initial P0a coverage. Complete SQL field/semantic parity a
 | Parameters and property overrides | Both synthetic sections render, including parameter flags | Real typed/sensitive values and endpoint access/redaction rules |
 | Duration history | Populated synthetic history/table/chart data renders | History scope/limit/estimate fixes and actual SSISDB results |
 | Refresh and browser state | Legacy templates are retained | Legacy full-page refresh remains; in-place updates and stream recovery belong to phases 3–5 |
-| Missing pages and DB failures | Application error-handler registration is retained | Database-independent 404/status policy in B3; resource/error cleanup in B2 |
+| Missing pages and DB failures | Application error-handler registration is retained; B2 fake-ODBC tests cover resource ownership and timeout wiring through failure paths | Database-independent 404/status policy in B3; actual driver/server cleanup and timeout behaviour need integration evidence |
 
-Next task: **B2**, the database query/resource boundary. Keep its scope to connection ownership, timeouts, package-relative query loading, and legacy row compatibility; defer query reshaping and HTTP error policy to their own tasks.
+## B2 work record
+
+Scope: SQL resource loading, parameter binding, connection/cursor ownership, and driver-level timeout settings. Preserve checked-in SQL and legacy row shapes. Input/HTTP error policy, query reshaping, and the default KPI execution-filter fix remain B3/B4/API work.
+
+Completed locally on 12 October 2026:
+
+- Added `dashboard/db.py` with package-relative UTF-8/BOM-aware SQL resource loading, flat `.sql` resource-name validation, and a query operation that accepts explicit settings without requiring a Flask context. SQL/parameter preparation happens before connection acquisition.
+- Each operation owns a new logical connection and cursor, applies the query timeout before creating the cursor, binds parameters, and attempts cursor/connection closes on success, failure, or cancellation. A failing cursor close still attempts connection closing. Cleanup errors retain the original operation error; if the operation otherwise succeeds, a close failure propagates instead of reporting success.
+- Added positive, configurable driver-level login/query timeouts: `DB_LOGIN_TIMEOUT_SECONDS=10` and `DB_QUERY_TIMEOUT_SECONDS=30`. App construction and query execution reject unbounded/invalid settings without echoing their values. The legacy monitor passes the active app's connection/timeouts to the boundary.
+- Preserved pyodbc transaction defaults, parameter order, SQL resources, and legacy single/list/empty result shapes. Returned values are not formatted or converted into JSON. The `0`/`-1` KPI mismatch and HTTP/error policy remain scheduled work.
+- Added 23 standard-library database-boundary tests and documented the settings and integration limits. No dependency was added. Test-created temporary directories were cleaned after verification.
+
+Validation environment remains Windows, Python **3.11.4**, Flask **3.1.2**, pyodbc **5.3.0**.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `python -m unittest discover -s tests -q` | Passed: 42 tests total (19 B1 + 23 B2) | Fake ODBC covers connect/timeout-setting/cursor/execute/fetch/mapping failures, query/cleanup cancellation, both close failures, primary-error preservation, timeout ordering/validation, distinct resources per call, parameter binding, typed/empty results, Unicode SQL, and execution outside the project directory; the legacy page suite also passes |
+| `python -m flask --app dashboard:create_app routes` | Passed | Existing application endpoints register without SQL Server |
+| `git diff --check` and SQL-resource diff | Passed | No whitespace errors and no checked-in SQL changes |
+
+These checks validate resource ownership and settings wiring using fake ODBC objects. They do not prove native-driver timeout enforcement, physical connection release/pool behaviour, transaction behaviour against SSISDB, real row conversion, or query performance. Login/query settings are not an end-to-end HTTP deadline. Record those integration results under P0b/B5a before making production claims; the parent backend phase remains incomplete.
+
+Next task: **B3**, validated inputs and HTTP error handling, including database-independent 404 responses. Keep SQL reshaping and aggregate KPI corrections in their assigned tasks.

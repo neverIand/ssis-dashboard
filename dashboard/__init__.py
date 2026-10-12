@@ -41,6 +41,10 @@ def create_app(config_overrides=None, *, config_path=None):
     if config_overrides is not None:
         app.config.from_mapping(deepcopy(config_overrides))
 
+    from dashboard.db import validate_timeouts
+
+    validate_timeouts(app.config['DB_LOGIN_TIMEOUT_SECONDS'], app.config['DB_QUERY_TIMEOUT_SECONDS'])
+
     from dashboard import filters, processors
     from dashboard.views import register_views
 

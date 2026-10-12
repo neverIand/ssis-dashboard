@@ -1,5 +1,5 @@
-import pyodbc
 from flask import current_app
+from dashboard.db import execute_query
 
 class configuration:
     pass
@@ -48,6 +48,8 @@ class monitor(object):
         self.config.asOfDate = current_app.config["AS_OF_DATE"]
         self.config.executionCount = current_app.config["EXECUTION_COUNT"]
         self.config.connectionString = current_app.config["CONNECTION_STRING"]["main"]
+        self.config.loginTimeout = current_app.config['DB_LOGIN_TIMEOUT_SECONDS']
+        self.config.queryTimeout = current_app.config['DB_QUERY_TIMEOUT_SECONDS']
 
     def get_engine_info(self):
         result = self.__execute_query('engine-info.sql', True)
@@ -177,23 +179,13 @@ class monitor(object):
         return result
 
     def __execute_query(self, query_file, onerow, *args):
-        result = {}
-        file = open('dashboard/query/' + query_file, 'r')
-        query = file.read()
-        file.close()
-        cnxn = pyodbc.connect(self.config.connectionString)
-        cursor = cnxn.cursor()
-        cursor.execute(query, args)
-        if (onerow == False):
-            rows = cursor.fetchall()
-            result = [dict(zip([cd[0] for cd in cursor.description], row)) for row in rows]
-        else:
-            row = cursor.fetchone()
-            if (row != None):
-                result = dict(zip([cd[0] for cd in cursor.description], row))
-        cursor.close()
-        
-        return result
+        return execute_query(
+            query_file, args,
+            connection_string=self.config.connectionString,
+            one_row=onerow,
+            login_timeout=self.config.loginTimeout,
+            query_timeout=self.config.queryTimeout,
+        )
 
     def __get_proper_execution_id(self, execution_id):
         result = 0    
