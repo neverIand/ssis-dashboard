@@ -20,7 +20,7 @@ These milestones implement roadmap item 1 and delivery phases 0–1. Phases 0 an
 | P0b | Phase 0: real-data baseline | Planned | With an approved SSISDB test configuration, record representative list/metrics/events/values/history/children behaviour, query timings, and execution plans. |
 | B1 | Phase 1: startup/configuration | Complete | Independent application factory, deterministic configuration loading, per-app monitoring configuration, explicit entry points, debug-off defaults, and database-free legacy page tests. Existing URLs and template endpoint names are preserved; the evidence and integration limits are recorded below. |
 | B2 | Phase 1: database query boundary | Complete | Package-relative SQL loading and a standalone parameterized query operation own each connection/cursor. Positive login/query timeouts are validated and applied; fake-ODBC tests cover acquisition, execution/fetch/mapping, cleanup, and non-project working directories. Legacy shapes and checked-in SQL are preserved; native integration remains P0b/B5a work. |
-| B3 | Phase 1: inputs and errors | Planned; next | Validate event/status/detail inputs; return correct HTTP statuses; make 404 handling independent of SSISDB; keep database details and secrets out of client errors. Add error-path regression tests. |
+| B3 | Phase 1: inputs and errors | Complete | Validate event/status/detail inputs and positive BIGINT execution IDs before queries; use fixed SQL resource maps; return safe HTML errors with correct HTTP statuses and database-independent routing errors. Treat absent/not-visible execution records alike. Synthetic HTTP/ODBC failure checks pass; API problem JSON and live permission/driver behaviour remain separate work. |
 | B4 | Phases 0–1: legacy query usage | Planned | Stop loading resources unused by the active screen; separate aggregate and execution-specific KPI calls and fix the `0`/`-1` mismatch. Record deliberate behaviour changes and test exact query arguments. Cohort/pagination/typed JSON changes belong to the API phase. |
 | B5a | Phase 1: runtime/dependency baseline | Planned | Select and constrain Python/dependency versions and validate the Python 3.14 target, pyodbc wheel, and required driver combination. Record local versus integration evidence. |
 | B5b | Phase 1: operational timing | Planned | Add focused request/query timing and safe error logging without exposing SQL parameters, credentials, or connection strings; verify representative success/failure paths. |
@@ -68,11 +68,11 @@ This checklist is the initial P0a coverage. Complete SQL field/semantic parity a
 | --- | --- | --- |
 | Overview, folder/project/status navigation, metrics/timeline | Populated synthetic overview renders; original navigation URLs and filters work | Real query results/cohort semantics; unused query removal and KPI aggregate fix in B4 |
 | Execution details, executables, child packages | Synthetic executable and child sections render with status helpers | SQL field parity and repeated/parallel/incomplete child observations |
-| Event messages | Synthetic event row renders and HTML-like text stays escaped | Category/filter semantics, bounded querying/search, invalid-input handling, and real event volumes |
+| Event messages | Synthetic event row renders for all five categories and HTML-like text stays escaped; unsupported categories fail before queries | Real category/filter semantics, bounded querying/search, and event volumes |
 | Parameters and property overrides | Both synthetic sections render, including parameter flags | Real typed/sensitive values and endpoint access/redaction rules |
 | Duration history | Populated synthetic history/table/chart data renders | History scope/limit/estimate fixes and actual SSISDB results |
 | Refresh and browser state | Legacy templates are retained | Legacy full-page refresh remains; in-place updates and stream recovery belong to phases 3–5 |
-| Missing pages and DB failures | Application error-handler registration is retained; B2 fake-ODBC tests cover resource ownership and timeout wiring through failure paths | Database-independent 404/status policy in B3; actual driver/server cleanup and timeout behaviour need integration evidence |
+| Missing pages and DB failures | B2 verifies resource cleanup; B3 covers database-independent routing/static/method errors, missing-execution short circuit, safe HTML/status mapping, and an ODBC timeout through cleanup to HTTP | Actual row visibility, driver/server error states, cleanup, and timeout enforcement need integration evidence; API problem JSON and access controls are later work |
 
 ## B2 work record
 
@@ -96,4 +96,26 @@ Validation environment remains Windows, Python **3.11.4**, Flask **3.1.2**, pyod
 
 These checks validate resource ownership and settings wiring using fake ODBC objects. They do not prove native-driver timeout enforcement, physical connection release/pool behaviour, transaction behaviour against SSISDB, real row conversion, or query performance. Login/query settings are not an end-to-end HTTP deadline. Record those integration results under P0b/B5a before making production claims; the parent backend phase remains incomplete.
 
-Next task: **B3**, validated inputs and HTTP error handling, including database-independent 404 responses. Keep SQL reshaping and aggregate KPI corrections in their assigned tasks.
+## B3 work record
+
+Scope: validation and HTTP failures for the retained legacy UI. Query/cohort reshaping, aggregate KPI correction, API representations, authentication/capability enforcement, and comprehensive timing remain separate milestones.
+
+Completed locally on 12 October 2026:
+
+- Added database-independent validation for case-sensitive execution statuses, the five legacy event categories, the two internal detail categories, and positive SQL Server `BIGINT` execution IDs. Views validate user selectors before constructing the monitor or running a query. Monitor status/event/detail operations also reject unsupported selectors before the query boundary; event/detail SQL names now come from explicit resource maps.
+- Replaced the database-dependent 404 template/handler with a standalone HTML error page. Unknown routes and missing static files return 404 without querying the catalog. Unsupported methods retain 405 and its `Allow` header; HEAD errors retain status/headers without a response body.
+- Detail, event, and value routes first fetch the requested execution record. An empty visible result returns 404 and runs no subsequent queries. Present records retain legacy rendering and links. No catalog row-visibility inference or browser authorization challenge was added.
+- Added safe 400/404/500/503/504 handling. Timeout SQLSTATEs map to 504; selected database connection/login/driver states map to 503; other driver errors remain 500, including SQL programming errors. Responses never echo input/driver diagnostics, SQL, connection strings, or tracebacks. Database/unexpected-error logs contain only safe status/SQLSTATE fields and a server-generated request ID; request/query timing remains B5b work.
+- Every response carries `X-Request-ID`; error pages show the same ID and disable caching. Client-supplied IDs are not trusted. Added 22 standard-library regression tests, updated development instructions and the legacy Visual Studio file manifest, and introduced no dependency.
+
+Validation environment remains Windows, Python **3.11.4**, Flask **3.1.2**, pyodbc **5.3.0**.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `python -m unittest discover -s tests -q` | Passed: 64 tests total (42 previous + 22 B3) | Invalid status/event/ID routes reject before monitor creation; fixed resource selection and parameter binding; all supported statuses/categories render; largest BIGINT accepted; missing executions skip subsequent queries; routing/static/405/HEAD errors; safe driver/unexpected failures and logs; unique server request IDs; timeout cleanup before HTTP response and empty fake-ODBC row through 404 |
+| `python -m flask --app dashboard:create_app routes` | Passed | All eight legacy endpoints plus static serving retained |
+| `git diff --check` and SQL-resource diff | Passed | No whitespace errors and no checked-in SQL changes |
+
+These checks use synthetic monitoring/ODBC objects and do not prove actual SSISDB row visibility, endpoint permissions, deployed driver SQLSTATEs, native timeout enforcement, or production logging/hosting behaviour. Legacy HTML errors are implemented; API problem JSON and access checks remain phase 2, and stream failures remain phase 5. History filter semantics and the aggregate execution sentinel are unchanged and remain assigned work. The parent backend phase remains incomplete.
+
+Next task: **B4**, remove queries unused by each legacy screen and separate aggregate/execution KPI arguments to fix the `0`/`-1` mismatch. Keep API cohort, pagination, and typed representations in phase 2.

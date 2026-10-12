@@ -66,7 +66,7 @@
     <Content Include="dashboard\static\js\plugins\smartMenu\addons\keyboard\jquery.smartmenus.keyboard.min.js" />
     <Content Include="dashboard\static\js\plugins\smartMenu\jquery.smartmenus.min.js" />
     <Content Include="dashboard\static\js\sb-admin-2.js" />
-    <Content Include="dashboard\templates\404.html" />
+    <Content Include="dashboard\templates\error.html" />
     <Content Include="dashboard\templates\execution-events.html" />
     <Content Include="dashboard\templates\fragments\engine-info.html" />
     <Content Include="dashboard\templates\fragments\engine-kpi.html" />
@@ -89,9 +89,11 @@
     <Compile Include="config.cfg" />
     <Compile Include="dashboard\config.py" />
     <Compile Include="dashboard\db.py" />
+    <Compile Include="dashboard\errors.py" />
     <Compile Include="dashboard\filters.py" />
     <Compile Include="dashboard\processors.py" />
     <Compile Include="dashboard\views.py" />
+    <Compile Include="dashboard\validation.py" />
     <Compile Include="dashboard\wsgi.py" />
     <Compile Include="dashboard\ssis.py" />
     <Compile Include="dashboard\__init__.py">

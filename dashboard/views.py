@@ -1,14 +1,16 @@
 from datetime import datetime
 import urllib.parse
 
-from flask import render_template
+from flask import abort, render_template
 from dashboard.ssis import monitor
+from dashboard.validation import event_query, status_code, validate_execution_id
 
 # Set app version
 version = "0.6.8 (beta)"
 
 # Define routes
 def packages(folder_name=monitor.all, project_name=monitor.all, status=monitor.all):
+    status_code(status)
     folder_name = urllib.parse.unquote(folder_name)
     project_name = urllib.parse.unquote(project_name)
 
@@ -60,9 +62,18 @@ def folder_project(folder_name, project_name):
 def folder(folder_name):
     return packages(folder_name=folder_name)
 
-def execution(execution_id=0):
+def _execution_monitor(execution_id):
+    validate_execution_id(execution_id)
     m = monitor()
     m.execution_id = execution_id
+    package_info = m.get_package_info()
+    if not package_info:
+        abort(404)
+    return m, package_info
+
+
+def execution(execution_id=0):
+    m, package_info = _execution_monitor(execution_id)
 
     environment = {
         'version': version,
@@ -75,7 +86,6 @@ def execution(execution_id=0):
     engine_kpi = m.get_engine_kpi()
     engine_info = m.get_engine_info()
     execution_statistics = m.get_execution_statistics()
-    package_info = m.get_package_info()
     package_kpi = m.get_package_kpi()
     package_list = m.get_package_list()
     package_executables = m.get_package_executables()
@@ -97,8 +107,8 @@ def execution(execution_id=0):
     )
 
 def package_events(execution_id, event_type):
-    m = monitor()
-    m.execution_id = execution_id
+    event_query(event_type)
+    m, package_info = _execution_monitor(execution_id)
 
     environment = {
         'version': version,
@@ -109,7 +119,6 @@ def package_events(execution_id, event_type):
 
     engine_kpi = m.get_engine_kpi()
     engine_info = m.get_engine_info()
-    package_info = m.get_package_info()
     package_kpi = m.get_package_kpi()
     package_events = m.get_package_events(event_type)
 
@@ -123,8 +132,7 @@ def package_events(execution_id, event_type):
     )
 
 def package_execution_values(execution_id):
-    m = monitor()
-    m.execution_id = execution_id
+    m, package_info = _execution_monitor(execution_id)
 
     environment = {
         'version': version,
@@ -133,7 +141,6 @@ def package_execution_values(execution_id):
         }
 
     engine_info = m.get_engine_info()
-    package_info = m.get_package_info()
     package_kpi = m.get_package_kpi()
     package_parameters = m.get_package_details("execution-values")
     package_overrides = m.get_package_details("execution-overrides")
@@ -149,6 +156,7 @@ def package_execution_values(execution_id):
     )
 
 def package_history(folder_name, project_name, status, package_name):
+    status_code(status)
     folder_name = urllib.parse.unquote(folder_name)
     project_name = urllib.parse.unquote(project_name)
     package_name = urllib.parse.unquote(package_name)
@@ -206,23 +214,6 @@ def package_history(folder_name, project_name, status, package_name):
 #def get_sample():
 #    return jsonify({'result': 123})
 
-def not_found(error):
-    m = monitor()
-
-    engine_info = m.get_engine_info()
-
-    environment = {
-        'version': version,
-        'timestamp': datetime.now()
-        }
-
-    return render_template(
-        '404.html',
-        environment=environment,
-        engine_info=engine_info
-    )
-
-
 def register_views(app):
     """Retain legacy endpoint names used by templates and existing links."""
     app.add_url_rule('/', view_func=packages)
@@ -239,5 +230,4 @@ def register_views(app):
         '/history/<folder_name>/project/<project_name>/status/<status>/package/<package_name>',
         view_func=package_history,
     )
-    app.register_error_handler(404, not_found)
 

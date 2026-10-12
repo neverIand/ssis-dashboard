@@ -1,5 +1,6 @@
 from flask import current_app
 from dashboard.db import execute_query
+from dashboard.validation import PACKAGE_STATUS_CODES, detail_query, event_query, status_code
 
 class configuration:
     pass
@@ -23,18 +24,7 @@ class monitor(object):
             3: 'cancelled'
         }
 
-    package_status_codes = {
-            0: 'all',
-            1: 'created',
-            2: 'running',
-            3: 'cancelled',
-            4: 'failed',
-            5: 'pending',
-            6: 'halted',
-            7: 'succeeded',
-            8: 'stopping',
-            9: 'completed'
-        }
+    package_status_codes = PACKAGE_STATUS_CODES
 
     folder_name = all
     project_name = all
@@ -150,7 +140,7 @@ class monitor(object):
         return result
 
     def get_package_events(self, event_type):
-        query_file = 'package-events-' + event_type + '.sql'
+        query_file = event_query(event_type)
         result = self.__execute_query(
             query_file, 
             False,
@@ -159,7 +149,7 @@ class monitor(object):
         return result
 
     def get_package_details(self, detail_type):
-        query_file = 'package-details-' + detail_type + '.sql'
+        query_file = detail_query(detail_type)
         result = self.__execute_query(
             query_file, 
             False,
@@ -200,10 +190,6 @@ class monitor(object):
         return result
 
     def __get_proper_package_status_code(self, status):
-        status_descriptions = {}
-        for k in self.package_status_codes.keys():
-            status_descriptions[self.package_status_codes[k]] = k 
-
-        return status_descriptions[status]
+        return status_code(status)
 
 

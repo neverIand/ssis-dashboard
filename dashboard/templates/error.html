@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ status }} {{ title }} | SSIS Dashboard</title>
+    <style>
+        body { margin: 0; color: #243447; background: #f5f7fa; font: 1rem/1.6 system-ui, sans-serif; }
+        main { max-width: 38rem; margin: 12vh auto; padding: 2rem; }
+        h1 { line-height: 1.25; }
+        a { color: #175c9e; }
+        code { overflow-wrap: anywhere; }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>{{ status }} {{ title }}</h1>
+        <p>{{ detail }}</p>
+        <p><a href="{{ url_for('packages') }}">Return to the dashboard</a></p>
+        <p>Request ID: <code>{{ request_id }}</code></p>
+    </main>
+</body>
+</html>
