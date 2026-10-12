@@ -4,6 +4,9 @@ AZURE = False
 # Enable or disable Flask debug mode
 DEBUG = False
 
+# Application timing/error events; Python logger levels apply process-wide.
+LOG_LEVEL = 'INFO'
+
 # Google Analytics Code to monitor dashboard usage
 GOOGLE_ANALYTICS = None
 

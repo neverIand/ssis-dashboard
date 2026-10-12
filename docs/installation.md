@@ -66,7 +66,23 @@ Unknown pages, missing static assets, and unsupported HTTP methods return databa
 
 The application maps ODBC timeout states `HYT00`/`HYT01` to 504, connection states in class `08` and database-login/driver states `28000`/`IM002`/`IM003` to 503. Other driver errors and unexpected application failures return 500. SQL syntax/access errors are not assumed to be a browser authorization failure, and database login failures do not challenge the browser for credentials. These are application error-policy choices based on ODBC's [SQLSTATE definitions](https://learn.microsoft.com/en-us/sql/odbc/reference/appendixes/appendix-a-odbc-error-codes) and pyodbc's [exception mapping](https://github.com/mkleehammer/pyodbc/wiki/Exceptions); real driver/identity results still require integration checks.
 
-Error pages use fixed safe messages, carry `Cache-Control: no-store`, and display a server-generated request ID matching `X-Request-ID`. HTTP exception headers such as 405's `Allow` are preserved, following Flask's [error-handler guidance](https://flask.palletsprojects.com/en/stable/errorhandling/). Database/unexpected-error log records include the request ID and safe status information; they omit exception text, SQL, values, credentials, and tracebacks. Detailed request/query timing remains a separate milestone. The current legacy responses are HTML; problem JSON, API access controls, and streaming errors belong to their later phases.
+Error pages use fixed safe messages, carry `Cache-Control: no-store`, and display a server-generated request ID matching `X-Request-ID`. HTTP exception headers such as 405's `Allow` are preserved, following Flask's [error-handler guidance](https://flask.palletsprojects.com/en/stable/errorhandling/). Database/unexpected-error application events include the request ID and safe status information; they omit exception text, SQL, values, credentials, and tracebacks. The current legacy responses are HTML; problem JSON, API access controls, and streaming errors belong to their later phases.
+
+### Request and query timing
+
+Application event messages are JSON, correlated by the server-generated `X-Request-ID`. `LOG_LEVEL` defaults to `INFO` and accepts `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. Logger levels configure Python's process-wide `dashboard` logger; request IDs/counters are context-local. `LOG_LEVEL` does not enable Flask's interactive debugger. The default Flask formatter may add its usual timestamp/level prefix around the JSON message; production formatting/collection remains a hosting choice.
+
+| Event | Safe fields / meaning |
+| --- | --- |
+| `query_completed` | Resource basename, per-request index, `ok`/`error`/`cancelled` outcome, milliseconds, successful row count or null, failure stage, cleanup-failure flag, request ID |
+| `request_completed` | Fixed endpoint name, standard method (unknown methods use `OTHER`), HTTP status or null for aborted dispatch, outcome, milliseconds, query count/failures/summed query milliseconds, request ID |
+| `database_error` / `request_error` | Safe status and validated SQLSTATE where available; request ID; no original exception text or traceback |
+
+Query timing starts after SQL-resource/parameter preparation, before connection acquisition, and finishes after cursor/connection cleanup. Counts include failed acquisition attempts. Empty successful results have zero rows; failures have null rows. A cleanup failure preserves the original query failure and sets `cleanup_failed`; timing observers cannot replace an active operation error. Ordinary log/observer failures do not change database results or HTTP errors. Cancellation still propagates after resources are closed.
+
+Request timing ends at response preparation, includes query work and rendering, and excludes body transfer/network/stream lifetime. Query and request timers use a monotonic clock; they are not deadlines. Successful completions are INFO events; query failures, 5xx/aborted request completions, and safe errors are ERROR events. Raising `LOG_LEVEL` suppresses lower-level events.
+
+Application events omit raw URLs/paths/query strings, request bodies/headers, SQL text/parameters, configuration content, credentials and row values. WSGI/proxy/access/startup output is separate and needs its own host review. Follow the tracked [manual backend checklist](BACKEND_CHECKLIST.md) for real driver/catalog, recovery, performance and host validation after the B milestones.
 
 ### Legacy query scope
 

@@ -1,5 +1,6 @@
 from flask import current_app
 from dashboard.db import execute_query
+from dashboard.observability import record_query
 from dashboard.validation import (
     PACKAGE_STATUS_CODES, detail_query, event_query, status_code, validate_execution_id,
 )
@@ -190,6 +191,7 @@ class monitor(object):
             one_row=onerow,
             login_timeout=self.config.loginTimeout,
             query_timeout=self.config.queryTimeout,
+            on_complete=record_query,
         )
 
     def __get_proper_name_filter(self, name_filter):

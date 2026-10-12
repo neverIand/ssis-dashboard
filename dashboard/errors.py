@@ -2,13 +2,14 @@
 
 from http import HTTPStatus
 import re
-from uuid import uuid4
+import logging
 
-from flask import current_app, g, render_template
+from flask import current_app, render_template
 import pyodbc
 from werkzeug.exceptions import HTTPException
 
 from dashboard.validation import InvalidInput
+from dashboard.observability import log_event, request_id as _request_id
 
 
 _DETAILS = {
@@ -21,12 +22,6 @@ _DETAILS = {
     503: 'The monitoring database is unavailable. Please try again later.',
     504: 'The monitoring database did not respond in time. Please try again later.',
 }
-
-
-def _request_id():
-    if 'request_id' not in g:
-        g.request_id = uuid4().hex
-    return g.request_id
 
 
 def _error_response(status, *, response=None):
@@ -66,32 +61,21 @@ def _database_error(error):
         status = 503
     else:
         status = 500
-    current_app.logger.error(
-        'Database request failed: status=%s sqlstate=%s request_id=%s',
-        status, state or 'unknown', _request_id(),
+    log_event(
+        'database_error', level=logging.ERROR,
+        status=status, sqlstate=state or 'unknown', request_id=_request_id(),
     )
     return _error_response(status)
 
 
 def _unexpected_error(error):
     # Exception text/tracebacks may contain SQL, credentials, or parameter values.
-    current_app.logger.error('Request failed: status=500 request_id=%s', _request_id())
+    log_event('request_error', level=logging.ERROR, status=500, request_id=_request_id())
     return _error_response(500)
 
 
 def register_error_handlers(app):
-    app.before_request(_start_request)
-    app.after_request(_add_request_id)
     app.register_error_handler(InvalidInput, _invalid_input)
     app.register_error_handler(HTTPException, _http_error)
     app.register_error_handler(pyodbc.Error, _database_error)
     app.register_error_handler(Exception, _unexpected_error)
-
-
-def _start_request():
-    _request_id()
-
-
-def _add_request_id(response):
-    response.headers['X-Request-ID'] = _request_id()
-    return response

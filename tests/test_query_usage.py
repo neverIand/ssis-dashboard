@@ -186,10 +186,11 @@ class EventKpiSelectionTests(unittest.TestCase):
         self.connect.assert_not_called()
 
     def assert_kpi_query(self, parameters):
-        self.query.assert_called_once_with(
-            'package-kpi.sql', parameters, connection_string='synthetic connection',
-            one_row=True, login_timeout=10, query_timeout=30,
-        )
+        self.query.assert_called_once()
+        self.assertEqual(self.query.call_args.args, ('package-kpi.sql', parameters))
+        for name, value in {'connection_string': 'synthetic connection', 'one_row': True,
+                            'login_timeout': 10, 'query_timeout': 30}.items():
+            self.assertEqual(self.query.call_args.kwargs[name], value)
 
     def test_default_aggregate_operation_selects_all_executions_instead_of_execution_zero(self):
         with self.app.app_context():

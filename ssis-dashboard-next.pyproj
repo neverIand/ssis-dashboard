@@ -92,6 +92,7 @@
     <Compile Include="dashboard\db.py" />
     <Compile Include="dashboard\errors.py" />
     <Compile Include="dashboard\filters.py" />
+    <Compile Include="dashboard\observability.py" />
     <Compile Include="dashboard\processors.py" />
     <Compile Include="dashboard\views.py" />
     <Compile Include="dashboard\validation.py" />

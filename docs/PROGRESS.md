@@ -23,7 +23,7 @@ These milestones implement roadmap item 1 and delivery phases 0–1. Phases 0 an
 | B3 | Phase 1: inputs and errors | Complete | Validate event/status/detail inputs and positive BIGINT execution IDs before queries; use fixed SQL resource maps; return safe HTML errors with correct HTTP statuses and database-independent routing errors. Treat absent/not-visible execution records alike. Synthetic HTTP/ODBC failure checks pass; API problem JSON and live permission/driver behaviour remain separate work. |
 | B4 | Phases 0–1: legacy query usage | Complete | Query only data consumed by each legacy screen and its shared navigation. Separate aggregate and execution event-KPI operations; keep the legacy SQL `-1` contract behind the aggregate adapter and reject invalid execution selectors. Per-route query counts, exact resource/parameter binding, populated rendering, and error short-circuit tests pass. Cohort/pagination/typed JSON and measured SSISDB performance remain separate work. |
 | B5a | Phase 1: runtime/dependency baseline | Awaiting integration | B5a1 dependency constraints and B5a2 Windows x64/standard CPython 3.14 replay are complete. Native driver/catalog compatibility remains B5a3, deferred to the user's consolidated manual checks after the B milestones. |
-| B5b | Phase 1: operational timing | Planned | Add focused request/query timing and safe error logging without exposing SQL parameters, credentials, or connection strings; verify representative success/failure paths. |
+| B5b | Phase 1: operational timing | Complete | Structured request/query/error events use server request IDs and safe fields. Synthetic stage/cleanup/cancellation, log-sink, repeated-context, and concurrent-request checks pass, plus a native missing-driver negative probe. The tracked manual checklist covers the user's deferred real-data and hosting checks. |
 | B5c | Phase 1: hosting baseline | Planned | Document and verify the startup/server configuration for the chosen deployment target. Split Windows and container delivery into separate tasks when those targets are confirmed; production stream capacity remains phase 5. |
 
 ### Runtime milestone decomposition
@@ -224,4 +224,26 @@ Validation environment: Windows x64, **CPython 3.14.8**, **pip 26.2.1**, Flask *
 
 Native extensions load with this Windows/interpreter ABI; this does not validate a deployed SQL Server driver or real catalog. No SSISDB connection, authentication, actual row conversion, native timeout enforcement, permission visibility, production server, or other OS/architecture/free-threaded Python was validated. At the user's request, B5a3/P0b are deferred to consolidated manual checks after the B milestones; prepare a tracked checklist during B5b rather than waiting for a database configuration now.
 
-Next task: **B5b**, focused safe request/query timing plus the tracked manual backend-validation checklist. Hosting remains B5c, and real-data gates stay open until the user's checks are recorded.
+## B5b work record
+
+Scope: focused application request/query timing and safe error events, plus the requested consolidated manual checks. Native SSISDB tests remain deferred until the user finishes the B implementation checks; production hosting and stream instrumentation remain separate work.
+
+Completed locally on 12 October 2026:
+
+- Added JSON application events for query completion, request completion, database errors and unexpected request errors. They share the server-generated request ID. Fixed endpoint/resource labels, status/outcome, durations, row counts, query counts and validated SQLSTATEs are recorded; raw input/URLs/headers, SQL/parameters, configuration, credentials, row values and exception text/tracebacks are excluded.
+- Added an optional completion observer to the standalone DB operation without introducing a Flask dependency there. Query timing spans acquisition, timeout setup, cursor creation, execution, fetch, mapping and resource cleanup. Success/empty/failure/cancellation and cleanup failures remain distinct; observers run after cleanup, preserve active query/cleanup errors, and do not change outcomes on ordinary observer errors.
+- Moved request-ID hooks into the timing boundary, reset counters at each request, and guard duplicate teardown observations. HTTP failures and dispatch cancellation produce safe summaries; manually pushed contexts do not create phantom requests. Tests cover retained and concurrent contexts. Request duration stops at response preparation, not body/network/stream completion.
+- Added a validated `LOG_LEVEL` setting, default INFO, for the process-wide application logger. Logging sinks are best effort; a failed sink cannot replace a safe HTTP error. Added 17 standard-library regressions and updated the existing query-contract assertion for the optional observer.
+- Prepared [the tracked manual backend checklist](BACKEND_CHECKLIST.md): environment/configuration, driver/authentication/visibility/types, every legacy workflow and query counts, bad input/missing rows, native timeouts and recovery, log correlation/redaction, cold/warm measurements, pooling/cleanup, and pending hosting checks. Each case has steps, expected evidence, and a NOT RUN result field. Known legacy cohort/history/access limitations and separate API/stream gates are explicit.
+
+Validation environment: Windows x64, standard **CPython 3.14.8**, **pip 26.2.1**, the same eight pinned runtime distributions, using `.local/venv-b5a2`.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `python -m unittest discover -s tests -q` | Passed: 94 tests (77 previous + 17 B5b) | Safe JSON fields and IDs, deterministic durations/sums, query failure stages, empty/multi-row shapes, both cleanup attempts, primary-error preservation, cancellation, observer/sink errors, retained/concurrent request isolation, no phantom/double summaries, and all earlier regressions |
+| Native Windows driver-manager negative probe | Passed | A confirmed unregistered driver returns IM002/503 before any server connection; three correlated query/error/request events, no credential canary, one failed acquisition. This is not SSISDB/SQL-driver integration evidence. |
+| Factory/WSGI registration and diff/ignore checks | Passed | Application endpoints remain registered; no SQL/template/dependency-pin changes; probes/test reports and local runtime remain ignored |
+
+Timing/log transport is best effort and does not impose a total HTTP deadline. SQL preparation is outside query timing; request timing excludes network/body transfer and future stream lifetime. Application-event sanitization does not configure external server/proxy/access/startup logs. Native authentication, data correctness, row visibility, driver timeout enforcement, actual pooling/cleanup, representative performance and chosen-host behaviour remain manual gates in the checklist; none is marked complete here.
+
+Next task: **B5c**, the bounded hosting/startup baseline. Split deployment targets into separate submilestones before implementation as needed. B5a3/P0b stay awaiting the user's consolidated checks after the B implementation work.

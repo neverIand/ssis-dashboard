@@ -47,9 +47,11 @@ def create_app(config_overrides=None, *, config_path=None):
 
     from dashboard import filters, processors
     from dashboard.errors import register_error_handlers
+    from dashboard.observability import register_observability
     from dashboard.views import register_views
 
     register_views(app)
+    register_observability(app)
     register_error_handlers(app)
     app.context_processor(processors.utility_processor)
     app.add_template_filter(filters.project, 'project')
