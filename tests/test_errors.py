@@ -1,8 +1,9 @@
+import json
 import sys
 import unittest
 from unittest.mock import Mock, patch
 
-from flask import abort
+from flask import abort, got_request_exception
 import pyodbc
 
 from dashboard import create_app
@@ -153,6 +154,10 @@ class HttpErrorTests(unittest.TestCase):
         self.assertIn('href="/"', response.get_data(as_text=True))
         return response.get_data(as_text=True)
 
+    def logged_events(self, logged, event):
+        records = [json.loads(record.getMessage()) for record in logged.records]
+        return [record for record in records if record['event'] == event]
+
     def test_unknown_route_and_missing_static_file_need_no_database(self):
         with patch('dashboard.views.monitor') as factory:
             for path in ('/not-a-route', '/static/does-not-exist.css'):
@@ -238,6 +243,10 @@ class HttpErrorTests(unittest.TestCase):
                 for value in ('secret_column', 'private-host', 'private-user', 'private-password', 'Traceback'):
                     self.assertNotIn(value, combined)
                 self.assertIn(response.headers['X-Request-ID'], ' '.join(logged.output))
+                event, = self.logged_events(logged, 'database_error')
+                self.assertEqual(event['exception_type'], error_type.__name__)
+                self.assertEqual(event['application_frames'][-1]['module'], 'dashboard.db')
+                self.assertEqual(event['application_frames'][-1]['function'], 'execute_query')
 
     def test_unexpected_failure_is_safe_even_with_testing_enabled(self):
         with patch('dashboard.views.monitor', side_effect=RuntimeError('PWD=private-password')):
@@ -246,6 +255,146 @@ class HttpErrorTests(unittest.TestCase):
         html = self.assert_safe_error(response, 500)
         self.assertNotIn('private-password', html + ' '.join(logged.output))
         self.assertTrue(all(record.exc_info is None for record in logged.records))
+        self.connect.assert_not_called()
+
+    def test_unexpected_failure_has_actionable_frames_without_diagnostic_values(self):
+        def fail(*args, **kwargs):
+            private_local = 'private-local-canary'
+            original = ValueError('private-exception-canary')
+            original.add_note('private-note-canary')
+            raise original from RuntimeError(private_local)
+
+        with patch('dashboard.ssis.execute_query', side_effect=fail), \
+             self.assertLogs(self.app.logger, level='ERROR') as logged:
+            response = self.client.get('/execution/42?token=private-url-canary')
+        html = self.assert_safe_error(response, 500)
+        event, = self.logged_events(logged, 'request_error')
+        self.assertEqual(event['request_id'], response.headers['X-Request-ID'])
+        self.assertEqual(event['exception_type'], 'ValueError')
+        self.assertTrue(event['application_frames'])
+        self.assertEqual(event['application_frames'][-1]['module'], 'dashboard.ssis')
+        self.assertEqual(event['application_frames'][-1]['function'], '__execute_query')
+        self.assertTrue(all(type(frame['line']) is int and frame['line'] > 0
+                            for frame in event['application_frames']))
+        for value in ('private-', 'Traceback', str(__file__), 'raise original'):
+            self.assertNotIn(value, html + ' '.join(logged.output))
+        self.assertTrue(all(record.exc_info is None for record in logged.records))
+        self.connect.assert_not_called()
+
+    def test_diagnostic_frames_are_bounded_and_external_metadata_is_excluded(self):
+        # A deep application call chain should not expand log size or expose
+        # an external script path/function or its forged module name.
+        namespace = {'__name__': 'dashboard.private_module_canary'}
+        exec(compile(
+            "def private_function_canary():\n    raise RuntimeError('private-value-canary')\n",
+            '/private-path-canary/generated.py', 'exec',
+        ), namespace)
+        depth = 0
+        def recurse():
+            nonlocal depth
+            depth += 1
+            if depth == 20:
+                namespace['private_function_canary']()
+            from dashboard.views import packages
+            return packages()
+
+        with patch('dashboard.views.monitor', side_effect=recurse), \
+             self.assertLogs(self.app.logger, level='ERROR') as logged:
+            response = self.client.get('/')
+        html = self.assert_safe_error(response, 500)
+        event, = self.logged_events(logged, 'request_error')
+        self.assertTrue(event['application_frames'])
+        self.assertLessEqual(len(event['application_frames']), 8)
+        self.assertTrue(all(frame['module'] == 'dashboard.views' and frame['function'] == 'packages'
+                            for frame in event['application_frames']))
+        self.assertNotIn('private', html + ' '.join(logged.output))
+        self.connect.assert_not_called()
+
+    def test_explicit_development_propagation_preserves_error_signal_and_request_summary(self):
+        for mode in ({'TESTING': True, 'DEBUG': False}, {'TESTING': False, 'DEBUG': True}):
+            with self.subTest(mode=mode):
+                self.app.config.update(mode, PROPAGATE_EXCEPTIONS=True)
+                original = KeyError('private-error-canary')
+                signals = []
+                def observe(sender, **kwargs):
+                    signals.append(kwargs['exception'])
+                with got_request_exception.connected_to(observe, self.app), \
+                     patch('dashboard.views.monitor', side_effect=original), \
+                     self.assertLogs(self.app.logger, level='ERROR') as logged, \
+                     self.assertRaises(KeyError) as caught:
+                    self.client.get('/')
+                self.assertIs(caught.exception, original)
+                self.assertEqual(signals, [original])
+                event, = self.logged_events(logged, 'request_error')
+                summary, = self.logged_events(logged, 'request_completed')
+                self.assertEqual(event['exception_type'], 'KeyError')
+                self.assertEqual(event['request_id'], summary['request_id'])
+                self.assertEqual(summary['outcome'], 'aborted')
+                self.assertIsNone(summary['status'])
+                self.assertNotIn('private-', ' '.join(logged.output))
+                self.assertTrue(all(record.exc_info is None for record in logged.records))
+        self.connect.assert_not_called()
+
+    def test_debug_mode_requires_explicit_boolean_propagation_opt_in(self):
+        for propagate in (None, False, 1, 'yes'):
+            with self.subTest(propagate=propagate):
+                self.app.config.update(DEBUG=True, PROPAGATE_EXCEPTIONS=propagate)
+                with patch('dashboard.views.monitor', side_effect=RuntimeError('private-value')), \
+                     self.assertLogs(self.app.logger, level='ERROR') as logged:
+                    response = self.client.get('/')
+                html = self.assert_safe_error(response, 500)
+                self.assertNotIn('private-value', html + ' '.join(logged.output))
+        self.connect.assert_not_called()
+
+    def test_propagation_flag_keeps_safe_errors_when_debug_and_testing_are_off(self):
+        self.app.config.update(TESTING=False, DEBUG=False, PROPAGATE_EXCEPTIONS=True)
+        for error, status in ((RuntimeError('private-value'), 500),
+                              (pyodbc.InterfaceError('08001', 'private-value'), 503)):
+            with self.subTest(status=status), \
+                 patch('dashboard.views.monitor', side_effect=error), \
+                 self.assertLogs(self.app.logger, level='ERROR') as logged:
+                response = self.client.get('/')
+            html = self.assert_safe_error(response, status)
+            self.assertNotIn('private-value', html + ' '.join(logged.output))
+        self.connect.assert_not_called()
+
+    def test_database_propagation_emits_signal_after_resource_cleanup(self):
+        self.app.config['PROPAGATE_EXCEPTIONS'] = True
+        original = pyodbc.OperationalError('HYT00', 'private-timeout-canary')
+        cursor = Mock()
+        cursor.execute.side_effect = original
+        connection = ConnectionFixture(cursor, [])
+        self.connect.side_effect = None
+        self.connect.return_value = connection
+        signals = []
+        def observe(sender, **kwargs):
+            cursor.close.assert_called_once_with()
+            connection.close.assert_called_once_with()
+            signals.append(kwargs['exception'])
+
+        with got_request_exception.connected_to(observe, self.app), \
+             self.assertLogs(self.app.logger, level='ERROR') as logged, \
+             self.assertRaises(pyodbc.OperationalError) as caught:
+            self.client.get('/execution/42')
+        self.assertIs(caught.exception, original)
+        self.assertEqual(signals, [original])
+        event, = self.logged_events(logged, 'database_error')
+        summary, = self.logged_events(logged, 'request_completed')
+        self.assertEqual(event['exception_type'], 'OperationalError')
+        self.assertEqual(event['sqlstate'], 'HYT00')
+        self.assertEqual(event['request_id'], summary['request_id'])
+        self.assertEqual(summary['query_count'], 1)
+        self.assertEqual(summary['query_failures'], 1)
+        self.assertEqual(summary['outcome'], 'aborted')
+        self.assertNotIn('private-', ' '.join(logged.output))
+
+    def test_expected_http_errors_stay_responses_with_propagation_enabled(self):
+        self.app.config['PROPAGATE_EXCEPTIONS'] = True
+        for path, method, status in (('/not-a-route', 'GET', 404),
+                                     ('/execution/0', 'GET', 400),
+                                     ('/execution/42', 'POST', 405)):
+            with self.subTest(path=path):
+                self.assert_safe_error(self.client.open(path, method=method), status)
         self.connect.assert_not_called()
 
     def test_query_failure_maps_after_cursor_and_connection_cleanup(self):

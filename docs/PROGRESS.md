@@ -1,6 +1,6 @@
 # Implementation progress
 
-Updated: 12 October 2026. Development base: `dev-next`.
+Updated: 13 October 2026. Development base: `dev-next`.
 
 The [roadmap](roadmap.md) defines scope; the [modernization plan](MODERNIZATION_PLAN.md) defines the design and delivery phases. This tracked document records smaller implementation milestones, their evidence, and the next bounded task. Update it with every code task. A completed submilestone does not mean its whole parent phase is complete.
 
@@ -24,6 +24,7 @@ These milestones implement roadmap item 1 and delivery phases 0–1. Phases 0 an
 | B4 | Phases 0–1: legacy query usage | Complete | Query only data consumed by each legacy screen and its shared navigation. Separate aggregate and execution event-KPI operations; keep the legacy SQL `-1` contract behind the aggregate adapter and reject invalid execution selectors. Per-route query counts, exact resource/parameter binding, populated rendering, and error short-circuit tests pass. Cohort/pagination/typed JSON and measured SSISDB performance remain separate work. |
 | B5a | Phase 1: runtime/dependency baseline | Awaiting integration | B5a1 dependency constraints and B5a2 Windows x64/standard CPython 3.14 replay are complete. Native driver/catalog compatibility remains B5a3, deferred to the user's consolidated manual checks after the B milestones. |
 | B5b | Phase 1: operational timing | Complete | Structured request/query/error events use server request IDs and safe fields. Synthetic stage/cleanup/cancellation, log-sink, repeated-context, and concurrent-request checks pass, plus a native missing-driver negative probe. The tracked manual checklist covers the user's deferred real-data and hosting checks. |
+| B5b1 | B5b: review follow-up | Complete | Safe exception type and bounded application locations are retained; explicit local debug/test propagation preserves the original error, Flask exception signal and database cleanup. Seven added regressions and the full 101-test suite pass on Linux x64/CPython 3.12.14; Windows/native integration remains deferred. |
 | B5c | Phase 1: hosting baseline | Planned | Document and verify the startup/server configuration for the chosen deployment target. Split Windows and container delivery into separate tasks when those targets are confirmed; production stream capacity remains phase 5. |
 
 ### Runtime milestone decomposition
@@ -245,5 +246,26 @@ Validation environment: Windows x64, standard **CPython 3.14.8**, **pip 26.2.1**
 | Factory/WSGI registration and diff/ignore checks | Passed | Application endpoints remain registered; no SQL/template/dependency-pin changes; probes/test reports and local runtime remain ignored |
 
 Timing/log transport is best effort and does not impose a total HTTP deadline. SQL preparation is outside query timing; request timing excludes network/body transfer and future stream lifetime. Application-event sanitization does not configure external server/proxy/access/startup logs. Native authentication, data correctness, row visibility, driver timeout enforcement, actual pooling/cleanup, representative performance and chosen-host behaviour remain manual gates in the checklist; none is marked complete here.
+
+## B5b1 review follow-up
+
+Scope: address the review finding that unexpected failures retained only a generic request-error event, with no actionable exception/location information or explicit local propagation path. This is a focused correction to B5b; hosting/API/SQL work remains separate.
+
+Completed locally on 13 October 2026:
+
+- Database and unexpected-error events include a sanitized exception type and the most recent eight Python application frames, each with module, function and line number. Application locations are derived from package-contained source paths, with bounded identifier labels. No exception arguments/text/notes/chains, source lines, locals, absolute paths or formatted traceback are logged.
+- Explicit Flask `PROPAGATE_EXCEPTIONS=True` with debug or testing enabled re-raises the original error after the safe event. Flask's exception signal and debugger/test propagation work normally. Expected validation/HTTP errors remain responses, and the propagation flag alone does not expose these errors when debug/testing are off.
+- Seven focused regression tests cover actionable/redacted and bounded locations (including forged external metadata), debug/test opt-in and original exception identity/signals, production-safe responses, database cleanup before propagation, expected HTTP errors and one correlated aborted-request summary. Existing driver-state tests also require useful application error locations.
+- Updated installation guidance and the deferred manual checklist. No runtime dependencies, SQL, page templates or hosting commands changed.
+
+Validation environment: Linux x64, **CPython 3.12.14**, the same eight pinned runtime packages, and a locally extracted Ubuntu unixODBC driver-manager library to load the native pyodbc wheel. No SQL Server driver or catalog connection was used.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused error suite | Passed: 29 tests | Safe exception/location fields, redaction, bounded frames/external exclusion, debug/test/production modes, original error/signals, cleanup before propagation and unchanged HTTP mappings |
+| Full database-free suite | Passed: 101 tests (94 previous + 7 follow-up) | All legacy routes, queries, resource ownership, validation, timing and request isolation regressions pass |
+| Dependency consistency, route discovery and `git diff --check` | Passed | Eight-package graph is consistent; all eight legacy endpoints and static serving register; no whitespace errors |
+
+Windows/CPython 3.14 replay and real SSISDB/hosting checks remain open; this follow-up does not change their status.
 
 Next task: **B5c**, the bounded hosting/startup baseline. Split deployment targets into separate submilestones before implementation as needed. B5a3/P0b stay awaiting the user's consolidated checks after the B implementation work.
