@@ -24,7 +24,7 @@ The purpose of this project is to provide a web-based, user-friendly, useful and
 
 ## Development on dev-next
 
-Create and activate a Python virtual environment, then install the runtime dependencies and run locally:
+Create and activate a fresh standard CPython 3.14 virtual environment, then install the runtime dependencies and run locally:
 
 ```sh
 python -m pip install -r requirements.txt
@@ -37,7 +37,7 @@ Run database-free application tests with the standard library test runner:
 python -m unittest discover -s tests -v
 ```
 
-See [installation](docs/installation.md) for configuration and the validated runtime/dependency policy. Python 3.14 and real SSISDB integration remain tracked work.
+See [installation](docs/installation.md) for configuration and environment setup. Python 3.14.8 on Windows x64 passes the database-free suite; real SSISDB and production hosting checks remain tracked work.
 
 ## Legacy Platforms & Tools
 

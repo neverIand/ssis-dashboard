@@ -22,7 +22,7 @@ These milestones implement roadmap item 1 and delivery phases 0–1. Phases 0 an
 | B2 | Phase 1: database query boundary | Complete | Package-relative SQL loading and a standalone parameterized query operation own each connection/cursor. Positive login/query timeouts are validated and applied; fake-ODBC tests cover acquisition, execution/fetch/mapping, cleanup, and non-project working directories. Legacy shapes and checked-in SQL are preserved; native integration remains P0b/B5a work. |
 | B3 | Phase 1: inputs and errors | Complete | Validate event/status/detail inputs and positive BIGINT execution IDs before queries; use fixed SQL resource maps; return safe HTML errors with correct HTTP statuses and database-independent routing errors. Treat absent/not-visible execution records alike. Synthetic HTTP/ODBC failure checks pass; API problem JSON and live permission/driver behaviour remain separate work. |
 | B4 | Phases 0–1: legacy query usage | Complete | Query only data consumed by each legacy screen and its shared navigation. Separate aggregate and execution event-KPI operations; keep the legacy SQL `-1` contract behind the aggregate adapter and reject invalid execution selectors. Per-route query counts, exact resource/parameter binding, populated rendering, and error short-circuit tests pass. Cohort/pagination/typed JSON and measured SSISDB performance remain separate work. |
-| B5a | Phase 1: runtime/dependency baseline | In progress | B5a1 dependency constraints are complete; Python 3.14 replay and native driver/catalog compatibility remain B5a2/B5a3. Keep local evidence separate from integration evidence. |
+| B5a | Phase 1: runtime/dependency baseline | Awaiting integration | B5a1 dependency constraints and B5a2 Windows x64/standard CPython 3.14 replay are complete. Native driver/catalog compatibility remains B5a3, deferred to the user's consolidated manual checks after the B milestones. |
 | B5b | Phase 1: operational timing | Planned | Add focused request/query timing and safe error logging without exposing SQL parameters, credentials, or connection strings; verify representative success/failure paths. |
 | B5c | Phase 1: hosting baseline | Planned | Document and verify the startup/server configuration for the chosen deployment target. Split Windows and container delivery into separate tasks when those targets are confirmed; production stream capacity remains phase 5. |
 
@@ -33,8 +33,8 @@ B5a combines dependency selection, interpreter changes, and native/database comp
 | ID | Status | Scope and exit condition |
 | --- | --- | --- |
 | B5a1 | Complete | Published runtime versions were reviewed; the normal requirements command applies exact constraints for the complete eight-package graph. Online resolution, clean offline installation from another working directory, dependency consistency, idempotent resolution, app entry points, and all 77 database-free tests passed on Windows x64/CPython 3.11.4. Python 3.14/native checks remain B5a2/B5a3. |
-| B5a2 | Planned; next | Validate the Python 3.14 target and compatible pyodbc binary/runtime dependencies. Recreate an isolated environment, run the full database-free suite and entry points, and document unsupported/unverified platforms rather than extrapolating from one platform. |
-| B5a3 | Planned | With P0b's approved test configuration, validate deployed ODBC driver/catalog compatibility, authentication, row conversion, timeouts, and resource behaviour. Record the actual combination and keep this integration gate open until evidence exists. |
+| B5a2 | Complete | The pinned graph installs on standard CPython 3.14.8/Windows x64 using cp314 wheels. Native modules load, all 77 database-free tests and entry points pass, and repeat installation proposes no changes. Other platform/free-threaded/native-DB claims remain separate checks. |
+| B5a3 | Awaiting integration | No test configuration is currently available. At the user's request, document driver/catalog, authentication, row conversion, timeout/resource, and permission checks for manual execution after the B milestones. Keep this gate open until actual results exist. |
 
 ## Later phase boundaries
 
@@ -199,4 +199,29 @@ The existing environment's pip 26 download was unresponsive and was interrupted.
 
 This snapshot fixes package versions, not wheel hashes, Python patch versions, operating-system libraries, or deployed ODBC drivers. Python 3.14, non-Windows/native integration, actual authentication/row conversion/timeout behaviour, production hosting, and container builds remain unverified. The parent backend/runtime phase remains incomplete.
 
-Next task: **B5a2**, replay this dependency snapshot on standard CPython 3.14 with compatible wheels and the full database-free suite. Native driver/catalog evidence remains B5a3/P0b, and hosting remains B5c.
+## B5a2 work record
+
+Scope: standard CPython 3.14 compatibility using the same pinned dependency graph. Real SSISDB/driver behaviour, free-threaded Python, other platforms, and production hosting remain separate checks.
+
+Completed locally on 12 October 2026:
+
+- Downloaded the official standard x64 CPython 3.14.8 NuGet runtime into `.local/`, following the Python project's CI-runtime documentation. Verified a 64-bit `cp314-win_amd64` build with the GIL enabled, plus bundled `venv`/`ensurepip`. Created a new `.local/venv-b5a2` without changing the system Python, PATH, or launcher registrations. The archive, runtime, wheels, reports, and reusable preparation script remain ignored.
+- Resolved the same eight runtime pins on the actual 3.14 interpreter. Downloaded `pyodbc-5.3.0-cp314-cp314-win_amd64.whl` and `markupsafe-3.0.4-cp314-cp314-win_amd64.whl`; installed offline from the requirements file while outside the project directory. No source compilation or additional runtime dependency was needed.
+- Verified the complete installed graph, native pyodbc and MarkupSafe extension loading, dependency consistency, and repeat installation with no proposed changes. All 77 tests pass, including factory/configuration/import/entry-point subprocess tests, populated legacy pages, fake-ODBC cleanup, safe failures, and per-screen query contracts.
+- Verified Flask version discovery and both `dashboard:create_app` and `dashboard.wsgi:app` route discovery. Updated the development guidance to prefer standard CPython 3.14, select the interpreter explicitly, and create a new environment when changing Python minor versions. No application-code, SQL, frontend-template, or dependency-pin change was necessary.
+
+Validation environment: Windows x64, **CPython 3.14.8**, **pip 26.2.1**, Flask **3.1.3**, pyodbc **5.3.0**, using `.local/venv-b5a2`. Runtime source: [official NuGet package](https://www.nuget.org/packages/python/3.14.8); package choice follows [Python's Windows CI documentation](https://docs.python.org/3.14/using/windows.html#the-nuget-org-packages).
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Runtime/ABI/build probe | Passed | CPython 3.14.8, 64 bits, `cp314-win_amd64`, GIL enabled |
+| Binary-wheel resolution and clean offline install | Passed | Exact eight-package graph; matching cp314 native wheels; included constraints also resolve outside the project directory |
+| Native imports and `python -m pip check` | Passed | pyodbc/MarkupSafe `.pyd` modules load; no broken requirements |
+| Repeat install `--dry-run` | Passed | Installer report proposes no changes |
+| `python -m unittest discover -s tests -q` | Passed: 77 tests | Same database-free suite on the new interpreter; test-created subprocesses use its executable |
+| Flask CLI and factory/WSGI route discovery | Passed | All eight legacy routes plus static serving register through both entry points |
+| Ignore/diff checks | Passed | Local runtime/environment/wheels/scripts/reports are ignored; runtime pins and application/SQL/templates remain unchanged |
+
+Native extensions load with this Windows/interpreter ABI; this does not validate a deployed SQL Server driver or real catalog. No SSISDB connection, authentication, actual row conversion, native timeout enforcement, permission visibility, production server, or other OS/architecture/free-threaded Python was validated. At the user's request, B5a3/P0b are deferred to consolidated manual checks after the B milestones; prepare a tracked checklist during B5b rather than waiting for a database configuration now.
+
+Next task: **B5b**, focused safe request/query timing plus the tracked manual backend-validation checklist. Hosting remains B5c, and real-data gates stay open until the user's checks are recorded.

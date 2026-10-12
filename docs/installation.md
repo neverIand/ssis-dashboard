@@ -1,22 +1,24 @@
 # Local development on dev-next
 
-Use the personal fork's `dev-next` branch. B5a1 is validated in a clean Windows x64 environment on CPython **3.11.4**, with Flask **3.1.3**, pyodbc **5.3.0**, and the complete runtime graph pinned in [`constraints.txt`](../constraints.txt). Python 3.14, native driver/catalog compatibility, current container images, and shared production hosting remain tracked work in [implementation progress](PROGRESS.md).
+Use the personal fork's `dev-next` branch. The preferred development runtime is standard, GIL-enabled **CPython 3.14**, validated on **3.14.8 / Windows x64** with Flask **3.1.3**, pyodbc **5.3.0**, and the complete runtime graph pinned in [`constraints.txt`](../constraints.txt). Native driver/catalog compatibility, current container images, and shared production hosting remain tracked work in [implementation progress](PROGRESS.md).
 
 ## Create an environment
 
-From the project root on Windows:
+Create a fresh environment when changing Python minor versions; use a new ignored path such as `.local/venv314` if `.venv` already belongs to another interpreter. From the project root on Windows, with a registered standard CPython 3.14 interpreter:
 
 ```bat
-python -m venv .venv
+py -3.14 -m venv .venv
 .venv\Scripts\activate
 python -m pip install -r requirements.txt
 ```
 
-On other systems, activate `.venv/bin/activate` instead. A SQL Server ODBC driver and an SSIS Catalog are required for real monitoring pages; application construction and the test suite do not connect to SQL Server.
+For an interpreter installed without launcher registration, use its full `python.exe` path in place of `py -3.14`. B5a2 used the official [CPython 3.14.8 NuGet package](https://www.nuget.org/packages/python/3.14.8) under `.local/python-3.14.8/`, then created `.local/venv-b5a2`. This follows Python's [local CI runtime documentation](https://docs.python.org/3.14/using/windows.html#the-nuget-org-packages) and does not require a system-wide installer or PATH change.
+
+On other systems, use an explicitly selected standard CPython 3.14 interpreter and activate `.venv/bin/activate`; those platforms still need their own validation. A SQL Server ODBC driver and an SSIS Catalog are required for real monitoring pages; application construction and the test suite do not connect to SQL Server.
 
 ### Runtime and dependency policy
 
-- The current locally validated development baseline is CPython 3.11 on Windows x64. The modernization target is standard CPython 3.14; its interpreter/wheel replay is B5a2, and native driver/catalog checks are B5a3. Other interpreter/platform combinations have no integration evidence yet. Keep the actual interpreter patch, architecture, and validation results in the progress record when changing them.
+- Standard CPython 3.14 is the preferred development baseline. B5a2 validated Windows x64/3.14.8, the `cp314-win_amd64` ABI, matching pyodbc/MarkupSafe wheels, native imports, and all 77 database-free tests. B5a1's CPython 3.11.4 environment remains earlier compatibility evidence. Free-threaded builds, other platforms/architectures, and actual driver/catalog compatibility are unverified; native integration remains B5a3. Record the actual interpreter patch, architecture, and evidence when changing them.
 - Python 3.6-era Visual Studio/IIS settings and the Ubuntu 16.04 Docker recipe are historical, unsupported configurations for this checkout. Current hosting is B5c work; installing the Python dependencies does not update those hosts or provide a production server.
 - [`requirements.txt`](../requirements.txt) declares only Flask and pyodbc and automatically includes `constraints.txt`. The constraint file fixes all eight required runtime distributions, including transitive dependencies. Normal `python -m pip install -r requirements.txt` applies the reviewed pins; avoid separate unconstrained installs of Flask or pyodbc.
 - Review stable published versions and their release notes before changing pins. The B5a1 snapshot includes the reviewed Flask 3.1.3, Werkzeug 3.1.9, MarkupSafe 3.0.4, and Click 8.5.0 updates. No optional Flask extras or additional test dependency is required; the tests use `unittest`. Installer/build tooling such as pip and setuptools is separate from the application runtime graph.
