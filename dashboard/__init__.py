@@ -1,32 +1,51 @@
-"""
-The flask application package.
-"""
+"""Application construction and configuration, without database access."""
 
-from dashboard import config
-from flask import Flask
+from copy import deepcopy
 import os
+from pathlib import Path
 
-app = Flask(__name__)
+from flask import Flask
 
-app.config.from_object(config)
+from dashboard import config as defaults
 
-envConfig = 'DASHBOARD_CONFIG'
-fileConfig = 'config.cfg'
 
-envConfigExists = os.getenv(envConfig) != None
-fileConfigExists = os.path.isfile('config.cfg')
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# If no configuration specific via environment variable
-# use the local configuration file, if that exists
-if envConfigExists == False and fileConfigExists == True:
-    os.environ[envConfig] = os.path.join('..','','') + fileConfig
-    envConfigExists = True
 
-# Load the configuration file specified in the environment variable
-if envConfigExists == True:
-    print("Loading configuration from: " + envConfig + " > " + os.environ[envConfig])
-    app.config.from_envvar(envConfig)
+def create_app(config_overrides=None, *, config_path=None):
+    """Create an independent app with the existing HTML routes.
 
-from dashboard.views import *
-from dashboard.processors import *
-from dashboard.filters import *
+    An explicit file takes precedence over DASHBOARD_CONFIG. Relative explicit
+    and environment paths retain Flask's package-relative convention. With
+    neither, the optional config.cfg lives at the project root, regardless of
+    the working directory. A supplied mapping skips automatic file loading;
+    an explicitly supplied file still loads before the mapping overrides it.
+    """
+    app = Flask(__name__)
+    app.config.from_mapping(deepcopy({
+        name: value for name, value in vars(defaults).items()
+        if name.isupper()
+    }))
+
+    if config_path is not None:
+        app.config.from_pyfile(os.fspath(config_path))
+    elif config_overrides is None:
+        environment_path = os.environ.get('DASHBOARD_CONFIG')
+        if environment_path is not None:
+            if not environment_path:
+                raise ValueError('DASHBOARD_CONFIG must name a configuration file.')
+            app.config.from_pyfile(environment_path)
+        else:
+            app.config.from_pyfile(str(_PROJECT_ROOT / 'config.cfg'), silent=True)
+
+    if config_overrides is not None:
+        app.config.from_mapping(deepcopy(config_overrides))
+
+    from dashboard import filters, processors
+    from dashboard.views import register_views
+
+    register_views(app)
+    app.context_processor(processors.utility_processor)
+    app.add_template_filter(filters.project, 'project')
+    app.add_template_filter(filters.folder, 'folder')
+    return app

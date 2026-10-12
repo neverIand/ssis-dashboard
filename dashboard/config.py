@@ -2,7 +2,7 @@
 AZURE = False
 
 # Enable or disable Flask debug mode
-DEBUG = True
+DEBUG = False
 
 # Google Analytics Code to monitor dashboard usage
 GOOGLE_ANALYTICS = None

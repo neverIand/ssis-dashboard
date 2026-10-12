@@ -1,2 +1,2 @@
-set FLASK_APP=dashboard\__init__.py
-flask run
+@echo off
+python -m flask --app dashboard:create_app run --host=127.0.0.1

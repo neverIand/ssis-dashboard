@@ -5,7 +5,7 @@ The purpose of this project is to provide a web-based, user-friendly, useful and
 
 ![Sample Screenshot](https://cloud.githubusercontent.com/assets/2612362/4003128/76e6869e-2973-11e4-9629-2bf45acd1141.png)
 
-## Supported Environments
+## Legacy Supported Environments
 
 * SQL Server 2012
 * SQL Server 2014
@@ -20,10 +20,28 @@ The purpose of this project is to provide a web-based, user-friendly, useful and
 * [Release Notes](docs/release-notes.md)
 * [Roadmap](docs/roadmap.md)
 * [Modernization Plan](docs/MODERNIZATION_PLAN.md)
+* [Implementation Progress](docs/PROGRESS.md)
 
-## Used Platforms & Tools 
+## Development on dev-next
 
-ssis-dashboard-next has been built using:
+Create and activate a Python virtual environment, then install the runtime dependencies and run locally:
+
+```sh
+python -m pip install -r requirements.txt
+python -m flask --app dashboard:create_app run --host=127.0.0.1
+```
+
+Run database-free application tests with the standard library test runner:
+
+```sh
+python -m unittest discover -s tests -v
+```
+
+See [installation](docs/installation.md) for configuration. The first backend milestone is locally validated on Python 3.11; the Python 3.14 target and real SSISDB integration remain tracked work.
+
+## Legacy Platforms & Tools
+
+The legacy dashboard was built using:
 
 * Python 3.6: https://www.python.org/ 
 * Flask 0.12.2: http://flask.pocoo.org/ 

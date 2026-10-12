@@ -1,5 +1,5 @@
 import pyodbc
-from dashboard import app
+from flask import current_app
 
 class configuration:
     pass
@@ -44,10 +44,10 @@ class monitor(object):
 
     def __init__(self):
         self.config = configuration()
-        self.config.hourSpan = app.config["HOUR_SPAN"]
-        self.config.asOfDate = app.config["AS_OF_DATE"]
-        self.config.executionCount = app.config["EXECUTION_COUNT"]
-        self.config.connectionString = app.config["CONNECTION_STRING"]["main"]
+        self.config.hourSpan = current_app.config["HOUR_SPAN"]
+        self.config.asOfDate = current_app.config["AS_OF_DATE"]
+        self.config.executionCount = current_app.config["EXECUTION_COUNT"]
+        self.config.connectionString = current_app.config["CONNECTION_STRING"]["main"]
 
     def get_engine_info(self):
         result = self.__execute_query('engine-info.sql', True)

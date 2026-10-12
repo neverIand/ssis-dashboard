@@ -2,16 +2,12 @@ from datetime import datetime
 import urllib.parse
 
 from flask import render_template
-from flask import make_response
-from flask import jsonify
 from dashboard.ssis import monitor
-from dashboard import app
 
 # Set app version
 version = "0.6.8 (beta)"
 
 # Define routes
-@app.route('/')
 def packages(folder_name=monitor.all, project_name=monitor.all, status=monitor.all):
     folder_name = urllib.parse.unquote(folder_name)
     project_name = urllib.parse.unquote(project_name)
@@ -55,19 +51,15 @@ def packages(folder_name=monitor.all, project_name=monitor.all, status=monitor.a
         package_executables=package_executables
     )
 
-@app.route('/folder/<folder_name>/project/<project_name>/status/<status>')
 def folder_project_status(folder_name, project_name, status):
     return packages(folder_name=folder_name, project_name=project_name, status=status)
 
-@app.route('/folder/<folder_name>/project/<project_name>')
 def folder_project(folder_name, project_name):
     return packages(folder_name=folder_name, project_name=project_name)
 
-@app.route('/folder/<folder_name>')
 def folder(folder_name):
     return packages(folder_name=folder_name)
 
-@app.route('/execution/<int:execution_id>')
 def execution(execution_id=0):
     m = monitor()
     m.execution_id = execution_id
@@ -104,7 +96,6 @@ def execution(execution_id=0):
         package_executables=package_executables
     )
 
-@app.route('/execution/<int:execution_id>/events/<event_type>')
 def package_events(execution_id, event_type):
     m = monitor()
     m.execution_id = execution_id
@@ -131,7 +122,6 @@ def package_events(execution_id, event_type):
         package_events=package_events
     )
 
-@app.route('/execution/<int:execution_id>/values')
 def package_execution_values(execution_id):
     m = monitor()
     m.execution_id = execution_id
@@ -158,7 +148,6 @@ def package_execution_values(execution_id):
         package_overrides=package_overrides
     )
 
-@app.route('/history/<folder_name>/project/<project_name>/status/<status>/package/<package_name>')
 def package_history(folder_name, project_name, status, package_name):
     folder_name = urllib.parse.unquote(folder_name)
     project_name = urllib.parse.unquote(project_name)
@@ -217,7 +206,6 @@ def package_history(folder_name, project_name, status, package_name):
 #def get_sample():
 #    return jsonify({'result': 123})
 
-@app.errorhandler(404)
 def not_found(error):
     m = monitor()
 
@@ -233,4 +221,23 @@ def not_found(error):
         environment=environment,
         engine_info=engine_info
     )
+
+
+def register_views(app):
+    """Retain legacy endpoint names used by templates and existing links."""
+    app.add_url_rule('/', view_func=packages)
+    app.add_url_rule('/folder/<folder_name>', view_func=folder)
+    app.add_url_rule('/folder/<folder_name>/project/<project_name>', view_func=folder_project)
+    app.add_url_rule(
+        '/folder/<folder_name>/project/<project_name>/status/<status>',
+        view_func=folder_project_status,
+    )
+    app.add_url_rule('/execution/<int:execution_id>', view_func=execution)
+    app.add_url_rule('/execution/<int:execution_id>/events/<event_type>', view_func=package_events)
+    app.add_url_rule('/execution/<int:execution_id>/values', view_func=package_execution_values)
+    app.add_url_rule(
+        '/history/<folder_name>/project/<project_name>/status/<status>/package/<package_name>',
+        view_func=package_history,
+    )
+    app.register_error_handler(404, not_found)
 

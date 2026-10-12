@@ -4,6 +4,8 @@ Date: 12 October 2026
 
 Status: proposed implementation plan; source audit completed. [The roadmap](roadmap.md) is the source of truth for scope and frontend decisions.
 
+Track delivered submilestones, validation evidence, and the next bounded code task in [implementation progress](PROGRESS.md). A delivery phase may span several code tasks; the progress log records that decomposition without treating partial completion as phase completion.
+
 ## Recommendation
 
 Keep Python, Flask, pyodbc, and the useful SSISDB queries. Turn the backend into a documented, read-only JSON API and replace the existing browser stack with vanilla JavaScript ES modules, semantic HTML, and authored CSS. Use native tables and small SVG charts where practical; chart and table libraries are allowed when their complexity justifies them. Migrate screen by screen, with the old interface available until the replacement covers its workflows and live updates.

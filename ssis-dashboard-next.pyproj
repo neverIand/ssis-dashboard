@@ -91,6 +91,7 @@
     <Compile Include="dashboard\filters.py" />
     <Compile Include="dashboard\processors.py" />
     <Compile Include="dashboard\views.py" />
+    <Compile Include="dashboard\wsgi.py" />
     <Compile Include="dashboard\ssis.py" />
     <Compile Include="dashboard\__init__.py">
       <SubType>Code</SubType>
