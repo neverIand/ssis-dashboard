@@ -1,6 +1,8 @@
 """Keep HTTP failures independent of catalog data and driver diagnostics."""
 
+from collections import deque
 from http import HTTPStatus
+from pathlib import Path
 import re
 import logging
 
@@ -10,6 +12,46 @@ from werkzeug.exceptions import HTTPException
 
 from dashboard.validation import InvalidInput
 from dashboard.observability import log_event, request_id as _request_id
+
+
+_PACKAGE_ROOT = Path(__file__).resolve().parent
+
+
+def _safe_symbol(value):
+    if isinstance(value, str) and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_.]{0,159}', value):
+        return value
+    return 'unknown'
+
+
+def _exception_details(error):
+    """Retain bounded application locations without formatting a traceback."""
+    frames = deque(maxlen=8)
+    traceback = error.__traceback__
+    while traceback is not None:
+        code = traceback.tb_frame.f_code
+        try:
+            source = Path(code.co_filename).relative_to(_PACKAGE_ROOT)
+        except ValueError:
+            pass
+        else:
+            if source.suffix == '.py' and '..' not in source.parts:
+                module = source.with_suffix('').parts
+                if module[-1] == '__init__':
+                    module = module[:-1]
+                frames.append({
+                    'module': _safe_symbol('.'.join(('dashboard', *module))),
+                    'function': _safe_symbol(code.co_name),
+                    'line': traceback.tb_lineno,
+                })
+        traceback = traceback.tb_next
+    # Do not read exception arguments, notes, chains, source lines or frame locals.
+    return {'exception_type': _safe_symbol(type(error).__name__), 'application_frames': list(frames)}
+
+
+def _propagate_errors():
+    # Explicit opt-in restores Flask's debugger/test handling. A production app
+    # keeps its safe response even if PROPAGATE_EXCEPTIONS was set accidentally.
+    return current_app.config['PROPAGATE_EXCEPTIONS'] is True and (current_app.debug or current_app.testing)
 
 
 _DETAILS = {
@@ -64,13 +106,20 @@ def _database_error(error):
     log_event(
         'database_error', level=logging.ERROR,
         status=status, sqlstate=state or 'unknown', request_id=_request_id(),
+        **_exception_details(error),
     )
+    if _propagate_errors():
+        raise
     return _error_response(status)
 
 
 def _unexpected_error(error):
-    # Exception text/tracebacks may contain SQL, credentials, or parameter values.
-    log_event('request_error', level=logging.ERROR, status=500, request_id=_request_id())
+    log_event(
+        'request_error', level=logging.ERROR, status=500, request_id=_request_id(),
+        **_exception_details(error),
+    )
+    if _propagate_errors():
+        raise
     return _error_response(500)
 
 
