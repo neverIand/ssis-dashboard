@@ -32,11 +32,7 @@ def packages(folder_name=monitor.all, project_name=monitor.all, status=monitor.a
     engine_kpi = m.get_engine_kpi()
     engine_info = m.get_engine_info()
     execution_statistics = m.get_execution_statistics()
-    package_info = m.get_package_info()
-    package_kpi = m.get_package_kpi()
     package_list = m.get_package_list()
-    package_executables = m.get_package_executables()
-    package_children = m.get_package_children()
 
     return render_template(
         'index.html',
@@ -46,11 +42,7 @@ def packages(folder_name=monitor.all, project_name=monitor.all, status=monitor.a
         engine_info=engine_info,
         engine_kpi=engine_kpi,
         execution_statistics=execution_statistics,
-        package_info=package_info,
-        package_kpi=package_kpi,
         package_list=package_list,
-        package_children=package_children,
-        package_executables=package_executables
     )
 
 def folder_project_status(folder_name, project_name, status):
@@ -83,11 +75,8 @@ def execution(execution_id=0):
 
     engine_folders = m.get_engine_folders()
     engine_projects = m.get_engine_projects()
-    engine_kpi = m.get_engine_kpi()
     engine_info = m.get_engine_info()
-    execution_statistics = m.get_execution_statistics()
-    package_kpi = m.get_package_kpi()
-    package_list = m.get_package_list()
+    package_kpi = m.get_execution_event_kpi(execution_id)
     package_executables = m.get_package_executables()
     package_children = m.get_package_children()
 
@@ -97,11 +86,8 @@ def execution(execution_id=0):
         engine_folders=engine_folders,
         engine_projects=engine_projects,
         engine_info=engine_info,
-        engine_kpi=engine_kpi,
-        execution_statistics=execution_statistics,
         package_info=package_info,
         package_kpi=package_kpi,
-        package_list=package_list,
         package_children=package_children,
         package_executables=package_executables
     )
@@ -117,9 +103,8 @@ def package_events(execution_id, event_type):
         'event_type': event_type
         }
 
-    engine_kpi = m.get_engine_kpi()
     engine_info = m.get_engine_info()
-    package_kpi = m.get_package_kpi()
+    package_kpi = m.get_execution_event_kpi(execution_id)
     package_events = m.get_package_events(event_type)
 
     return render_template(
@@ -141,7 +126,7 @@ def package_execution_values(execution_id):
         }
 
     engine_info = m.get_engine_info()
-    package_kpi = m.get_package_kpi()
+    package_kpi = m.get_execution_event_kpi(execution_id)
     package_parameters = m.get_package_details("execution-values")
     package_overrides = m.get_package_details("execution-overrides")
 
@@ -175,18 +160,13 @@ def package_history(folder_name, project_name, status, package_name):
         'status': status
         }
 
-    engine_kpi = m.get_engine_kpi()
     engine_info = m.get_engine_info()
-    package_info = m.get_package_info()
-    package_kpi = m.get_package_kpi()
     package_history = m.get_package_history()
 
     return render_template(
         'execution-history.html',
         environment=environment,
         engine_info=engine_info,
-        package_info=package_info,
-        package_kpi=package_kpi,
         package_history=package_history
     )
 

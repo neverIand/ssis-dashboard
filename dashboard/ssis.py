@@ -1,6 +1,8 @@
 from flask import current_app
 from dashboard.db import execute_query
-from dashboard.validation import PACKAGE_STATUS_CODES, detail_query, event_query, status_code
+from dashboard.validation import (
+    PACKAGE_STATUS_CODES, detail_query, event_query, status_code, validate_execution_id,
+)
 
 class configuration:
     pass
@@ -81,15 +83,28 @@ class monitor(object):
             )                
         return result
 
-    def get_package_kpi(self):
+    def get_aggregate_event_kpi(self):
+        """Count events in the legacy folder/project/start-time cohort."""
+        # The checked-in SQL uses -1 for aggregation; do not expose it as an ID.
+        return self.__get_event_kpi(
+            -1,
+            self.__get_proper_name_filter(self.folder_name),
+            self.__get_proper_name_filter(self.project_name),
+        )
+
+    def get_execution_event_kpi(self, execution_id):
+        """Count events for one explicit execution, independent of screen filters."""
+        return self.__get_event_kpi(validate_execution_id(execution_id), '%', '%')
+
+    def __get_event_kpi(self, execution_id, folder_pattern, project_pattern):
         result = self.__execute_query(
             'package-kpi.sql', 
             True,
             self.config.hourSpan, 
             self.config.asOfDate,
-            self.__get_proper_name_filter(self.folder_name), 
-            self.__get_proper_name_filter(self.project_name), 
-            self.__get_proper_execution_id(self.execution_id)
+            folder_pattern,
+            project_pattern,
+            execution_id
             )            
         return result
 
@@ -115,7 +130,7 @@ class monitor(object):
         result = self.__execute_query(
                 'package-info.sql', 
                 True,
-                self.__get_proper_execution_id(self.execution_id)
+                validate_execution_id(self.execution_id)
                 )       
         return result
 
@@ -123,7 +138,7 @@ class monitor(object):
         result = self.__execute_query(
             'package-executables.sql', 
             False,
-            self.__get_proper_execution_id(self.execution_id)
+            validate_execution_id(self.execution_id)
             )
 
         for r in result:
@@ -135,7 +150,7 @@ class monitor(object):
         result = self.__execute_query(
             'package-children.sql', 
             False,
-            self.__get_proper_execution_id(self.execution_id)
+            validate_execution_id(self.execution_id)
             )
         return result
 
@@ -144,7 +159,7 @@ class monitor(object):
         result = self.__execute_query(
             query_file, 
             False,
-            self.__get_proper_execution_id(self.execution_id)
+            validate_execution_id(self.execution_id)
             )
         return result
 
@@ -153,7 +168,7 @@ class monitor(object):
         result = self.__execute_query(
             query_file, 
             False,
-            self.__get_proper_execution_id(self.execution_id)
+            validate_execution_id(self.execution_id)
             )
         return result
 
@@ -176,12 +191,6 @@ class monitor(object):
             login_timeout=self.config.loginTimeout,
             query_timeout=self.config.queryTimeout,
         )
-
-    def __get_proper_execution_id(self, execution_id):
-        result = 0    
-        if (self.execution_id != monitor.all): 
-            result = execution_id
-        return result
 
     def __get_proper_name_filter(self, name_filter):
         result = '%'    

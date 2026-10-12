@@ -44,6 +44,12 @@ The application maps ODBC timeout states `HYT00`/`HYT01` to 504, connection stat
 
 Error pages use fixed safe messages, carry `Cache-Control: no-store`, and display a server-generated request ID matching `X-Request-ID`. HTTP exception headers such as 405's `Allow` are preserved, following Flask's [error-handler guidance](https://flask.palletsprojects.com/en/stable/errorhandling/). Database/unexpected-error log records include the request ID and safe status information; they omit exception text, SQL, values, credentials, and tracebacks. Detailed request/query timing remains a separate milestone. The current legacy responses are HTML; problem JSON, API access controls, and streaming errors belong to their later phases.
 
+### Legacy query scope
+
+Pages query only their displayed data and required shared navigation. A successful overview request uses six logical queries, execution details seven, an event page four, values five, and history two. These counts are regression-tested with synthetic query traces; they are not measured SQL Server timings. The complete before/after record is in [implementation progress](PROGRESS.md#b4-work-record).
+
+The monitoring adapter provides explicit `get_aggregate_event_kpi()` and `get_execution_event_kpi(execution_id)` operations. The aggregate operation retains legacy folder/project/start-time filtering and binds SQL's internal `-1` aggregate selector. The execution operation accepts only a positive BIGINT ID and does not inherit the screen's folder/project or selected-execution filters. Other execution resource operations require a valid selected ID rather than silently querying execution zero. Overview status cards use their existing status-count query and do not request unused event KPIs. Checked-in SQL and existing history/time-filter semantics remain unchanged pending the API milestone.
+
 ## Run locally
 
 ```bat

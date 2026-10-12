@@ -21,10 +21,20 @@ These milestones implement roadmap item 1 and delivery phases 0–1. Phases 0 an
 | B1 | Phase 1: startup/configuration | Complete | Independent application factory, deterministic configuration loading, per-app monitoring configuration, explicit entry points, debug-off defaults, and database-free legacy page tests. Existing URLs and template endpoint names are preserved; the evidence and integration limits are recorded below. |
 | B2 | Phase 1: database query boundary | Complete | Package-relative SQL loading and a standalone parameterized query operation own each connection/cursor. Positive login/query timeouts are validated and applied; fake-ODBC tests cover acquisition, execution/fetch/mapping, cleanup, and non-project working directories. Legacy shapes and checked-in SQL are preserved; native integration remains P0b/B5a work. |
 | B3 | Phase 1: inputs and errors | Complete | Validate event/status/detail inputs and positive BIGINT execution IDs before queries; use fixed SQL resource maps; return safe HTML errors with correct HTTP statuses and database-independent routing errors. Treat absent/not-visible execution records alike. Synthetic HTTP/ODBC failure checks pass; API problem JSON and live permission/driver behaviour remain separate work. |
-| B4 | Phases 0–1: legacy query usage | Planned | Stop loading resources unused by the active screen; separate aggregate and execution-specific KPI calls and fix the `0`/`-1` mismatch. Record deliberate behaviour changes and test exact query arguments. Cohort/pagination/typed JSON changes belong to the API phase. |
-| B5a | Phase 1: runtime/dependency baseline | Planned | Select and constrain Python/dependency versions and validate the Python 3.14 target, pyodbc wheel, and required driver combination. Record local versus integration evidence. |
+| B4 | Phases 0–1: legacy query usage | Complete | Query only data consumed by each legacy screen and its shared navigation. Separate aggregate and execution event-KPI operations; keep the legacy SQL `-1` contract behind the aggregate adapter and reject invalid execution selectors. Per-route query counts, exact resource/parameter binding, populated rendering, and error short-circuit tests pass. Cohort/pagination/typed JSON and measured SSISDB performance remain separate work. |
+| B5a | Phase 1: runtime/dependency baseline | Planned | Deliver B5a1–B5a3 below: reproducible dependencies, Python 3.14 validation, then driver/catalog compatibility. Keep local evidence separate from integration evidence. |
 | B5b | Phase 1: operational timing | Planned | Add focused request/query timing and safe error logging without exposing SQL parameters, credentials, or connection strings; verify representative success/failure paths. |
 | B5c | Phase 1: hosting baseline | Planned | Document and verify the startup/server configuration for the chosen deployment target. Split Windows and container delivery into separate tasks when those targets are confirmed; production stream capacity remains phase 5. |
+
+### Runtime milestone decomposition
+
+B5a combines dependency selection, interpreter changes, and native/database compatibility. Keep those as separate reviewable tasks; do not claim runtime completion from a dependency-install check alone.
+
+| ID | Status | Scope and exit condition |
+| --- | --- | --- |
+| B5a1 | Planned; next | Choose and document a runtime/version policy and reproducible dependency constraints with minimal dependencies. Validate installation from the declared files in an isolated ignored environment, dependency consistency, factory startup, and the database-free suite. Record the interpreter actually used. |
+| B5a2 | Planned | Validate the Python 3.14 target and compatible pyodbc binary/runtime dependencies. Recreate an isolated environment, run the full database-free suite and entry points, and document unsupported/unverified platforms rather than extrapolating from one platform. |
+| B5a3 | Planned | With P0b's approved test configuration, validate deployed ODBC driver/catalog compatibility, authentication, row conversion, timeouts, and resource behaviour. Record the actual combination and keep this integration gate open until evidence exists. |
 
 ## Later phase boundaries
 
@@ -66,7 +76,7 @@ This checklist is the initial P0a coverage. Complete SQL field/semantic parity a
 
 | Workflow | Current local evidence | Remaining evidence/work |
 | --- | --- | --- |
-| Overview, folder/project/status navigation, metrics/timeline | Populated synthetic overview renders; original navigation URLs and filters work | Real query results/cohort semantics; unused query removal and KPI aggregate fix in B4 |
+| Overview, folder/project/status navigation, metrics/timeline | Populated synthetic overview renders; original navigation URLs and filters work; B4 records six required query calls and bound status/name/window/count arguments | Real query results/cohort semantics and timings; aggregate event-KPI adapter is tested locally but not displayed on the overview |
 | Execution details, executables, child packages | Synthetic executable and child sections render with status helpers | SQL field parity and repeated/parallel/incomplete child observations |
 | Event messages | Synthetic event row renders for all five categories and HTML-like text stays escaped; unsupported categories fail before queries | Real category/filter semantics, bounded querying/search, and event volumes |
 | Parameters and property overrides | Both synthetic sections render, including parameter flags | Real typed/sensitive values and endpoint access/redaction rules |
@@ -118,4 +128,35 @@ Validation environment remains Windows, Python **3.11.4**, Flask **3.1.2**, pyod
 
 These checks use synthetic monitoring/ODBC objects and do not prove actual SSISDB row visibility, endpoint permissions, deployed driver SQLSTATEs, native timeout enforcement, or production logging/hosting behaviour. Legacy HTML errors are implemented; API problem JSON and access checks remain phase 2, and stream failures remain phase 5. History filter semantics and the aggregate execution sentinel are unchanged and remain assigned work. The parent backend phase remains incomplete.
 
-Next task: **B4**, remove queries unused by each legacy screen and separate aggregate/execution KPI arguments to fix the `0`/`-1` mismatch. Keep API cohort, pagination, and typed representations in phase 2.
+## B4 work record
+
+Scope: legacy screen query selection and explicit event-KPI operations. Keep the checked-in SQL, time/cohort/name/status semantics, row shapes, and frontend templates intact. API query redesign and native performance measurement remain separate work.
+
+Completed locally on 12 October 2026:
+
+- Removed overview calls for execution info, event KPIs, executables, and children; removed execution-detail calls for engine status cards, the daily chart, and the execution list; removed event/history calls whose results their templates do not consume. Retained folder/project queries where the shared navigation uses them. Values still require both detail queries and event KPI cards.
+- Replaced the ambiguous `get_package_kpi()` operation with `get_aggregate_event_kpi()` and `get_execution_event_kpi(execution_id)`. Aggregation binds `-1` only inside the legacy SQL adapter and retains folder/project/start-time filtering across statuses. Execution KPIs require an explicit positive BIGINT ID and bind neutral name patterns, independent of the monitor's selected execution or screen filters. Removed the helper that silently converted an unset execution selection to `0`; other execution resource operations now validate their selected ID before querying.
+- Overview status cards continue to use `engine-kpi.sql`; there is no new overview event-KPI card or aggregate query. The aggregate adapter's `0`/`-1` correction is covered as a backend operation. Existing SQL branch semantics, including lower-only aggregate time bounds and execution-specific queries outside the dashboard time window, were not redesigned.
+- Added 13 standard-library regressions that render the actual views and monitor over a recorded synthetic query boundary, verify exact resources/parameters/result modes for all eight routes and five event categories, retain visible content/navigation, and check missing/invalid request short circuits. Separate selector checks cover wildcard/Unicode/bound values, the full BIGINT range, aggregate defaults, conflicting screen state, and invalid execution selection. No dependency was added.
+- Decomposed the upcoming B5a runtime work into dependency constraints, Python 3.14 validation, and native driver/catalog integration before expanding its implementation scope.
+
+Successful legacy page query calls per request, verified with synthetic boundary traces:
+
+| Screen | Before B4 | After B4 | Preserved data |
+| --- | --- | --- | --- |
+| Overview and folder/project/status variants | 10 | 6 | Navigation, status cards, daily chart, execution table |
+| Execution details | 10 | 7 | Navigation, package information, event KPIs, executables, children |
+| Events (all five categories) | 5 | 4 | Package information, event KPIs, escaped messages |
+| Values/overrides | 5 | 5 | Package information, event KPIs, both value sections and flags |
+| Package history | 5 | 2 | Server header, history table, duration chart |
+
+Validation environment remains Windows, Python **3.11.4**, Flask **3.1.2**, pyodbc **5.3.0**.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `python -m unittest discover -s tests -q` | Passed: 77 tests total (64 previous + 13 B4) | Per-screen query contracts, retained populated rendering, explicit aggregate/execution selection, invalid IDs rejected before query calls, and existing configuration/database/error regressions |
+| `git diff --check` and SQL/template diff | Passed | No whitespace errors and no checked-in SQL or frontend-template changes |
+
+The counts describe logical query calls for successful requests; failures may stop earlier. Synthetic traces do not measure SSISDB latency, execution plans, event volumes, native connection pooling, actual row visibility, or aggregate results against SQL Server. SQL cohort fixes and history scope/estimates remain phase 2 work, and real performance evidence remains P0b/B5a3. The parent backend phase remains incomplete.
+
+Next task: **B5a1**, make dependency installation reproducible and document the runtime policy. Python 3.14 replay and native driver/catalog checks are separate B5a2/B5a3 tasks.

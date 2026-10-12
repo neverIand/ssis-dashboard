@@ -29,7 +29,7 @@ class LegacyMonitorFixture:
             'package_name': 'Sample.dtsx', 'project_lsn': 123,
         }
 
-    def get_package_kpi(self):
+    def get_execution_event_kpi(self, execution_id):
         return {'events': 1, 'errors': 0, 'warnings': 0, 'memory_warnings': 0, 'duplicate_warnings': 0}
 
     def get_package_list(self):
