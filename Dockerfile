@@ -1,6 +1,6 @@
 FROM ubuntu:16.04
 
-LABEL name="ssis-dashboard" version="0.6.8" maintainer="Davide Mauri <info@davidemauri.it>"
+LABEL name="ssis-dashboard-next" version="0.6.8" maintainer="Davide Mauri <info@davidemauri.it>"
 
 # apt-get and system utilities
 RUN apt-get update && apt-get install -y \
@@ -33,7 +33,7 @@ RUN apt-get autoremove -y
 # upgrade pip
 RUN pip3 install --upgrade pip
 
-# install ssis-dashboard
+# install ssis-dashboard-next
 WORKDIR /usr/src/app
 COPY requirements.txt ./
 RUN pip3 install --no-cache-dir -r requirements.txt

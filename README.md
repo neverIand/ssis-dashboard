@@ -1,4 +1,4 @@
-SQL Server Integration Services Dashboard v 0.6.8 Beta
+ssis-dashboard-next v 0.6.8 Beta
 =========================================
 
 The purpose of this project is to provide a web-based, user-friendly, useful and nice looking SQL Server Integration Services Dashboard and a set of REST API to monitor execution of SQL Server Integration Services Packages.
@@ -19,10 +19,11 @@ The purpose of this project is to provide a web-based, user-friendly, useful and
 * [Install, Configure & Run on Docker](docs/docker-support.md)
 * [Release Notes](docs/release-notes.md)
 * [Roadmap](docs/roadmap.md)
+* [Modernization Plan](docs/MODERNIZATION_PLAN.md)
 
 ## Used Platforms & Tools 
 
-SSIS Dashboard has been built using:
+ssis-dashboard-next has been built using:
 
 * Python 3.6: https://www.python.org/ 
 * Flask 0.12.2: http://flask.pocoo.org/ 

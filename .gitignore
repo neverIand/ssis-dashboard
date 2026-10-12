@@ -306,3 +306,8 @@ target/
 
 # Visual Studio Code
 .vscode/
+
+# Local environments, downloaded wheels, and reusable work files
+.venv/
+wheelhouse/
+.local/

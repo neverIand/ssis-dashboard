@@ -1,5 +1,5 @@
 """
-This script runs the ssis-dashboard application using a development server.
+This script runs the ssis-dashboard-next application using a development server.
 """
 
 from os import environ
