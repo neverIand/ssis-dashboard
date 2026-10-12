@@ -22,7 +22,7 @@ These milestones implement roadmap item 1 and delivery phases 0–1. Phases 0 an
 | B2 | Phase 1: database query boundary | Complete | Package-relative SQL loading and a standalone parameterized query operation own each connection/cursor. Positive login/query timeouts are validated and applied; fake-ODBC tests cover acquisition, execution/fetch/mapping, cleanup, and non-project working directories. Legacy shapes and checked-in SQL are preserved; native integration remains P0b/B5a work. |
 | B3 | Phase 1: inputs and errors | Complete | Validate event/status/detail inputs and positive BIGINT execution IDs before queries; use fixed SQL resource maps; return safe HTML errors with correct HTTP statuses and database-independent routing errors. Treat absent/not-visible execution records alike. Synthetic HTTP/ODBC failure checks pass; API problem JSON and live permission/driver behaviour remain separate work. |
 | B4 | Phases 0–1: legacy query usage | Complete | Query only data consumed by each legacy screen and its shared navigation. Separate aggregate and execution event-KPI operations; keep the legacy SQL `-1` contract behind the aggregate adapter and reject invalid execution selectors. Per-route query counts, exact resource/parameter binding, populated rendering, and error short-circuit tests pass. Cohort/pagination/typed JSON and measured SSISDB performance remain separate work. |
-| B5a | Phase 1: runtime/dependency baseline | Planned | Deliver B5a1–B5a3 below: reproducible dependencies, Python 3.14 validation, then driver/catalog compatibility. Keep local evidence separate from integration evidence. |
+| B5a | Phase 1: runtime/dependency baseline | In progress | B5a1 dependency constraints are complete; Python 3.14 replay and native driver/catalog compatibility remain B5a2/B5a3. Keep local evidence separate from integration evidence. |
 | B5b | Phase 1: operational timing | Planned | Add focused request/query timing and safe error logging without exposing SQL parameters, credentials, or connection strings; verify representative success/failure paths. |
 | B5c | Phase 1: hosting baseline | Planned | Document and verify the startup/server configuration for the chosen deployment target. Split Windows and container delivery into separate tasks when those targets are confirmed; production stream capacity remains phase 5. |
 
@@ -32,8 +32,8 @@ B5a combines dependency selection, interpreter changes, and native/database comp
 
 | ID | Status | Scope and exit condition |
 | --- | --- | --- |
-| B5a1 | Planned; next | Choose and document a runtime/version policy and reproducible dependency constraints with minimal dependencies. Validate installation from the declared files in an isolated ignored environment, dependency consistency, factory startup, and the database-free suite. Record the interpreter actually used. |
-| B5a2 | Planned | Validate the Python 3.14 target and compatible pyodbc binary/runtime dependencies. Recreate an isolated environment, run the full database-free suite and entry points, and document unsupported/unverified platforms rather than extrapolating from one platform. |
+| B5a1 | Complete | Published runtime versions were reviewed; the normal requirements command applies exact constraints for the complete eight-package graph. Online resolution, clean offline installation from another working directory, dependency consistency, idempotent resolution, app entry points, and all 77 database-free tests passed on Windows x64/CPython 3.11.4. Python 3.14/native checks remain B5a2/B5a3. |
+| B5a2 | Planned; next | Validate the Python 3.14 target and compatible pyodbc binary/runtime dependencies. Recreate an isolated environment, run the full database-free suite and entry points, and document unsupported/unverified platforms rather than extrapolating from one platform. |
 | B5a3 | Planned | With P0b's approved test configuration, validate deployed ODBC driver/catalog compatibility, authentication, row conversion, timeouts, and resource behaviour. Record the actual combination and keep this integration gate open until evidence exists. |
 
 ## Later phase boundaries
@@ -159,4 +159,44 @@ Validation environment remains Windows, Python **3.11.4**, Flask **3.1.2**, pyod
 
 The counts describe logical query calls for successful requests; failures may stop earlier. Synthetic traces do not measure SSISDB latency, execution plans, event volumes, native connection pooling, actual row visibility, or aggregate results against SQL Server. SQL cohort fixes and history scope/estimates remain phase 2 work, and real performance evidence remains P0b/B5a3. The parent backend phase remains incomplete.
 
-Next task: **B5a1**, make dependency installation reproducible and document the runtime policy. Python 3.14 replay and native driver/catalog checks are separate B5a2/B5a3 tasks.
+## B5a1 work record
+
+Scope: reviewed package versions, automatic runtime constraints, clean installation, and development runtime policy. Interpreter upgrades, native ODBC/SSISDB compatibility, production servers, and container modernization remain separate tasks.
+
+Completed locally on 12 October 2026:
+
+- Added `constraints.txt` and included it from `requirements.txt`, so the existing install command applies exact pins without another flag. Flask and pyodbc remain the only direct dependencies; the complete required graph has eight distributions. Optional extras and third-party test tools were not added.
+- Reviewed the publishers' metadata/release notes and validated stable updates from Flask 3.1.2 to 3.1.3, Werkzeug 3.1.5 to 3.1.9, MarkupSafe 3.0.3 to 3.0.4, and Click 8.3.1 to 8.5.0. The new Click graph does not require Colorama; it is absent from the clean runtime. Other runtime pins remain the tested versions below. Extended the existing invalid-path regression to cover an overlong decimal execution segment with Python's normal integer-conversion limit; the updated converter returns a database-free 404.
+- Created an independent environment under `.local/venv-b5a1`, resolved/downloaded binary wheels from public PyPI into ignored `wheelhouse/`, then installed offline using the tracked requirements. Installation from `.local/` with an absolute requirements path resolved the included constraints correctly. Verified that every installed runtime distribution matched its pin, and repeat resolution proposed no changes. Retained the ignored environment, reports, wheels, and reusable inspection scripts for follow-up checks.
+- Documented the current validated Windows x64/CPython 3.11 baseline and the still-pending standard CPython 3.14 target. Documented clean/offline installation, version-review checks, installer/runtime separation, and the limits of version-only constraints. Updated README guidance, the Visual Studio manifest, and Docker's input-copy instruction so both requirements and constraints are present before its install step. The legacy Docker/IIS/Visual Studio interpreter settings remain unsupported hosting work; no container was built.
+
+Pinned runtime distributions:
+
+| Distribution | Version | Role |
+| --- | --- | --- |
+| Flask | 3.1.3 | Direct |
+| pyodbc | 5.3.0 | Direct |
+| blinker | 1.9.0 | Required transitive |
+| click | 8.5.0 | Required transitive |
+| itsdangerous | 2.2.0 | Required transitive |
+| Jinja2 | 3.1.6 | Required transitive |
+| MarkupSafe | 3.0.4 | Required transitive |
+| Werkzeug | 3.1.9 | Required transitive |
+
+Validation environment: Windows x64, **CPython 3.11.4**, **pip 23.1.2**, using `.local/venv-b5a1`. The bundled installer/bootstrap packages are not application pins.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Online binary-wheel resolution via `pip download -r requirements.txt` | Passed | All eight required distributions resolved to the reviewed pins using public PyPI |
+| Clean offline install using `--no-index --only-binary=:all: --find-links wheelhouse` | Passed | Installed from the declared requirements outside the project directory; complete installed runtime graph matches `constraints.txt` |
+| Repeat offline install resolution with `--dry-run` | Passed | Installer report contains no proposed package changes |
+| `python -m pip check` | Passed | No broken runtime requirements |
+| `python -m unittest discover -s tests -q` | Passed: 77 tests | The existing factory/configuration, entry-point, populated template, query/resource, input/error, and per-screen query-contract suite passes with the new dependency snapshot; no live DB connection |
+| Flask version/route CLI checks | Passed | Flask 3.1.3/Werkzeug 3.1.9; all eight legacy endpoints plus static serving registered |
+| Ignore/status/diff checks | Passed | Environment, wheelhouse, inspection scripts, and install reports remain ignored; no SQL, frontend-template, or application-code changes |
+
+The existing environment's pip 26 download was unresponsive and was interrupted. The fresh environment's bundled pip 23.1.2 completed online resolution/offline checks; its optional update check was disabled for bounded validation commands. The root cause of the older command's delay was not established. All task-owned CLI sessions were closed and no workspace Python process remained after checks.
+
+This snapshot fixes package versions, not wheel hashes, Python patch versions, operating-system libraries, or deployed ODBC drivers. Python 3.14, non-Windows/native integration, actual authentication/row conversion/timeout behaviour, production hosting, and container builds remain unverified. The parent backend/runtime phase remains incomplete.
+
+Next task: **B5a2**, replay this dependency snapshot on standard CPython 3.14 with compatible wheels and the full database-free suite. Native driver/catalog evidence remains B5a3/P0b, and hosting remains B5c.

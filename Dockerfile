@@ -35,7 +35,7 @@ RUN pip3 install --upgrade pip
 
 # install ssis-dashboard-next
 WORKDIR /usr/src/app
-COPY requirements.txt ./
+COPY requirements.txt constraints.txt ./
 RUN pip3 install --no-cache-dir -r requirements.txt
 COPY . .
 ENV FLASK_APP=dashboard/__init__.py LC_ALL=C.UTF-8 LANG=C.UTF-8

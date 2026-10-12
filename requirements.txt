@@ -1,2 +1,4 @@
+# The normal install command also applies the reviewed runtime pins.
+-c constraints.txt
+Flask
 pyodbc
-flask

@@ -1,3 +1,4 @@
+import sys
 import unittest
 from unittest.mock import Mock, patch
 
@@ -50,10 +51,13 @@ class InputValidationTests(unittest.TestCase):
             for suffix in ('', '/events/all', '/values')
         ], 400)
 
-    def test_unmatched_negative_or_non_integer_ids_are_database_free_404s(self):
-        self.assert_rejected_before_monitor([
+    def test_unmatched_id_segments_are_database_free_404s(self):
+        paths = [
             '/execution/-1', '/execution/not-an-id', '/execution/1.5',
-        ], 404)
+        ]
+        if 0 < sys.get_int_max_str_digits() < 5000:
+            paths.append('/execution/' + '9' * 5000)
+        self.assert_rejected_before_monitor(paths, 404)
 
     def test_invalid_values_are_not_echoed_in_error_pages(self):
         response = self.client.get('/execution/42/events/%3Cscript%3Esecret-input')

@@ -83,6 +83,7 @@
     <Content Include="LICENSE" />
     <Content Include="README.md" />
     <Content Include="requirements.txt" />
+    <Content Include="constraints.txt" />
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>

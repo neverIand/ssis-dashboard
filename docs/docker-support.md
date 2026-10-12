@@ -1,8 +1,8 @@
 # Docker Support
 
-This page describes the legacy upstream image. A current `dev-next` container/runtime remains part of the runtime milestone in [implementation progress](PROGRESS.md); use [local development](installation.md) for the new backend work.
+This page describes the legacy upstream image. A current `dev-next` container and production startup remain B5c work in [implementation progress](PROGRESS.md); use [local development](installation.md) for the validated dependency snapshot. The checked-in Ubuntu 16.04/Python 3.6 recipe does not support the new runtime pins.
 
-Execution of SSIS Dashboard in a Docker container is fully supported. 
+The following commands refer to the published legacy `yorek/ssis-dashboard` image; they do not validate the current `dev-next` checkout.
 
 Download and install Docker (Community Edition is enough):
 

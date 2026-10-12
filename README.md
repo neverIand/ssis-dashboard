@@ -37,7 +37,7 @@ Run database-free application tests with the standard library test runner:
 python -m unittest discover -s tests -v
 ```
 
-See [installation](docs/installation.md) for configuration. The first backend milestone is locally validated on Python 3.11; the Python 3.14 target and real SSISDB integration remain tracked work.
+See [installation](docs/installation.md) for configuration and the validated runtime/dependency policy. Python 3.14 and real SSISDB integration remain tracked work.
 
 ## Legacy Platforms & Tools
 

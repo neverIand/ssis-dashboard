@@ -1,6 +1,6 @@
 # Local development on dev-next
 
-Use the personal fork's `dev-next` branch. The first backend milestone is validated on Python 3.11 with Flask 3.1.2 and pyodbc 5.3.0. Python 3.14, dependency constraints, current container images, and shared production hosting remain tracked work in [implementation progress](PROGRESS.md); the legacy Python 3.6 instructions do not describe the new development environment.
+Use the personal fork's `dev-next` branch. B5a1 is validated in a clean Windows x64 environment on CPython **3.11.4**, with Flask **3.1.3**, pyodbc **5.3.0**, and the complete runtime graph pinned in [`constraints.txt`](../constraints.txt). Python 3.14, native driver/catalog compatibility, current container images, and shared production hosting remain tracked work in [implementation progress](PROGRESS.md).
 
 ## Create an environment
 
@@ -13,6 +13,28 @@ python -m pip install -r requirements.txt
 ```
 
 On other systems, activate `.venv/bin/activate` instead. A SQL Server ODBC driver and an SSIS Catalog are required for real monitoring pages; application construction and the test suite do not connect to SQL Server.
+
+### Runtime and dependency policy
+
+- The current locally validated development baseline is CPython 3.11 on Windows x64. The modernization target is standard CPython 3.14; its interpreter/wheel replay is B5a2, and native driver/catalog checks are B5a3. Other interpreter/platform combinations have no integration evidence yet. Keep the actual interpreter patch, architecture, and validation results in the progress record when changing them.
+- Python 3.6-era Visual Studio/IIS settings and the Ubuntu 16.04 Docker recipe are historical, unsupported configurations for this checkout. Current hosting is B5c work; installing the Python dependencies does not update those hosts or provide a production server.
+- [`requirements.txt`](../requirements.txt) declares only Flask and pyodbc and automatically includes `constraints.txt`. The constraint file fixes all eight required runtime distributions, including transitive dependencies. Normal `python -m pip install -r requirements.txt` applies the reviewed pins; avoid separate unconstrained installs of Flask or pyodbc.
+- Review stable published versions and their release notes before changing pins. The B5a1 snapshot includes the reviewed Flask 3.1.3, Werkzeug 3.1.9, MarkupSafe 3.0.4, and Click 8.5.0 updates. No optional Flask extras or additional test dependency is required; the tests use `unittest`. Installer/build tooling such as pip and setuptools is separate from the application runtime graph.
+- These constraints make package-version selection repeatable; they do not lock interpreter/system-driver versions or wheel hashes. Native wheel/driver compatibility and production artifact validation require separate evidence. A wheelhouse belongs in the ignored `wheelhouse/` directory and contains platform/interpreter-specific artifacts.
+
+This follows pip's [constraints-file semantics](https://pip.pypa.io/en/stable/user_guide/#constraints-files) and [repeatable-install guidance](https://pip.pypa.io/en/stable/topics/repeatable-installs/). Release information comes from the maintainers' [Flask](https://flask.palletsprojects.com/en/stable/changes/), [Werkzeug](https://werkzeug.palletsprojects.com/en/stable/changes/), [MarkupSafe](https://markupsafe.palletsprojects.com/en/stable/changes/), and [Click](https://github.com/pallets/click/releases/tag/8.5.0) releases, plus [pyodbc's published requirements and wheels](https://pypi.org/project/pyodbc/5.3.0/). Pin updates require a clean environment, dependency consistency, the database-free suite, and application entry-point checks before committing the new snapshot.
+
+### Download and install offline
+
+For an interpreter/platform with compatible published wheels, prepare the wheelhouse while online, then install into a new environment without using an index:
+
+```sh
+python -m pip download --only-binary=:all: --dest wheelhouse -r requirements.txt
+python -m pip install --no-index --only-binary=:all: --find-links wheelhouse -r requirements.txt
+python -m pip check
+```
+
+Download wheels using the intended interpreter and platform. `--only-binary=:all:` fails if a compatible wheel is unavailable; source builds and their toolchains are outside this validated workflow. The B5a1 clean install used pip 23.1.2, also worked from outside the project directory with an absolute requirements path, and matched every installed runtime distribution to its declared constraint. Repeating the install proposed no package changes. Recreate the environment when reviewing the graph so unused packages from an older installation do not obscure the result.
 
 ## Configure
 
@@ -36,7 +58,7 @@ SQL loads from package-relative `dashboard/query` resources, using UTF-8 with op
 
 ### Legacy inputs and errors
 
-Execution routes accept positive SQL Server `BIGINT` IDs from 1 to 9,223,372,036,854,775,807. Zero and larger IDs return 400 before a query; negative or non-integer path segments do not match the existing route and return 404. Status names are case-sensitive: `all`, `created`, `running`, `cancelled`, `failed`, `pending`, `halted`, `succeeded`, `stopping`, or `completed`. Supported event categories are `all`, `errors`, `warnings`, `duplicate-warnings`, and `memory-warnings`. Event and internal detail operations select from fixed SQL resource maps. Unsupported selectors return 400 without querying SSISDB. This validation retains the existing history query's scope; the status path segment does not yet change its SQL filter.
+Execution routes accept positive SQL Server `BIGINT` IDs from 1 to 9,223,372,036,854,775,807. Zero and out-of-range integer IDs that reach the view return 400 before a query. Negative or non-integer path segments do not match the route; segments exceeding Python's enabled integer-conversion limit also return 404. Status names are case-sensitive: `all`, `created`, `running`, `cancelled`, `failed`, `pending`, `halted`, `succeeded`, `stopping`, or `completed`. Supported event categories are `all`, `errors`, `warnings`, `duplicate-warnings`, and `memory-warnings`. Event and internal detail operations select from fixed SQL resource maps. Unsupported selectors return 400 without querying SSISDB. This validation retains the existing history query's scope; the status path segment does not yet change its SQL filter.
 
 Unknown pages, missing static assets, and unsupported HTTP methods return database-independent HTML errors. Execution details, events, and values first look up the requested execution; no visible record returns 404 and skips subsequent queries. This does not distinguish a missing execution from one hidden by catalog row visibility.
 
