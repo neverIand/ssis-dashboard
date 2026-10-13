@@ -268,4 +268,13 @@ Validation environment: Linux x64, **CPython 3.12.14**, the same eight pinned ru
 
 Windows/CPython 3.14 replay and real SSISDB/hosting checks remain open; this follow-up does not change their status.
 
+## Local validation preparation
+
+Prepared against merged `dev-next` commit `45bfb3c`:
+
+- Added the [local SSISDB validation guide](BACKEND_VALIDATION_GUIDE.md) with Windows setup/configuration commands, required catalog fixtures, a bounded native connection/timeout probe, browser walkthroughs, SQL/visibility comparisons, failure/recovery procedures, log correlation, timing and resource checks.
+- Marked all 30 checklist cases by execution ownership: 6 database-free, 10 automatable after catalog setup, 11 requiring both automation and setup/visual/local access, and 3 awaiting hosting. These are feasibility labels; a complete native integration runner is not implemented. Remote chat access does not imply access to the user's localhost or Windows identity.
+- Kept all integration results NOT RUN. This documentation preparation does not change B5a3/P0b, the Windows replay requirement, or B5c. No application, SQL, template or dependency changes.
+- Verified all case labels, unchanged result statuses, local Markdown links/anchors, Python snippet syntax and whitespace. On the existing Linux/Python 3.12 environment, replayed route discovery from two working directories, invalid-timeout rejection and the helper's missing-driver failure path without leaking dummy credentials. PowerShell execution, successful SQL connections and native SQL timeouts still require the Windows/SSISDB setup; the 101-test application suite was not rerun for this documentation-only change.
+
 Next task: **B5c**, the bounded hosting/startup baseline. Split deployment targets into separate submilestones before implementation as needed. B5a3/P0b stay awaiting the user's consolidated checks after the B implementation work.
