@@ -42,15 +42,19 @@ def _close_resources(cursor, connection, *, operation_failed):
 
 
 def execute_query(query_file, parameters=(), *, connection_string, one_row=False,
-                  login_timeout, query_timeout, on_complete=None):
+                  login_timeout, query_timeout, on_complete=None, typed_timestamps=False):
     """Execute bound SQL and return legacy dictionaries, closing owned resources.
 
     Keep pyodbc's existing transaction defaults. An empty single-row result is
     {}, an empty multi-row result is [], and ODBC-returned values stay typed.
     Each call owns its connection and cursor; no Flask context is required.
     An optional observer receives safe metadata after cleanup, never row values.
+    typed_timestamps opts new API queries into exact datetimeoffset conversion;
+    the default preserves the legacy driver values and formatted SQL shapes.
     """
     validate_timeouts(login_timeout, query_timeout)
+    if type(typed_timestamps) is not bool:
+        raise ValueError('typed_timestamps must be a Boolean.')
     query = load_query(query_file)
     parameters = tuple(parameters)
     connection = None
@@ -65,6 +69,11 @@ def execute_query(query_file, parameters=(), *, connection_string, one_row=False
         connection = pyodbc.connect(connection_string, timeout=login_timeout)
         stage = 'timeout_setup'
         connection.timeout = query_timeout
+        if typed_timestamps:
+            from dashboard.timestamps import SQL_SS_TIMESTAMPOFFSET, decode_datetimeoffset
+
+            stage = 'converter_setup'
+            connection.add_output_converter(SQL_SS_TIMESTAMPOFFSET, decode_datetimeoffset)
         stage = 'cursor'
         cursor = connection.cursor()
         stage = 'execute'

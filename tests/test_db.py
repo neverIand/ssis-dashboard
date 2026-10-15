@@ -11,6 +11,7 @@ import pyodbc
 from dashboard import create_app
 from dashboard.db import execute_query, load_query
 from dashboard.ssis import monitor
+from dashboard.timestamps import SQL_SS_TIMESTAMPOFFSET, decode_datetimeoffset
 
 
 class ConnectionFixture:
@@ -22,6 +23,7 @@ class ConnectionFixture:
         self.timeout_error = None
         self.close_error = None
         self.cursor = Mock(side_effect=lambda: events.append('cursor') or cursor)
+        self.add_output_converter = Mock(side_effect=lambda *args: events.append('converter'))
         self.close = Mock(side_effect=self.close_connection)
 
     @property
@@ -88,6 +90,34 @@ class DatabaseBoundaryTests(unittest.TestCase):
         self.assertEqual(self.query(one_row=True), {'execution_id': 1, 'label': 'alpha'})
         self.cursor.fetchall.assert_not_called()
         self.assert_resources_closed()
+
+    def test_typed_timestamps_register_converter_before_cursor(self):
+        self.query(typed_timestamps=True)
+        self.connection.add_output_converter.assert_called_once_with(SQL_SS_TIMESTAMPOFFSET, decode_datetimeoffset)
+        self.assertEqual(self.events[:4], ['query-timeout', 'converter', 'cursor', 'execute'])
+        self.assert_resources_closed()
+        self.configure_resources()
+        self.query()
+        self.connection.add_output_converter.assert_not_called()
+
+    def test_converter_setup_failure_closes_connection_and_reports_safe_stage(self):
+        error = RuntimeError('private-converter-diagnostic')
+        self.connection.add_output_converter.side_effect = error
+        reports = []
+        with self.assertRaises(RuntimeError) as caught:
+            self.query(typed_timestamps=True, on_complete=reports.append)
+        self.assertIs(caught.exception, error)
+        self.connection.close.assert_called_once_with()
+        self.connection.cursor.assert_not_called()
+        self.assertEqual(reports[0]['failure_stage'], 'converter_setup')
+        self.assertEqual(reports[0]['outcome'], 'error')
+        self.assertNotIn('private-', str(reports))
+
+    def test_invalid_converter_option_fails_before_connecting(self):
+        for value in (None, 1, 'true'):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                self.query(typed_timestamps=value)
+        self.connect.assert_not_called()
 
     def test_empty_results_retain_legacy_shapes_without_column_metadata(self):
         for one_row, expected in ((False, []), (True, {})):

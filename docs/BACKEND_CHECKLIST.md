@@ -8,7 +8,7 @@ The completed local runs now fully pass **25 of 30 cases**. **OBS-02** retains t
 
 The two-package fixture is deployed and guide steps 7–10 are complete. Both actual Windows reader accounts passed native SQL and HTTP replay with their intended roles/visibility. History, controlled values/property overrides, sensitive masking, failure, repeated/parallel children, running cases and second-folder scope are validated. No further fixture creation or reader setup is needed for these completed checks.
 
-**Hosting is on hold at the user's request.** B5c, HOST-01/02/03 and production host/proxy/access/startup logging remain NOT RUN until reprioritized. Native cleanup-failure observation, raw datetimeoffset conversion and measured KPI cost remain separate follow-ups. B5a3/P0b stay open.
+**Hosting is on hold at the user's request.** B5c, HOST-01/02/03 and production host/proxy/access/startup logging remain NOT RUN until reprioritized. C1b now proves opt-in native datetimeoffset conversion as recorded below. Native cleanup-failure observation and measured KPI cost remain follow-ups. B5a3/P0b stay open.
 
 ## How to use this checklist
 
@@ -277,7 +277,7 @@ Guide steps **7–10 PASS** at the same application commit, using the deployed `
 
 The private run pointer is `.local/backend-validation/runs/fixture-current.private.json`. Its directory contains preflight/deployed `.ispac`, execution/grant records, native comparisons, actual/impersonated HTTP results and bodies, scope results, summary and cleanup audit. Reader passwords were entered only in the local secure prompt; none were saved. The application/SQL resources/dependency pins were unchanged, so the 101-test suite was not repeated; its earlier Windows evidence remains the baseline.
 
-Remaining: **OBS-02** native cleanup-failure observation, the four deferred host/logging cases, and the separately recorded raw datetimeoffset conversion limitation for future typed data. The legacy running estimate is evidence of current query behavior, not a prediction-accuracy guarantee. B5a3/P0b remain open for their native follow-ups; hosting stays deferred.
+Remaining: **OBS-02** native cleanup-failure observation and the four deferred host/logging cases. C1b subsequently proves typed datetimeoffset conversion as recorded below. The legacy running estimate is evidence of current query behavior, not a prediction-accuracy guarantee. B5a3/P0b remain open for their native follow-ups; hosting stays deferred.
 
 ## Recorded baseline: 15 October 2026
 
@@ -312,10 +312,21 @@ The first process overview took **2,419 ms** at response preparation. The table 
 
 `package-kpi.sql` dominated details/events/values: its per-query warm medians were about **1,502/1,340/1,394 ms**. The overview list query took about **424 ms**. A captured aggregate KPI plan recorded **2,412 ms compilation** and **98 ms execution**; compilation cost merits investigation when the SQL/API milestone addresses this operation. No query was changed in this validation task, and no current latency threshold was invented to turn this baseline into a pass/fail budget.
 
-The additional raw `SELECT SYSDATETIMEOFFSET()` probe **FAILS** with pyodbc's unsupported SQL type **-155**. Current checked-in page queries explicitly format/cast their timestamps, and those actual responses passed. Separate native BIGINT, Unicode NVARCHAR, NULL datetime2, Decimal, Boolean and datetime2 probes passed. Raw datetimeoffset support remains unresolved for future typed data work; string rendering does not establish it.
+The additional raw `SELECT SYSDATETIMEOFFSET()` probe **FAILS** with pyodbc's unsupported SQL type **-155**. Current checked-in page queries explicitly format/cast their timestamps, and those actual responses passed. Separate native BIGINT, Unicode NVARCHAR, NULL datetime2, Decimal, Boolean and datetime2 probes passed. This initial bare-driver limitation is resolved for opted-in typed queries by the C1b converter proof below; the default unconverted driver behavior remains unchanged.
 
 Known legacy behavior was retained: different start/created-time cohorts, NULL warning/error display, status-independent aggregate/history scope, wildcard rather than exact-name semantics, and a history heading/limit mismatch. The initial single-project fixture could not establish isolation of identically named packages across multiple projects. The later fixture run above verifies the designed same-project/package history scope across two folders.
 
 After the user created the reader logins and applied the initial grants, a separate read-only session-impersonation audit found enabled mapped logins, sysadmin/db_owner/ssis_admin zero for both, ssis_logreader one only for the normal reader, and four-versus-one execution visibility. The administrator context was restored. Actual reader sign-in/HTTP was NOT RUN at that stage and is now completed as recorded above.
 
 Private original evidence is in `.local/backend-validation/runs/2026-10-15/`: inventory/configuration, test output, raw/reviewed/final request reports, responses/template snapshots, logs/plans, DMV samples, browser notes and ownership/cleanup records. The original retired docs and relocation hashes are under `runs/organization-2026-10-15/`. Old snapshots contain original absolute paths; use the relocation manifest to find moved files. The earlier documentation consolidation did not rerun SQL/packages/tests or change case results; subsequent fixture validation above completed nine cases.
+
+
+## Typed datetimeoffset resolution / C1b
+
+15 October 2026: the application now offers `execute_query(..., typed_timestamps=True)` with a connection-local -155 output converter. It keeps exact 100-nanosecond UTC instants until explicit serialization and binds canonical timestamp strings through `CONVERT(datetimeoffset(7), ?)` so Python datetime cannot truncate the seventh digit. The default legacy path remains unchanged.
+
+On standard Windows x64 CPython 3.14.8 / pyodbc 5.3.0 / Driver 17.10.0006 / SQL 2022 16.00.1000, a read-only native run passed **26 assertions over 15 application queries**. Controlled source-offset and canonical input round-trips, +05:45/-00:30 and +/-14-hour offsets, date/year rollover, adjacent 100-nanosecond instants, large/max IDs, NULLs, Decimal/Boolean/counts and unknown codes survive strict JSON. Three real catalog rows' raw created/start/end timestamps agree with separate SQL UTC projections. A subsequent unconverted logical connection reproduces the unsupported type, and legacy formatted text stays unchanged. Every observed logical query completed cleanup. The full **130-test** database-free suite and `pip check` pass.
+
+The current private validation connection supplied the SQL identity; normal/restricted reader HTTP was not replayed for this conversion task. Only bounded SELECTs were run; no server or catalog mutation was required. Private evidence is `.local/backend-validation/runs/c1b-20261015T202103Z/result.private.json`; the reusable ignored probe is `.local/backend-validation/tools/probe-typed-data.py`. The restricted execution context failed Windows encryption/credential setup before any query; the approved native run used the same config outside that restriction.
+
+This closes the extra typed datetimeoffset compatibility follow-up on this baseline. It does not close **OBS-02**, change the **25/30** checklist total, complete B5a3/P0b, or establish API endpoint, other-driver/platform or hosting acceptance. Registration/decoder failure cleanup remains covered synthetically; deliberate native cleanup failure remains NOT RUN. See [C1b progress](PROGRESS.md#c1b--exact-typed-sql-to-json-boundary).
