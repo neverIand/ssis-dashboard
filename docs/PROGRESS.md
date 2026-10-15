@@ -10,6 +10,8 @@ Prefer one coherent implementation boundary per task, with concrete exit checks 
 
 Statuses: **Planned**, **In progress**, **Complete**, **Awaiting integration**, or **Deferred**. Deferred records work explicitly put on hold by the user. Complete means its stated local exit checks passed; SQL Server, driver, proxy, and deployment claims require their own recorded integration evidence.
 
+Current next task: **C1a, the read-only API contract and local access policy**, in the [Stage C breakdown](#stage-c--read-only-api-delivery-phase-2). Backend native follow-ups remain open; B5c and production hosting remain deferred.
+
 ## Baseline and backend foundation
 
 These milestones implement roadmap item 1 and delivery phases 0–1. Phases 0 and 1 remain incomplete until all their required checks, including real SSISDB validation, pass.
@@ -43,15 +45,63 @@ B5a combines dependency selection, interpreter changes, and native/database comp
 
 ## Later phase boundaries
 
-Do not expand a backend foundation task into these phases. Decompose them into concrete submilestones here when implementation approaches.
+Do not expand a backend foundation task into these phases. Stage C is decomposed below; decompose subsequent phases when implementation approaches.
 
 | Parent phase | Intended slices | Status |
 | --- | --- | --- |
-| 2: API | Execution-list contract/query semantics first; then metrics/metadata, details/children, events/values/history, and access/redaction checks | Planned |
+| 2: API / Stage C | C1–C8 below: contract/types/HTTP boundary, bounded executions, metadata/metrics, inspection, events, values, history, and local acceptance | Planned; next active stage |
 | 3: first native screen | Shell/build choice, URL filters/list/cards, data-only updates and preserved state | Planned |
 | 4: feature parity | Details/children, searchable events, values, history/charts, legacy URL mapping | Planned |
 | 5: live updates | Detector prototype/capacity, stream contract, snapshot/resume/resync, bounded subscriptions, browser recovery, production proxy validation | Planned |
 | 6: cutover | Prebuilt assets, legacy removal, deployment/CI documentation, load validation, rollback rehearsal | Planned |
+
+## Stage C / read-only API (delivery phase 2)
+
+Planned on 15 October 2026. Stage B is sufficiently validated to begin local API work: 25 of 30 backend checklist cases pass, including the deployed fixtures and both actual Windows reader identities. This is a stage transition, not closure of B5a3/P0b or a claim of production readiness. All C tasks below remain **Planned**; this change records their scope without implementing endpoints.
+
+### Backend carry-over and scope
+
+| Item | Treatment during Stage C |
+| --- | --- |
+| Raw datetimeoffset / ODBC type -155 | Resolve and validate in C1b before any typed timestamp endpoint ships. Feed the resulting native evidence back into B5a3/P0b; formatted legacy timestamps do not close this limitation. |
+| OBS-02 native cleanup-failure observation | Retain the explicit NOT RUN assertion. Existing synthetic cleanup coverage and successful native cleanup do not establish this specific observation. Investigate when reproducible; unrelated API work can proceed. |
+| Measured legacy KPI/compile cost | Address the execution-specific event-count query in C4a and measure the list/calculated-sort paths in C2. Compare equivalent workloads; do not transfer legacy timings into API performance claims. |
+| B5c, OBS-03 host portion, HOST-01/02/03 | Remain deferred. No service/container rollout, production proxy/authentication/HTTPS/logging or production stream-capacity work is required to start Stage C. |
+
+Keep Flask/pyodbc, parameterized read-only catalog queries and the legacy routes. Use functions grouped around operations and a small API blueprint, explicit serializers and checked-in SQL; no ORM or new runtime dependency is assumed. Define local endpoint capabilities and redaction now even while production identity/proxy integration is deferred. SQL row visibility continues to follow the configured database identity.
+
+### Task breakdown
+
+The numbered groups are planning boundaries. Each lettered row is one focused task with its own implementation record and validation; do not combine an entire group into a large change by default. Extend `docs/openapi.yaml` with each implemented resource, and label unimplemented resources as planned.
+
+| ID | Scope / deliverable | Concrete exit checks |
+| --- | --- | --- |
+| C1a | Contract and local access policy. Specify concrete DTO fields/examples, common errors, exact-name versus explicit pattern mode, created-time cohort, effective time bounds, statuses, sort allowlists, paging/cursor rules, and event/value capabilities. Record intended differences from legacy behavior. | The OpenAPI draft covers the proposed resources without presenting them as implemented. Defaults/caps, nullable/unknown values, cursor invalidation and sensitive-data policy are explicit. The list/summary/timeline relationship and SQL-identity visibility boundary are unambiguous. Documentation-only task; no hosting decision is needed. |
+| C1b | Typed SQL/JSON boundary. Resolve the actual Driver 17 datetimeoffset failure using a tested connection-local converter or an explicit offset-preserving SQL representation. Serialize BIGINT/LSN as decimal strings, UTC offset timestamps, nulls, numeric seconds/counts, booleans and unknown codes. | Fake-boundary tests include IDs above JavaScript's safe integer limit, fractions, non-UTC offsets, NULL start/end and unknown status/logging codes. A separate native SQL-to-serializer-to-JSON probe proves the selected conversion on the recorded Windows/Python/driver baseline before endpoint work. Legacy formatted shapes still pass their regressions; native gaps remain NOT RUN if access is unavailable. |
+| C1c | Versioned API HTTP boundary and `/meta`; local `/healthz` and bounded `/readyz` outside the versioned API. Register the blueprint, shared validation/problem responses and local capability checks; preserve request IDs, safe diagnostics and protocol headers. Keep browser/proxy identity headers untrusted. | API 400/403/404/405/500/503/504 paths produce safe `application/problem+json`, including unknown API paths and routing failures; applicable authentication failures have a defined 401 contract. Legacy errors remain HTML. Invalid inputs and denied capabilities short-circuit before SQL. `/meta` exposes only documented non-secret fields; liveness performs no DB query and readiness uses a short bounded dependency check without diagnostics leakage. |
+| C2a | First execution page: `GET /api/v1/executions`, initially ordered by execution ID. Apply exact catalog names, optional deliberate pattern mode, `[from,to)` on `created_time`, status and bounded limit. Select/page candidates before retrieving event counts/logging data for those IDs. | Independent SQL comparisons include created/pending/running rows, both time boundaries, special/long names, empty visibility and NULLs. Default 50/max 200, stable ID order, `has_more`, filter/bounds-bound cursors and an upper-ID paging fence pass tests. Malformed or mismatched cursors fail safely; a cursor never grants visibility. Measure query plans/timings and retain actual row identity for links. |
+| C2b | Required global execution sorts. Implement the contract's allowlisted numeric/date/name/status sorts, with ID tie-breakers and explicit NULL ordering. Treat calculated duration/error/warning sorts as separate measured query shapes. | Ordering covers the entire matching cohort, not just the current page. Ties, both directions, multi-page traversal, changed sort/filter inputs and mutable membership have defined behavior. No untrusted SQL fragments. Record plans and cost for calculated sorts; define invalidation/refetch rather than claiming a snapshot during status changes or retention. |
+| C3a | Navigation resources: bounded `/folders` and `/projects?folder=...`, with unique field aliases and unambiguous identity. | Actual normal/restricted reader results match SQL visibility; names including literal wildcard characters remain exact in exact mode. Multi-page navigation and empty collections work, and no server/connection secrets are returned. |
+| C3b | `/metrics/summary` using the same folder/project/created-time range as the execution list. | Summary includes all statuses even when the table selects one status; this intentional distinction is documented. Effective bounds can be reused across requests. Independent SQL counts cover pending/no-start and empty cohorts. |
+| C3c | `/metrics/timeline` with bounded zero-filled buckets and the configured display timezone. | The timeline applies the selected status within the same effective cohort. Boundary, empty-range and Europe/London DST tests pass; bucket count/range caps hold. Native comparisons distinguish bucket timezone from UTC wire timestamps and do not use a timezone-less SQL date as a substitute. |
+| C4a | `/executions/{id}` identity, status, actual timings and execution-specific event counts. Replace repeated KPI scans with a measured conditional aggregation for the API path. | Visible IDs, unknown codes, running NULLs and IDs outside the overview range work. Missing and not-visible IDs have indistinguishable safe 404 behavior before follow-up queries. KPI counts match all five documented event categories; old pages retain their adapter. |
+| C4b | Bounded `/executions/{id}/executables`, with typed statistics and executable-result codes kept distinct from execution status. | Stable paging/order, incomplete executable rows and insufficient logging are represented explicitly. Permission/missing-execution short circuits, real fixture comparison and SQL/result typing pass. |
+| C4c | Bounded `/executions/{id}/children`, preserving invocation/path identity and observed timings. | Reuse the repeated/parallel/active fixture oracle; test loops, missing end events and low logging. Pairing must distinguish occurrences and execution paths, not package names alone. Missing observations are labelled unavailable/incomplete rather than invented child execution IDs or completion times. |
+| C5 | Paged/searchable `/executions/{id}/events`. Preserve all five categories, expose event IDs, and search across the execution's matching events with bound inputs. | Stable time/ID ordering, duplicate timestamps, category/search combinations, ties across page boundaries, caps and cursor fences pass. Search is not limited to the visible page. Sensitive free text follows the capability policy, messages remain JSON text, and responses use `Cache-Control: no-store`; logs/errors contain no message or search-value leakage. |
+| C6 | `/executions/{id}/values` with SQL type metadata, explicit redacted markers and separate parameter/override policy. | Serializer redacts sensitive parameters even if a faulty fake row supplies a value. Unapproved override values are hidden by default; denied capabilities fail before the sensitive query. Controlled Int32/Boolean/string/NULL values, flags, safe display strings, actual reader visibility and no-store/canary checks pass. |
+| C7a | Exact folder/project/package `/history`, explicit status scope and bounded count; typed actual timings with no forecast substituted into actual fields. | Default last 50 running/succeeded rows and optional other outcomes match the documented query. Same package names across folders/projects stay isolated; use synthetic coverage where the existing live fixture lacks a case and record any native gap. Labels/limits agree and current legacy history remains available. |
+| C7b | Basic history estimates from the most recent five completed successful runs preceding the execution being estimated. Return method/sample count and separate estimated duration/end fields. | Exclude the current execution and future samples; test fewer than five samples, no history, zero/null durations and running rows. Independent calculations match the selected cutoff/order; actual end times remain NULL until observed. No model dependency or prediction-accuracy claim. |
+| C8 | API-wide local acceptance and handoff. Consolidate contract examples, intentional legacy differences, native replay and measured query/resource behavior. | Full existing regressions plus contract tests pass. Actual normal/restricted identities and independent SQL verify implemented resources, safe failures/timeouts, redaction, bounded rows/payloads and no accumulating active work/resources. Record representative cold/warm timings/plans; claim p95 targets only with a defined workload and enough samples. Keep unavailable checks NOT RUN and stop/audit task-owned helpers. Hosting/stream checks remain deferred, not passed. |
+
+### Order and stage gates
+
+Start with **C1a → C1b → C1c → C2a**. This puts the contract and known native conversion problem ahead of dependent endpoints. Follow with C2b and C3a/C3b, then C3c and C4a; C4b/C4c/C5/C6 build on the visible-execution and capability boundary. Implement C7a before C7b, and finish with C8. Keep each task reviewable and update its evidence/status here before expanding scope.
+
+The first native overview can start in delivery phase 3 after **C1 + C2a + C3a + C3b** pass their local checks. It can link to legacy details initially and expose only implemented sorts until C2b passes. This overlap is an early usable milestone, not full API completion. The new frontend shell/build, screen parity, SSE/detector/recovery and production hosting stay in their own phases.
+
+Stage C is complete only after all C1–C8 rows have their stated contract and local SQL/HTTP evidence, the API works without the replacement UI, read-only/access/redaction behavior is checked, and remaining production gates are explicitly carried forward. Preserve the two open native backend follow-ups until their own evidence closes them; do not relabel the five existing incomplete checklist cases merely because API work starts.
+
+Planning validation: roadmap/plan/progress alignment, task dependencies, local Markdown links/anchors and whitespace are checked for this documentation change. No endpoints, SQL, packages, permissions, runtime dependencies or servers are changed; no application-test replay is needed for the task breakdown.
 
 ## B1 work record
 
@@ -281,7 +331,7 @@ Prepared against merged `dev-next` commit `45bfb3c`:
 - Kept all integration results NOT RUN. This documentation preparation does not change B5a3/P0b, the Windows replay requirement, or B5c. No application, SQL, template or dependency changes.
 - Verified all case labels, unchanged result statuses, local Markdown links/anchors, Python snippet syntax and whitespace. On the existing Linux/Python 3.12 environment, replayed route discovery from two working directories, invalid-timeout rejection and the helper's missing-driver failure path without leaking dummy credentials. PowerShell execution, successful SQL connections and native SQL timeouts still require the Windows/SSISDB setup; the 101-test application suite was not rerun for this documentation-only change.
 
-Next active validation: **B5a3b/P0b**, the missing local reader identities and representative fixtures. B5c and related hosting work are now deferred at the user's request; their eventual delivery gates do not block this local work.
+At this preparation stage, the next active validation was **B5a3b/P0b**, the missing local reader identities and representative fixtures; B5a3b2 below records their later completion. B5c and related hosting work remain deferred at the user's request; their eventual delivery gates do not block local API work.
 
 ## B5a3a / local real-data validation
 

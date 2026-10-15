@@ -1,8 +1,8 @@
 # ssis-dashboard-next modernization plan
 
-Date: 12 October 2026
+Updated: 15 October 2026. Source audit: 12 October 2026.
 
-Status: proposed implementation plan; source audit completed. [The roadmap](roadmap.md) is the source of truth for scope and frontend decisions.
+Status: implementation in progress; backend foundation largely delivered, read-only API next. [The roadmap](roadmap.md) is the source of truth for scope and frontend decisions.
 
 Track delivered submilestones, validation evidence, and the next bounded code task in [implementation progress](PROGRESS.md). A delivery phase may span several code tasks; the progress log records that decomposition without treating partial completion as phase completion.
 
@@ -240,9 +240,11 @@ Use reviewable commits on `dev-next`, or feature branches/PRs against that devel
 | 5. Production live updates | SSE endpoint and event contract, shared detection, snapshot/resume/resync, heartbeats, bounded queues, subscription cleanup, hidden-tab recovery, connection status, polling fallback, proxy/worker validation | A production stream works behind the intended authenticated proxy; reconnect/restart/overflow recovery passes; ordinary API traffic and DB load remain acceptable; all updates preserve view state | 3–5 days |
 | 6. Cutover | Default to new UI, remove Jinja UI/legacy assets, package prebuilt frontend files, update Windows/container docs, CI and rollback instructions | No obsolete browser assets or public internet requests; clean production build/install and representative SSISDB/stream load pass; previous release remains deployable | 2–3 days |
 
-Total planning range: **17–27 developer days** for a tested replacement including production live updates. The first usable list/filter screen should arrive earlier, after the foundation and initial API work. Re-estimate after the real-data baseline and stream prototype, especially for event volume, child timing, shared-user permissions, and proxy/worker capacity.
+Total original planning range: **17–27 developer days** for a tested replacement including production live updates. These original ranges are not a remaining-work estimate. The first usable list/filter screen should arrive earlier, after the foundation and initial API work. Re-estimate API effort after the contract, native timestamp solution and first measured paged query; re-estimate production work after hosting is reprioritized and the stream prototype is measured.
 
-The highest-priority implementation slice is a reproducible startup and a testable backend boundary: dependency constraints, app factory/configuration, explicit connection/cursor ownership and timeouts, cleanup after failures, and focused regressions for the default execution-filter mismatch and invalid input. Record the workflow baseline in parallel and keep the legacy presentation working. Follow this with `GET /api/v1/executions` plus a minimal native table to test the data/API/UI boundary. Prototype streaming capacity before committing to shared-production hosting; deliver the resilient production stream in phase 5.
+The next active stage is **Stage C / delivery phase 2: the read-only API**. Its [tracked task breakdown](PROGRESS.md#stage-c--read-only-api-delivery-phase-2) starts with C1a, the explicit contract and local access policy; C1b resolves typed/native timestamp conversion; C1c adds the common HTTP boundary; C2a delivers `GET /api/v1/executions`. Preserve the legacy presentation adapter throughout. Keep native cleanup-failure observation open without blocking unrelated API work; do not represent the formatted legacy timestamps as proof of typed datetimeoffset compatibility.
+
+After C1, C2a and the C3a/C3b navigation/summary slices pass local contract and SQL checks, phase 3 can deliver the first native filter/list/cards screen and link to existing execution details. Required global sorts remain C2b; timeline, remaining inspection resources, events, values, history and API-wide acceptance remain explicit Stage C work. This early screen does not complete phase 2, feature parity or live updates. Production hosting/proxy/capacity work stays deferred; phase 5 still requires a validated production stream when hosting resumes.
 
 ### Coexistence and rollback
 

@@ -6,6 +6,8 @@ The [backend checklist](BACKEND_CHECKLIST.md) holds procedures, results and the 
 
 **Hosting is on hold at the user's request (15 October 2026).** Defer B5c, HOST-01/02/03, service/container deployment, production authentication/proxy/HTTPS/host-log configuration, and production stream/proxy capacity validation until reprioritized. Continue local database permissions, fixtures, application behavior and non-hosting implementation independently. The migration targets below remain in scope for later delivery.
 
+**Next: Stage C / delivery phase 2, the read-only API.** Start with the contract and typed-data boundary, including the observed datetimeoffset limitation, then deliver a bounded execution-list endpoint. Follow with navigation/metrics, execution inspection, events, redacted values and corrected history. The [Stage C task breakdown](PROGRESS.md#stage-c--read-only-api-delivery-phase-2) records dependencies and exit checks. Native cleanup-failure observation remains an open backend follow-up; hosting stays deferred. The first native screen can begin once the list, navigation and summary API slices pass their local checks; full API and production live-update completion retain their separate gates.
+
 ## Current
 
 - Flask/Jinja renders the dashboard from SSISDB catalog queries.
