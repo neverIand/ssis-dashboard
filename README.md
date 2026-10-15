@@ -21,8 +21,8 @@ The purpose of this project is to provide a web-based, user-friendly, useful and
 * [Roadmap](docs/roadmap.md)
 * [Modernization Plan](docs/MODERNIZATION_PLAN.md)
 * [Implementation Progress](docs/PROGRESS.md)
-* [Backend Manual Checklist](docs/BACKEND_CHECKLIST.md)
-* [Local SSISDB Validation Guide](docs/BACKEND_VALIDATION_GUIDE.md)
+* [Backend Validation: Checklist, Procedures & Results](docs/BACKEND_CHECKLIST.md)
+* [SSIS Test Project Guide](docs/SSIS_FIXTURE_PROJECT_GUIDE.md)
 
 ## Development on dev-next
 

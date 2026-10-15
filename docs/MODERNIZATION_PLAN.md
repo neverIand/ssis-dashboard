@@ -6,6 +6,8 @@ Status: proposed implementation plan; source audit completed. [The roadmap](road
 
 Track delivered submilestones, validation evidence, and the next bounded code task in [implementation progress](PROGRESS.md). A delivery phase may span several code tasks; the progress log records that decomposition without treating partial completion as phase completion.
 
+Validation update, 15 October 2026: the consolidated [backend checklist](BACKEND_CHECKLIST.md) records **25 of 30 cases PASS**, including the Windows/Python 3.14/native SQL baseline, designed fixtures and both actual Windows reader accounts. [SSIS fixture steps 7–10](SSIS_FIXTURE_PROJECT_GUIDE.md) are complete after 84 additional HTTP requests and 628 passing assertions. Native cleanup-failure observation and raw datetimeoffset compatibility keep their local follow-ups explicit. At the user's request, B5c and all production service/container/proxy/transport/host-log and production stream-capacity work remain deferred. Hosting remains an eventual delivery gate and does not block current local work. The design targets remain unchanged.
+
 ## Recommendation
 
 Keep Python, Flask, pyodbc, and the useful SSISDB queries. Turn the backend into a documented, read-only JSON API and replace the existing browser stack with vanilla JavaScript ES modules, semantic HTML, and authored CSS. Use native tables and small SVG charts where practical; chart and table libraries are allowed when their complexity justifies them. Migrate screen by screen, with the old interface available until the replacement covers its workflows and live updates.
