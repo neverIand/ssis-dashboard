@@ -2,7 +2,7 @@
 
 Updated: 15 October 2026. Source audit: 12 October 2026.
 
-Status: implementation in progress; backend foundation largely delivered, API contract drafted and exact typed/native boundary validated. [The roadmap](roadmap.md) is the source of truth for scope and frontend decisions.
+Status: implementation in progress; contract/typed/HTTP API foundation complete, with metadata/liveness/readiness implemented and execution resources next. [The roadmap](roadmap.md) is the source of truth for scope and frontend decisions.
 
 Track delivered submilestones, validation evidence, and the next bounded code task in [implementation progress](PROGRESS.md). A delivery phase may span several code tasks; the progress log records that decomposition without treating partial completion as phase completion.
 
@@ -139,7 +139,7 @@ Render catalog names and event text using `textContent`, never database-derived 
 
 ## Proposed API contract
 
-All monitoring operations are read-only `GET /api/v1/...`. JSON resources return data, not HTML fragments or CSS class names; `/stream` instead returns `text/event-stream`. These paths are proposed, not implemented. C1a's [detailed contract and local access policy](API_CONTRACT.md) and [OpenAPI 3.1 draft](openapi.yaml) define the Stage C fields, examples, limits, sort/paging rules and deliberate legacy differences. All 14 documented GET operations remain marked planned; the stream schema remains phase 5 work.
+All monitoring operations are read-only `GET /api/v1/...`. JSON resources return data, not HTML fragments or CSS class names; `/stream` instead returns `text/event-stream`. C1c implements `/meta`, `/healthz` and `/readyz`; the other 11 Stage C operations remain planned. C1a's [detailed contract and local access policy](API_CONTRACT.md) and [OpenAPI 3.1 draft](openapi.yaml) define fields, examples, limits, sort/paging rules and deliberate legacy differences. Each OpenAPI operation records its implementation status; the stream schema remains phase 5 work.
 
 | Endpoint | Purpose / principal inputs |
 | --- | --- |
@@ -242,7 +242,7 @@ Use reviewable commits on `dev-next`, or feature branches/PRs against that devel
 
 Total original planning range: **17–27 developer days** for a tested replacement including production live updates. These original ranges are not a remaining-work estimate. The first usable list/filter screen should arrive earlier, after the foundation and initial API work. Re-estimate API effort after the contract, native timestamp solution and first measured paged query; re-estimate production work after hosting is reprioritized and the stream prototype is measured.
 
-The active stage is **Stage C / delivery phase 2: the read-only API**. Its [tracked task breakdown](PROGRESS.md#stage-c--read-only-api-delivery-phase-2) records C1a's completed draft contract/local access policy and C1b's exact typed SQL/JSON boundary. Native Driver 17 converter/binding checks preserve seven timestamp digits, and all 130 database-free tests pass. Next, C1c adds the common HTTP boundary; C2a delivers `GET /api/v1/executions`. Preserve the legacy presentation adapter throughout. Native cleanup-failure observation remains open independently of C1b's conversion proof.
+The active stage is **Stage C / delivery phase 2: the read-only API**. Its [tracked task breakdown](PROGRESS.md#stage-c--read-only-api-delivery-phase-2) records C1a's completed draft contract/local access policy and C1b's exact typed SQL/JSON boundary. C1c implements the common HTTP boundary, metadata and health resources; 148 database-free tests and the recorded native request/response checks pass. Next, C2a delivers `GET /api/v1/executions` using the exact typed boundary and shared validation/capability/error behavior. Preserve the legacy presentation adapter throughout. Native cleanup-failure observation remains open independently of C1b's conversion proof.
 
 After C1, C2a and the C3a/C3b navigation/summary slices pass local contract and SQL checks, phase 3 can deliver the first native filter/list/cards screen and link to existing execution details. Required global sorts remain C2b; timeline, remaining inspection resources, events, values, history and API-wide acceptance remain explicit Stage C work. This early screen does not complete phase 2, feature parity or live updates. Production hosting/proxy/capacity work stays deferred; phase 5 still requires a validated production stream when hosting resumes.
 

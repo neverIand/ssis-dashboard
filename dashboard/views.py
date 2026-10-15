@@ -5,8 +5,7 @@ from flask import abort, render_template
 from dashboard.ssis import monitor
 from dashboard.validation import event_query, status_code, validate_execution_id
 
-# Set app version
-version = "0.6.8 (beta)"
+from dashboard.version import APP_VERSION as version
 
 # Define routes
 def packages(folder_name=monitor.all, project_name=monitor.all, status=monitor.all):

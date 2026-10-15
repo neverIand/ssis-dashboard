@@ -1,10 +1,10 @@
-# C1a draft: every operation below is planned, not implemented.
+# C1c: metadata/liveness/readiness implemented; remaining operations planned.
 openapi: 3.1.1
 jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
 info:
   title: ssis-dashboard read-only API
   version: 1.0.0-draft.1
-  description: C1a DRAFT. All operations are planned and unimplemented. API_CONTRACT.md defines local access, semantic
+  description: Stage C DRAFT. C1c implements metadata/liveness/readiness; remaining resources are planned. API_CONTRACT.md defines local access, semantic
     validation, cursor and cross-field rules. No production/shared authentication or stream implementation is claimed.
   license: {name: Apache-2.0, identifier: Apache-2.0}
 servers:
@@ -18,8 +18,8 @@ paths:
     get:
       operationId: getMeta
       summary: Non-secret API metadata and implemented capabilities
-      description: PLANNED; not implemented.
-      x-implementation-status: planned
+      description: Implemented in C1c; no catalog query. Execution sorts are empty until C2a ships.
+      x-implementation-status: implemented
       x-milestone: C1c
       parameters: []
       responses:
@@ -387,8 +387,8 @@ paths:
     get:
       operationId: getLiveness
       summary: Process liveness without database work
-      description: PLANNED; not implemented.
-      x-implementation-status: planned
+      description: Implemented in C1c; no catalog query.
+      x-implementation-status: implemented
       x-milestone: C1c
       parameters: []
       responses:
@@ -409,9 +409,9 @@ paths:
     get:
       operationId: getReadiness
       summary: One bounded read-only dependency check
-      description: PLANNED; not implemented. Two-second positive driver login/query caps each by default, not a
-        two-second total HTTP deadline. No connection or identity diagnostics.
-      x-implementation-status: planned
+      description: Implemented in C1c. One zero-row catalog read with two-second positive driver login/query caps
+        each by default, reduced by lower global timeouts; not a two-second total HTTP deadline. No connection or identity diagnostics.
+      x-implementation-status: implemented
       x-milestone: C1c
       parameters: []
       responses:
@@ -1988,7 +1988,7 @@ components:
           - {code: 4, name: runtime-lineage}
           - {code: 100, name: custom}
           event_kinds: [all, errors, warnings, duplicate-warnings, memory-warnings]
-          execution_sorts: [execution_id]
+          execution_sorts: []
         meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z'}
     FoldersResponse:
       summary: Synthetic target response; not live output

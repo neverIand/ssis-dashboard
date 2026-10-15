@@ -13,7 +13,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 def create_app(config_overrides=None, *, config_path=None):
-    """Create an independent app with the existing HTML routes.
+    """Create an independent app with retained HTML and versioned API routes.
 
     An explicit file takes precedence over DASHBOARD_CONFIG. Relative explicit
     and environment paths retain Flask's package-relative convention. With
@@ -43,9 +43,11 @@ def create_app(config_overrides=None, *, config_path=None):
 
     from dashboard.db import validate_timeouts
     from dashboard.timezones import validate_display_timezone
+    from dashboard.api import register_api, validate_config
 
     validate_timeouts(app.config['DB_LOGIN_TIMEOUT_SECONDS'], app.config['DB_QUERY_TIMEOUT_SECONDS'])
     validate_display_timezone(app.config['DISPLAY_TIMEZONE'])
+    validate_config(app.config)
 
     from dashboard import filters, processors
     from dashboard.errors import register_error_handlers
@@ -54,6 +56,7 @@ def create_app(config_overrides=None, *, config_path=None):
 
     register_views(app)
     register_observability(app)
+    register_api(app)
     register_error_handlers(app)
     app.context_processor(processors.utility_processor)
     app.add_template_filter(filters.project, 'project')

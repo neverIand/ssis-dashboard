@@ -12,6 +12,7 @@ from werkzeug.exceptions import HTTPException
 
 from dashboard.validation import InvalidInput
 from dashboard.observability import log_event, request_id as _request_id
+from dashboard.api import is_api_request, problem_response
 
 
 _PACKAGE_ROOT = Path(__file__).resolve().parent
@@ -67,6 +68,8 @@ _DETAILS = {
 
 
 def _error_response(status, *, response=None):
+    if is_api_request():
+        return problem_response(status, response=response)
     if response is None:
         response = current_app.response_class(status=status)
     response.set_data(render_template(

@@ -26,6 +26,14 @@ AS_OF_DATE = 'NOW'
 # Validated at startup; legacy SQL display formatting is unchanged.
 DISPLAY_TIMEZONE = 'Europe/London'
 
+# Local API policy; these flags do not introduce browser/SQL identity delegation.
+API_EVENTS_ENABLED = False
+API_VALUES_ENABLED = False
+API_OVERRIDE_VALUES_ENABLED = False
+API_MAX_RANGE_HOURS = 744
+API_MAX_TIMELINE_BUCKETS = 1000
+API_READINESS_TIMEOUT_SECONDS = 2
+
 # Time range to display. Data will be shown from AS_OF_DATE - HOUR_SPAN value to AS_OF_DATE.
 HOUR_SPAN = 360
 

@@ -1,10 +1,10 @@
 # Read-only API contract
 
-Updated: 15 October 2026. Milestone: C1a. **Draft implementation contract; none of these endpoints exists yet.** [OpenAPI](openapi.yaml) defines fields, parameters, examples and response schemas; this document defines cross-field rules and local access policy. Track delivery in [PROGRESS](PROGRESS.md#stage-c--read-only-api-delivery-phase-2). The [roadmap](roadmap.md) governs scope.
+Updated: 15 October 2026. Milestones: C1a–C1c. **Draft contract; `/api/v1/meta`, `/healthz` and `/readyz` are implemented.** The other 11 resources remain planned. [OpenAPI](openapi.yaml) defines fields, parameters, examples and response schemas; this document defines cross-field rules and local access policy. Track delivery in [PROGRESS](PROGRESS.md#stage-c--read-only-api-delivery-phase-2). The [roadmap](roadmap.md) governs scope.
 
 ## Delivery and compatibility
 
-Stage C covers 12 `/api/v1` resources plus `/healthz` and `/readyz`. Every OpenAPI operation has `x-implementation-status: planned` and its delivery milestone. An implemented resource changes status only when its own evidence is recorded. The stream contract belongs to phase 5 and is deliberately absent from the Stage C paths; the existing SSE requirement remains in the modernization plan.
+Stage C covers 12 `/api/v1` resources plus `/healthz` and `/readyz`. OpenAPI marks C1c's three operations `implemented`, with the other 11 `planned`, and records their delivery milestones. An implemented resource changes status only when its own evidence is recorded. The stream contract belongs to phase 5 and is deliberately absent from the Stage C paths; the existing SSE requirement remains in the modernization plan. `/meta` currently advertises an empty execution-sort list because the execution endpoint starts in C2a.
 
 Keep legacy routes, formatted SQL results and HTML errors working through their adapter. The API has its own typed result models and safe JSON errors. Use `GET` for monitoring; ordinary `HEAD` has the same policy/status/headers and no body, and Flask may answer `OPTIONS` with method information. Neither provides a capability bypass. Other methods return 405 with `Allow`. GET requests have no request body. Frontend and API share an application origin and base path; the spec's `/` server denotes the local root binding, and a later prefix deployment must publish the correct base URL. Do not hardcode the origin root in clients.
 
@@ -16,7 +16,7 @@ The initial API is for a loopback-bound process under one configured SQL identit
 
 All catalog queries enforce the configured SQL connection identity's visibility. A browser does not choose a database identity. Cursors, IDs and filter names grant no access. Do not introduce a cross-user result cache, wildcard CORS or trust in browser-supplied identity/proxy headers. Shared authentication/delegation and production transport remain B5c work; the OpenAPI `security: []` describes this local mode and must not be read as approval for anonymous shared hosting.
 
-These are **proposed application settings**, to implement with C1c/C5/C6, not settings supported by today's application:
+These application settings are implemented and validated at startup in C1c. API capability guards run before view/SQL work, including for HEAD and automatic OPTIONS. The flags govern API routes; legacy pages retain their existing SQL-identity access during coexistence. Event/value resources and their redaction serializers remain C5/C6 work, and enabling a flag does not create an unimplemented endpoint:
 
 | Setting | Default | Effect |
 | --- | --- | --- |
@@ -95,7 +95,9 @@ Use RFC 9457 `application/problem+json` with `type: about:blank`, standard statu
 | 503 | `database_unavailable`; existing safe connection/authentication/driver SQLSTATE mapping |
 | 504 | `database_timeout`; existing HYT00/HYT01 mapping |
 
-`/healthz` checks process liveness with zero database queries. `/readyz` performs one read-only dependency check with separately validated positive driver login/query timeout caps of two seconds each (`API_READINESS_TIMEOUT_SECONDS`, proposed); these are driver limits, not a promise of a two-second total HTTP deadline. It exposes only ready/unavailable status and the common safe error shape. Neither returns connection/identity/server information or replaces a workflow/native/hosting check.
+`/healthz` checks process liveness with zero database queries. `/readyz` performs one zero-row catalog read in the configured SSISDB, independent of execution visibility/count. `API_READINESS_TIMEOUT_SECONDS` defaults to 2 and accepts integers 1–2; each driver login/query timeout is the smaller of this cap and its global database timeout. These are driver limits, not a promise of a two-second total HTTP deadline. It exposes only ready status or the common safe error shape. Neither returns connection/identity/server information or replaces a workflow/native/hosting check.
+
+C1c's shared input layer decodes query encoding once with strict UTF-8, rejects malformed percent escapes, duplicate/unknown/empty keys or values and NUL, and rejects GET/HEAD bodies before any catalog call. Registered resources declare accepted query keys; the three implemented resources accept none. Integer/ID, UTF-16 name-width, known-status and exact timestamp helpers are ready for resource tasks. Cohort/pattern/cursor behavior remains with C2a and later resources. Unknown routes under `/api/v1` return JSON 404; HTTP 405 preserves `Allow`. The local mode has no login requirement; a future authentication boundary's real 401 challenge is preserved by the common renderer.
 
 ## Validation and remaining gates
 
