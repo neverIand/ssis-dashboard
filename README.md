@@ -21,6 +21,7 @@ The purpose of this project is to provide a web-based, user-friendly, useful and
 * [Roadmap](docs/roadmap.md)
 * [Modernization Plan](docs/MODERNIZATION_PLAN.md)
 * [Implementation Progress](docs/PROGRESS.md)
+* [Draft Read-only API Contract](docs/API_CONTRACT.md) and [OpenAPI](docs/openapi.yaml)
 * [Backend Validation: Checklist, Procedures & Results](docs/BACKEND_CHECKLIST.md)
 * [SSIS Test Project Guide](docs/SSIS_FIXTURE_PROJECT_GUIDE.md)
 
@@ -33,9 +34,10 @@ python -m pip install -r requirements.txt
 python -m flask --app dashboard:create_app run --host=127.0.0.1
 ```
 
-Run database-free application tests with the standard library test runner:
+Run the database-free tests with the standard library test runner:
 
 ```sh
+python -m pip install -r requirements-dev.txt
 python -m unittest discover -s tests -v
 ```
 

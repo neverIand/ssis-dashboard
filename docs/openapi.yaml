@@ -1,0 +1,2176 @@
+# C1a draft: every operation below is planned, not implemented.
+openapi: 3.1.1
+jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
+info:
+  title: ssis-dashboard read-only API
+  version: 1.0.0-draft.1
+  description: C1a DRAFT. All operations are planned and unimplemented. API_CONTRACT.md defines local access, semantic
+    validation, cursor and cross-field rules. No production/shared authentication or stream implementation is claimed.
+  license: {name: Apache-2.0, identifier: Apache-2.0}
+servers:
+- {url: /, description: Local application root. A future URL-prefix deployment must publish its actual application
+    base.}
+security: []
+x-contract-status: draft
+x-deferred-resources: [/api/v1/stream (phase 5; event/resume/resync schemas not defined here)]
+paths:
+  /api/v1/meta:
+    get:
+      operationId: getMeta
+      summary: Non-secret API metadata and implemented capabilities
+      description: PLANNED; not implemented.
+      x-implementation-status: planned
+      x-milestone: C1c
+      parameters: []
+      responses:
+        '200':
+          description: Successful documented resource; empty visible collections remain successful.
+          headers:
+            X-Request-ID: {$ref: '#/components/headers/RequestId'}
+            Cache-Control: {$ref: '#/components/headers/NoStore'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MetaResponse'}
+              examples:
+                synthetic: {$ref: '#/components/examples/MetaResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /api/v1/folders:
+    get:
+      operationId: listFolders
+      summary: Visible folders containing visible projects
+      description: PLANNED; not implemented.
+      x-implementation-status: planned
+      x-milestone: C3a
+      parameters:
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      - {$ref: '#/components/parameters/FolderSort'}
+      - {$ref: '#/components/parameters/AscendingDirection'}
+      responses:
+        '200':
+          description: Successful documented resource; empty visible collections remain successful.
+          headers:
+            X-Request-ID: {$ref: '#/components/headers/RequestId'}
+            Cache-Control: {$ref: '#/components/headers/NoStore'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FoldersResponse'}
+              examples:
+                synthetic: {$ref: '#/components/examples/FoldersResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '503': {$ref: '#/components/responses/DatabaseUnavailable'}
+        '504': {$ref: '#/components/responses/DatabaseTimeout'}
+  /api/v1/projects:
+    get:
+      operationId: listProjects
+      summary: Visible projects in one exact folder
+      description: PLANNED; not implemented.
+      x-implementation-status: planned
+      x-milestone: C3a
+      parameters:
+      - {$ref: '#/components/parameters/RequiredFolder'}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      - {$ref: '#/components/parameters/ProjectSort'}
+      - {$ref: '#/components/parameters/AscendingDirection'}
+      responses:
+        '200':
+          description: Successful documented resource; empty visible collections remain successful.
+          headers:
+            X-Request-ID: {$ref: '#/components/headers/RequestId'}
+            Cache-Control: {$ref: '#/components/headers/NoStore'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProjectsResponse'}
+              examples:
+                synthetic: {$ref: '#/components/examples/ProjectsResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '503': {$ref: '#/components/responses/DatabaseUnavailable'}
+        '504': {$ref: '#/components/responses/DatabaseTimeout'}
+  /api/v1/metrics/summary:
+    get:
+      operationId: getSummary
+      summary: All-status counts in the created-time cohort
+      description: PLANNED; not implemented. Accept status for shared filter URLs, but intentionally count all statuses.
+        Reuse explicit bounds from execution pages.
+      x-implementation-status: planned
+      x-milestone: C3b
+      parameters:
+      - {$ref: '#/components/parameters/Folder'}
+      - {$ref: '#/components/parameters/Project'}
+      - {$ref: '#/components/parameters/FolderPattern'}
+      - {$ref: '#/components/parameters/ProjectPattern'}
+      - {$ref: '#/components/parameters/From'}
+      - {$ref: '#/components/parameters/To'}
+      - {$ref: '#/components/parameters/Status'}
+      responses:
+        '200':
+          description: Successful documented resource; empty visible collections remain successful.
+          headers:
+            X-Request-ID: {$ref: '#/components/headers/RequestId'}
+            Cache-Control: {$ref: '#/components/headers/NoStore'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SummaryResponse'}
+              examples:
+                synthetic: {$ref: '#/components/examples/SummaryResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '503': {$ref: '#/components/responses/DatabaseUnavailable'}
+        '504': {$ref: '#/components/responses/DatabaseTimeout'}
+  /api/v1/metrics/timeline:
+    get:
+      operationId: getTimeline
+      summary: Zero-filled timezone-aware creation buckets
+      description: PLANNED; not implemented. Apply selected statuses before buckets; current status is not a historical
+        reconstruction. Return UTC bucket boundaries across DST.
+      x-implementation-status: planned
+      x-milestone: C3c
+      parameters:
+      - {$ref: '#/components/parameters/Folder'}
+      - {$ref: '#/components/parameters/Project'}
+      - {$ref: '#/components/parameters/FolderPattern'}
+      - {$ref: '#/components/parameters/ProjectPattern'}
+      - {$ref: '#/components/parameters/From'}
+      - {$ref: '#/components/parameters/To'}
+      - {$ref: '#/components/parameters/Status'}
+      - {$ref: '#/components/parameters/Bucket'}
+      responses:
+        '200':
+          description: Successful documented resource; empty visible collections remain successful.
+          headers:
+            X-Request-ID: {$ref: '#/components/headers/RequestId'}
+            Cache-Control: {$ref: '#/components/headers/NoStore'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TimelineResponse'}
+              examples:
+                synthetic: {$ref: '#/components/examples/TimelineResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '503': {$ref: '#/components/responses/DatabaseUnavailable'}
+        '504': {$ref: '#/components/responses/DatabaseTimeout'}
+  /api/v1/executions:
+    get:
+      operationId: listExecutions
+      summary: Bounded execution page with recorded event counts
+      description: PLANNED; not implemented. C2a implements execution_id sort only. C2b adds other advertised global
+        sorts. Use created_time bounds, an upper ID and authenticated filter-bound keyset cursors; no database snapshot.
+      x-implementation-status: planned
+      x-milestone: C2a/C2b
+      parameters:
+      - {$ref: '#/components/parameters/Folder'}
+      - {$ref: '#/components/parameters/Project'}
+      - {$ref: '#/components/parameters/FolderPattern'}
+      - {$ref: '#/components/parameters/ProjectPattern'}
+      - {$ref: '#/components/parameters/From'}
+      - {$ref: '#/components/parameters/To'}
+      - {$ref: '#/components/parameters/Status'}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      - {$ref: '#/components/parameters/ExecutionSort'}
+      - {$ref: '#/components/parameters/Direction'}
+      responses:
+        '200':
+          description: Successful documented resource; empty visible collections remain successful.
+          headers:
+            X-Request-ID: {$ref: '#/components/headers/RequestId'}
+            Cache-Control: {$ref: '#/components/headers/NoStore'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExecutionsResponse'}
+              examples:
+                synthetic: {$ref: '#/components/examples/ExecutionsResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '503': {$ref: '#/components/responses/DatabaseUnavailable'}
+        '504': {$ref: '#/components/responses/DatabaseTimeout'}
+  /api/v1/executions/{id}:
+    get:
+      operationId: getExecution
+      summary: Visible execution identity, actual timings and event counts
+      description: PLANNED; not implemented. Independent of overview filters. Absent and hidden IDs return indistinguishable
+        safe 404 before further work.
+      x-implementation-status: planned
+      x-milestone: C4a
+      parameters:
+      - {$ref: '#/components/parameters/ExecutionId'}
+      responses:
+        '200':
+          description: Successful documented resource; empty visible collections remain successful.
+          headers:
+            X-Request-ID: {$ref: '#/components/headers/RequestId'}
+            Cache-Control: {$ref: '#/components/headers/NoStore'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExecutionResponse'}
+              examples:
+                synthetic: {$ref: '#/components/examples/ExecutionResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '503': {$ref: '#/components/responses/DatabaseUnavailable'}
+        '504': {$ref: '#/components/responses/DatabaseTimeout'}
+  /api/v1/executions/{id}/executables:
+    get:
+      operationId: listExecutables
+      summary: Bounded executable observations
+      description: PLANNED; not implemented.
+      x-implementation-status: planned
+      x-milestone: C4b
+      parameters:
+      - {$ref: '#/components/parameters/ExecutionId'}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      - {$ref: '#/components/parameters/ExecutableSort'}
+      - {$ref: '#/components/parameters/AscendingDirection'}
+      responses:
+        '200':
+          description: Successful documented resource; empty visible collections remain successful.
+          headers:
+            X-Request-ID: {$ref: '#/components/headers/RequestId'}
+            Cache-Control: {$ref: '#/components/headers/NoStore'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExecutablesResponse'}
+              examples:
+                synthetic: {$ref: '#/components/examples/ExecutablesResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '503': {$ref: '#/components/responses/DatabaseUnavailable'}
+        '504': {$ref: '#/components/responses/DatabaseTimeout'}
+  /api/v1/executions/{id}/children:
+    get:
+      operationId: listChildren
+      summary: Bounded child invocation observations within parent execution
+      description: PLANNED; not implemented. Use path/source/occurrence matching; incomplete observations retain
+        NULL end/duration. Children share the parent's execution ID.
+      x-implementation-status: planned
+      x-milestone: C4c
+      parameters:
+      - {$ref: '#/components/parameters/ExecutionId'}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      - {$ref: '#/components/parameters/ChildSort'}
+      - {$ref: '#/components/parameters/AscendingDirection'}
+      responses:
+        '200':
+          description: Successful documented resource; empty visible collections remain successful.
+          headers:
+            X-Request-ID: {$ref: '#/components/headers/RequestId'}
+            Cache-Control: {$ref: '#/components/headers/NoStore'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ChildrenResponse'}
+              examples:
+                synthetic: {$ref: '#/components/examples/ChildrenResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '503': {$ref: '#/components/responses/DatabaseUnavailable'}
+        '504': {$ref: '#/components/responses/DatabaseTimeout'}
+  /api/v1/executions/{id}/events:
+    get:
+      operationId: listEvents
+      summary: Paged category/search results across full matching event text
+      description: PLANNED; not implemented. Disabled by default; deny before SQL. Literal full-message search precedes
+        paging/display truncation. No exact total required.
+      x-implementation-status: planned
+      x-milestone: C5
+      parameters:
+      - {$ref: '#/components/parameters/ExecutionId'}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      - {$ref: '#/components/parameters/EventKind'}
+      - {$ref: '#/components/parameters/Search'}
+      - {$ref: '#/components/parameters/EventSort'}
+      - {$ref: '#/components/parameters/AscendingDirection'}
+      responses:
+        '200':
+          description: Successful documented resource; empty visible collections remain successful.
+          headers:
+            X-Request-ID: {$ref: '#/components/headers/RequestId'}
+            Cache-Control: {$ref: '#/components/headers/NoStore'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EventsResponse'}
+              examples:
+                synthetic: {$ref: '#/components/examples/EventsResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '503': {$ref: '#/components/responses/DatabaseUnavailable'}
+        '504': {$ref: '#/components/responses/DatabaseTimeout'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+      x-local-capability: events
+  /api/v1/executions/{id}/values:
+    get:
+      operationId: listValues
+      summary: One bounded parameter or property-override section
+      description: PLANNED; not implemented. Disabled by default; deny before SQL. Fixed ascending ID/path order
+        per section. Override values default to NULL/policy-redacted; sensitive values always redacted.
+      x-implementation-status: planned
+      x-milestone: C6
+      parameters:
+      - {$ref: '#/components/parameters/ExecutionId'}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      - {$ref: '#/components/parameters/Section'}
+      responses:
+        '200':
+          description: Successful documented resource; empty visible collections remain successful.
+          headers:
+            X-Request-ID: {$ref: '#/components/headers/RequestId'}
+            Cache-Control: {$ref: '#/components/headers/NoStore'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ValuesResponse'}
+              examples:
+                ParametersResponse: {$ref: '#/components/examples/ParametersResponse'}
+                OverridesResponse: {$ref: '#/components/examples/OverridesResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '503': {$ref: '#/components/responses/DatabaseUnavailable'}
+        '504': {$ref: '#/components/responses/DatabaseTimeout'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+      x-local-capability: values
+  /api/v1/history:
+    get:
+      operationId: listHistory
+      summary: Exact package history with separate estimates
+      description: PLANNED; not implemented. Default last 50 running/succeeded; no implicit dashboard time range.
+        C7a returns estimate NULL; C7b adds prior-five-successful mean with no future samples.
+      x-implementation-status: planned
+      x-milestone: C7a/C7b
+      parameters:
+      - {$ref: '#/components/parameters/RequiredFolder'}
+      - {$ref: '#/components/parameters/RequiredProject'}
+      - {$ref: '#/components/parameters/RequiredPackage'}
+      - {$ref: '#/components/parameters/HistoryStatus'}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      - {$ref: '#/components/parameters/HistorySort'}
+      - {$ref: '#/components/parameters/Direction'}
+      responses:
+        '200':
+          description: Successful documented resource; empty visible collections remain successful.
+          headers:
+            X-Request-ID: {$ref: '#/components/headers/RequestId'}
+            Cache-Control: {$ref: '#/components/headers/NoStore'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HistoryResponse'}
+              examples:
+                synthetic: {$ref: '#/components/examples/HistoryResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '503': {$ref: '#/components/responses/DatabaseUnavailable'}
+        '504': {$ref: '#/components/responses/DatabaseTimeout'}
+  /healthz:
+    get:
+      operationId: getLiveness
+      summary: Process liveness without database work
+      description: PLANNED; not implemented.
+      x-implementation-status: planned
+      x-milestone: C1c
+      parameters: []
+      responses:
+        '200':
+          description: Successful documented resource; empty visible collections remain successful.
+          headers:
+            X-Request-ID: {$ref: '#/components/headers/RequestId'}
+            Cache-Control: {$ref: '#/components/headers/NoStore'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LivenessResponse'}
+              examples:
+                synthetic: {$ref: '#/components/examples/LivenessResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /readyz:
+    get:
+      operationId: getReadiness
+      summary: One bounded read-only dependency check
+      description: PLANNED; not implemented. Two-second positive driver login/query caps each by default, not a
+        two-second total HTTP deadline. No connection or identity diagnostics.
+      x-implementation-status: planned
+      x-milestone: C1c
+      parameters: []
+      responses:
+        '200':
+          description: Successful documented resource; empty visible collections remain successful.
+          headers:
+            X-Request-ID: {$ref: '#/components/headers/RequestId'}
+            Cache-Control: {$ref: '#/components/headers/NoStore'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReadinessResponse'}
+              examples:
+                synthetic: {$ref: '#/components/examples/ReadinessResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '503': {$ref: '#/components/responses/DatabaseUnavailable'}
+        '504': {$ref: '#/components/responses/DatabaseTimeout'}
+components:
+  schemas:
+    Id: {type: string, maxLength: 19, pattern: '^([1-9][0-9]{0,17}|[1-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6]|9223372036854775807)$',
+      description: Positive SQL BIGINT decimal string; numeric value <= 9223372036854775807. Never a floating-point
+        number.}
+    Lsn: {type: string, maxLength: 19, pattern: '^(0|([1-9][0-9]{0,17}|[1-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6]|9223372036854775807))$',
+      description: 'Nonnegative SQL BIGINT decimal string, <= 9223372036854775807; not a sequential counter.'}
+    UtcTimestamp: {type: string, maxLength: 28, format: date-time, pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\.[0-9]{1,7})?Z$',
+      description: 'UTC RFC 3339; preserve up to seven fractional digits, including SQL''s seventh digit when present.'}
+    InputTimestamp:
+      type: string
+      maxLength: 33
+      format: date-time
+      pattern: ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\.[0-9]{1,7})?(Z|[+-]((0[0-9]|1[0-3]):[0-5][0-9]|14:00))$
+      description: Valid offset-aware instant, offset at most +/-14:00; uppercase T/Z, no unknown -00:00 offset
+        or leap seconds. Semantic date/range checks also apply.
+      not: {pattern: '-00:00$'}
+    RequestId: {type: string, maxLength: 32, pattern: '^[0-9a-f]{32}$'}
+    Name128: {type: string, maxLength: 128, minLength: 1, x-sql-max-utf16-units: 128}
+    PackageName: {type: string, maxLength: 260, minLength: 1, x-sql-max-utf16-units: 260}
+    Path: {type: string, maxLength: 16384, description: 'Original catalog path, never interpreted as a filesystem
+        or URL path.'}
+    Cursor: {type: string, maxLength: 8192, minLength: 1, pattern: '^[A-Za-z0-9_.-]+$', description: Opaque authenticated
+        paging token; 30-minute non-sliding lifetime. Never authorization.}
+    StatusSelection:
+      type: array
+      items:
+        type: integer
+        enum: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+      maxItems: 9
+      minItems: 1
+      uniqueItems: true
+    ExecutionStatus:
+      type: object
+      additionalProperties: false
+      required: [code, name]
+      properties:
+        code: {type: integer, minimum: -2147483648, maximum: 2147483647}
+        name:
+          type: string
+          enum: [created, running, cancelled, failed, pending, halted, succeeded, stopping, completed, unknown]
+    LoggingLevel:
+      type: object
+      additionalProperties: false
+      required: [code, name]
+      properties:
+        code: {type: integer}
+        name:
+          type: string
+          enum: [none, basic, performance, verbose, runtime-lineage, custom, unknown]
+    ExecutableResult:
+      type: object
+      additionalProperties: false
+      required: [code, name]
+      properties:
+        code: {type: integer, minimum: -32768, maximum: 32767}
+        name:
+          type: string
+          enum: [success, failure, completion, cancelled, unknown]
+    ParameterObjectType:
+      type: object
+      additionalProperties: false
+      required: [code, name]
+      properties:
+        code: {type: integer, minimum: -32768, maximum: 32767}
+        name:
+          type: string
+          enum: [project, package, system, unknown]
+    Environment:
+      type: object
+      additionalProperties: false
+      required: [folder_name, name]
+      properties:
+        folder_name:
+          anyOf:
+          - {$ref: '#/components/schemas/Name128'}
+          - {type: 'null'}
+        name:
+          anyOf:
+          - {$ref: '#/components/schemas/Name128'}
+          - {type: 'null'}
+    EventCounts:
+      type: object
+      additionalProperties: false
+      required: [all, errors, warnings, duplicate_warnings, memory_warnings]
+      properties:
+        all: {type: integer, minimum: 0, maximum: 9007199254740991}
+        errors: {type: integer, minimum: 0, maximum: 9007199254740991}
+        warnings: {type: integer, minimum: 0, maximum: 9007199254740991}
+        duplicate_warnings: {type: integer, minimum: 0, maximum: 9007199254740991}
+        memory_warnings: {type: integer, minimum: 0, maximum: 9007199254740991}
+      description: Counts of visible recorded messages; category heuristics can overlap.
+    Capabilities:
+      type: object
+      additionalProperties: false
+      required: [events, values, override_values]
+      properties:
+        events: {type: boolean}
+        values: {type: boolean}
+        override_values: {type: boolean}
+      allOf:
+      - if:
+          properties:
+            override_values: {const: true}
+          required: [override_values]
+        then:
+          properties:
+            values: {const: true}
+    Limits:
+      type: object
+      additionalProperties: false
+      required: [default_limit, max_limit, default_range_hours, max_range_hours, max_timeline_buckets, cursor_ttl_seconds,
+        max_cursor_characters, max_text_characters, max_search_characters]
+      properties:
+        default_limit: {type: integer, const: 50}
+        max_limit: {type: integer, const: 200}
+        default_range_hours: {type: integer, minimum: 1}
+        max_range_hours: {type: integer, minimum: 1}
+        max_timeline_buckets: {type: integer, minimum: 1, maximum: 1000}
+        cursor_ttl_seconds: {type: integer, const: 1800}
+        max_cursor_characters: {type: integer, const: 8192}
+        max_text_characters: {type: integer, const: 16384}
+        max_search_characters: {type: integer, const: 512}
+    ResponseMeta:
+      type: object
+      additionalProperties: false
+      required: [request_id, generated_at]
+      properties:
+        request_id: {$ref: '#/components/schemas/RequestId'}
+        generated_at: {$ref: '#/components/schemas/UtcTimestamp'}
+    PageMeta:
+      type: object
+      additionalProperties: false
+      required: [request_id, generated_at, from, to, limit, sort, direction, as_of, upper_id, next_cursor, has_more,
+        consistency]
+      properties:
+        request_id: {$ref: '#/components/schemas/RequestId'}
+        generated_at: {$ref: '#/components/schemas/UtcTimestamp'}
+        from:
+          anyOf:
+          - {$ref: '#/components/schemas/UtcTimestamp'}
+          - {type: 'null'}
+        to:
+          anyOf:
+          - {$ref: '#/components/schemas/UtcTimestamp'}
+          - {type: 'null'}
+        limit: {type: integer, minimum: 1, maximum: 200}
+        sort: {type: string, maxLength: 40}
+        direction:
+          type: string
+          enum: [asc, desc]
+        as_of: {$ref: '#/components/schemas/UtcTimestamp'}
+        upper_id:
+          anyOf:
+          - {$ref: '#/components/schemas/Id'}
+          - {type: 'null'}
+        next_cursor:
+          anyOf:
+          - {$ref: '#/components/schemas/Cursor'}
+          - {type: 'null'}
+        has_more: {type: boolean}
+        consistency: {type: string, const: live}
+      description: No database snapshot. has_more is true iff next_cursor is non-NULL; from/to are NULL for non-windowed
+        resources.
+      allOf:
+      - if:
+          properties:
+            has_more: {const: false}
+          required: [has_more]
+        then:
+          properties:
+            next_cursor: {type: 'null'}
+      - if:
+          properties:
+            has_more: {const: true}
+          required: [has_more]
+        then:
+          properties:
+            next_cursor: {$ref: '#/components/schemas/Cursor'}
+      - if:
+          properties:
+            from: {const: null}
+          required: [from]
+        then:
+          properties:
+            to: {type: 'null'}
+      - if:
+          properties:
+            to: {const: null}
+          required: [to]
+        then:
+          properties:
+            from: {type: 'null'}
+    WindowPageMeta:
+      type: object
+      additionalProperties: false
+      required: [request_id, generated_at, from, to, limit, sort, direction, as_of, upper_id, next_cursor, has_more,
+        consistency]
+      properties:
+        request_id: {$ref: '#/components/schemas/RequestId'}
+        generated_at: {$ref: '#/components/schemas/UtcTimestamp'}
+        from: {$ref: '#/components/schemas/UtcTimestamp'}
+        to: {$ref: '#/components/schemas/UtcTimestamp'}
+        limit: {type: integer, minimum: 1, maximum: 200}
+        sort: {type: string, maxLength: 40}
+        direction:
+          type: string
+          enum: [asc, desc]
+        as_of: {$ref: '#/components/schemas/UtcTimestamp'}
+        upper_id:
+          anyOf:
+          - {$ref: '#/components/schemas/Id'}
+          - {type: 'null'}
+        next_cursor:
+          anyOf:
+          - {$ref: '#/components/schemas/Cursor'}
+          - {type: 'null'}
+        has_more: {type: boolean}
+        consistency: {type: string, const: live}
+      allOf:
+      - if:
+          properties:
+            has_more: {const: false}
+          required: [has_more]
+        then:
+          properties:
+            next_cursor: {type: 'null'}
+      - if:
+          properties:
+            has_more: {const: true}
+          required: [has_more]
+        then:
+          properties:
+            next_cursor: {$ref: '#/components/schemas/Cursor'}
+      - if:
+          properties:
+            from: {const: null}
+          required: [from]
+        then:
+          properties:
+            to: {type: 'null'}
+      - if:
+          properties:
+            to: {const: null}
+          required: [to]
+        then:
+          properties:
+            from: {type: 'null'}
+    ObservationPageMeta:
+      type: object
+      additionalProperties: false
+      required: [request_id, generated_at, from, to, limit, sort, direction, as_of, upper_id, next_cursor, has_more,
+        consistency, availability]
+      properties:
+        request_id: {$ref: '#/components/schemas/RequestId'}
+        generated_at: {$ref: '#/components/schemas/UtcTimestamp'}
+        from:
+          anyOf:
+          - {$ref: '#/components/schemas/UtcTimestamp'}
+          - {type: 'null'}
+        to:
+          anyOf:
+          - {$ref: '#/components/schemas/UtcTimestamp'}
+          - {type: 'null'}
+        limit: {type: integer, minimum: 1, maximum: 200}
+        sort: {type: string, maxLength: 40}
+        direction:
+          type: string
+          enum: [asc, desc]
+        as_of: {$ref: '#/components/schemas/UtcTimestamp'}
+        upper_id:
+          anyOf:
+          - {$ref: '#/components/schemas/Id'}
+          - {type: 'null'}
+        next_cursor:
+          anyOf:
+          - {$ref: '#/components/schemas/Cursor'}
+          - {type: 'null'}
+        has_more: {type: boolean}
+        consistency: {type: string, const: live}
+        availability:
+          type: string
+          enum: [available, not-recorded, unknown]
+      allOf:
+      - if:
+          properties:
+            has_more: {const: false}
+          required: [has_more]
+        then:
+          properties:
+            next_cursor: {type: 'null'}
+      - if:
+          properties:
+            has_more: {const: true}
+          required: [has_more]
+        then:
+          properties:
+            next_cursor: {$ref: '#/components/schemas/Cursor'}
+      - if:
+          properties:
+            from: {const: null}
+          required: [from]
+        then:
+          properties:
+            to: {type: 'null'}
+      - if:
+          properties:
+            to: {const: null}
+          required: [to]
+        then:
+          properties:
+            from: {type: 'null'}
+    ValuesPageMeta:
+      type: object
+      additionalProperties: false
+      required: [request_id, generated_at, from, to, limit, sort, direction, as_of, upper_id, next_cursor, has_more,
+        consistency, section]
+      properties:
+        request_id: {$ref: '#/components/schemas/RequestId'}
+        generated_at: {$ref: '#/components/schemas/UtcTimestamp'}
+        from:
+          anyOf:
+          - {$ref: '#/components/schemas/UtcTimestamp'}
+          - {type: 'null'}
+        to:
+          anyOf:
+          - {$ref: '#/components/schemas/UtcTimestamp'}
+          - {type: 'null'}
+        limit: {type: integer, minimum: 1, maximum: 200}
+        sort: {type: string, maxLength: 40}
+        direction:
+          type: string
+          enum: [asc, desc]
+        as_of: {$ref: '#/components/schemas/UtcTimestamp'}
+        upper_id:
+          anyOf:
+          - {$ref: '#/components/schemas/Id'}
+          - {type: 'null'}
+        next_cursor:
+          anyOf:
+          - {$ref: '#/components/schemas/Cursor'}
+          - {type: 'null'}
+        has_more: {type: boolean}
+        consistency: {type: string, const: live}
+        section:
+          type: string
+          enum: [parameters, overrides]
+      allOf:
+      - if:
+          properties:
+            has_more: {const: false}
+          required: [has_more]
+        then:
+          properties:
+            next_cursor: {type: 'null'}
+      - if:
+          properties:
+            has_more: {const: true}
+          required: [has_more]
+        then:
+          properties:
+            next_cursor: {$ref: '#/components/schemas/Cursor'}
+      - if:
+          properties:
+            from: {const: null}
+          required: [from]
+        then:
+          properties:
+            to: {type: 'null'}
+      - if:
+          properties:
+            to: {const: null}
+          required: [to]
+        then:
+          properties:
+            from: {type: 'null'}
+    SummaryMeta:
+      type: object
+      additionalProperties: false
+      required: [request_id, generated_at, from, to, status_scope]
+      properties:
+        request_id: {$ref: '#/components/schemas/RequestId'}
+        generated_at: {$ref: '#/components/schemas/UtcTimestamp'}
+        from: {$ref: '#/components/schemas/UtcTimestamp'}
+        to: {$ref: '#/components/schemas/UtcTimestamp'}
+        status_scope: {type: string, const: all}
+    TimelineMeta:
+      type: object
+      additionalProperties: false
+      required: [request_id, generated_at, from, to, timezone, bucket, selected_statuses]
+      properties:
+        request_id: {$ref: '#/components/schemas/RequestId'}
+        generated_at: {$ref: '#/components/schemas/UtcTimestamp'}
+        from: {$ref: '#/components/schemas/UtcTimestamp'}
+        to: {$ref: '#/components/schemas/UtcTimestamp'}
+        timezone: {type: string, maxLength: 128}
+        bucket:
+          type: string
+          enum: [day, hour]
+        selected_statuses:
+          type: array
+          items:
+            type: integer
+            enum: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+          maxItems: 9
+          uniqueItems: true
+    Execution:
+      type: object
+      additionalProperties: false
+      required: [execution_id, folder_name, project_name, package_name, project_lsn, environment, status, logging_level,
+        created_at, started_at, ended_at, duration_seconds, elapsed_seconds, warning_count, error_count]
+      properties:
+        execution_id: {$ref: '#/components/schemas/Id'}
+        folder_name: {$ref: '#/components/schemas/Name128'}
+        project_name: {$ref: '#/components/schemas/Name128'}
+        package_name: {$ref: '#/components/schemas/PackageName'}
+        project_lsn:
+          anyOf:
+          - {$ref: '#/components/schemas/Lsn'}
+          - {type: 'null'}
+        environment: {$ref: '#/components/schemas/Environment'}
+        status: {$ref: '#/components/schemas/ExecutionStatus'}
+        logging_level:
+          anyOf:
+          - {$ref: '#/components/schemas/LoggingLevel'}
+          - {type: 'null'}
+        created_at: {$ref: '#/components/schemas/UtcTimestamp'}
+        started_at:
+          anyOf:
+          - {$ref: '#/components/schemas/UtcTimestamp'}
+          - {type: 'null'}
+        ended_at:
+          anyOf:
+          - {$ref: '#/components/schemas/UtcTimestamp'}
+          - {type: 'null'}
+        duration_seconds:
+          anyOf:
+          - {type: number, minimum: 0}
+          - {type: 'null'}
+        elapsed_seconds:
+          anyOf:
+          - {type: number, minimum: 0}
+          - {type: 'null'}
+        warning_count: {type: integer, minimum: 0, maximum: 9007199254740991}
+        error_count: {type: integer, minimum: 0, maximum: 9007199254740991}
+      allOf:
+      - if:
+          properties:
+            started_at: {const: null}
+          required: [started_at]
+        then:
+          properties:
+            duration_seconds: {type: 'null'}
+            elapsed_seconds: {type: 'null'}
+      - if:
+          properties:
+            ended_at: {const: null}
+          required: [ended_at]
+        then:
+          properties:
+            duration_seconds: {type: 'null'}
+    ExecutionDetail:
+      type: object
+      additionalProperties: false
+      required: [execution_id, folder_name, project_name, package_name, project_lsn, environment, status, logging_level,
+        created_at, started_at, ended_at, duration_seconds, elapsed_seconds, warning_count, error_count, event_counts]
+      properties:
+        execution_id: {$ref: '#/components/schemas/Id'}
+        folder_name: {$ref: '#/components/schemas/Name128'}
+        project_name: {$ref: '#/components/schemas/Name128'}
+        package_name: {$ref: '#/components/schemas/PackageName'}
+        project_lsn:
+          anyOf:
+          - {$ref: '#/components/schemas/Lsn'}
+          - {type: 'null'}
+        environment: {$ref: '#/components/schemas/Environment'}
+        status: {$ref: '#/components/schemas/ExecutionStatus'}
+        logging_level:
+          anyOf:
+          - {$ref: '#/components/schemas/LoggingLevel'}
+          - {type: 'null'}
+        created_at: {$ref: '#/components/schemas/UtcTimestamp'}
+        started_at:
+          anyOf:
+          - {$ref: '#/components/schemas/UtcTimestamp'}
+          - {type: 'null'}
+        ended_at:
+          anyOf:
+          - {$ref: '#/components/schemas/UtcTimestamp'}
+          - {type: 'null'}
+        duration_seconds:
+          anyOf:
+          - {type: number, minimum: 0}
+          - {type: 'null'}
+        elapsed_seconds:
+          anyOf:
+          - {type: number, minimum: 0}
+          - {type: 'null'}
+        warning_count: {type: integer, minimum: 0, maximum: 9007199254740991}
+        error_count: {type: integer, minimum: 0, maximum: 9007199254740991}
+        event_counts: {$ref: '#/components/schemas/EventCounts'}
+      allOf:
+      - if:
+          properties:
+            started_at: {const: null}
+          required: [started_at]
+        then:
+          properties:
+            duration_seconds: {type: 'null'}
+            elapsed_seconds: {type: 'null'}
+      - if:
+          properties:
+            ended_at: {const: null}
+          required: [ended_at]
+        then:
+          properties:
+            duration_seconds: {type: 'null'}
+    Folder:
+      type: object
+      additionalProperties: false
+      required: [folder_id, name, description]
+      properties:
+        folder_id: {$ref: '#/components/schemas/Id'}
+        name: {$ref: '#/components/schemas/Name128'}
+        description:
+          anyOf:
+          - {type: string, maxLength: 1024}
+          - {type: 'null'}
+    Project:
+      type: object
+      additionalProperties: false
+      required: [project_id, folder_id, folder_name, name, description]
+      properties:
+        project_id: {$ref: '#/components/schemas/Id'}
+        folder_id: {$ref: '#/components/schemas/Id'}
+        folder_name: {$ref: '#/components/schemas/Name128'}
+        name: {$ref: '#/components/schemas/Name128'}
+        description:
+          anyOf:
+          - {type: string, maxLength: 1024}
+          - {type: 'null'}
+    StatusCount:
+      type: object
+      additionalProperties: false
+      required: [code, name, count]
+      properties:
+        code: {type: integer, minimum: -2147483648, maximum: 2147483647}
+        name:
+          type: string
+          enum: [created, running, cancelled, failed, pending, halted, succeeded, stopping, completed, unknown]
+        count: {type: integer, minimum: 0, maximum: 9007199254740991}
+    Summary:
+      type: object
+      additionalProperties: false
+      required: [total, by_status]
+      properties:
+        total: {type: integer, minimum: 0, maximum: 9007199254740991}
+        by_status:
+          type: array
+          items: {$ref: '#/components/schemas/StatusCount'}
+          maxItems: 65536
+      description: Known codes have zero-filled entries; include each observed unknown code separately. total equals
+        the sum of counts.
+    TimelineBucket:
+      type: object
+      additionalProperties: false
+      required: [start, end, created_count, started_count, succeeded_count, failed_count]
+      properties:
+        start: {$ref: '#/components/schemas/UtcTimestamp'}
+        end: {$ref: '#/components/schemas/UtcTimestamp'}
+        created_count: {type: integer, minimum: 0, maximum: 9007199254740991}
+        started_count: {type: integer, minimum: 0, maximum: 9007199254740991}
+        succeeded_count: {type: integer, minimum: 0, maximum: 9007199254740991}
+        failed_count: {type: integer, minimum: 0, maximum: 9007199254740991}
+      description: Group by created_time, with current status/start observations; edge bucket counts are clipped
+        to effective bounds.
+    Executable:
+      type: object
+      additionalProperties: false
+      required: [statistics_id, execution_id, executable_id, package_name, package_path, execution_path, name, started_at,
+        ended_at, duration_seconds, result]
+      properties:
+        statistics_id: {$ref: '#/components/schemas/Id'}
+        execution_id: {$ref: '#/components/schemas/Id'}
+        executable_id: {$ref: '#/components/schemas/Id'}
+        package_name:
+          anyOf:
+          - {$ref: '#/components/schemas/PackageName'}
+          - {type: 'null'}
+        package_path:
+          anyOf:
+          - {$ref: '#/components/schemas/Path'}
+          - {type: 'null'}
+        execution_path: {$ref: '#/components/schemas/Path'}
+        name: {type: string, maxLength: 4000}
+        started_at:
+          anyOf:
+          - {$ref: '#/components/schemas/UtcTimestamp'}
+          - {type: 'null'}
+        ended_at:
+          anyOf:
+          - {$ref: '#/components/schemas/UtcTimestamp'}
+          - {type: 'null'}
+        duration_seconds:
+          anyOf:
+          - {type: number, minimum: 0}
+          - {type: 'null'}
+        result:
+          anyOf:
+          - {$ref: '#/components/schemas/ExecutableResult'}
+          - {type: 'null'}
+    ChildObservation:
+      type: object
+      additionalProperties: false
+      required: [observation_id, execution_id, package_name, package_path, execution_path, source_name, source_type,
+        started_at, ended_at, duration_seconds, state]
+      properties:
+        observation_id: {$ref: '#/components/schemas/Id'}
+        execution_id: {$ref: '#/components/schemas/Id'}
+        package_name:
+          anyOf:
+          - {$ref: '#/components/schemas/PackageName'}
+          - {type: 'null'}
+        package_path: {$ref: '#/components/schemas/Path'}
+        execution_path: {$ref: '#/components/schemas/Path'}
+        source_name:
+          anyOf:
+          - {type: string, maxLength: 4000}
+          - {type: 'null'}
+        source_type: {type: integer, minimum: -32768, maximum: 32767}
+        started_at: {$ref: '#/components/schemas/UtcTimestamp'}
+        ended_at:
+          anyOf:
+          - {$ref: '#/components/schemas/UtcTimestamp'}
+          - {type: 'null'}
+        duration_seconds:
+          anyOf:
+          - {type: number, minimum: 0}
+          - {type: 'null'}
+        state:
+          type: string
+          enum: [complete, incomplete]
+      description: observation_id is the pre-event ID; execution_id remains the parent's catalog execution ID.
+      allOf:
+      - if:
+          properties:
+            state: {const: incomplete}
+          required: [state]
+        then:
+          properties:
+            ended_at: {type: 'null'}
+            duration_seconds: {type: 'null'}
+      - if:
+          properties:
+            state: {const: complete}
+          required: [state]
+        then:
+          properties:
+            ended_at: {$ref: '#/components/schemas/UtcTimestamp'}
+            duration_seconds: {type: number, minimum: 0}
+    Event:
+      type: object
+      additionalProperties: false
+      required: [event_id, execution_id, message_time, event_name, message_type, source_type, message, truncated,
+        package_name, package_path, execution_path, source_name, subcomponent_name]
+      properties:
+        event_id: {$ref: '#/components/schemas/Id'}
+        execution_id: {$ref: '#/components/schemas/Id'}
+        message_time: {$ref: '#/components/schemas/UtcTimestamp'}
+        event_name:
+          anyOf:
+          - {type: string, maxLength: 1024}
+          - {type: 'null'}
+        message_type: {type: integer, minimum: -32768, maximum: 32767}
+        source_type: {type: integer, minimum: -32768, maximum: 32767}
+        message:
+          anyOf:
+          - {type: string, maxLength: 16384}
+          - {type: 'null'}
+        truncated: {type: boolean}
+        package_name:
+          anyOf:
+          - {$ref: '#/components/schemas/PackageName'}
+          - {type: 'null'}
+        package_path:
+          anyOf:
+          - {$ref: '#/components/schemas/Path'}
+          - {type: 'null'}
+        execution_path:
+          anyOf:
+          - {$ref: '#/components/schemas/Path'}
+          - {type: 'null'}
+        source_name:
+          anyOf:
+          - {type: string, maxLength: 4000}
+          - {type: 'null'}
+        subcomponent_name:
+          anyOf:
+          - {type: string, maxLength: 4000}
+          - {type: 'null'}
+    Parameter:
+      type: object
+      additionalProperties: false
+      required: [execution_parameter_id, object_type, name, sql_type, sensitive, required, value_set, runtime_override,
+        value, truncated, redacted, redaction_reason]
+      properties:
+        execution_parameter_id: {$ref: '#/components/schemas/Id'}
+        object_type: {$ref: '#/components/schemas/ParameterObjectType'}
+        name: {$ref: '#/components/schemas/Name128'}
+        sql_type: {type: string, maxLength: 128}
+        sensitive: {type: boolean}
+        required: {type: boolean}
+        value_set: {type: boolean}
+        runtime_override: {type: boolean}
+        value:
+          anyOf:
+          - {type: string, maxLength: 16384}
+          - {type: 'null'}
+        truncated: {type: boolean}
+        redacted: {type: boolean}
+        redaction_reason:
+          anyOf:
+          - type: string
+            enum: [sensitive, policy]
+          - {type: 'null'}
+      allOf:
+      - if:
+          properties:
+            redacted: {const: true}
+          required: [redacted]
+        then:
+          properties:
+            value: {type: 'null'}
+            truncated: {const: false}
+            redaction_reason:
+              type: string
+              enum: [sensitive, policy]
+      - if:
+          properties:
+            redacted: {const: false}
+          required: [redacted]
+        then:
+          properties:
+            redaction_reason: {type: 'null'}
+      - if:
+          properties:
+            sensitive: {const: true}
+          required: [sensitive]
+        then:
+          properties:
+            value: {type: 'null'}
+            redacted: {const: true}
+            truncated: {const: false}
+            redaction_reason: {const: sensitive}
+    PropertyOverride:
+      type: object
+      additionalProperties: false
+      required: [property_id, property_path, sensitive, value, truncated, redacted, redaction_reason]
+      properties:
+        property_id: {$ref: '#/components/schemas/Id'}
+        property_path: {type: string, maxLength: 4000, minLength: 1, x-sql-max-utf16-units: 4000}
+        sensitive: {type: boolean}
+        value:
+          anyOf:
+          - {type: string, maxLength: 16384}
+          - {type: 'null'}
+        truncated: {type: boolean}
+        redacted: {type: boolean}
+        redaction_reason:
+          anyOf:
+          - type: string
+            enum: [sensitive, policy]
+          - {type: 'null'}
+      description: property_id and sensitive come from the public catalog view. SQL type metadata is not fabricated
+        for its nvarchar(max) value.
+      allOf:
+      - if:
+          properties:
+            redacted: {const: true}
+          required: [redacted]
+        then:
+          properties:
+            value: {type: 'null'}
+            truncated: {const: false}
+            redaction_reason:
+              type: string
+              enum: [sensitive, policy]
+      - if:
+          properties:
+            redacted: {const: false}
+          required: [redacted]
+        then:
+          properties:
+            redaction_reason: {type: 'null'}
+      - if:
+          properties:
+            sensitive: {const: true}
+          required: [sensitive]
+        then:
+          properties:
+            value: {type: 'null'}
+            redacted: {const: true}
+            truncated: {const: false}
+            redaction_reason: {const: sensitive}
+    Estimate:
+      type: object
+      additionalProperties: false
+      required: [method, sample_count, duration_seconds, ended_at]
+      properties:
+        method: {type: string, const: mean_last_5_successful}
+        sample_count: {type: integer, minimum: 1, maximum: 5}
+        duration_seconds: {type: number, exclusiveMinimum: 0}
+        ended_at: {$ref: '#/components/schemas/UtcTimestamp'}
+    HistoryExecution:
+      type: object
+      additionalProperties: false
+      required: [execution_id, folder_name, project_name, package_name, project_lsn, environment, status, logging_level,
+        created_at, started_at, ended_at, duration_seconds, elapsed_seconds, warning_count, error_count, estimate]
+      properties:
+        execution_id: {$ref: '#/components/schemas/Id'}
+        folder_name: {$ref: '#/components/schemas/Name128'}
+        project_name: {$ref: '#/components/schemas/Name128'}
+        package_name: {$ref: '#/components/schemas/PackageName'}
+        project_lsn:
+          anyOf:
+          - {$ref: '#/components/schemas/Lsn'}
+          - {type: 'null'}
+        environment: {$ref: '#/components/schemas/Environment'}
+        status: {$ref: '#/components/schemas/ExecutionStatus'}
+        logging_level:
+          anyOf:
+          - {$ref: '#/components/schemas/LoggingLevel'}
+          - {type: 'null'}
+        created_at: {$ref: '#/components/schemas/UtcTimestamp'}
+        started_at:
+          anyOf:
+          - {$ref: '#/components/schemas/UtcTimestamp'}
+          - {type: 'null'}
+        ended_at:
+          anyOf:
+          - {$ref: '#/components/schemas/UtcTimestamp'}
+          - {type: 'null'}
+        duration_seconds:
+          anyOf:
+          - {type: number, minimum: 0}
+          - {type: 'null'}
+        elapsed_seconds:
+          anyOf:
+          - {type: number, minimum: 0}
+          - {type: 'null'}
+        warning_count: {type: integer, minimum: 0, maximum: 9007199254740991}
+        error_count: {type: integer, minimum: 0, maximum: 9007199254740991}
+        estimate:
+          anyOf:
+          - {$ref: '#/components/schemas/Estimate'}
+          - {type: 'null'}
+      allOf:
+      - if:
+          properties:
+            started_at: {const: null}
+          required: [started_at]
+        then:
+          properties:
+            duration_seconds: {type: 'null'}
+            elapsed_seconds: {type: 'null'}
+      - if:
+          properties:
+            ended_at: {const: null}
+          required: [ended_at]
+        then:
+          properties:
+            duration_seconds: {type: 'null'}
+      - if:
+          properties:
+            started_at: {const: null}
+          required: [started_at]
+        then:
+          properties:
+            estimate: {type: 'null'}
+    Meta:
+      type: object
+      additionalProperties: false
+      required: [app_version, api_version, display_timezone, capabilities, limits, execution_statuses, executable_results,
+        logging_levels, event_kinds, execution_sorts]
+      properties:
+        app_version: {type: string, maxLength: 64}
+        api_version: {type: string, const: v1}
+        display_timezone: {type: string, maxLength: 128}
+        capabilities: {$ref: '#/components/schemas/Capabilities'}
+        limits: {$ref: '#/components/schemas/Limits'}
+        execution_statuses:
+          type: array
+          items: {$ref: '#/components/schemas/ExecutionStatus'}
+          maxItems: 9
+        executable_results:
+          type: array
+          items: {$ref: '#/components/schemas/ExecutableResult'}
+          maxItems: 4
+        logging_levels:
+          type: array
+          items: {$ref: '#/components/schemas/LoggingLevel'}
+          maxItems: 6
+        event_kinds:
+          type: array
+          items:
+            type: string
+            enum: [all, errors, warnings, duplicate-warnings, memory-warnings]
+          maxItems: 5
+        execution_sorts:
+          type: array
+          items:
+            type: string
+            enum: [execution_id, created_at, started_at, ended_at, project_name, package_name, environment, status,
+              logging_level, duration_seconds, warning_count, error_count]
+          maxItems: 12
+      description: Advertise only implemented sort capabilities, not all planned sorts. No identity/connection/server
+        fields.
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [type, title, status, detail, code, request_id]
+      properties:
+        type: {type: string, const: 'about:blank'}
+        title: {type: string, maxLength: 80}
+        status:
+          type: integer
+          enum: [400, 401, 403, 404, 405, 500, 503, 504]
+        detail: {type: string, maxLength: 256}
+        code:
+          type: string
+          enum: [invalid_input, invalid_cursor, cursor_expired, unauthenticated, forbidden, not_found, method_not_allowed,
+            internal_error, database_unavailable, database_timeout]
+        request_id: {$ref: '#/components/schemas/RequestId'}
+      description: Fixed safe details; no instance URL, rejected values, SQL or exception diagnostic.
+    Liveness:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: {type: string, const: ok}
+    Readiness:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: {type: string, const: ready}
+    MetaResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: {$ref: '#/components/schemas/Meta'}
+        meta: {$ref: '#/components/schemas/ResponseMeta'}
+    FoldersResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: {$ref: '#/components/schemas/Folder'}
+          maxItems: 200
+        meta: {$ref: '#/components/schemas/PageMeta'}
+    ProjectsResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: {$ref: '#/components/schemas/Project'}
+          maxItems: 200
+        meta: {$ref: '#/components/schemas/PageMeta'}
+    ExecutionsResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: {$ref: '#/components/schemas/Execution'}
+          maxItems: 200
+        meta: {$ref: '#/components/schemas/WindowPageMeta'}
+    ExecutionResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: {$ref: '#/components/schemas/ExecutionDetail'}
+        meta: {$ref: '#/components/schemas/ResponseMeta'}
+    ExecutablesResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: {$ref: '#/components/schemas/Executable'}
+          maxItems: 200
+        meta: {$ref: '#/components/schemas/ObservationPageMeta'}
+    ChildrenResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: {$ref: '#/components/schemas/ChildObservation'}
+          maxItems: 200
+        meta: {$ref: '#/components/schemas/ObservationPageMeta'}
+    EventsResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: {$ref: '#/components/schemas/Event'}
+          maxItems: 200
+        meta: {$ref: '#/components/schemas/PageMeta'}
+    SummaryResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: {$ref: '#/components/schemas/Summary'}
+        meta: {$ref: '#/components/schemas/SummaryMeta'}
+    TimelineResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: {$ref: '#/components/schemas/TimelineBucket'}
+          maxItems: 1000
+        meta: {$ref: '#/components/schemas/TimelineMeta'}
+    HistoryResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: {$ref: '#/components/schemas/HistoryExecution'}
+          maxItems: 200
+        meta: {$ref: '#/components/schemas/PageMeta'}
+    LivenessResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: {$ref: '#/components/schemas/Liveness'}
+        meta: {$ref: '#/components/schemas/ResponseMeta'}
+    ReadinessResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: {$ref: '#/components/schemas/Readiness'}
+        meta: {$ref: '#/components/schemas/ResponseMeta'}
+    ParametersResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: {$ref: '#/components/schemas/Parameter'}
+          maxItems: 200
+        meta:
+          type: object
+          additionalProperties: false
+          required: [request_id, generated_at, from, to, limit, sort, direction, as_of, upper_id, next_cursor, has_more,
+            consistency, section]
+          properties:
+            request_id: {$ref: '#/components/schemas/RequestId'}
+            generated_at: {$ref: '#/components/schemas/UtcTimestamp'}
+            from:
+              anyOf:
+              - {$ref: '#/components/schemas/UtcTimestamp'}
+              - {type: 'null'}
+            to:
+              anyOf:
+              - {$ref: '#/components/schemas/UtcTimestamp'}
+              - {type: 'null'}
+            limit: {type: integer, minimum: 1, maximum: 200}
+            sort: {type: string, maxLength: 40}
+            direction:
+              type: string
+              enum: [asc, desc]
+            as_of: {$ref: '#/components/schemas/UtcTimestamp'}
+            upper_id:
+              anyOf:
+              - {$ref: '#/components/schemas/Id'}
+              - {type: 'null'}
+            next_cursor:
+              anyOf:
+              - {$ref: '#/components/schemas/Cursor'}
+              - {type: 'null'}
+            has_more: {type: boolean}
+            consistency: {type: string, const: live}
+            section: {type: string, const: parameters}
+          allOf:
+          - if:
+              properties:
+                has_more: {const: false}
+              required: [has_more]
+            then:
+              properties:
+                next_cursor: {type: 'null'}
+          - if:
+              properties:
+                has_more: {const: true}
+              required: [has_more]
+            then:
+              properties:
+                next_cursor: {$ref: '#/components/schemas/Cursor'}
+          - if:
+              properties:
+                from: {const: null}
+              required: [from]
+            then:
+              properties:
+                to: {type: 'null'}
+          - if:
+              properties:
+                to: {const: null}
+              required: [to]
+            then:
+              properties:
+                from: {type: 'null'}
+    OverridesResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: {$ref: '#/components/schemas/PropertyOverride'}
+          maxItems: 200
+        meta:
+          type: object
+          additionalProperties: false
+          required: [request_id, generated_at, from, to, limit, sort, direction, as_of, upper_id, next_cursor, has_more,
+            consistency, section]
+          properties:
+            request_id: {$ref: '#/components/schemas/RequestId'}
+            generated_at: {$ref: '#/components/schemas/UtcTimestamp'}
+            from:
+              anyOf:
+              - {$ref: '#/components/schemas/UtcTimestamp'}
+              - {type: 'null'}
+            to:
+              anyOf:
+              - {$ref: '#/components/schemas/UtcTimestamp'}
+              - {type: 'null'}
+            limit: {type: integer, minimum: 1, maximum: 200}
+            sort: {type: string, maxLength: 40}
+            direction:
+              type: string
+              enum: [asc, desc]
+            as_of: {$ref: '#/components/schemas/UtcTimestamp'}
+            upper_id:
+              anyOf:
+              - {$ref: '#/components/schemas/Id'}
+              - {type: 'null'}
+            next_cursor:
+              anyOf:
+              - {$ref: '#/components/schemas/Cursor'}
+              - {type: 'null'}
+            has_more: {type: boolean}
+            consistency: {type: string, const: live}
+            section: {type: string, const: overrides}
+          allOf:
+          - if:
+              properties:
+                has_more: {const: false}
+              required: [has_more]
+            then:
+              properties:
+                next_cursor: {type: 'null'}
+          - if:
+              properties:
+                has_more: {const: true}
+              required: [has_more]
+            then:
+              properties:
+                next_cursor: {$ref: '#/components/schemas/Cursor'}
+          - if:
+              properties:
+                from: {const: null}
+              required: [from]
+            then:
+              properties:
+                to: {type: 'null'}
+          - if:
+              properties:
+                to: {const: null}
+              required: [to]
+            then:
+              properties:
+                from: {type: 'null'}
+    ValuesResponse:
+      oneOf:
+      - {$ref: '#/components/schemas/ParametersResponse'}
+      - {$ref: '#/components/schemas/OverridesResponse'}
+  parameters:
+    Folder:
+      name: folder
+      in: query
+      required: false
+      description: Exact folder name; mutually exclusive with folder_pattern.
+      schema: {$ref: '#/components/schemas/Name128'}
+    RequiredFolder:
+      name: folder
+      in: query
+      required: true
+      description: Exact folder name, required.
+      schema: {$ref: '#/components/schemas/Name128'}
+    Project:
+      name: project
+      in: query
+      required: false
+      description: Exact project name; mutually exclusive with project_pattern.
+      schema: {$ref: '#/components/schemas/Name128'}
+    RequiredProject:
+      name: project
+      in: query
+      required: true
+      description: Exact project name, required.
+      schema: {$ref: '#/components/schemas/Name128'}
+    RequiredPackage:
+      name: package
+      in: query
+      required: true
+      description: Exact package name, required.
+      schema: {$ref: '#/components/schemas/PackageName'}
+    FolderPattern:
+      name: folder_pattern
+      in: query
+      required: false
+      description: 'Explicit glob: * matches any sequence; \* is literal *, \\ is literal backslash. SQL wildcard
+        characters are escaped, not interpreted.'
+      schema: {type: string, maxLength: 512, minLength: 1, x-sql-max-utf16-units: 512}
+    ProjectPattern:
+      name: project_pattern
+      in: query
+      required: false
+      description: 'Explicit glob: * matches any sequence; \* is literal *, \\ is literal backslash. SQL wildcard
+        characters are escaped, not interpreted.'
+      schema: {type: string, maxLength: 512, minLength: 1, x-sql-max-utf16-units: 512}
+    From:
+      name: from
+      in: query
+      required: false
+      description: Inclusive created_time lower bound; default effective to minus HOUR_SPAN (360 hours). Required
+        explicitly when continuing a windowed cursor.
+      schema: {$ref: '#/components/schemas/InputTimestamp'}
+    To:
+      name: to
+      in: query
+      required: false
+      description: Exclusive created_time upper bound; resolved once from request clock or fixed AS_OF_DATE. Required
+        explicitly on cursor continuation.
+      schema: {$ref: '#/components/schemas/InputTimestamp'}
+    Status:
+      name: status
+      in: query
+      required: false
+      description: Comma-separated known codes 1-9, no duplicates/spaces. Omitted means all, including future catalog
+        codes.
+      schema: {$ref: '#/components/schemas/StatusSelection'}
+      style: form
+      explode: false
+    HistoryStatus:
+      name: status
+      in: query
+      required: false
+      description: Comma-separated known codes; default running/succeeded (2,7).
+      schema:
+        $ref: '#/components/schemas/StatusSelection'
+        default: [2, 7]
+      style: form
+      explode: false
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Bounded page size; repeat original effective value on continuation.
+      schema: {type: integer, minimum: 1, maximum: 200, default: 50}
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque next cursor; repeat other selectors and explicit effective time bounds. Filter/direction/limit/scope
+        mismatch is 400.
+      schema: {$ref: '#/components/schemas/Cursor'}
+    Direction:
+      name: direction
+      in: query
+      required: false
+      description: Sort direction; changing it starts a new cursor session.
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+    AscendingDirection:
+      name: direction
+      in: query
+      required: false
+      description: Sort direction; changing it starts a new cursor session.
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: asc
+    ExecutionSort:
+      name: sort
+      in: query
+      required: false
+      description: Global allowlisted order with unique-ID tie-breaker; NULLs last. C2a supports execution_id only;
+        other execution sorts are C2b.
+      schema:
+        type: string
+        enum: [execution_id, created_at, started_at, ended_at, project_name, package_name, environment, status,
+          logging_level, duration_seconds, warning_count, error_count]
+        default: execution_id
+    FolderSort:
+      name: sort
+      in: query
+      required: false
+      description: Global allowlisted order with unique-ID tie-breaker; NULLs last. C2a supports execution_id only;
+        other execution sorts are C2b.
+      schema:
+        type: string
+        enum: [name, folder_id]
+        default: name
+    ProjectSort:
+      name: sort
+      in: query
+      required: false
+      description: Global allowlisted order with unique-ID tie-breaker; NULLs last. C2a supports execution_id only;
+        other execution sorts are C2b.
+      schema:
+        type: string
+        enum: [name, project_id]
+        default: name
+    ExecutableSort:
+      name: sort
+      in: query
+      required: false
+      description: Global allowlisted order with unique-ID tie-breaker; NULLs last. C2a supports execution_id only;
+        other execution sorts are C2b.
+      schema:
+        type: string
+        enum: [started_at, statistics_id]
+        default: started_at
+    ChildSort:
+      name: sort
+      in: query
+      required: false
+      description: Global allowlisted order with unique-ID tie-breaker; NULLs last. C2a supports execution_id only;
+        other execution sorts are C2b.
+      schema:
+        type: string
+        enum: [started_at, observation_id]
+        default: started_at
+    EventSort:
+      name: sort
+      in: query
+      required: false
+      description: Global allowlisted order with unique-ID tie-breaker; NULLs last. C2a supports execution_id only;
+        other execution sorts are C2b.
+      schema:
+        type: string
+        enum: [message_time, event_id]
+        default: message_time
+    HistorySort:
+      name: sort
+      in: query
+      required: false
+      description: Global allowlisted order with unique-ID tie-breaker; NULLs last. C2a supports execution_id only;
+        other execution sorts are C2b.
+      schema:
+        type: string
+        enum: [execution_id]
+        default: execution_id
+    EventKind:
+      name: kind
+      in: query
+      required: false
+      description: Category before search/paging; duplicate/memory categories retain documented legacy substring
+        heuristics.
+      schema:
+        type: string
+        enum: [all, errors, warnings, duplicate-warnings, memory-warnings]
+        default: all
+    Search:
+      name: q
+      in: query
+      required: false
+      description: Literal full-message substring, catalog collation; escape LIKE wildcards. Bound before paging,
+        even for truncated display text.
+      schema: {type: string, maxLength: 512, minLength: 1, x-sql-max-utf16-units: 1024}
+    Bucket:
+      name: bucket
+      in: query
+      required: false
+      description: Display-timezone calendar buckets, zero filled; configured cap may be lowered but never exceeds
+        1000.
+      schema:
+        type: string
+        enum: [day, hour]
+        default: day
+    Section:
+      name: section
+      in: query
+      required: false
+      description: One bounded values section; fixed ascending execution_parameter_id/property_id order, each with
+        its own query/cursor. Override values are policy-redacted by default.
+      schema:
+        type: string
+        enum: [parameters, overrides]
+        default: parameters
+    ExecutionId:
+      name: id
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/Id'}
+      description: Positive SQL BIGINT string; absent and hidden IDs share the same 404. Zero is invalid.
+  headers:
+    RequestId:
+      description: Server-generated request ID, also in response meta/problem.
+      schema: {$ref: '#/components/schemas/RequestId'}
+    NoStore:
+      description: Do not cache monitoring responses, including errors.
+      schema: {type: string, const: no-store}
+  responses:
+    BadRequest:
+      description: Bad Request. Fixed safe detail; no rejected values or diagnostics.
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/RequestId'}
+        Cache-Control: {$ref: '#/components/headers/NoStore'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          example: {type: 'about:blank', title: Bad Request, status: 400, detail: The request contains an unsupported
+              or invalid value., code: invalid_input, request_id: 0123456789abcdef0123456789abcdef}
+    Unauthenticated:
+      description: Unauthorized. Fixed safe detail; no rejected values or diagnostics.
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/RequestId'}
+        Cache-Control: {$ref: '#/components/headers/NoStore'}
+        WWW-Authenticate:
+          description: Real challenge from future configured shared authentication; not emitted by local mode.
+          schema: {type: string, maxLength: 256}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          example: {type: 'about:blank', title: Unauthorized, status: 401, detail: Authentication is required to
+              access this resource., code: unauthenticated, request_id: 0123456789abcdef0123456789abcdef}
+    Forbidden:
+      description: Forbidden. Fixed safe detail; no rejected values or diagnostics.
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/RequestId'}
+        Cache-Control: {$ref: '#/components/headers/NoStore'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          example: {type: 'about:blank', title: Forbidden, status: 403, detail: You do not have permission to access
+              this resource., code: forbidden, request_id: 0123456789abcdef0123456789abcdef}
+    NotFound:
+      description: Not Found. Fixed safe detail; no rejected values or diagnostics.
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/RequestId'}
+        Cache-Control: {$ref: '#/components/headers/NoStore'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          example: {type: 'about:blank', title: Not Found, status: 404, detail: The requested resource or execution
+              is not available., code: not_found, request_id: 0123456789abcdef0123456789abcdef}
+    MethodNotAllowed:
+      description: Method Not Allowed. Fixed safe detail; no rejected values or diagnostics.
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/RequestId'}
+        Cache-Control: {$ref: '#/components/headers/NoStore'}
+        Allow:
+          description: Actual permitted methods, normally GET, HEAD, OPTIONS.
+          schema: {type: string, maxLength: 128}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          example: {type: 'about:blank', title: Method Not Allowed, status: 405, detail: This request method is
+              not supported for this resource., code: method_not_allowed, request_id: 0123456789abcdef0123456789abcdef}
+    InternalError:
+      description: Internal Server Error. Fixed safe detail; no rejected values or diagnostics.
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/RequestId'}
+        Cache-Control: {$ref: '#/components/headers/NoStore'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          example: {type: 'about:blank', title: Internal Server Error, status: 500, detail: The request could not
+              be completed. Use the request ID when reporting the problem., code: internal_error, request_id: 0123456789abcdef0123456789abcdef}
+    DatabaseUnavailable:
+      description: Service Unavailable. Fixed safe detail; no rejected values or diagnostics.
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/RequestId'}
+        Cache-Control: {$ref: '#/components/headers/NoStore'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          example: {type: 'about:blank', title: Service Unavailable, status: 503, detail: The monitoring database
+              is unavailable. Please try again later., code: database_unavailable, request_id: 0123456789abcdef0123456789abcdef}
+    DatabaseTimeout:
+      description: Gateway Timeout. Fixed safe detail; no rejected values or diagnostics.
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/RequestId'}
+        Cache-Control: {$ref: '#/components/headers/NoStore'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          example: {type: 'about:blank', title: Gateway Timeout, status: 504, detail: The monitoring database did
+              not respond in time. Please try again later., code: database_timeout, request_id: 0123456789abcdef0123456789abcdef}
+  examples:
+    MetaResponse:
+      summary: Synthetic target response; not live output
+      value:
+        data:
+          app_version: 0.6.8
+          api_version: v1
+          display_timezone: Europe/London
+          capabilities: {events: false, values: false, override_values: false}
+          limits: {default_limit: 50, max_limit: 200, default_range_hours: 360, max_range_hours: 744, max_timeline_buckets: 1000,
+            cursor_ttl_seconds: 1800, max_cursor_characters: 8192, max_text_characters: 16384, max_search_characters: 512}
+          execution_statuses:
+          - {code: 1, name: created}
+          - {code: 2, name: running}
+          - {code: 3, name: cancelled}
+          - {code: 4, name: failed}
+          - {code: 5, name: pending}
+          - {code: 6, name: halted}
+          - {code: 7, name: succeeded}
+          - {code: 8, name: stopping}
+          - {code: 9, name: completed}
+          executable_results:
+          - {code: 0, name: success}
+          - {code: 1, name: failure}
+          - {code: 2, name: completion}
+          - {code: 3, name: cancelled}
+          logging_levels:
+          - {code: 0, name: none}
+          - {code: 1, name: basic}
+          - {code: 2, name: performance}
+          - {code: 3, name: verbose}
+          - {code: 4, name: runtime-lineage}
+          - {code: 100, name: custom}
+          event_kinds: [all, errors, warnings, duplicate-warnings, memory-warnings]
+          execution_sorts: [execution_id]
+        meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z'}
+    FoldersResponse:
+      summary: Synthetic target response; not live output
+      value:
+        data:
+        - {folder_id: '1', name: Sample % folder, description: null}
+        meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z', from: null,
+          to: null, limit: 50, sort: name, direction: asc, as_of: '2026-10-15T11:00:00.1234567Z', upper_id: '9007199254740993',
+          next_cursor: null, has_more: false, consistency: live}
+    ProjectsResponse:
+      summary: Synthetic target response; not live output
+      value:
+        data:
+        - {project_id: '2', folder_id: '1', folder_name: Sample % folder, name: Sample project, description: Synthetic
+            project}
+        meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z', from: null,
+          to: null, limit: 50, sort: name, direction: asc, as_of: '2026-10-15T11:00:00.1234567Z', upper_id: '9007199254740993',
+          next_cursor: null, has_more: false, consistency: live}
+    ExecutionsResponse:
+      summary: Synthetic target response; not live output
+      value:
+        data:
+        - execution_id: '9007199254740993'
+          folder_name: Sample % folder
+          project_name: Sample project
+          package_name: Probe.dtsx
+          project_lsn: '123'
+          environment: {folder_name: null, name: null}
+          status: {code: 2, name: running}
+          logging_level: {code: 1, name: basic}
+          created_at: '2026-10-15T10:59:00Z'
+          started_at: '2026-10-15T10:59:30.1234567Z'
+          ended_at: null
+          duration_seconds: null
+          elapsed_seconds: 30
+          warning_count: 1
+          error_count: 0
+        meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z', from: '2026-10-14T11:00:00Z',
+          to: '2026-10-15T11:00:00Z', limit: 50, sort: execution_id, direction: desc, as_of: '2026-10-15T11:00:00.1234567Z',
+          upper_id: '9007199254740993', next_cursor: null, has_more: false, consistency: live}
+    ExecutionResponse:
+      summary: Synthetic target response; not live output
+      value:
+        data:
+          execution_id: '9007199254740993'
+          folder_name: Sample % folder
+          project_name: Sample project
+          package_name: Probe.dtsx
+          project_lsn: '123'
+          environment: {folder_name: null, name: null}
+          status: {code: 2, name: running}
+          logging_level: {code: 1, name: basic}
+          created_at: '2026-10-15T10:59:00Z'
+          started_at: '2026-10-15T10:59:30.1234567Z'
+          ended_at: null
+          duration_seconds: null
+          elapsed_seconds: 30
+          warning_count: 1
+          error_count: 0
+          event_counts: {all: 8, errors: 0, warnings: 1, duplicate_warnings: 1, memory_warnings: 1}
+        meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z'}
+    SummaryResponse:
+      summary: Synthetic target response; not live output
+      value:
+        data:
+          total: 1
+          by_status:
+          - {code: 1, name: created, count: 0}
+          - {code: 2, name: running, count: 1}
+          - {code: 3, name: cancelled, count: 0}
+          - {code: 4, name: failed, count: 0}
+          - {code: 5, name: pending, count: 0}
+          - {code: 6, name: halted, count: 0}
+          - {code: 7, name: succeeded, count: 0}
+          - {code: 8, name: stopping, count: 0}
+          - {code: 9, name: completed, count: 0}
+        meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z', from: '2026-10-14T11:00:00Z',
+          to: '2026-10-15T11:00:00Z', status_scope: all}
+    TimelineResponse:
+      summary: Synthetic target response; not live output
+      value:
+        data:
+        - {start: '2026-10-13T23:00:00Z', end: '2026-10-14T23:00:00Z', created_count: 0, started_count: 0, succeeded_count: 0,
+          failed_count: 0}
+        - {start: '2026-10-14T23:00:00Z', end: '2026-10-15T23:00:00Z', created_count: 1, started_count: 1, succeeded_count: 0,
+          failed_count: 0}
+        meta:
+          request_id: 0123456789abcdef0123456789abcdef
+          generated_at: '2026-10-15T11:00:00.1234567Z'
+          from: '2026-10-14T11:00:00Z'
+          to: '2026-10-15T11:00:00Z'
+          timezone: Europe/London
+          bucket: day
+          selected_statuses: [2]
+    ExecutablesResponse:
+      summary: Synthetic target response; not live output
+      value:
+        data:
+        - {statistics_id: '5', execution_id: '9007199254740993', executable_id: '6', package_name: Probe.dtsx, package_path: \Package\Delay,
+          execution_path: \Probe\Delay, name: Delay, started_at: '2026-10-15T10:59:30Z', ended_at: null, duration_seconds: null,
+          result: null}
+        meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z', from: null,
+          to: null, limit: 50, sort: started_at, direction: asc, as_of: '2026-10-15T11:00:00.1234567Z', upper_id: '9007199254740993',
+          next_cursor: null, has_more: false, consistency: live, availability: available}
+    ChildrenResponse:
+      summary: Synthetic target response; not live output
+      value:
+        data:
+        - {observation_id: '7', execution_id: '9007199254740993', package_name: Probe.dtsx, package_path: \Package,
+          execution_path: '\Parent\Run child[1]\Probe', source_name: Probe, source_type: 30, started_at: '2026-10-15T10:59:30Z',
+          ended_at: null, duration_seconds: null, state: incomplete}
+        meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z', from: null,
+          to: null, limit: 50, sort: started_at, direction: asc, as_of: '2026-10-15T11:00:00.1234567Z', upper_id: '9007199254740993',
+          next_cursor: null, has_more: false, consistency: live, availability: available}
+    EventsResponse:
+      summary: Synthetic target response; not live output
+      value:
+        data:
+        - {event_id: '8', execution_id: '9007199254740993', message_time: '2026-10-15T10:59:31.0000001Z', event_name: OnWarning,
+          message_type: 110, source_type: 30, message: <b>Synthetic duplicate warning</b>, truncated: false, package_name: Probe.dtsx,
+          package_path: \Package, execution_path: \Probe, source_name: Probe, subcomponent_name: null}
+        meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z', from: null,
+          to: null, limit: 50, sort: message_time, direction: asc, as_of: '2026-10-15T11:00:00.1234567Z', upper_id: '9007199254740993',
+          next_cursor: null, has_more: false, consistency: live}
+    ParametersResponse:
+      summary: Synthetic target response; not live output
+      value:
+        data:
+        - execution_parameter_id: '9'
+          object_type: {code: 30, name: package}
+          name: DummySecret
+          sql_type: String
+          sensitive: true
+          required: false
+          value_set: true
+          runtime_override: true
+          value: null
+          truncated: false
+          redacted: true
+          redaction_reason: sensitive
+        meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z', from: null,
+          to: null, limit: 50, sort: execution_parameter_id, direction: asc, as_of: '2026-10-15T11:00:00.1234567Z',
+          upper_id: '9007199254740993', next_cursor: null, has_more: false, consistency: live, section: parameters}
+    OverridesResponse:
+      summary: Synthetic target response; not live output
+      value:
+        data:
+        - {property_id: '10', property_path: '\Package.Properties[Description]', sensitive: false, value: null,
+          truncated: false, redacted: true, redaction_reason: policy}
+        meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z', from: null,
+          to: null, limit: 50, sort: property_id, direction: asc, as_of: '2026-10-15T11:00:00.1234567Z', upper_id: '9007199254740993',
+          next_cursor: null, has_more: false, consistency: live, section: overrides}
+    HistoryResponse:
+      summary: Synthetic target response; not live output
+      value:
+        data:
+        - execution_id: '9007199254740993'
+          folder_name: Sample % folder
+          project_name: Sample project
+          package_name: Probe.dtsx
+          project_lsn: '123'
+          environment: {folder_name: null, name: null}
+          status: {code: 2, name: running}
+          logging_level: {code: 1, name: basic}
+          created_at: '2026-10-15T10:59:00Z'
+          started_at: '2026-10-15T10:59:30.1234567Z'
+          ended_at: null
+          duration_seconds: null
+          elapsed_seconds: 30
+          warning_count: 1
+          error_count: 0
+          estimate: {method: mean_last_5_successful, sample_count: 5, duration_seconds: 60, ended_at: '2026-10-15T11:00:30.1234567Z'}
+        meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z', from: null,
+          to: null, limit: 50, sort: execution_id, direction: desc, as_of: '2026-10-15T11:00:00.1234567Z', upper_id: '9007199254740993',
+          next_cursor: null, has_more: false, consistency: live}
+    LivenessResponse:
+      summary: Synthetic target response; not live output
+      value:
+        data: {status: ok}
+        meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z'}
+    ReadinessResponse:
+      summary: Synthetic target response; not live output
+      value:
+        data: {status: ready}
+        meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z'}

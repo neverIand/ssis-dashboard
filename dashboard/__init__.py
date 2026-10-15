@@ -42,8 +42,10 @@ def create_app(config_overrides=None, *, config_path=None):
         app.config.from_mapping(deepcopy(config_overrides))
 
     from dashboard.db import validate_timeouts
+    from dashboard.timezones import validate_display_timezone
 
     validate_timeouts(app.config['DB_LOGIN_TIMEOUT_SECONDS'], app.config['DB_QUERY_TIMEOUT_SECONDS'])
+    validate_display_timezone(app.config['DISPLAY_TIMEZONE'])
 
     from dashboard import filters, processors
     from dashboard.errors import register_error_handlers

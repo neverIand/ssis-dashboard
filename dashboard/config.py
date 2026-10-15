@@ -22,6 +22,10 @@ DB_QUERY_TIMEOUT_SECONDS = 30
 # Set to 'NOW' to show current data or any valid date to show data for a fixed date only
 AS_OF_DATE = 'NOW'
 
+# IANA timezone for the forthcoming API's display buckets and legacy date input.
+# Validated at startup; legacy SQL display formatting is unchanged.
+DISPLAY_TIMEZONE = 'Europe/London'
+
 # Time range to display. Data will be shown from AS_OF_DATE - HOUR_SPAN value to AS_OF_DATE.
 HOUR_SPAN = 360
 

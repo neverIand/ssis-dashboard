@@ -10,7 +10,7 @@ Prefer one coherent implementation boundary per task, with concrete exit checks 
 
 Statuses: **Planned**, **In progress**, **Complete**, **Awaiting integration**, or **Deferred**. Deferred records work explicitly put on hold by the user. Complete means its stated local exit checks passed; SQL Server, driver, proxy, and deployment claims require their own recorded integration evidence.
 
-Current next task: **C1a, the read-only API contract and local access policy**, in the [Stage C breakdown](#stage-c--read-only-api-delivery-phase-2). Backend native follow-ups remain open; B5c and production hosting remain deferred.
+Current next task: **C1b, the typed SQL/JSON boundary and native datetimeoffset solution**, in the [Stage C breakdown](#stage-c--read-only-api-delivery-phase-2). C1a's draft contract and local access policy are complete. Backend native follow-ups remain open; B5c and production hosting remain deferred.
 
 ## Baseline and backend foundation
 
@@ -49,7 +49,7 @@ Do not expand a backend foundation task into these phases. Stage C is decomposed
 
 | Parent phase | Intended slices | Status |
 | --- | --- | --- |
-| 2: API / Stage C | C1–C8 below: contract/types/HTTP boundary, bounded executions, metadata/metrics, inspection, events, values, history, and local acceptance | Planned; next active stage |
+| 2: API / Stage C | C1–C8 below: contract/types/HTTP boundary, bounded executions, metadata/metrics, inspection, events, values, history, and local acceptance | In progress; C1a complete, C1b next |
 | 3: first native screen | Shell/build choice, URL filters/list/cards, data-only updates and preserved state | Planned |
 | 4: feature parity | Details/children, searchable events, values, history/charts, legacy URL mapping | Planned |
 | 5: live updates | Detector prototype/capacity, stream contract, snapshot/resume/resync, bounded subscriptions, browser recovery, production proxy validation | Planned |
@@ -57,7 +57,7 @@ Do not expand a backend foundation task into these phases. Stage C is decomposed
 
 ## Stage C / read-only API (delivery phase 2)
 
-Planned on 15 October 2026. Stage B is sufficiently validated to begin local API work: 25 of 30 backend checklist cases pass, including the deployed fixtures and both actual Windows reader identities. This is a stage transition, not closure of B5a3/P0b or a claim of production readiness. All C tasks below remain **Planned**; this change records their scope without implementing endpoints.
+Planned on 15 October 2026. Stage B is sufficiently validated to begin local API work: 25 of 30 backend checklist cases pass, including the deployed fixtures and both actual Windows reader identities. This is a stage transition, not closure of B5a3/P0b or a claim of production readiness. C1a is **Complete** for its documentation scope; the remaining C tasks are **Planned**. No API endpoint has been implemented yet.
 
 ### Backend carry-over and scope
 
@@ -68,7 +68,7 @@ Planned on 15 October 2026. Stage B is sufficiently validated to begin local API
 | Measured legacy KPI/compile cost | Address the execution-specific event-count query in C4a and measure the list/calculated-sort paths in C2. Compare equivalent workloads; do not transfer legacy timings into API performance claims. |
 | B5c, OBS-03 host portion, HOST-01/02/03 | Remain deferred. No service/container rollout, production proxy/authentication/HTTPS/logging or production stream-capacity work is required to start Stage C. |
 
-Keep Flask/pyodbc, parameterized read-only catalog queries and the legacy routes. Use functions grouped around operations and a small API blueprint, explicit serializers and checked-in SQL; no ORM or new runtime dependency is assumed. Define local endpoint capabilities and redaction now even while production identity/proxy integration is deferred. SQL row visibility continues to follow the configured database identity.
+Keep Flask/pyodbc, parameterized read-only catalog queries and the legacy routes. Use functions grouped around operations and a small API blueprint, explicit serializers and checked-in SQL; no ORM is planned. The one added runtime dependency is first-party `tzdata`, supplying the IANA database required on Windows. Contract-validation tools are separate development dependencies. Define local endpoint capabilities and redaction now even while production identity/proxy integration is deferred. SQL row visibility continues to follow the configured database identity.
 
 ### Task breakdown
 
@@ -76,7 +76,7 @@ The numbered groups are planning boundaries. Each lettered row is one focused ta
 
 | ID | Scope / deliverable | Concrete exit checks |
 | --- | --- | --- |
-| C1a | Contract and local access policy. Specify concrete DTO fields/examples, common errors, exact-name versus explicit pattern mode, created-time cohort, effective time bounds, statuses, sort allowlists, paging/cursor rules, and event/value capabilities. Record intended differences from legacy behavior. | The OpenAPI draft covers the proposed resources without presenting them as implemented. Defaults/caps, nullable/unknown values, cursor invalidation and sensitive-data policy are explicit. The list/summary/timeline relationship and SQL-identity visibility boundary are unambiguous. Documentation-only task; no hosting decision is needed. |
+| C1a | **Complete.** [Contract and local access policy](API_CONTRACT.md), with [OpenAPI schemas/examples](openapi.yaml). Specify concrete DTO fields/examples, common errors, exact-name versus explicit pattern mode, created-time cohort, effective time bounds, statuses, sort allowlists, paging/cursor rules, and event/value capabilities. Record intended differences from legacy behavior. | The draft covers 14 planned GET operations, 59 concrete schemas and 15 synthetic response examples. Structural/schema/reference/example validation and invalid-instance checks pass; no endpoint or native conversion is claimed. See the C1a work record below. |
 | C1b | Typed SQL/JSON boundary. Resolve the actual Driver 17 datetimeoffset failure using a tested connection-local converter or an explicit offset-preserving SQL representation. Serialize BIGINT/LSN as decimal strings, UTC offset timestamps, nulls, numeric seconds/counts, booleans and unknown codes. | Fake-boundary tests include IDs above JavaScript's safe integer limit, fractions, non-UTC offsets, NULL start/end and unknown status/logging codes. A separate native SQL-to-serializer-to-JSON probe proves the selected conversion on the recorded Windows/Python/driver baseline before endpoint work. Legacy formatted shapes still pass their regressions; native gaps remain NOT RUN if access is unavailable. |
 | C1c | Versioned API HTTP boundary and `/meta`; local `/healthz` and bounded `/readyz` outside the versioned API. Register the blueprint, shared validation/problem responses and local capability checks; preserve request IDs, safe diagnostics and protocol headers. Keep browser/proxy identity headers untrusted. | API 400/403/404/405/500/503/504 paths produce safe `application/problem+json`, including unknown API paths and routing failures; applicable authentication failures have a defined 401 contract. Legacy errors remain HTML. Invalid inputs and denied capabilities short-circuit before SQL. `/meta` exposes only documented non-secret fields; liveness performs no DB query and readiness uses a short bounded dependency check without diagnostics leakage. |
 | C2a | First execution page: `GET /api/v1/executions`, initially ordered by execution ID. Apply exact catalog names, optional deliberate pattern mode, `[from,to)` on `created_time`, status and bounded limit. Select/page candidates before retrieving event counts/logging data for those IDs. | Independent SQL comparisons include created/pending/running rows, both time boundaries, special/long names, empty visibility and NULLs. Default 50/max 200, stable ID order, `has_more`, filter/bounds-bound cursors and an upper-ID paging fence pass tests. Malformed or mismatched cursors fail safely; a cursor never grants visibility. Measure query plans/timings and retain actual row identity for links. |
@@ -102,6 +102,29 @@ The first native overview can start in delivery phase 3 after **C1 + C2a + C3a +
 Stage C is complete only after all C1–C8 rows have their stated contract and local SQL/HTTP evidence, the API works without the replacement UI, read-only/access/redaction behavior is checked, and remaining production gates are explicitly carried forward. Preserve the two open native backend follow-ups until their own evidence closes them; do not relabel the five existing incomplete checklist cases merely because API work starts.
 
 Planning validation: roadmap/plan/progress alignment, task dependencies, local Markdown links/anchors and whitespace are checked for this documentation change. No endpoints, SQL, packages, permissions, runtime dependencies or servers are changed; no application-test replay is needed for the task breakdown.
+
+## C1a / API contract and local access policy
+
+Completed 15 October 2026 on `dev-next`. This is the documented implementation contract, not an API implementation or database replay.
+
+- Added `docs/openapi.yaml` (OpenAPI 3.1.1), with 14 planned GET operations, their delivery milestones, 59 concrete schemas, shared headers/problem responses and 15 synthetic response examples. Excluded the phase 5 stream schema. IDs above JavaScript's safe integer range, NULL actual end times, sensitive/policy redaction and incomplete child observations are represented explicitly.
+- Added `docs/API_CONTRACT.md` for semantic validation and local policy: exact names versus explicit escaped patterns, created-time `[from,to)` cohorts, all-status summaries versus selected-status list/timeline, DST-aware buckets, bounded cursor sessions/global sorts, recorded-count meaning, capped text projections, separately paged values sections and estimates using only prior completed successful runs. Property overrides use the public view's real `property_id` and sensitive flag, avoiding path-sized cursor keys.
+- Specified proposed capability settings with events/values/override display disabled by default, always-enforced sensitive redaction, SQL-identity visibility, safe absent/hidden 404 behavior, no-store responses and no trusted browser identity headers. These settings are design targets for C1c/C5/C6 and are not accepted application configuration yet. Local mode has no new login flow; shared authentication/transport/host logging remain deferred.
+- Kept the roadmap/modernization plan and README links aligned. Initial reusable authoring/check helpers, packages and outputs remain ignored under `.local/contract-tools/`. The review follow-up below promotes durable checks and development pins into the repository and adds the required timezone-data runtime dependency.
+
+Validation: OpenAPI 3.1 structural validation passes with `openapi-spec-validator 0.9.0`; all 59 JSON Schemas, 399 internal references, 14 unique planned GET operations and 15 response examples pass. Twenty-three invalid-instance probes are rejected (including numeric/invalid/overflow IDs, bad timestamps/offsets/status selections, contradictory capabilities, plaintext sensitive values, inconsistent cursor metadata, incomplete children with an end time, fabricated actual duration and count overflow); pending, unknown-code, maximum-ID, input-offset and continuation examples pass. Local links/anchors, ignore boundaries and whitespace are checked separately. This proves document consistency, not parser/serializer/query/authentication behavior; no application tests, SQL/HTTP replay, fixture executions, permissions or servers are changed/run.
+
+Next: **C1b** implements and proves the typed boundary, especially the existing Driver 17 datetimeoffset -155 limitation and seven-digit UTC wire timestamps while preserving legacy result shapes. C1c owns the HTTP namespace/problem/capability implementation. All existing incomplete backend/native/hosting cases retain their results.
+
+### C1a review follow-up
+
+Addressed Astra's review on 15 October 2026 before starting C1b:
+
+- Added first-party `tzdata==2026.5` to the runtime pins and a loadable `DISPLAY_TIMEZONE` check at application construction, defaulting to `Europe/London`. Invalid configuration or missing data fails before SQL access. The setting prepares API time operations; legacy SQL formatting is unchanged.
+- Widened execution-status and summary-status output codes to the signed SQL INT range. Known input selectors remain 1–9; tests cover unknown output codes outside SMALLINT and both INT bounds.
+- Promoted OpenAPI/schema/reference/example and invalid-instance checks to tracked `tests/test_api_contract.py`. Added separate `requirements-dev.txt`/`constraints-dev.txt`; the normal test command no longer depends on ignored helper scripts or installed package targets. Added startup/fallback/DST tests in `tests/test_timezones.py` and updated installation instructions.
+
+Validation: created a fresh standard CPython 3.14.8 Windows x64 environment at ignored `.local/contract-review-venv314` and installed `requirements-dev.txt` using binary wheels only. All 29 runtime/development distributions installed, and `pip check` passed. The normal `python -m unittest discover -s tests -q` command passed **114 tests** (101 existing + 9 contract + 4 timezone), including WSGI/legacy-launcher construction, all 59 schemas/399 references/14 operations/15 response examples, 28 invalid-instance cases and unknown status codes across both SQL INT boundaries. London spring-forward and repeated autumn-hour checks pass with `PYTHONTZPATH` empty, proving the packaged fallback rather than relying on a system IANA database. All 35 local planning links/anchors, 16 Stage C task IDs and whitespace checks pass. No DB/server process was started. No API endpoint or native timestamp conversion is claimed; the backend/native/hosting gates above retain their recorded status.
 
 ## B1 work record
 

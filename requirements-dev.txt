@@ -1,0 +1,7 @@
+# Application runtime plus tools for the tracked, database-free contract tests.
+-r requirements.txt
+-c constraints-dev.txt
+PyYAML
+jsonschema
+openapi-spec-validator
+rfc3339-validator

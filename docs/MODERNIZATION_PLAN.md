@@ -2,7 +2,7 @@
 
 Updated: 15 October 2026. Source audit: 12 October 2026.
 
-Status: implementation in progress; backend foundation largely delivered, read-only API next. [The roadmap](roadmap.md) is the source of truth for scope and frontend decisions.
+Status: implementation in progress; backend foundation largely delivered, read-only API contract drafted. [The roadmap](roadmap.md) is the source of truth for scope and frontend decisions.
 
 Track delivered submilestones, validation evidence, and the next bounded code task in [implementation progress](PROGRESS.md). A delivery phase may span several code tasks; the progress log records that decomposition without treating partial completion as phase completion.
 
@@ -139,7 +139,7 @@ Render catalog names and event text using `textContent`, never database-derived 
 
 ## Proposed API contract
 
-All monitoring operations are read-only `GET /api/v1/...`. JSON resources return data, not HTML fragments or CSS class names; `/stream` instead returns `text/event-stream`. These paths are proposed, not implemented.
+All monitoring operations are read-only `GET /api/v1/...`. JSON resources return data, not HTML fragments or CSS class names; `/stream` instead returns `text/event-stream`. These paths are proposed, not implemented. C1a's [detailed contract and local access policy](API_CONTRACT.md) and [OpenAPI 3.1 draft](openapi.yaml) define the Stage C fields, examples, limits, sort/paging rules and deliberate legacy differences. All 14 documented GET operations remain marked planned; the stream schema remains phase 5 work.
 
 | Endpoint | Purpose / principal inputs |
 | --- | --- |
@@ -153,7 +153,7 @@ All monitoring operations are read-only `GET /api/v1/...`. JSON resources return
 | `/executions/{id}/executables` | Paged executable statistics |
 | `/executions/{id}/children` | Paged child-package observations and timings |
 | `/executions/{id}/events` | Paged messages; `kind` selects all, errors, warnings, duplicate warnings, or memory warnings; plus text search |
-| `/executions/{id}/values` | Parameter metadata/redacted values and permitted property overrides |
+| `/executions/{id}/values?section=parameters` | Bounded parameter metadata/redacted values; `section=overrides` pages permitted property overrides separately |
 | `/history?folder=...&project=...&package=...` | Exact package history, explicit status scope, bounded count, separately labelled estimates |
 | `/stream` | Authorized SSE notifications for the selected monitoring scope; typed change/resync events with resumable IDs, without parameter values or raw log messages |
 | `/healthz` and `/readyz` outside the versioned API | Process liveness without a DB query; readiness with a short dependency check |
@@ -163,7 +163,7 @@ All monitoring operations are read-only `GET /api/v1/...`. JSON resources return
 - Use query parameters for names, including spaces, Unicode, `%`, `#`, and slashes; do not decode them a second time. Names are exact by default. A separate explicit pattern mode can retain the old `*` use case, translating and escaping SQL wildcard characters deliberately.
 - Preserve the configurable 360-hour default range initially. API inputs are offset-aware `from` and `to`; use the half-open interval `[from, to)`. Resolve an omitted `to` once and return the effective bounds so the browser can reuse them across list and chart requests. Cap requested ranges, initially at 31 days with an administrator override.
 - Use `created_time` for the dashboard execution cohort so created/pending executions remain visible. Status cards intentionally summarize all statuses in the same folder/project/time cohort; the table and timeline apply the selected status. Make this distinction explicit in the API contract and UI.
-- Daily buckets use an explicitly configured display timezone, with Europe/London as the proposed default. Implement and test DST boundaries rather than grouping by a timezone-less SQL date. An old `AS_OF_DATE` value becomes the upper bound; it does **not** reconstruct the status of an execution at that historical moment.
+- Daily buckets use `DISPLAY_TIMEZONE`, default Europe/London, already checked at application construction. Pinned first-party `tzdata` provides the IANA database on Windows and other hosts without system data. Implement and test bucket DST boundaries rather than grouping by a timezone-less SQL date. An old `AS_OF_DATE` value becomes the upper bound; it does **not** reconstruct the status of an execution at that historical moment.
 - Start with `limit=50`, maximum 200, and deterministic ordering. Use cursor pagination for large execution/event lists, including the sort key and unique ID as a tie-breaker. Bind cursors to filters, direction, and effective time bounds; validate cursor contents and never treat them as authorization.
 - Apply bounded pagination to folder/project collections too; the navigation must handle more items than fit on one API page.
 - Capture an upper execution/event ID for a paging session to avoid new inserts shifting the page boundary. Live status changes and catalog retention can still change membership: do not describe this as a database snapshot. Offer a data-only refresh action for new data. When an update changes a sort key or filter membership, explicitly invalidate/refetch the affected page and cursors while retaining the user's view preferences; do not silently append rows outside the current paging scope.
@@ -181,7 +181,7 @@ All monitoring operations are read-only `GET /api/v1/...`. JSON resources return
 - JSON errors and failures before a stream starts use `application/problem+json` with `type`, `title`, `status`, a safe `detail`, and a request ID. Define 400 invalid input, 401 unauthenticated, 403 denied endpoint capability, 404 absent/not-visible execution, 503 unavailable DB, and 504 query timeout. After stream headers are sent, use a documented safe status/resync event or close the connection rather than attempting to change the HTTP status. Do not return SQL text, connection strings, or tracebacks.
 - Return an empty list when a scoped catalog query legitimately has no visible rows. Do not turn every empty result into an authorization error. Failures must remain distinguishable from empty data.
 
-The OpenAPI file is a deliverable of the API phase, not a pretense that the implementation exists today. Extend it with the stream endpoint/media type, and document the SSE event schemas and resume/resync behaviour during the live-update phase. Contract tests should keep validation, serialization, examples, and documentation aligned.
+The OpenAPI file is a deliverable of the API phase, not a pretense that the implementation exists today. Extend it with the stream endpoint/media type, and document the SSE event schemas and resume/resync behaviour during the live-update phase. [Tracked contract tests](../tests/test_api_contract.py) validate structure, references, examples and invalid instances using the separate pinned [development requirements](../requirements-dev.txt); extend them with runtime validation/serialization checks as those milestones ship.
 
 ### Production live updates
 
@@ -242,7 +242,7 @@ Use reviewable commits on `dev-next`, or feature branches/PRs against that devel
 
 Total original planning range: **17–27 developer days** for a tested replacement including production live updates. These original ranges are not a remaining-work estimate. The first usable list/filter screen should arrive earlier, after the foundation and initial API work. Re-estimate API effort after the contract, native timestamp solution and first measured paged query; re-estimate production work after hosting is reprioritized and the stream prototype is measured.
 
-The next active stage is **Stage C / delivery phase 2: the read-only API**. Its [tracked task breakdown](PROGRESS.md#stage-c--read-only-api-delivery-phase-2) starts with C1a, the explicit contract and local access policy; C1b resolves typed/native timestamp conversion; C1c adds the common HTTP boundary; C2a delivers `GET /api/v1/executions`. Preserve the legacy presentation adapter throughout. Keep native cleanup-failure observation open without blocking unrelated API work; do not represent the formatted legacy timestamps as proof of typed datetimeoffset compatibility.
+The active stage is **Stage C / delivery phase 2: the read-only API**. Its [tracked task breakdown](PROGRESS.md#stage-c--read-only-api-delivery-phase-2) records C1a's completed draft contract and local access policy. Next, C1b resolves typed/native timestamp conversion; C1c adds the common HTTP boundary; C2a delivers `GET /api/v1/executions`. Preserve the legacy presentation adapter throughout. Keep native cleanup-failure observation open without blocking unrelated API work; do not represent the formatted legacy timestamps as proof of typed datetimeoffset compatibility.
 
 After C1, C2a and the C3a/C3b navigation/summary slices pass local contract and SQL checks, phase 3 can deliver the first native filter/list/cards screen and link to existing execution details. Required global sorts remain C2b; timeline, remaining inspection resources, events, values, history and API-wide acceptance remain explicit Stage C work. This early screen does not complete phase 2, feature parity or live updates. Production hosting/proxy/capacity work stays deferred; phase 5 still requires a validated production stream when hosting resumes.
 
