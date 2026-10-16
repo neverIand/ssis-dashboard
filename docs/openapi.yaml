@@ -1,10 +1,10 @@
-# C1-C5: twelve GET operations implemented; values and history planned.
+# C1-C6: thirteen GET operations implemented; history planned.
 openapi: 3.1.1
 jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
 info:
   title: ssis-dashboard read-only API
   version: 1.0.0-draft.1
-  description: Stage C DRAFT. C1-C5 implement twelve GET operations; values and history remain planned. API_CONTRACT.md defines local access, semantic
+  description: Stage C DRAFT. C1-C6 implement thirteen GET operations; history remains planned. API_CONTRACT.md defines local access, semantic
     validation, cursor and cross-field rules. No production/shared authentication or stream implementation is claimed.
   license: {name: Apache-2.0, identifier: Apache-2.0}
 servers:
@@ -326,9 +326,10 @@ paths:
     get:
       operationId: listValues
       summary: One bounded parameter or property-override section
-      description: PLANNED; not implemented. Disabled by default; deny before SQL. Fixed ascending ID/path order
-        per section. Override values default to NULL/policy-redacted; sensitive values always redacted.
-      x-implementation-status: planned
+      description: Implemented in C6. Disabled by default; deny before SQL. Each section has fixed ascending numeric
+        ID paging before value projection. Override values default to NULL/policy-redacted; sensitive values are
+        always redacted in SQL and serialization. Original parameter type labels and display strings are preserved.
+      x-implementation-status: implemented
       x-milestone: C6
       parameters:
       - {$ref: '#/components/parameters/ExecutionId'}
@@ -913,10 +914,10 @@ components:
           - {$ref: '#/components/schemas/UtcTimestamp'}
           - {type: 'null'}
         limit: {type: integer, minimum: 1, maximum: 200}
-        sort: {type: string, maxLength: 40}
+        sort: {type: string, enum: [execution_parameter_id, property_id]}
         direction:
           type: string
-          enum: [asc, desc]
+          const: asc
         as_of: {$ref: '#/components/schemas/UtcTimestamp'}
         upper_id:
           anyOf:
@@ -932,6 +933,20 @@ components:
           type: string
           enum: [parameters, overrides]
       allOf:
+      - if:
+          properties:
+            section: {const: parameters}
+          required: [section]
+        then:
+          properties:
+            sort: {const: execution_parameter_id}
+      - if:
+          properties:
+            section: {const: overrides}
+          required: [section]
+        then:
+          properties:
+            sort: {const: property_id}
       - if:
           properties:
             has_more: {const: false}
@@ -1311,7 +1326,7 @@ components:
         execution_parameter_id: {$ref: '#/components/schemas/Id'}
         object_type: {$ref: '#/components/schemas/ParameterObjectType'}
         name: {$ref: '#/components/schemas/Name128'}
-        sql_type: {type: string, maxLength: 128}
+        sql_type: {type: string, maxLength: 128, description: Original catalog parameter_data_type label; not an inferred JSON type.}
         sensitive: {type: boolean}
         required: {type: boolean}
         value_set: {type: boolean}
