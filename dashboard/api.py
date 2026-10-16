@@ -10,6 +10,7 @@ from werkzeug.exceptions import Forbidden, ServiceUnavailable
 from dashboard.api_validation import COHORT_PARAMETERS, fixed_as_of, query_arguments
 from dashboard.executions import EXECUTION_SORTS, QUERY_PARAMETERS, execution_page
 from dashboard.executables import QUERY_PARAMETERS as EXECUTABLE_PARAMETERS, executable_page
+from dashboard.children import QUERY_PARAMETERS as CHILD_PARAMETERS, child_page
 from dashboard.inspection import execution_detail
 from dashboard.metrics import execution_summary
 from dashboard.timeline import execution_timeline
@@ -171,6 +172,13 @@ def execution(id):
 @query_parameters(*EXECUTABLE_PARAMETERS)
 def executables(id):
     data, meta = executable_page(id, g.api_query, current_app.config)
+    return resource_response(data, meta=meta)
+
+
+@blueprint.get('/executions/<id>/children', merge_slashes=False)
+@query_parameters(*CHILD_PARAMETERS)
+def children(id):
+    data, meta = child_page(id, g.api_query, current_app.config)
     return resource_response(data, meta=meta)
 
 

@@ -13,20 +13,6 @@ from dashboard.validation import InvalidInput
 QUERY_PARAMETERS = ('limit', 'cursor', 'sort', 'direction')
 
 
-def _text(value, maximum, *, units=False, name=False):
-    if value is None:
-        return None
-    if not isinstance(value, str) or len(value) > maximum or (name and (not value or '\0' in value)):
-        raise ValueError('Invalid executable text.')
-    try:
-        width = len(value.encode('utf-16-le')) // 2
-    except UnicodeError:
-        raise ValueError('Invalid executable text.') from None
-    if units and width > maximum:
-        raise ValueError('Invalid executable text width.')
-    return value
-
-
 def _seek(state, sort):
     if state is None:
         return None, None
@@ -47,10 +33,10 @@ def _serialize(row, identifier, upper):
     return {
         'statistics_id': wire.bigint(row['statistics_id']), 'execution_id': identifier,
         'executable_id': wire.bigint(row['executable_id']),
-        'package_name': _text(row['package_name'], 260, units=True, name=True),
-        'package_path': _text(row['package_path'], 16384),
-        'execution_path': _text(row['execution_path'], 16384),
-        'name': _text(row['name'], 4000, units=True),
+        'package_name': wire.catalog_text(row['package_name'], 260, units=True, name=True),
+        'package_path': wire.catalog_text(row['package_path'], 16384),
+        'execution_path': wire.catalog_text(row['execution_path'], 16384),
+        'name': wire.catalog_text(row['name'], 4000, units=True),
         'started_at': wire.utc_timestamp(row['started_at']), 'ended_at': wire.utc_timestamp(row['ended_at']),
         'duration_seconds': wire.duration_seconds(row['started_at'], row['ended_at']),
         'result': wire.executable_result(row['execution_result']),

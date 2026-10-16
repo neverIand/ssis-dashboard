@@ -15,6 +15,21 @@ _BIGINT_MAX = 2**63 - 1
 _EXACT_COUNT_MAX = 2**53 - 1
 
 
+def catalog_text(value, maximum, *, units=False, name=False):
+    """Bound catalog text by Unicode characters and, for names, SQL UTF-16 units."""
+    if value is None:
+        return None
+    if not isinstance(value, str) or len(value) > maximum or (name and (not value or '\0' in value)):
+        raise ValueError('Invalid catalog text.')
+    try:
+        width = len(value.encode('utf-16-le')) // 2
+    except UnicodeError:
+        raise ValueError('Invalid catalog text.') from None
+    if units and width > maximum:
+        raise ValueError('Invalid catalog text width.')
+    return value
+
+
 def bigint(value, *, allow_zero=False):
     if type(value) is not int or not (0 if allow_zero else 1) <= value <= _BIGINT_MAX:
         raise ValueError('Invalid SQL BIGINT identifier.')
