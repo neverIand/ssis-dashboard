@@ -1,6 +1,6 @@
 # Read-only API contract
 
-Updated: 16 October 2026. Milestones: C1a–C7b. **All 14 Stage C GET operations, including bounded exact-package history and prior-success estimates, are implemented.** C8 API-wide acceptance remains required. [OpenAPI](openapi.yaml) defines fields, parameters, examples and response schemas; this document defines cross-field rules and local access policy. Track delivery in [PROGRESS](PROGRESS.md#stage-c--read-only-api-delivery-phase-2). The [roadmap](roadmap.md) governs scope.
+Updated: 16 October 2026. Milestones: C1a–C7b implemented, C8.1 combined acceptance complete locally. **All 14 Stage C GET operations, including bounded exact-package history and prior-success estimates, are implemented.** C8.2 workload/resource acceptance and C8.3 independent reader HTTP remain required. [OpenAPI](openapi.yaml) defines fields, parameters, examples and response schemas; this document defines cross-field rules and local access policy. The [acceptance matrix](API_ACCEPTANCE.md) records deliberate legacy differences, combined native checks and remaining gates. Track delivery in [PROGRESS](PROGRESS.md#stage-c--read-only-api-delivery-phase-2). The [roadmap](roadmap.md) governs scope.
 
 ## Delivery and compatibility
 
