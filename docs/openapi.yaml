@@ -1,10 +1,10 @@
-# C1-C7a: fourteen GET operations implemented; history estimates remain C7b.
+# C1-C7b: fourteen GET operations and prior-success history estimates implemented.
 openapi: 3.1.1
 jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
 info:
   title: ssis-dashboard read-only API
   version: 1.0.0-draft.1
-  description: Stage C DRAFT. C1-C7a implement fourteen GET operations; history estimates remain C7b. API_CONTRACT.md defines local access, semantic
+  description: Stage C DRAFT. C1-C7b implement fourteen GET operations and prior-success history estimates. API_CONTRACT.md defines local access, semantic
     validation, cursor and cross-field rules. No production/shared authentication or stream implementation is claimed.
   license: {name: Apache-2.0, identifier: Apache-2.0}
 servers:
@@ -360,9 +360,9 @@ paths:
     get:
       operationId: listHistory
       summary: Exact package history with separate estimates
-      description: Implemented in C7a with estimate NULL. Default last 50 running/succeeded; exact catalog equality
+      description: Implemented in C7a/C7b. Default last 50 running/succeeded; exact catalog equality
         for folder/project/package, ID paging in either direction and no implicit dashboard time range.
-        C7b estimates remain planned; actual fields never contain forecasts.
+        Estimates use up to five visible successful runs completed by each target start; actual fields retain observed values.
       x-implementation-status: implemented
       x-milestone: C7a/C7b
       parameters:
@@ -1424,6 +1424,9 @@ components:
             redaction_reason: {const: sensitive}
     Estimate:
       type: object
+      description: Mean of up to five visible valid successes ending by the target start, ordered by end time then ID descending;
+        independent of page status and ID ceiling. Duration retains the arithmetic mean; estimated end rounds to 100 ns, half up.
+        A zero mean, absent start/sample or unrepresentable estimated end returns estimate NULL.
       additionalProperties: false
       required: [method, sample_count, duration_seconds, ended_at]
       properties:
@@ -2348,7 +2351,8 @@ components:
           elapsed_seconds: 30
           warning_count: 1
           error_count: 0
-          estimate: null
+          estimate: {method: mean_last_5_successful, sample_count: 5, duration_seconds: 40.5,
+            ended_at: '2026-10-15T11:00:10.6234567Z'}
         meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z', from: null,
           to: null, limit: 50, sort: execution_id, direction: desc, as_of: '2026-10-15T11:00:00.1234567Z', upper_id: '9007199254740993',
           next_cursor: null, has_more: false, consistency: live}

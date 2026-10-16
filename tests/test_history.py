@@ -1,7 +1,8 @@
-"""Exact history selection, observed timing and bounded cursor contracts."""
+"""Exact history, prior-success estimates and bounded cursor contracts."""
 
 import base64
 from copy import deepcopy
+from decimal import Decimal
 import json
 from unittest.mock import Mock, patch
 import unittest
@@ -20,7 +21,7 @@ IDENTITY = {'folder':'Folder', 'project':'Project', 'package':'Package.dtsx'}
 
 
 def history(identifier=1, **changes):
-    return execution(identifier, logging_rows=1, **changes)
+    return execution(identifier, **{'logging_rows':1, 'estimate_sample_count':0, 'estimate_total_ticks':None, **changes})
 
 
 class HistoryTests(unittest.TestCase):
@@ -40,14 +41,24 @@ class HistoryTests(unittest.TestCase):
 
     def query_fixture(self, resource, parameters, **settings):
         folder, project, package, *statuses = parameters[:12]
-        source = [r for r in self.rows if (r['folder_name'], r['project_name'], r['package_name'])==(folder, project, package)
-                  and r['status'] in statuses]
+        scope = [r for r in self.rows if (r['folder_name'], r['project_name'], r['package_name'])==(folder, project, package)]
+        source = [r for r in scope if r['status'] in statuses]
         if resource=='api-history-fence.sql':
             return {'upper_id':max((r['execution_id'] for r in source), default=None)}
         take, upper, last, descending = parameters[-4:]
+        last = None if last == 0 else last
         source = [r for r in source if r['execution_id']<=upper and
                   (last is None or (r['execution_id']<last if descending else r['execution_id']>last))]
-        return deepcopy(sorted(source, key=lambda r:r['execution_id'], reverse=bool(descending))[:take])
+        page = deepcopy(sorted(source, key=lambda r:r['execution_id'], reverse=bool(descending))[:take])
+        for row in page:
+            samples = [] if row['started_at'] is None else sorted(
+                (r for r in scope if r['status']==7 and r['execution_id']!=row['execution_id']
+                 and r['started_at'] is not None and r['ended_at'] is not None
+                 and r['started_at']<=r['ended_at']<=row['started_at']),
+                key=lambda r:(r['ended_at'], r['execution_id']), reverse=True)[:5]
+            row['estimate_sample_count'] = len(samples)
+            row['estimate_total_ticks'] = Decimal(sum(r['ended_at'].utc_ticks-r['started_at'].utc_ticks for r in samples)) if samples else None
+        return page
 
     def get(self, values=None, **kwargs):
         return self.client.get('/api/v1/history', query_string={**IDENTITY, **(values or {})}, **kwargs)
@@ -79,7 +90,7 @@ class HistoryTests(unittest.TestCase):
         self.assertEqual([r['execution_id'] for r in page['data']], [str(i) for i in range(251, 201, -1)])
         self.assertEqual((page['meta']['sort'], page['meta']['direction'], page['meta']['upper_id']), ('execution_id', 'desc', '251'))
         self.assertEqual(self.query.call_args.args, ('api-history-page.sql',
-            ('Folder', 'Project', 'Package.dtsx', 2, 7, None, None, None, None, None, None, None, 51, 251, None, 1)))
+            ('Folder', 'Project', 'Package.dtsx', 2, 7, 2, 2, 2, 2, 2, 2, 2, 51, 251, 0, 1)))
         self.assertTrue(all(r['estimate'] is None for r in page['data']))
         self.assertFalse(self.app.config['API_EVENTS_ENABLED'])
         self.assertFalse(self.app.config['API_VALUES_ENABLED'])
@@ -112,7 +123,7 @@ class HistoryTests(unittest.TestCase):
 
     def test_status_is_explicit_canonical_and_excludes_unknown_future_codes(self):
         self.rows = [history(i, status=i, started_at=None if i==1 else history()['started_at']) for i in range(1, 10)]
-        self.rows.append(history(20, status=2147483647))
+        self.rows.extend((history(20, status=2147483647), history(21, status=0)))
         self.assertEqual([r['execution_id'] for r in self.page()['data']], ['7', '2'])
         page = self.page({'status':'9,8,7,6,5,4,3,2,1'})
         self.assertEqual([r['status']['code'] for r in page['data']], list(range(9, 0, -1)))
@@ -144,6 +155,82 @@ class HistoryTests(unittest.TestCase):
         self.assertGreater(item['duration_seconds'], 1e11)
         self.assertEqual(item['logging_level'], {'code':2147483647, 'name':'unknown'})
         self.assertEqual(item['environment'], {'folder_name':'Env folder', 'name':None})
+
+    def test_estimate_uses_last_five_valid_visible_successes_outside_page_status_and_fence(self):
+        def sample(identifier, duration, finish=0, **changes):
+            return history(identifier, **{'status':7, 'started_at':Timestamp(NOW.utc_ticks+finish-duration),
+                                         'ended_at':Timestamp(NOW.utc_ticks+finish), **changes})
+        self.rows = [history(1, started_at=NOW), sample(10,100,-50), sample(11,20,-40), sample(12,30,-30),
+                     sample(13,40,-20), sample(14,50,-10), sample(15,60,-10), sample(16,0), sample(17,1000,1),
+                     sample(18,1000,started_at=None), sample(19,1000,ended_at=None), sample(20,-1),
+                     sample(21,1000,status=4), sample(22,1000,status=9), sample(23,1000,folder_name='Other'),
+                     sample(24,1000,project_name='Other'), sample(25,1000,package_name='Other')]
+        page = self.page({'status':'2', 'limit':'1'})
+        item = page['data'][0]
+        self.assertEqual(page['meta']['upper_id'], '1')
+        self.assertEqual(item['estimate'], {'method':'mean_last_5_successful', 'sample_count':5,
+            'duration_seconds':0.0000036, 'ended_at':Timestamp(NOW.utc_ticks+36).isoformat()})
+        self.assertIsNone(item['ended_at'])
+        self.assertIsNone(item['duration_seconds'])
+        self.assertNotIn('estimate_total_ticks', item)
+
+    def test_estimate_includes_zero_samples_and_rounds_only_its_end_to_nearest_tick(self):
+        for zero_count, seconds, rounded_ticks in ((1,0.00000005,1), (4,0.00000002,0)):
+            self.rows = [history(1, started_at=NOW), history(2,status=7,started_at=Timestamp(NOW.utc_ticks-1),ended_at=NOW)]
+            self.rows += [history(3+i,status=7,started_at=NOW,ended_at=NOW) for i in range(zero_count)]
+            estimate = self.page({'status':'2'})['data'][0]['estimate']
+            self.assertEqual(estimate, {'method':'mean_last_5_successful', 'sample_count':zero_count+1,
+                'duration_seconds':seconds, 'ended_at':Timestamp(NOW.utc_ticks+rounded_ticks).isoformat()})
+        self.rows[1]['started_at'] = NOW
+        self.assertIsNone(self.page({'status':'2'})['data'][0]['estimate'])
+
+    def test_successful_target_is_excluded_and_actual_end_is_preserved(self):
+        self.rows = [history(99,status=7,started_at=NOW,ended_at=NOW),
+                     history(10,status=7,started_at=Timestamp(NOW.utc_ticks-2),ended_at=NOW),
+                     history(11,status=7,started_at=NOW,ended_at=Timestamp(NOW.utc_ticks+1))]
+        item = self.page({'status':'7', 'limit':'1'})['data'][0]
+        self.assertEqual(item['execution_id'], '99')
+        self.assertEqual(item['estimate']['sample_count'], 1)
+        self.assertEqual(item['estimate']['duration_seconds'], 0.0000002)
+        self.assertEqual(item['estimate']['ended_at'], Timestamp(NOW.utc_ticks+2).isoformat())
+        self.assertEqual((item['ended_at'], item['duration_seconds']), (NOW.isoformat(), 0))
+
+    def test_estimates_recheck_current_visible_samples_without_changing_cursor_time(self):
+        self.rows = [history(1,started_at=NOW), history(2,started_at=NOW),
+                     history(10,status=7,started_at=Timestamp(NOW.utc_ticks-10),ended_at=NOW)]
+        first = self.page({'status':'2','limit':'1','direction':'asc'})
+        self.assertIsNotNone(first['data'][0]['estimate'])
+        self.rows = self.rows[:2]
+        self.clock.return_value = Timestamp(NOW.utc_ticks+100)
+        second = self.page({'status':'2','limit':'1','direction':'asc','cursor':first['meta']['next_cursor']})
+        self.assertIsNone(second['data'][0]['estimate'])
+        self.assertEqual(first['meta']['as_of'], second['meta']['as_of'])
+
+    def test_long_sample_durations_and_unrepresentable_estimated_end(self):
+        begin = parse_timestamp('0001-01-01T00:00:00.0000001Z')
+        end = parse_timestamp('8001-01-01T00:00:00.0000002Z')
+        self.rows = [history(1,started_at=parse_timestamp('9000-01-01T00:00:00Z'))]
+        self.rows += [history(i,status=7,started_at=begin,ended_at=end) for i in range(2,7)]
+        self.assertGreater(sum(end.utc_ticks-begin.utc_ticks for _ in range(5)), 2**63-1)
+        self.assertIsNone(self.page({'status':'2'})['data'][0]['estimate'])
+        self.rows = [history(1,started_at=parse_timestamp('5000-01-01T00:00:00.0000001Z')),
+                     history(2,status=7,started_at=begin,ended_at=parse_timestamp('1001-01-01T00:00:00.0000002Z'))]
+        item = self.page({'status':'2'})['data'][0]
+        ticks = self.rows[1]['ended_at'].utc_ticks-begin.utc_ticks
+        self.assertEqual(item['estimate']['duration_seconds'], ticks/TICKS_PER_SECOND)
+        self.assertEqual(item['estimate']['ended_at'], Timestamp(self.rows[0]['started_at'].utc_ticks+ticks).isoformat())
+
+    def test_malformed_estimate_aggregates_including_sentinel_fail_closed(self):
+        changes = ({'estimate_sample_count':True}, {'estimate_sample_count':-1}, {'estimate_sample_count':6},
+                   {'estimate_total_ticks':Decimal(1)}, {'estimate_sample_count':1},
+                   *({'estimate_sample_count':1,'estimate_total_ticks':v} for v in
+                     (1,1.0,'1',Decimal('-1'),Decimal('0.5'),Decimal('NaN'),Decimal('Infinity'),Decimal('1e30'))),
+                   {'estimate_sample_count':1,'estimate_total_ticks':Decimal(1),'started_at':None})
+        for change in changes:
+            self.query.side_effect = lambda r,*a,**kw:({'upper_id':251} if r.endswith('fence.sql') else
+                                                     [history(1),history(2,**change)])
+            with self.assertLogs(self.app.logger, level='ERROR'):
+                self.assertEqual(self.get({'limit':'1'}).status_code, 500)
 
     def test_initial_empty_and_absent_or_hidden_names_are_successful_empty(self):
         for values in ({'folder':'Absent'}, {'project':'Hidden'}, {'package':'Absent'}):

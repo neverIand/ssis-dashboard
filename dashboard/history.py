@@ -1,14 +1,42 @@
-"""Exact-package history with bounded ID paging and observed timings only."""
+"""Bounded exact-package history and estimates from prior visible successes."""
+
+from decimal import Decimal
 
 from dashboard import api_validation as inputs, cursors, serialization as wire
 from dashboard.db import execute_query
 from dashboard.executions import serialize_execution
 from dashboard.observability import record_query
-from dashboard.timestamps import parse_timestamp, utc_now
+from dashboard.timestamps import TICKS_PER_SECOND, Timestamp, as_timestamp, parse_timestamp, utc_now
 from dashboard.validation import InvalidInput
 
 
 QUERY_PARAMETERS = ('folder', 'project', 'package', 'status', 'limit', 'cursor', 'sort', 'direction')
+_MAX_DURATION_TICKS = parse_timestamp('9999-12-31T23:59:59.9999999Z').utc_ticks
+
+
+def serialize_estimate(row):
+    """Keep the rational mean until JSON/100-ns timestamp rounding is required."""
+    count, total = wire.count(row['estimate_sample_count']), row['estimate_total_ticks']
+    if count > 5 or (count == 0 and total is not None):
+        raise ValueError('Invalid history estimate aggregate.')
+    if count == 0:
+        return None
+    if (row['started_at'] is None or type(total) is not Decimal or not total.is_finite()
+            or total < 0 or total > count * _MAX_DURATION_TICKS or total != total.to_integral_value()):
+        raise ValueError('Invalid history estimate aggregate.')
+    total = int(total)
+    if total == 0:
+        return None
+    # Nonnegative half ticks round up; duration retains the unrounded mean.
+    mean_ticks = (2 * total + count) // (2 * count)
+    start_ticks = as_timestamp(row['started_at']).utc_ticks
+    try:
+        end = Timestamp(start_ticks + mean_ticks)
+    except ValueError:
+        # A valid catalog instant plus a valid duration can exceed year 9999.
+        return None
+    return {'method': 'mean_last_5_successful', 'sample_count': count,
+            'duration_seconds': total / (count * TICKS_PER_SECOND), 'ended_at': end.isoformat()}
 
 
 def history_page(values, config):
@@ -45,7 +73,9 @@ def history_page(values, config):
                              typed_timestamps=True, on_complete=record_query)
 
     status = selection['status']
-    parameters = (selection['folder'], selection['project'], selection['package'], *status, *([None] * (9 - len(status))))
+    # Duplicate an included status rather than binding unused NULLs: identical
+    # IN membership without pyodbc's per-NULL parameter-type descriptions.
+    parameters = (selection['folder'], selection['project'], selection['package'], *status, *([status[0]] * (9 - len(status))))
     as_of = now if state is None else parse_timestamp(state['as_of'])
     if state is None:
         upper = query('api-history-fence.sql', parameters, one_row=True)['upper_id']
@@ -53,7 +83,7 @@ def history_page(values, config):
         if upper is not None:
             wire.bigint(upper)
     rows = [] if upper is None else query('api-history-page.sql', (
-        *parameters, selection['limit'] + 1, upper, last, int(selection['direction'] == 'desc')))
+        *parameters, selection['limit'] + 1, upper, 0 if last is None else last, int(selection['direction'] == 'desc')))
     if len(rows) > selection['limit'] + 1:
         raise ValueError('Unexpected history page size.')
     serialized = []
@@ -63,7 +93,7 @@ def history_page(values, config):
                 or type(row['logging_rows']) is not int or row['logging_rows'] not in (0, 1)
                 or (row['logging_rows'] == 0 and row['logging_level'] is not None)):
             raise ValueError('Unexpected history metadata.')
-        serialized.append({**serialize_execution(row, as_of=as_of), 'estimate': None})
+        serialized.append({**serialize_execution(row, as_of=as_of), 'estimate': serialize_estimate(row)})
     if len({row['execution_id'] for row in serialized}) != len(serialized):
         raise ValueError('Duplicate history execution ID.')
     has_more = len(serialized) > selection['limit']

@@ -167,6 +167,12 @@ class APIContractTests(unittest.TestCase):
         execution = self.example_row('ExecutionsResponse')
         execution['error_count'] = 9007199254740992
         cases.append(('Execution', execution))
+        history = self.example_row('HistoryResponse')
+        history.update(started_at=None, elapsed_seconds=None)
+        cases.append(('HistoryExecution', history))
+        for count in (0,6):
+            cases.append(('Estimate', {'method':'mean_last_5_successful', 'sample_count':count,
+                                      'duration_seconds':1, 'ended_at':'2026-10-15T11:00:00Z'}))
         cases.append(('Capabilities', {'events': False, 'values': False, 'override_values': True}))
         for number, (name, value) in enumerate(cases):
             with self.subTest(case=number, schema=name):

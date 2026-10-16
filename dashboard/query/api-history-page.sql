@@ -2,7 +2,8 @@ SET NOCOUNT ON;
 DECLARE @folder nvarchar(128) = ?, @project nvarchar(128) = ?, @package nvarchar(260) = ?,
         @s1 int = ?, @s2 int = ?, @s3 int = ?, @s4 int = ?, @s5 int = ?,
         @s6 int = ?, @s7 int = ?, @s8 int = ?, @s9 int = ?,
-        @take int = ?, @upper bigint = ?, @last bigint = ?, @descending bit = ?;
+        -- Zero is an internal first-page marker; execution IDs remain positive.
+        @take int = ?, @upper bigint = ?, @last bigint = NULLIF(?, 0), @descending bit = ?;
 
 CREATE TABLE #history_page (execution_id bigint NOT NULL PRIMARY KEY);
 -- Fixed ID orders keep the range usable without sorting a whole named scope.
@@ -49,6 +50,33 @@ OUTER APPLY (
     WHERE v.execution_id = p.execution_id AND v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL'
 ) AS logging;
 
-SELECT * FROM #history_rows
-ORDER BY CASE WHEN @descending = 1 THEN execution_id END DESC,
-         CASE WHEN @descending = 0 THEN execution_id END ASC;
+-- Read the visible prior-success timestamps once rather than expanding the
+-- catalog's permission joins for every page row. No counts or durations are
+-- calculated over this source; only each target's TOP (5) is aggregated below.
+DECLARE @latest_start datetimeoffset(7) = (SELECT MAX(started_at) FROM #history_rows);
+SELECT e.execution_id, e.start_time, e.end_time
+INTO #history_successes
+FROM catalog.executions AS e
+WHERE e.folder_name = @folder AND e.project_name = @project AND e.package_name = @package
+  AND e.status = 7 AND e.start_time IS NOT NULL
+  AND e.end_time >= e.start_time AND e.end_time <= @latest_start;
+CREATE UNIQUE CLUSTERED INDEX IX_history_success_end ON #history_successes (end_time DESC, execution_id DESC);
+
+-- Sample only for the bounded page, independently of its status/ID fence.
+-- Decimal totals avoid BIGINT overflow across five long durations; splitting
+-- whole seconds and fractions also avoids DATEDIFF_BIG(nanosecond) overflow.
+SELECT r.*, estimate.estimate_sample_count, estimate.estimate_total_ticks
+FROM #history_rows AS r
+OUTER APPLY (
+    SELECT COUNT_BIG(*) AS estimate_sample_count,
+           SUM(CONVERT(decimal(38, 0), DATEDIFF_BIG(second, s.start_time, s.end_time)) * 10000000
+               + (DATEPART(nanosecond, s.end_time) - DATEPART(nanosecond, s.start_time)) / 100) AS estimate_total_ticks
+    FROM (
+        SELECT TOP (5) e.start_time, e.end_time
+        FROM #history_successes AS e
+        WHERE e.execution_id <> r.execution_id AND e.end_time <= r.started_at
+        ORDER BY e.end_time DESC, e.execution_id DESC
+    ) AS s
+) AS estimate
+ORDER BY CASE WHEN @descending = 1 THEN r.execution_id END DESC,
+         CASE WHEN @descending = 0 THEN r.execution_id END ASC;
