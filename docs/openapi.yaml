@@ -226,8 +226,9 @@ paths:
     get:
       operationId: listExecutables
       summary: Bounded executable observations
-      description: PLANNED; not implemented.
-      x-implementation-status: planned
+      description: Implemented in C4b. Scoped to one visible execution, independently of overview filters. Page statistics
+        before path/name enrichment. Nullable observations remain NULL; user-defined execution values are never returned.
+      x-implementation-status: implemented
       x-milestone: C4b
       parameters:
       - {$ref: '#/components/parameters/ExecutionId'}
@@ -1028,8 +1029,14 @@ components:
           anyOf:
           - {$ref: '#/components/schemas/Path'}
           - {type: 'null'}
-        execution_path: {$ref: '#/components/schemas/Path'}
-        name: {type: string, maxLength: 4000}
+        execution_path:
+          anyOf:
+          - {$ref: '#/components/schemas/Path'}
+          - {type: 'null'}
+        name:
+          anyOf:
+          - {type: string, maxLength: 4000, x-sql-max-utf16-units: 4000}
+          - {type: 'null'}
         started_at:
           anyOf:
           - {$ref: '#/components/schemas/UtcTimestamp'}
@@ -1785,8 +1792,8 @@ components:
       name: sort
       in: query
       required: false
-      description: Global allowlisted order with unique-ID tie-breaker; NULLs last. C2a supports execution_id only;
-        other execution sorts are C2b.
+      description: Global order within this execution; NULL starts last in both directions, with a same-direction
+        statistics-ID tie-breaker. Both keys and all seven fractional timestamp digits survive continuation.
       schema:
         type: string
         enum: [started_at, statistics_id]

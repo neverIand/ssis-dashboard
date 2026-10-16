@@ -9,6 +9,7 @@ from werkzeug.exceptions import Forbidden, ServiceUnavailable
 
 from dashboard.api_validation import COHORT_PARAMETERS, fixed_as_of, query_arguments
 from dashboard.executions import EXECUTION_SORTS, QUERY_PARAMETERS, execution_page
+from dashboard.executables import QUERY_PARAMETERS as EXECUTABLE_PARAMETERS, executable_page
 from dashboard.inspection import execution_detail
 from dashboard.metrics import execution_summary
 from dashboard.timeline import execution_timeline
@@ -164,6 +165,13 @@ def folders():
 @blueprint.get('/executions/<id>', merge_slashes=False)
 def execution(id):
     return resource_response(execution_detail(id, current_app.config))
+
+
+@blueprint.get('/executions/<id>/executables', merge_slashes=False)
+@query_parameters(*EXECUTABLE_PARAMETERS)
+def executables(id):
+    data, meta = executable_page(id, g.api_query, current_app.config)
+    return resource_response(data, meta=meta)
 
 
 @blueprint.get('/projects', merge_slashes=False)
