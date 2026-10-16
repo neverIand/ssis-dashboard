@@ -140,6 +140,51 @@ class DatabaseBoundaryTests(unittest.TestCase):
         self.assertEqual(parameters, (value,))
         self.assert_resources_closed()
 
+    def test_declared_parameters_preserve_nulls_and_every_nonnull_value(self):
+        values = [None, "private-quote' %_[~ 東京", '😀' * 130, '<b>' + 'x' * 5000 + '</b>',
+                  '2026-10-15T12:00:00.1234567+05:45', 2**63 - 1, -(2**31), 0,
+                  Decimal('12345678901234567890.1234567'), False, b'', None]
+        for declared in (False, True):
+            with self.subTest(declared=declared):
+                self.configure_resources()
+                reports = []
+                self.query(parameters=iter(values), declared_parameters=declared, on_complete=reports.append)
+                sql, bound = self.cursor.execute.call_args.args
+                self.assertEqual(sql, load_query('engine-info.sql'))
+                self.assertEqual(len(bound), len(values))
+                for actual, original in zip(bound, values):
+                    self.assertIs(actual, pyodbc.BinaryNull if declared and original is None else original)
+                self.assertIsNone(values[0])
+                self.assertIsNone(values[-1])
+                self.assertEqual(reports[0]['outcome'], 'ok')
+                self.assertNotIn('private-', str(reports) + sql)
+                self.cursor.setinputsizes.assert_not_called()
+                self.assert_resources_closed()
+
+    def test_declared_parameter_option_requires_boolean_before_connecting(self):
+        for value in (None, 0, 1, 'true', (), []):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'declared_parameters'):
+                self.query(declared_parameters=value)
+        self.connect.assert_not_called()
+
+    def test_declared_parameter_failure_or_cancellation_preserves_primary_and_closes_both(self):
+        for error in (pyodbc.Error('HYT00', 'private-query-canary'), KeyboardInterrupt('private-cancel-canary')):
+            with self.subTest(error=type(error).__name__):
+                self.configure_resources()
+                self.cursor.execute.side_effect = error
+                self.cursor_close_error = RuntimeError('private-close-canary')
+                self.connection.close_error = RuntimeError('private-close-canary')
+                reports = []
+                with self.assertRaises(type(error)) as caught:
+                    self.query(parameters=(None,), declared_parameters=True, on_complete=reports.append)
+                self.assertIs(caught.exception, error)
+                self.assertIs(self.cursor.execute.call_args.args[1][0], pyodbc.BinaryNull)
+                self.assertEqual(reports[0]['failure_stage'], 'execute')
+                self.assertEqual(reports[0]['outcome'], 'error' if isinstance(error, Exception) else 'cancelled')
+                self.assertTrue(reports[0]['cleanup_failed'])
+                self.assertNotIn('private-', str(reports))
+                self.assert_resources_closed()
+
     def test_odbc_values_are_preserved_without_display_or_json_conversion(self):
         values = (9007199254740993, Decimal('1.250'), datetime(2026, 10, 12, tzinfo=timezone.utc), True, None)
         names = ('id', 'duration', 'timestamp', 'flag', 'end_time')

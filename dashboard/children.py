@@ -76,8 +76,8 @@ def child_page(value, values, config):
     def query(resource, parameters, *, one_row=False):
         return execute_query(resource, parameters, connection_string=config['CONNECTION_STRING']['main'],
                              one_row=one_row, login_timeout=config['DB_LOGIN_TIMEOUT_SECONDS'],
-                             query_timeout=config['DB_QUERY_TIMEOUT_SECONDS'], typed_timestamps=True,
-                             on_complete=record_query)
+                             query_timeout=config['DB_QUERY_TIMEOUT_SECONDS'],
+                             typed_timestamps=True, declared_parameters=True, on_complete=record_query)
 
     as_of = now if state is None else parse_timestamp(state['as_of'])
     if state is None:

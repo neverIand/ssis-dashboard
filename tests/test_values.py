@@ -308,7 +308,7 @@ class ValueTests(unittest.TestCase):
                 connection.add_output_converter.assert_called_once()
                 cursor.close.assert_called_once()
                 connection.close.assert_called_once()
-            expected = (42, 51, 1, None)+( (0,) if section=='overrides' else () )
+            expected = (42, 51, 1, pyodbc.BinaryNull)+( (0,) if section=='overrides' else () )
             self.assertEqual(cursors_used[-1].execute.call_args.args[1], expected)
 
     def test_database_failures_preserve_safe_status_and_short_circuit(self):

@@ -114,7 +114,7 @@ def execution_timeline(values, config, *, fixed_to):
         *status, *([None] * (9 - len(status)))),
         connection_string=config['CONNECTION_STRING']['main'],
         login_timeout=config['DB_LOGIN_TIMEOUT_SECONDS'], query_timeout=config['DB_QUERY_TIMEOUT_SECONDS'],
-        typed_timestamps=True, on_complete=record_query)
+        typed_timestamps=True, declared_parameters=True, on_complete=record_query)
     if len(rows) != len(bounds):
         raise ValueError('Unexpected timeline bucket count.')
     data = []

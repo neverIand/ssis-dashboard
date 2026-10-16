@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+import re
 import unittest
 from unittest.mock import patch
 
@@ -71,6 +72,16 @@ class APIAcceptanceTests(unittest.TestCase):
                 if '$ref' in response:
                     response = self.contract.resolve(response['$ref'])
                 self.assertEqual(response['content']['application/json']['schema']['$ref'], '#/components/schemas/'+schema)
+
+    def test_api_null_binding_precondition_all_markers_have_explicit_sql_declarations(self):
+        from dashboard.db import load_query
+
+        for resource in (Path(__file__).resolve().parents[1]/'dashboard/query').glob('api-*.sql'):
+            with self.subTest(resource=resource.name):
+                sql = re.sub(r'(?m)^[ \t]*--[^\n]*', '', load_query(resource.name))
+                declared = re.findall(r'\bDECLARE\s+@[^;]+;', sql, flags=re.IGNORECASE)
+                self.assertEqual(sql.count('?'), sum(statement.count('?') for statement in declared),
+                                 'Explicit NULL binding requires SQL to declare every parameter type.')
 
     def test_all_production_gets_reject_invalid_queries_bodies_and_methods_before_sql(self):
         with self.assertLogs(self.app.logger, level='INFO') as logged:

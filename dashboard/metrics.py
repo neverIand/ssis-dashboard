@@ -14,7 +14,7 @@ def execution_summary(values, config, *, fixed_to):
         selection['folder_pattern'], selection['project_pattern']),
         connection_string=config['CONNECTION_STRING']['main'],
         login_timeout=config['DB_LOGIN_TIMEOUT_SECONDS'], query_timeout=config['DB_QUERY_TIMEOUT_SECONDS'],
-        typed_timestamps=True, on_complete=record_query)
+        typed_timestamps=True, declared_parameters=True, on_complete=record_query)
     counts = dict.fromkeys(wire.EXECUTION_STATUSES, 0)
     observed = set()
     for row in rows:

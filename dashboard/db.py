@@ -42,7 +42,8 @@ def _close_resources(cursor, connection, *, operation_failed):
 
 
 def execute_query(query_file, parameters=(), *, connection_string, one_row=False,
-                  login_timeout, query_timeout, on_complete=None, typed_timestamps=False):
+                  login_timeout, query_timeout, on_complete=None, typed_timestamps=False,
+                  declared_parameters=False):
     """Execute bound SQL and return legacy dictionaries, closing owned resources.
 
     Keep pyodbc's existing transaction defaults. An empty single-row result is
@@ -51,12 +52,21 @@ def execute_query(query_file, parameters=(), *, connection_string, one_row=False
     An optional observer receives safe metadata after cleanup, never row values.
     typed_timestamps opts new API queries into exact datetimeoffset conversion;
     the default preserves the legacy driver values and formatted SQL shapes.
+    declared_parameters requires SQL to DECLARE/CONVERT each parameter's type.
+    It binds None with the driver's explicit NULL marker to avoid expensive
+    SQLDescribeParam calls for complex batches. Non-NULL values stay unchanged.
     """
     validate_timeouts(login_timeout, query_timeout)
     if type(typed_timestamps) is not bool:
         raise ValueError('typed_timestamps must be a Boolean.')
+    if type(declared_parameters) is not bool:
+        raise ValueError('declared_parameters must be a Boolean.')
     query = load_query(query_file)
     parameters = tuple(parameters)
+    if declared_parameters:
+        # BinaryNull carries SQL_NULL_DATA without type discovery. These batches
+        # assign the NULL to an explicitly typed SQL variable before using it.
+        parameters = tuple(pyodbc.BinaryNull if value is None else value for value in parameters)
     connection = None
     cursor = None
     operation_failed = False
