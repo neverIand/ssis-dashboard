@@ -1,10 +1,10 @@
-# C1-C4c: eleven GET operations implemented; events, values and history planned.
+# C1-C5: twelve GET operations implemented; values and history planned.
 openapi: 3.1.1
 jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
 info:
   title: ssis-dashboard read-only API
   version: 1.0.0-draft.1
-  description: Stage C DRAFT. C1-C4c implement eleven GET operations; events, values and history remain planned. API_CONTRACT.md defines local access, semantic
+  description: Stage C DRAFT. C1-C5 implement twelve GET operations; values and history remain planned. API_CONTRACT.md defines local access, semantic
     validation, cursor and cross-field rules. No production/shared authentication or stream implementation is claimed.
   license: {name: Apache-2.0, identifier: Apache-2.0}
 servers:
@@ -290,9 +290,10 @@ paths:
     get:
       operationId: listEvents
       summary: Paged category/search results across full matching event text
-      description: PLANNED; not implemented. Disabled by default; deny before SQL. Literal full-message search precedes
-        paging/display truncation. No exact total required.
-      x-implementation-status: planned
+      description: Implemented in C5. Disabled by default; deny before SQL. Literal full-message search precedes
+        bounded paging/display truncation. NULL-ID matches are explicitly reported with unknown availability;
+        GUIDs do not replace the numeric identity. No exact total required.
+      x-implementation-status: implemented
       x-milestone: C5
       parameters:
       - {$ref: '#/components/parameters/ExecutionId'}
@@ -821,6 +822,80 @@ components:
         then:
           properties:
             from: {type: 'null'}
+    EventsPageMeta:
+      type: object
+      additionalProperties: false
+      required: [request_id, generated_at, from, to, limit, sort, direction, as_of, upper_id, next_cursor, has_more,
+        consistency, availability, has_unidentified_events]
+      properties:
+        request_id: {$ref: '#/components/schemas/RequestId'}
+        generated_at: {$ref: '#/components/schemas/UtcTimestamp'}
+        from:
+          anyOf:
+          - {$ref: '#/components/schemas/UtcTimestamp'}
+          - {type: 'null'}
+        to:
+          anyOf:
+          - {$ref: '#/components/schemas/UtcTimestamp'}
+          - {type: 'null'}
+        limit: {type: integer, minimum: 1, maximum: 200}
+        sort: {type: string, maxLength: 40}
+        direction:
+          type: string
+          enum: [asc, desc]
+        as_of: {$ref: '#/components/schemas/UtcTimestamp'}
+        upper_id:
+          anyOf:
+          - {$ref: '#/components/schemas/Id'}
+          - {type: 'null'}
+        next_cursor:
+          anyOf:
+          - {$ref: '#/components/schemas/Cursor'}
+          - {type: 'null'}
+        has_more: {type: boolean}
+        consistency: {type: string, const: live}
+        availability:
+          type: string
+          enum: [available, not-recorded, unknown]
+        has_unidentified_events:
+          type: boolean
+          description: True when matching visible events without public numeric IDs cannot enter the page.
+      allOf:
+      - if:
+          properties:
+            has_unidentified_events: {const: true}
+          required: [has_unidentified_events]
+        then:
+          properties:
+            availability: {const: unknown}
+      - if:
+          properties:
+            has_more: {const: false}
+          required: [has_more]
+        then:
+          properties:
+            next_cursor: {type: 'null'}
+      - if:
+          properties:
+            has_more: {const: true}
+          required: [has_more]
+        then:
+          properties:
+            next_cursor: {$ref: '#/components/schemas/Cursor'}
+      - if:
+          properties:
+            from: {const: null}
+          required: [from]
+        then:
+          properties:
+            to: {type: 'null'}
+      - if:
+          properties:
+            to: {const: null}
+          required: [to]
+        then:
+          properties:
+            from: {type: 'null'}
     ValuesPageMeta:
       type: object
       additionalProperties: false
@@ -1198,7 +1273,10 @@ components:
           - {type: string, maxLength: 1024}
           - {type: 'null'}
         message_type: {type: integer, minimum: -32768, maximum: 32767}
-        source_type: {type: integer, minimum: -32768, maximum: 32767}
+        source_type:
+          anyOf:
+          - {type: integer, minimum: -32768, maximum: 32767}
+          - {type: 'null'}
         message:
           anyOf:
           - {type: string, maxLength: 16384}
@@ -1543,7 +1621,7 @@ components:
           type: array
           items: {$ref: '#/components/schemas/Event'}
           maxItems: 200
-        meta: {$ref: '#/components/schemas/PageMeta'}
+        meta: {$ref: '#/components/schemas/EventsPageMeta'}
     SummaryResponse:
       type: object
       additionalProperties: false
@@ -1894,8 +1972,8 @@ components:
       name: sort
       in: query
       required: false
-      description: Global allowlisted order with unique-ID tie-breaker; NULLs last. C2a supports execution_id only;
-        other execution sorts are C2b.
+      description: Global order over matching identified events in this execution; non-NULL message times and
+        same-direction numeric event-ID ties preserve all seven fractional timestamp digits.
       schema:
         type: string
         enum: [message_time, event_id]
@@ -1924,8 +2002,9 @@ components:
       name: q
       in: query
       required: false
-      description: Literal full-message substring, catalog collation; escape LIKE wildcards. Bound before paging,
-        even for truncated display text.
+      description: Literal full-message substring, case-insensitive using SQL LOWER under Latin1_General_100_CI_AS_SC
+        then exact BIN2 comparison. Accent-sensitive; wildcard characters have no special meaning. Bound before
+        paging, even for truncated display text.
       schema: {type: string, maxLength: 512, minLength: 1, x-sql-max-utf16-units: 1024}
     Bucket:
       name: bucket
@@ -2206,7 +2285,7 @@ components:
           package_path: \Package, execution_path: \Probe, source_name: Probe, subcomponent_name: null}
         meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z', from: null,
           to: null, limit: 50, sort: message_time, direction: asc, as_of: '2026-10-15T11:00:00.1234567Z', upper_id: '9007199254740993',
-          next_cursor: null, has_more: false, consistency: live}
+          next_cursor: null, has_more: false, consistency: live, availability: available, has_unidentified_events: false}
     ParametersResponse:
       summary: Synthetic target response; not live output
       value:

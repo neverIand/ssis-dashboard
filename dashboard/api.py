@@ -11,6 +11,7 @@ from dashboard.api_validation import COHORT_PARAMETERS, fixed_as_of, query_argum
 from dashboard.executions import EXECUTION_SORTS, QUERY_PARAMETERS, execution_page
 from dashboard.executables import QUERY_PARAMETERS as EXECUTABLE_PARAMETERS, executable_page
 from dashboard.children import QUERY_PARAMETERS as CHILD_PARAMETERS, child_page
+from dashboard.events import QUERY_PARAMETERS as EVENT_PARAMETERS, event_page
 from dashboard.inspection import execution_detail
 from dashboard.metrics import execution_summary
 from dashboard.timeline import execution_timeline
@@ -179,6 +180,14 @@ def executables(id):
 @query_parameters(*CHILD_PARAMETERS)
 def children(id):
     data, meta = child_page(id, g.api_query, current_app.config)
+    return resource_response(data, meta=meta)
+
+
+@blueprint.get('/executions/<id>/events', merge_slashes=False)
+@query_parameters(*EVENT_PARAMETERS)
+@requires_capability('events')
+def events(id):
+    data, meta = event_page(id, g.api_query, current_app.config)
     return resource_response(data, meta=meta)
 
 
