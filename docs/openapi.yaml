@@ -97,9 +97,9 @@ paths:
     get:
       operationId: getSummary
       summary: All-status counts in the created-time cohort
-      description: PLANNED; not implemented. Accept status for shared filter URLs, but intentionally count all statuses.
-        Reuse explicit bounds from execution pages.
-      x-implementation-status: planned
+      description: Implemented in C3b. Accept and validate status for shared filter URLs, but intentionally count all statuses.
+        Reuse explicit creation bounds from execution pages. Known codes are zero-filled; observed unknown codes remain separate.
+      x-implementation-status: implemented
       x-milestone: C3b
       parameters:
       - {$ref: '#/components/parameters/Folder'}

@@ -8,29 +8,18 @@ from dashboard.timestamps import parse_timestamp, sql_timestamp, utc_now
 from dashboard.validation import InvalidInput
 
 
-QUERY_PARAMETERS = ('folder', 'project', 'folder_pattern', 'project_pattern', 'from', 'to',
-                    'status', 'limit', 'cursor', 'sort', 'direction')
+QUERY_PARAMETERS = (*inputs.COHORT_PARAMETERS, 'limit', 'cursor', 'sort', 'direction')
 
 
 def _selection(values, config, *, now, fixed_to):
-    selection = {}
-    for name in ('folder', 'project'):
-        pattern = name + '_pattern'
-        if name in values and pattern in values:
-            raise InvalidInput('Exact and pattern selectors are mutually exclusive.')
-        selection[name] = inputs.catalog_name(values[name]) if name in values else None
-        selection[pattern] = inputs.catalog_pattern(values[pattern]) if pattern in values else None
-    selection['status'] = inputs.statuses(values['status']) if 'status' in values else ()
+    if 'cursor' in values and not {'from', 'to'} <= values.keys():
+        raise cursors.InvalidCursor()
+    selection, start, end = inputs.execution_cohort(values, config, now=now, fixed_to=fixed_to)
     selection['limit'] = inputs.integer(values['limit']) if 'limit' in values else 50
     selection['sort'] = values.get('sort', 'execution_id')
     selection['direction'] = values.get('direction', 'desc')
     if selection['sort'] not in EXECUTION_SORTS or selection['direction'] not in ('asc', 'desc'):
         raise InvalidInput('Unsupported execution order.')
-    if 'cursor' in values and not {'from', 'to'} <= values.keys():
-        raise cursors.InvalidCursor()
-    start, end = inputs.time_window(values, now=now, fixed_to=fixed_to,
-                                    hours=config['HOUR_SPAN'], max_hours=config['API_MAX_RANGE_HOURS'])
-    selection.update({'from': start.isoformat(), 'to': end.isoformat()})
     return selection, start, end
 
 

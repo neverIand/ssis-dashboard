@@ -9,6 +9,9 @@ from dashboard.timestamps import Timestamp, TICKS_PER_SECOND, parse_timestamp
 from dashboard.validation import InvalidInput
 
 
+COHORT_PARAMETERS = ('folder', 'project', 'folder_pattern', 'project_pattern', 'from', 'to', 'status')
+
+
 def query_arguments(raw, allowed):
     if re.search(rb'%(?![0-9A-Fa-f]{2})', raw):
         raise InvalidInput('Invalid query encoding.')
@@ -133,3 +136,19 @@ def time_window(values, *, now, fixed_to, hours, max_hours):
     if not 0 < span <= max_hours * 3600 * TICKS_PER_SECOND:
         raise InvalidInput('Invalid time range.')
     return start, end
+
+
+def execution_cohort(values, config, *, now, fixed_to):
+    """One interpretation of names, statuses and creation bounds across resources."""
+    selection = {}
+    for name in ('folder', 'project'):
+        pattern = name + '_pattern'
+        if name in values and pattern in values:
+            raise InvalidInput('Exact and pattern selectors are mutually exclusive.')
+        selection[name] = catalog_name(values[name]) if name in values else None
+        selection[pattern] = catalog_pattern(values[pattern]) if pattern in values else None
+    selection['status'] = statuses(values['status']) if 'status' in values else ()
+    start, end = time_window(values, now=now, fixed_to=fixed_to,
+                             hours=config['HOUR_SPAN'], max_hours=config['API_MAX_RANGE_HOURS'])
+    selection.update({'from': start.isoformat(), 'to': end.isoformat()})
+    return selection, start, end
