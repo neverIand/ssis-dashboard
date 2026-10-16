@@ -199,9 +199,9 @@ paths:
     get:
       operationId: getExecution
       summary: Visible execution identity, actual timings and event counts
-      description: PLANNED; not implemented. Independent of overview filters. Absent and hidden IDs return indistinguishable
-        safe 404 before further work.
-      x-implementation-status: planned
+      description: Implemented in C4a. Independent of overview filters. Absent and hidden IDs return indistinguishable
+        safe 404 before event work; aggregation rechecks visibility and returns only recorded counts.
+      x-implementation-status: implemented
       x-milestone: C4a
       parameters:
       - {$ref: '#/components/parameters/ExecutionId'}
@@ -522,7 +522,8 @@ components:
         warnings: {type: integer, minimum: 0, maximum: 9007199254740991}
         duplicate_warnings: {type: integer, minimum: 0, maximum: 9007199254740991}
         memory_warnings: {type: integer, minimum: 0, maximum: 9007199254740991}
-      description: Counts of visible recorded messages; category heuristics can overlap.
+      description: Counts of visible recorded messages. All includes other/unknown kinds; duplicate warnings are
+        a subset of warnings. Heuristics use full source text and catalog collation; zero does not prove no event occurred.
     Capabilities:
       type: object
       additionalProperties: false
@@ -893,6 +894,8 @@ components:
           properties:
             duration_seconds: {type: 'null'}
     ExecutionDetail:
+      description: Current visible execution, independent of overview filters. Active elapsed time uses this request's
+        clock; warning_count and error_count agree with event_counts.warnings and event_counts.errors.
       type: object
       additionalProperties: false
       required: [execution_id, folder_name, project_name, package_name, project_lsn, environment, status, logging_level,

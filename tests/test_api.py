@@ -170,7 +170,7 @@ class APIHTTPTests(unittest.TestCase):
         self.assert_response(self.client.get('/readyz'), 'Problem', 500)
 
     def test_unknown_api_paths_and_methods_have_json_legacy_remains_html(self):
-        for path in ('/api/v1', '/api/v1/missing', '/api/v1/executions/not-an-id', '/api/v1/meta/', '/api/v1//meta'):
+        for path in ('/api/v1', '/api/v1/missing', '/api/v1/executions/42/missing', '/api/v1/meta/', '/api/v1//meta'):
             with self.subTest(path=path):
                 self.assert_response(self.client.get(path), 'Problem', 404)
         for path in ('/api/v1/meta', '/healthz', '/readyz'):
