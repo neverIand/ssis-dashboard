@@ -14,5 +14,4 @@ WHERE f.name = @folder AND p.project_id <= @upper
 ORDER BY CASE WHEN @by_name = 1 AND @descending = 0 THEN p.name END ASC,
          CASE WHEN @by_name = 1 AND @descending = 1 THEN p.name END DESC,
          CASE WHEN @descending = 0 THEN p.project_id END ASC,
-         CASE WHEN @descending = 1 THEN p.project_id END DESC
-OPTION (RECOMPILE);
+         CASE WHEN @descending = 1 THEN p.project_id END DESC;

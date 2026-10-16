@@ -2,7 +2,7 @@
 
 Updated: 16 October 2026. Source audit: 12 October 2026.
 
-Status: implementation in progress; contract/typed/HTTP API foundation, the bounded execution list and catalog navigation are complete locally. C2b implements all 12 global execution sorts; C3a adds bounded folder/project name and ID sorting with native catalog/reader-scope, exact seek and plan evidence. C3b summary metrics is next. [The roadmap](roadmap.md) is the source of truth for scope and frontend decisions.
+Status: implementation in progress; contract/typed/HTTP API foundation, the bounded execution list and catalog navigation are complete locally. C2b implements all 12 global execution sorts; C3a adds bounded folder/project name and ID sorting with native catalog/reader-scope, exact seek and plan evidence. The C2/C3 performance follow-up now bounds ordinary-sort materialization, aggregates page event counts separately and reuses navigation plans, with verified reductions in native query work. C3b summary metrics is next. [The roadmap](roadmap.md) is the source of truth for scope and frontend decisions.
 
 Track delivered submilestones, validation evidence, and the next bounded code task in [implementation progress](PROGRESS.md). A delivery phase may span several code tasks; the progress log records that decomposition without treating partial completion as phase completion.
 

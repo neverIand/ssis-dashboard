@@ -4,12 +4,13 @@ import base64
 from functools import cmp_to_key
 import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from dashboard import create_app, cursors
-from dashboard.execution_order import EXECUTION_SORTS, encode_key, seek_values
+from dashboard.execution_order import CALCULATED_SORTS, EXECUTION_SORTS, encode_key, seek_values
 from dashboard.timestamps import Timestamp, as_timestamp, parse_timestamp
 from tests import test_executions as pages, test_api_contract as contract_tests
+from tests.test_db import ConnectionFixture
 
 
 def raw_key(row, sort):
@@ -63,7 +64,7 @@ class ExecutionSortingTests(unittest.TestCase):
         if resource=='api-executions-fence.sql':
             return {'upper_id':max((row['execution_id'] for row in self.rows),default=None)}
         take, upper, last, descending = parameters[15:19]
-        sort = parameters[19] if resource=='api-executions-sort.sql' else 'execution_id'
+        sort = parameters[19] if resource != 'api-executions-page.sql' else 'execution_id'
         boundary = None
         if last is not None:
             if sort=='execution_id':
@@ -138,7 +139,10 @@ class ExecutionSortingTests(unittest.TestCase):
                 with self.subTest(sort=sort,direction=direction):
                     self.assertEqual(self.chain(sort,direction),order)
                     page_call=self.query.call_args
-                    self.assertEqual(page_call.args[0], 'api-executions-page.sql' if sort=='execution_id' else 'api-executions-sort.sql')
+                    resource = ('api-executions-page.sql' if sort == 'execution_id' else
+                                'api-executions-sort.sql' if sort in CALCULATED_SORTS else
+                                'api-executions-ordered-page.sql')
+                    self.assertEqual(page_call.args[0], resource)
                     self.assertEqual(page_call.args[1][15],3)
                     self.assertTrue(page_call.kwargs['typed_timestamps'])
         self.connect.assert_not_called()
@@ -160,6 +164,33 @@ class ExecutionSortingTests(unittest.TestCase):
         self.assertEqual(state['sort_key'],[str(end.utc_ticks)])
         self.assertGreater(int(state['sort_key'][0]),2**53)
         self.assertEqual(self.chain('duration_seconds',limit='1',first=response),[2,1])
+
+    def test_all_sort_resources_bind_their_real_sql_and_close_owned_connections(self):
+        from dashboard.db import execute_query
+
+        self.query.side_effect = execute_query
+        row = self.rows[0]
+        for sort in EXECUTION_SORTS:
+            with self.subTest(sort=sort):
+                sql_cursors, connections = [], []
+                for names, values in ((['upper_id'], [(8,)]), (list(row), [tuple(row.values())])):
+                    cursor = Mock()
+                    cursor.description = [(name,) for name in names]
+                    cursor.fetchone.return_value = values[0]
+                    cursor.fetchall.return_value = values
+                    sql_cursors.append(cursor)
+                    connections.append(ConnectionFixture(cursor, []))
+                self.connect.side_effect = connections
+                response = self.get({**pages.WINDOW, 'sort': sort})
+                self.assertEqual(response.status_code, 200, response.json)
+                for connection, cursor in zip(connections, sql_cursors):
+                    sql, parameters = cursor.execute.call_args.args
+                    self.assertEqual(sql.count('?'), len(parameters))
+                    connection.add_output_converter.assert_called_once()
+                    cursor.close.assert_called_once()
+                    connection.close.assert_called_once()
+                self.assertEqual(len(sql_cursors[-1].execute.call_args.args[1]),
+                                 19 if sort == 'execution_id' else 26)
 
     def test_null_cursor_can_continue_inside_terminal_null_group(self):
         for sort in ('started_at','ended_at','duration_seconds','logging_level','environment'):

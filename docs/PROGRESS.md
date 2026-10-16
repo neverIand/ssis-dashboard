@@ -10,7 +10,33 @@ Prefer one coherent implementation boundary per task, with concrete exit checks 
 
 Statuses: **Planned**, **In progress**, **Complete**, **Awaiting integration**, or **Deferred**. Deferred records work explicitly put on hold by the user. Complete means its stated local exit checks passed; SQL Server, driver, proxy, and deployment claims require their own recorded integration evidence.
 
-Next task: **C3b, summary metrics**, in the [Stage C breakdown](#stage-c--read-only-api-delivery-phase-2). C1a/C1b/C1c/C2a/C2b/C3a are complete locally with native evidence; six GET operations and all 12 execution sorts are implemented. All 192 database-free tests pass. Independent reader sign-in/HTTP and larger-workload performance acceptance remain C8 checks; native cleanup-failure observation, B5c and production hosting retain their gates.
+Next task: **C3b, summary metrics**, in the [Stage C breakdown](#stage-c--read-only-api-delivery-phase-2). C1a/C1b/C1c/C2a/C2b/C3a and the performance review follow-up below are complete locally with native evidence; six GET operations and all 12 execution sorts are implemented. All 193 database-free tests pass. Independent reader sign-in/HTTP and larger-workload performance acceptance remain C8 checks; native cleanup-failure observation, B5c and production hosting retain their gates.
+
+### C2/C3 performance review follow-up
+
+**Complete locally, 16 October 2026.** Addressed the three findings from the interim review of `5f84961` before reusing these query shapes in later endpoints. This is a focused performance task; C3b and later feature scopes retain their existing status.
+
+1. Aggregate the selected page's recorded event counts once, then join the materialized counts. Verify identical typed rows and catalog visibility, and compare actual event-table scans/rows/logical reads. A demonstrated reduction in database work is sufficient reason to retain an improvement even when small-catalog wall-clock timings vary; still record timings and any regressions.
+2. Separate ordinary catalog-column sorts from calculated sorts. Apply ordinary seek/TOP before page materialization; retain whole-cohort evaluation only for keys that require it. Verify every sort/direction, ties/NULLs, precise keys, continuation, filters and the 201-candidate cap against independent native SQL.
+3. Remove unconditional navigation recompilation where cached plans pass both sort/direction and continuation checks. Measure folder/project compilation and repeated requests; do not remove execution-filter hints without their own evidence.
+
+Implementation: [ordinary execution ordering](../dashboard/query/api-executions-ordered-page.sql) now applies the existing exact filters, fence, NULL/collation-aware keyset predicate and TOP directly to the catalog source. Only the four calculated sorts retain the cohort path; its seek logic is reduced to the required numeric key. ID, ordinary and calculated page enrichment use a separate grouped count materialization before unrelated logging joins. Navigation page queries reuse cached plans. Resource dispatch and actual SQL bind/connection-ownership tests cover every sort. No response/cursor contract, legacy query, runtime dependency or persistent catalog object changed.
+
+Native plan and result evidence against the original commit:
+
+| Workload | Before | After | Validation |
+| --- | --- | --- | --- |
+| Event access for ID, created-time, logging and duration pages, 16 executions | 16 event-table scans; 32,112 rows read; 2,192 logical reads | 1 scan; 2,007 rows read; 137 logical reads | Every typed DTO and exact cursor key matches; all four plan shapes show the same reduction |
+| Ordinary created-time ordering, transient 20,000-row cohort | 20,000 rows copied to the cohort, then 201 to the page | No cohort copy; 201 rows copied directly to the page | First and continuation pages match the old query; actual insert-input counters prove the bound |
+| Folder/project name pages, three interleaved samples per variant | Median 536 / 513 ms | Median 276 / 288 ms | Identical typed rows; no unconditional page recompilation |
+
+The event-access change is retained for its verified work reduction, as requested. Small-catalog execution-page timings remain variable: before/after medians are 2167/2412 ms (ID), 3080/3124 ms (created), 3392/3385 ms (logging), and 3309/3554 ms (duration). No overall latency improvement or p95 claim is made for those shapes. The 20,000-row fixture gives one sample per first/continuation variant, not larger production-workload acceptance. Cached plan `CompileTime` describes its last compilation and is not treated as a new compilation charge on every execution.
+
+Validation: **193 database-free tests PASS**. Six native fixture/catalog/filter/precision replays produce **355 schema-validated WSGI responses, 479 application queries and 87,243 passing assertions**. All 12 sorts/directions, ties, NULLs, exact names/patterns/statuses, 100-nanosecond and long-duration cursor keys, limits/inserts/retention, mutable count behavior and empty scopes pass independent comparisons. Administrator-session `EXECUTE AS LOGIN` proves both existing normal/restricted readers retain their execution and navigation visibility; this is not independent Windows-reader sign-in/TCP HTTP. All 479 observed queries succeed with clean owned-resource cleanup. Before/after comparisons add 36 measured current-catalog queries, four measured larger-fixture queries and 16 actual-plan replays. No TCP server, package execution, grants, persistent data, services or cache flushes were needed.
+
+Private evidence under `.local/backend-validation/runs/`: `query-performance-20261016T014419336990Z` (catalog timing/plans), `query-performance-20261016T014649971198Z` (20,000-row first/continuation plans), and each run's offline-checked `summary.private.json`. Regression runs: `c2b-20261016T014133418289Z` (all sort fixtures), `c2b-20261016T014705100048Z` (catalog/readers), `c2b-20261016T014928816581Z` (filters/live counts), `c2b-20261016T014940897487Z` (precision), `c3a-20261016T014927779600Z` (navigation fixtures), and `c3a-20261016T014932865845Z` (navigation catalog/readers). Reusable probes remain ignored in `.local/backend-validation/tools/`.
+
+Repository guidance now requires query-work/compilation review for later features. Larger representative workloads, cold/warm distributions, p95 and independent Windows-reader HTTP acceptance remain C8; existing OBS-02 and deferred hosting gates stay open.
 
 ## Baseline and backend foundation
 

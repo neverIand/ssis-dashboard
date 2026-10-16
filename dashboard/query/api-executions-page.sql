@@ -27,19 +27,20 @@ ORDER BY CASE WHEN @descending = 1 THEN e.execution_id END DESC,
          CASE WHEN @descending = 0 THEN e.execution_id END ASC
 OPTION (RECOMPILE);
 
-SELECT p.*, loglevel.logging_level,
-       recorded.warning_count, recorded.error_count
+-- Isolate aggregation from logging/permission joins so the event view can be
+-- scanned once for the page, rather than once per execution.
+SELECT p.execution_id,
+       SUM(CASE WHEN m.event_name = N'OnWarning' THEN CONVERT(bigint, 1) ELSE CONVERT(bigint, 0) END) AS warning_count,
+       SUM(CASE WHEN m.event_name = N'OnError' THEN CONVERT(bigint, 1) ELSE CONVERT(bigint, 0) END) AS error_count
+INTO #page_counts
 FROM #execution_page AS p
-OUTER APPLY (
-    SELECT SUM(CASE WHEN m.event_name = N'OnWarning' THEN CONVERT(bigint, 1) ELSE CONVERT(bigint, 0) END) AS warning_count,
-           SUM(CASE WHEN m.event_name = N'OnError' THEN CONVERT(bigint, 1) ELSE CONVERT(bigint, 0) END) AS error_count
-    FROM catalog.event_messages AS m
-    WHERE m.operation_id = p.execution_id AND m.event_name IN (N'OnWarning', N'OnError')
-) AS totals
-CROSS APPLY (
-    SELECT COALESCE(totals.warning_count, CONVERT(bigint, 0)) AS warning_count,
-           COALESCE(totals.error_count, CONVERT(bigint, 0)) AS error_count
-) AS recorded
+LEFT JOIN catalog.event_messages AS m ON m.operation_id = p.execution_id AND m.event_name IN (N'OnWarning', N'OnError')
+GROUP BY p.execution_id
+OPTION (RECOMPILE);
+
+SELECT p.*, loglevel.logging_level, recorded.warning_count, recorded.error_count
+FROM #execution_page AS p
+INNER JOIN #page_counts AS recorded ON recorded.execution_id = p.execution_id
 OUTER APPLY (
     SELECT CONVERT(int, v.parameter_value) AS logging_level
     FROM catalog.execution_parameter_values AS v

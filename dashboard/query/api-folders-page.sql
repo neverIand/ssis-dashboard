@@ -12,5 +12,4 @@ WHERE EXISTS (SELECT 1 FROM catalog.projects AS p WHERE p.folder_id = f.folder_i
 ORDER BY CASE WHEN @by_name = 1 AND @descending = 0 THEN f.name END ASC,
          CASE WHEN @by_name = 1 AND @descending = 1 THEN f.name END DESC,
          CASE WHEN @descending = 0 THEN f.folder_id END ASC,
-         CASE WHEN @descending = 1 THEN f.folder_id END DESC
-OPTION (RECOMPILE);
+         CASE WHEN @descending = 1 THEN f.folder_id END DESC;

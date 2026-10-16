@@ -9,9 +9,9 @@ DECLARE @from datetimeoffset(7) = CONVERT(datetimeoffset(7), ?),
         @sort nvarchar(40) = ?, @last_null1 bit = ?, @last_number bigint = ?,
         @last_time datetimeoffset(7) = CONVERT(datetimeoffset(7), ?),
         @last_text1 nvarchar(260) = ?, @last_null2 bit = ?, @last_text2 nvarchar(128) = ?;
-DECLARE @forward int = CASE WHEN @descending = 1 THEN -1 ELSE 1 END;
-
--- Metadata for the whole visible, selected cohort, under the original ID fence.
+-- Only calculated sorts use this whole-cohort path. Ordinary catalog keys
+-- seek/page directly in api-executions-ordered-page.sql. Non-ID shapes share
+-- the same fixed seek binds; this one needs only the first numeric/null key.
 -- SELECT INTO retains the catalog name columns' collation.
 SELECT e.execution_id, e.folder_name, e.project_name, e.package_name,
        e.project_lsn, e.environment_folder_name, e.environment_name, e.status,
@@ -63,56 +63,44 @@ END;
 
 WITH keyed AS (
     SELECT c.*,
-           CASE @sort WHEN N'status' THEN CONVERT(bigint, status) WHEN N'logging_level' THEN logging_level
+           CASE @sort WHEN N'logging_level' THEN logging_level
                 WHEN N'duration_seconds' THEN duration_ticks WHEN N'warning_count' THEN warning_count
-                WHEN N'error_count' THEN error_count END AS sort_number,
-           CASE @sort WHEN N'created_at' THEN created_at WHEN N'started_at' THEN started_at WHEN N'ended_at' THEN ended_at END AS sort_time,
-           CASE @sort WHEN N'project_name' THEN project_name WHEN N'package_name' THEN package_name
-                WHEN N'environment' THEN environment_folder_name END AS sort_text1,
-           CASE WHEN @sort = N'environment' THEN environment_name END AS sort_text2
+                WHEN N'error_count' THEN error_count END AS sort_number
     FROM #execution_cohort AS c
 ), ranked AS (
     SELECT k.*,
-           CASE WHEN sort_number IS NULL AND sort_time IS NULL AND sort_text1 IS NULL THEN 1 ELSE 0 END AS sort_null1,
-           CASE WHEN sort_text2 IS NULL THEN 1 ELSE 0 END AS sort_null2
+           CASE WHEN sort_number IS NULL THEN 1 ELSE 0 END AS sort_null1
     FROM keyed AS k
 )
 SELECT TOP (@take) r.* INTO #execution_page
 FROM ranked AS r
-CROSS APPLY (
-    SELECT CASE WHEN sort_null1 > @last_null1 THEN 1 WHEN sort_null1 < @last_null1 THEN -1
-                WHEN sort_number > @last_number OR sort_time > @last_time OR sort_text1 > @last_text1 THEN @forward
-                WHEN sort_number < @last_number OR sort_time < @last_time OR sort_text1 < @last_text1 THEN -@forward
-                ELSE 0 END AS first_comparison,
-           CASE WHEN sort_null2 > @last_null2 THEN 1 WHEN sort_null2 < @last_null2 THEN -1
-                WHEN sort_text2 > @last_text2 THEN @forward WHEN sort_text2 < @last_text2 THEN -@forward
-                ELSE 0 END AS second_comparison
-) AS seek
-WHERE @last IS NULL OR seek.first_comparison > 0
-   OR (seek.first_comparison = 0 AND (seek.second_comparison > 0
-       OR (seek.second_comparison = 0 AND ((@descending = 1 AND execution_id < @last)
-                                        OR (@descending = 0 AND execution_id > @last)))))
+WHERE @last IS NULL OR sort_null1 > @last_null1
+   OR (sort_null1 = @last_null1 AND (
+       (@descending = 0 AND sort_number > @last_number)
+       OR (@descending = 1 AND sort_number < @last_number)
+       OR ((sort_number = @last_number OR @last_null1 = 1)
+           AND ((@descending = 0 AND execution_id > @last)
+                OR (@descending = 1 AND execution_id < @last)))))
 ORDER BY sort_null1 ASC,
          CASE WHEN @descending = 0 THEN sort_number END ASC, CASE WHEN @descending = 1 THEN sort_number END DESC,
-         CASE WHEN @descending = 0 THEN sort_time END ASC, CASE WHEN @descending = 1 THEN sort_time END DESC,
-         CASE WHEN @descending = 0 THEN sort_text1 END ASC, CASE WHEN @descending = 1 THEN sort_text1 END DESC,
-         sort_null2 ASC,
-         CASE WHEN @descending = 0 THEN sort_text2 END ASC, CASE WHEN @descending = 1 THEN sort_text2 END DESC,
          CASE WHEN @descending = 0 THEN execution_id END ASC, CASE WHEN @descending = 1 THEN execution_id END DESC
 OPTION (RECOMPILE);
 
 -- Fetch only the remaining presentation metrics for the bounded page.
 IF @sort NOT IN (N'warning_count', N'error_count')
-    UPDATE p SET warning_count = COALESCE(recorded.warning_count, CONVERT(bigint, 0)),
-                 error_count = COALESCE(recorded.error_count, CONVERT(bigint, 0))
+BEGIN
+    SELECT p.execution_id,
+           SUM(CASE WHEN m.event_name = N'OnWarning' THEN CONVERT(bigint, 1) ELSE CONVERT(bigint, 0) END) AS warning_count,
+           SUM(CASE WHEN m.event_name = N'OnError' THEN CONVERT(bigint, 1) ELSE CONVERT(bigint, 0) END) AS error_count
+    INTO #page_counts
     FROM #execution_page AS p
-    OUTER APPLY (
-        SELECT SUM(CASE WHEN m.event_name = N'OnWarning' THEN CONVERT(bigint, 1) ELSE CONVERT(bigint, 0) END) AS warning_count,
-               SUM(CASE WHEN m.event_name = N'OnError' THEN CONVERT(bigint, 1) ELSE CONVERT(bigint, 0) END) AS error_count
-        FROM catalog.event_messages AS m
-        WHERE m.operation_id = p.execution_id AND m.event_name IN (N'OnWarning', N'OnError')
-    ) AS recorded
+    LEFT JOIN catalog.event_messages AS m ON m.operation_id = p.execution_id AND m.event_name IN (N'OnWarning', N'OnError')
+    GROUP BY p.execution_id
     OPTION (RECOMPILE);
+
+    UPDATE p SET warning_count = recorded.warning_count, error_count = recorded.error_count
+    FROM #execution_page AS p INNER JOIN #page_counts AS recorded ON recorded.execution_id = p.execution_id;
+END;
 
 IF @sort <> N'logging_level'
     UPDATE p SET logging_level = CONVERT(int, v.parameter_value)
@@ -124,8 +112,4 @@ IF @sort <> N'logging_level'
 SELECT * FROM #execution_page
 ORDER BY sort_null1 ASC,
          CASE WHEN @descending = 0 THEN sort_number END ASC, CASE WHEN @descending = 1 THEN sort_number END DESC,
-         CASE WHEN @descending = 0 THEN sort_time END ASC, CASE WHEN @descending = 1 THEN sort_time END DESC,
-         CASE WHEN @descending = 0 THEN sort_text1 END ASC, CASE WHEN @descending = 1 THEN sort_text1 END DESC,
-         sort_null2 ASC,
-         CASE WHEN @descending = 0 THEN sort_text2 END ASC, CASE WHEN @descending = 1 THEN sort_text2 END DESC,
          CASE WHEN @descending = 0 THEN execution_id END ASC, CASE WHEN @descending = 1 THEN execution_id END DESC;

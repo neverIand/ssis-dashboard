@@ -2,7 +2,7 @@
 
 from dashboard import api_validation as inputs, cursors, serialization as wire
 from dashboard.db import execute_query
-from dashboard.execution_order import EXECUTION_SORTS, encode_key, seek_values
+from dashboard.execution_order import CALCULATED_SORTS, EXECUTION_SORTS, encode_key, seek_values
 from dashboard.observability import record_query
 from dashboard.timestamps import parse_timestamp, sql_timestamp, utc_now
 from dashboard.validation import InvalidInput
@@ -105,7 +105,8 @@ def execution_page(values, config, *, fixed_to):
     page_parameters = (*parameters, selection['limit'] + 1, upper, last, int(selection['direction'] == 'desc'))
     resource = 'api-executions-page.sql'
     if selection['sort'] != 'execution_id':
-        resource = 'api-executions-sort.sql'
+        resource = ('api-executions-sort.sql' if selection['sort'] in CALCULATED_SORTS
+                    else 'api-executions-ordered-page.sql')
         page_parameters += (selection['sort'], *seek)
     rows = [] if upper is None else query(resource, page_parameters)
     has_more = len(rows) > selection['limit']

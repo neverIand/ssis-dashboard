@@ -314,7 +314,7 @@ class ExecutionAPITests(unittest.TestCase):
             self.assertNotIn('private-', sql)
             self.assertIn('datetimeoffset(7)', sql)
         page_sql = sql_cursors[1].execute.call_args.args[0]
-        self.assertLess(page_sql.index('INTO #execution_page'), page_sql.index('FROM catalog.event_messages'))
+        self.assertLess(page_sql.index('INTO #execution_page'), page_sql.index('catalog.event_messages'))
 
     def test_database_timeout_is_safe_and_never_falls_back_to_unbounded_legacy_query(self):
         self.query.side_effect = pyodbc.OperationalError('HYT00', 'private-canary')

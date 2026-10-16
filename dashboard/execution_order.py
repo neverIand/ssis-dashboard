@@ -11,6 +11,7 @@ from dashboard.validation import InvalidInput
 EXECUTION_SORTS = ('execution_id', 'created_at', 'started_at', 'ended_at', 'project_name',
                    'package_name', 'environment', 'status', 'logging_level', 'duration_seconds',
                    'warning_count', 'error_count')
+CALCULATED_SORTS = frozenset(('logging_level', 'duration_seconds', 'warning_count', 'error_count'))
 _DATES = frozenset(('created_at', 'started_at', 'ended_at'))
 _NUMBERS = frozenset(('status', 'logging_level', 'duration_seconds', 'warning_count', 'error_count'))
 
