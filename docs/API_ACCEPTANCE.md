@@ -1,6 +1,6 @@
 # Stage C API acceptance
 
-Updated: 16 October 2026. C8.1/C8.2a are complete locally: 341 database-free tests, the measured NULL-binding fix and combined native replay pass. C8.2b's defined workload/source-work/compilation/payload checks are next. The [roadmap](roadmap.md) defines scope, [contract](API_CONTRACT.md) defines semantics and [OpenAPI](openapi.yaml) defines the response schemas. This is the combined acceptance record; individual SQL/fixture proofs remain in [progress](PROGRESS.md). Local binding improvements do not close C8.2b/C8.2c workload/resource acceptance, C8.3 independent reader HTTP, or deferred hosting/stream work.
+Updated: 16 October 2026. C8.1/C8.2a and C8.2b.1's [defined current-catalog workload](API_WORKLOAD.md) are complete locally. The existing 341-test application baseline is unchanged. Larger/full-page/reader SQL workloads and measured remedies remain C8.2b.2/.3; the one-second execution-page target is not passed. The [roadmap](roadmap.md) defines scope, [contract](API_CONTRACT.md) defines semantics and [OpenAPI](openapi.yaml) defines the response schemas. Individual SQL/fixture proofs remain in [progress](PROGRESS.md). Local baselines do not close C8.2b/C8.2c acceptance, C8.3 independent reader HTTP, or deferred hosting/stream work.
 
 ## Operation matrix
 
@@ -58,13 +58,20 @@ A same-process paired on/off check adds **198 assertions / 66 successful WSGI re
 
 Private combined evidence is `.local/backend-validation/runs/c8-acceptance-20261016T182335365627Z/acceptance.private.json` and its offline summary. The [C8.2a progress record](PROGRESS.md#c82a--measured-null-binding) records parameter inventory, paired measurements, native fixture/plan files and the explicit binding precondition.
 
+### C8.2b.1 defined workload baseline
+
+The [protocol and complete result table](API_WORKLOAD.md) now define twenty scenarios across all fourteen operations. Two warmups per case precede 100 round-robin samples: **2,000 schema responses / 3,700 queries PASS**. Source fingerprints, data, unique request IDs, row/query bounds and owned cleanup pass. Five fresh clients per operation add **70 schema responses / 125 queries**; **87 native diagnostic calls** cover 29 parameter sets/all 25 SQL resources. Client startup, observed SQL cache state, timed API phases and untimed plan/IO/compile observations are separate.
+
+Four sixteen-row execution pages have local WSGI p95 **1,064–1,092 ms**; the proposed full 50-row/network target is **not passed**. Execute phases dominate their medians; repeated statement compilation and ordinary logging enrichment are measured follow-ups. Cached plan metadata is not recurring compile time. Maximum body is **26,204 bytes** on a 50-event continuation; wide-text/full-page workloads remain open. Existing administrator visibility and fresh processes do not prove normal/restricted reader HTTP. No runtime/SQL/dependency change was made for this baseline.
+
 | Check | Status / required evidence |
 | --- | --- |
 | Production-route boundary suite and existing regressions | PASS: 341 tests (337 at C8.1 + four binding/declaration tests); the four combined HTTP tests retain their 111 production-route requests, with no real database access. |
 | Combined native WSGI/SQL journey and existing reader scope | PASS locally: 1,249 assertions, all fourteen operations in all three SQL contexts, independent comparisons, safe negative paths and clean owned resources. This is SQL impersonation/WSGI evidence. |
 | Native readiness timeout and recovery | PASS: final C8.2a driver HYT00, safe 504 in 1,036 ms, one failed query with clean cleanup; liveness succeeds with zero queries and the next readiness returns ready in 25 ms with one query. This is a driver-cap observation, not an end-to-end deadline guarantee. |
 | C8.2a nullable-bind inventory/fix | PASS locally: all 25 resources profiled; all fourteen nullable-resource actual-plan/IO pairs, affected fixtures, long XML, exact typed results and combined reader-scope replay pass. |
-| C8.2b representative workload/p95/cold-warm/compile/IO | NOT RUN for API-wide acceptance. Individual milestone measurements are evidence, not a capacity claim. Include narrow history-source growth and acquisition/compilation variation. |
+| C8.2b.1 defined current-catalog workload | PASS as a local baseline: twenty cases × 100 warm samples, seventy fresh-client first responses and 87 native diagnostics; all recorded data/outcome/cleanup checks pass. Four execution p95s exceed one second on sixteen rows; no production/network/full-page budget pass. |
+| C8.2b.2/.3 representative workload / measured fixes / budgets | NOT RUN for API-wide acceptance. Include full 50/max-200 pages, larger/deep/selective/repeated-key/wide-text/history cases, reader SQL IO and recurring compile/logging costs. The existing small baseline does not close these gates. |
 | C8.2c sustained/concurrent resource accumulation | NOT RUN. Clean owned resources in individual replays/final audits do not prove repeated/concurrent capacity. |
 | C8.3 independent normal/restricted Windows-reader HTTP | NOT RUN for Stage C. Older Stage B actual-reader checks do not cover the completed API. Record actual process identity, sanitized request manifest and independent SQL for the same identity; never administrator impersonation as a substitute. |
 | Reader SHOWPLAN and real Scale Out/active workloads | NOT RUN where permission/workload is unavailable. Keep explicit coverage gaps; no permission changes or package runs are implied. |
