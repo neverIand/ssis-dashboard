@@ -1,10 +1,10 @@
-# C1-C6: thirteen GET operations implemented; history planned.
+# C1-C7a: fourteen GET operations implemented; history estimates remain C7b.
 openapi: 3.1.1
 jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
 info:
   title: ssis-dashboard read-only API
   version: 1.0.0-draft.1
-  description: Stage C DRAFT. C1-C6 implement thirteen GET operations; history remains planned. API_CONTRACT.md defines local access, semantic
+  description: Stage C DRAFT. C1-C7a implement fourteen GET operations; history estimates remain C7b. API_CONTRACT.md defines local access, semantic
     validation, cursor and cross-field rules. No production/shared authentication or stream implementation is claimed.
   license: {name: Apache-2.0, identifier: Apache-2.0}
 servers:
@@ -360,9 +360,10 @@ paths:
     get:
       operationId: listHistory
       summary: Exact package history with separate estimates
-      description: PLANNED; not implemented. Default last 50 running/succeeded; no implicit dashboard time range.
-        C7a returns estimate NULL; C7b adds prior-five-successful mean with no future samples.
-      x-implementation-status: planned
+      description: Implemented in C7a with estimate NULL. Default last 50 running/succeeded; exact catalog equality
+        for folder/project/package, ID paging in either direction and no implicit dashboard time range.
+        C7b estimates remain planned; actual fields never contain forecasts.
+      x-implementation-status: implemented
       x-milestone: C7a/C7b
       parameters:
       - {$ref: '#/components/parameters/RequiredFolder'}
@@ -1997,8 +1998,7 @@ components:
       name: sort
       in: query
       required: false
-      description: Global allowlisted order with unique-ID tie-breaker; NULLs last. C2a supports execution_id only;
-        other execution sorts are C2b.
+      description: Global numeric execution-ID order in the exact named history scope; only execution_id is supported.
       schema:
         type: string
         enum: [execution_id]
@@ -2348,7 +2348,7 @@ components:
           elapsed_seconds: 30
           warning_count: 1
           error_count: 0
-          estimate: {method: mean_last_5_successful, sample_count: 5, duration_seconds: 60, ended_at: '2026-10-15T11:00:30.1234567Z'}
+          estimate: null
         meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z', from: null,
           to: null, limit: 50, sort: execution_id, direction: desc, as_of: '2026-10-15T11:00:00.1234567Z', upper_id: '9007199254740993',
           next_cursor: null, has_more: false, consistency: live}

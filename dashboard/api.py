@@ -13,6 +13,7 @@ from dashboard.executables import QUERY_PARAMETERS as EXECUTABLE_PARAMETERS, exe
 from dashboard.children import QUERY_PARAMETERS as CHILD_PARAMETERS, child_page
 from dashboard.events import QUERY_PARAMETERS as EVENT_PARAMETERS, event_page
 from dashboard.values import QUERY_PARAMETERS as VALUE_PARAMETERS, value_page
+from dashboard.history import QUERY_PARAMETERS as HISTORY_PARAMETERS, history_page
 from dashboard.inspection import execution_detail
 from dashboard.metrics import execution_summary
 from dashboard.timeline import execution_timeline
@@ -197,6 +198,13 @@ def events(id):
 @requires_capability('values')
 def values(id):
     data, meta = value_page(id, g.api_query, current_app.config)
+    return resource_response(data, meta=meta)
+
+
+@blueprint.get('/history', merge_slashes=False)
+@query_parameters(*HISTORY_PARAMETERS)
+def history():
+    data, meta = history_page(g.api_query, current_app.config)
     return resource_response(data, meta=meta)
 
 
