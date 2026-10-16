@@ -11,6 +11,7 @@ import pyodbc
 from werkzeug.exceptions import HTTPException
 
 from dashboard.validation import InvalidInput
+from dashboard.cursors import InvalidCursor
 from dashboard.observability import log_event, request_id as _request_id
 from dashboard.api import is_api_request, problem_response
 
@@ -85,6 +86,8 @@ def _error_response(status, *, response=None):
 
 
 def _invalid_input(error):
+    if is_api_request() and isinstance(error, InvalidCursor):
+        return problem_response(400, cursor_error='cursor_expired' if error.expired else 'invalid_cursor')
     return _error_response(400)
 
 

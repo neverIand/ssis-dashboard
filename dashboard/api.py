@@ -7,9 +7,11 @@ import json
 from flask import Blueprint, current_app, g, request
 from werkzeug.exceptions import Forbidden, ServiceUnavailable
 
-from dashboard.api_validation import query_arguments
+from dashboard.api_validation import fixed_as_of, query_arguments
+from dashboard.executions import QUERY_PARAMETERS, execution_page
 from dashboard.db import execute_query
 from dashboard.observability import record_query, request_id
+from dashboard import cursors
 from dashboard import serialization as wire
 from dashboard.validation import EVENT_QUERIES, InvalidInput
 from dashboard.version import APP_VERSION
@@ -82,16 +84,20 @@ def _json(payload, *, status=200, response=None, mimetype='application/json'):
     return response
 
 
-def resource_response(data):
+def resource_response(data, *, meta=None):
     return _json({'data': data, 'meta': {
+        **(meta or {}),
         'request_id': request_id(), 'generated_at': wire.utc_timestamp(datetime.now(timezone.utc)),
     }})
 
 
-def problem_response(status, *, response=None):
+def problem_response(status, *, response=None, cursor_error=None):
     if status not in _PROBLEMS:
         status = 500
     code, detail = _PROBLEMS[status]
+    if status == 400 and cursor_error in ('invalid_cursor', 'cursor_expired'):
+        code = cursor_error
+        detail = 'The paging cursor is invalid or expired. Start a new first page.'
     return _json({'type': 'about:blank', 'title': HTTPStatus(status).phrase, 'status': status,
                   'detail': detail, 'code': code, 'request_id': request_id()},
                  status=status, response=response, mimetype='application/problem+json')
@@ -126,14 +132,22 @@ def metadata():
             'default_limit': 50, 'max_limit': 200, 'default_range_hours': config['HOUR_SPAN'],
             'max_range_hours': config['API_MAX_RANGE_HOURS'],
             'max_timeline_buckets': config['API_MAX_TIMELINE_BUCKETS'],
-            'cursor_ttl_seconds': 1800, 'max_cursor_characters': 8192,
+            'cursor_ttl_seconds': cursors.TTL_SECONDS, 'max_cursor_characters': cursors.MAX_CHARACTERS,
             'max_text_characters': 16384, 'max_search_characters': 512,
         },
         'execution_statuses': [wire.execution_status(code) for code in wire.EXECUTION_STATUSES],
         'executable_results': [wire.executable_result(code) for code in wire.EXECUTABLE_RESULTS],
         'logging_levels': [wire.logging_level(code) for code in wire.LOGGING_LEVELS],
-        'event_kinds': list(EVENT_QUERIES), 'execution_sorts': [],
+        'event_kinds': list(EVENT_QUERIES), 'execution_sorts': ['execution_id'],
     })
+
+
+@blueprint.get('/executions', merge_slashes=False)
+@query_parameters(*QUERY_PARAMETERS)
+def executions():
+    data, meta = execution_page(g.api_query, current_app.config,
+                                fixed_to=current_app.extensions['api_fixed_as_of'])
+    return resource_response(data, meta=meta)
 
 
 def liveness():
@@ -152,6 +166,7 @@ def readiness():
 
 
 def register_api(app):
+    app.extensions['api_fixed_as_of'] = fixed_as_of(app.config['AS_OF_DATE'], app.config['DISPLAY_TIMEZONE'])
     app.register_blueprint(blueprint)
     app.add_url_rule('/healthz', 'healthz', liveness, methods=['GET'], merge_slashes=False)
     app.add_url_rule('/readyz', 'readyz', readiness, methods=['GET'], merge_slashes=False)

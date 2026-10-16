@@ -19,10 +19,11 @@ CONNECTION_STRING = {
 DB_LOGIN_TIMEOUT_SECONDS = 10
 DB_QUERY_TIMEOUT_SECONDS = 30
 
-# Set to 'NOW' to show current data or any valid date to show data for a fixed date only
+# NOW uses the request clock. Fixed dates accept an offset, or one unambiguous
+# local time in DISPLAY_TIMEZONE. The API filters creation time, not historical status.
 AS_OF_DATE = 'NOW'
 
-# IANA timezone for the forthcoming API's display buckets and legacy date input.
+# IANA timezone for API display buckets and legacy fixed-date input.
 # Validated at startup; legacy SQL display formatting is unchanged.
 DISPLAY_TIMEZONE = 'Europe/London'
 
