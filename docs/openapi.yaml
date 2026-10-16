@@ -40,8 +40,8 @@ paths:
     get:
       operationId: listFolders
       summary: Visible folders containing visible projects
-      description: PLANNED; not implemented.
-      x-implementation-status: planned
+      description: Implemented in C3a. Name/ID keyset pages retain SQL visibility and exclude folders without visible projects.
+      x-implementation-status: implemented
       x-milestone: C3a
       parameters:
       - {$ref: '#/components/parameters/Limit'}
@@ -68,8 +68,8 @@ paths:
     get:
       operationId: listProjects
       summary: Visible projects in one exact folder
-      description: PLANNED; not implemented.
-      x-implementation-status: planned
+      description: Implemented in C3a. Exact folder equality follows catalog collation; unknown/hidden/empty folder scopes return an empty page. Missing folder input returns 400.
+      x-implementation-status: implemented
       x-milestone: C3a
       parameters:
       - {$ref: '#/components/parameters/RequiredFolder'}
@@ -1762,8 +1762,7 @@ components:
       name: sort
       in: query
       required: false
-      description: Global allowlisted order with unique-ID tie-breaker; NULLs last. C2a supports execution_id only;
-        other execution sorts are C2b.
+      description: Catalog name order with a same-direction folder-ID tie-breaker, or folder ID alone. Names are non-NULL.
       schema:
         type: string
         enum: [name, folder_id]
@@ -1772,8 +1771,7 @@ components:
       name: sort
       in: query
       required: false
-      description: Global allowlisted order with unique-ID tie-breaker; NULLs last. C2a supports execution_id only;
-        other execution sorts are C2b.
+      description: Catalog name order with a same-direction project-ID tie-breaker, or project ID alone. Names are non-NULL.
       schema:
         type: string
         enum: [name, project_id]

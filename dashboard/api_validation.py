@@ -35,10 +35,13 @@ def integer(value, *, minimum=1, maximum=200):
     return result
 
 
-def execution_id(value):
+def identifier(value):
     if not isinstance(value, str) or value.startswith('0'):
-        raise InvalidInput('Invalid execution ID.')
+        raise InvalidInput('Invalid catalog ID.')
     return integer(value, maximum=2**63 - 1)
+
+
+execution_id = identifier
 
 
 def catalog_name(value, *, utf16_units=128):

@@ -5,7 +5,7 @@ fractional digit for JSON, cursor comparisons and explicit SQL parameter casts.
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 import re
 import struct
 
@@ -109,3 +109,7 @@ def decode_datetimeoffset(value):
 def sql_timestamp(value):
     """Bind this string with CONVERT(datetimeoffset(7), ?), never as datetime."""
     return as_timestamp(value).isoformat()[:-1] + '+00:00'
+
+
+def utc_now():
+    return as_timestamp(datetime.now(timezone.utc))

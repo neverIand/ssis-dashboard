@@ -9,6 +9,7 @@ from werkzeug.exceptions import Forbidden, ServiceUnavailable
 
 from dashboard.api_validation import fixed_as_of, query_arguments
 from dashboard.executions import EXECUTION_SORTS, QUERY_PARAMETERS, execution_page
+from dashboard.navigation import QUERY_PARAMETERS as NAVIGATION_PARAMETERS, navigation_page
 from dashboard.db import execute_query
 from dashboard.observability import record_query, request_id
 from dashboard import cursors
@@ -147,6 +148,20 @@ def metadata():
 def executions():
     data, meta = execution_page(g.api_query, current_app.config,
                                 fixed_to=current_app.extensions['api_fixed_as_of'])
+    return resource_response(data, meta=meta)
+
+
+@blueprint.get('/folders', merge_slashes=False)
+@query_parameters(*NAVIGATION_PARAMETERS)
+def folders():
+    data, meta = navigation_page('folders', g.api_query, current_app.config)
+    return resource_response(data, meta=meta)
+
+
+@blueprint.get('/projects', merge_slashes=False)
+@query_parameters('folder', *NAVIGATION_PARAMETERS)
+def projects():
+    data, meta = navigation_page('projects', g.api_query, current_app.config)
     return resource_response(data, meta=meta)
 
 

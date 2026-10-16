@@ -41,6 +41,13 @@ def digest(value):
     return hmac.new(_KEY, encoded.encode('ascii'), hashlib.sha256).hexdigest()
 
 
+def scope_digest(config):
+    """Bind the configured SQL/policy scope; browser headers grant no identity."""
+    return digest({'connection': config['CONNECTION_STRING']['main'],
+                   'policy': [config[name] for name in (
+                       'API_EVENTS_ENABLED', 'API_VALUES_ENABLED', 'API_OVERRIDE_VALUES_ENABLED')]})
+
+
 def seal(payload):
     body = _encode(json.dumps(payload, sort_keys=True, separators=(',', ':'), allow_nan=False).encode('ascii'))
     signature = _encode(hmac.new(_KEY, body.encode('ascii'), hashlib.sha256).digest())

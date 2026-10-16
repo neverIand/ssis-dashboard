@@ -1,21 +1,15 @@
 """Filter, page and serialize visible executions without legacy presentation SQL."""
 
-from datetime import datetime, timezone
-
 from dashboard import api_validation as inputs, cursors, serialization as wire
 from dashboard.db import execute_query
 from dashboard.execution_order import EXECUTION_SORTS, encode_key, seek_values
 from dashboard.observability import record_query
-from dashboard.timestamps import as_timestamp, parse_timestamp, sql_timestamp
+from dashboard.timestamps import parse_timestamp, sql_timestamp, utc_now
 from dashboard.validation import InvalidInput
 
 
 QUERY_PARAMETERS = ('folder', 'project', 'folder_pattern', 'project_pattern', 'from', 'to',
                     'status', 'limit', 'cursor', 'sort', 'direction')
-
-
-def utc_now():
-    return as_timestamp(datetime.now(timezone.utc))
 
 
 def _selection(values, config, *, now, fixed_to):
@@ -76,9 +70,7 @@ def execution_page(values, config, *, fixed_to):
         selection_digest = cursors.digest(selection)
         # The configured SQL identity and API policy define this local scope.
         # No browser identity/header participates; SQL visibility is rechecked.
-        scope = cursors.digest({'connection': config['CONNECTION_STRING']['main'],
-                                'policy': [config[name] for name in (
-                                    'API_EVENTS_ENABLED', 'API_VALUES_ENABLED', 'API_OVERRIDE_VALUES_ENABLED')]})
+        scope = cursors.scope_digest(config)
         state = None
         if 'cursor' in values:
             state = cursors.open_cursor(values['cursor'], resource='v1/executions',
