@@ -8,7 +8,7 @@ from flask import Blueprint, current_app, g, request
 from werkzeug.exceptions import Forbidden, ServiceUnavailable
 
 from dashboard.api_validation import fixed_as_of, query_arguments
-from dashboard.executions import QUERY_PARAMETERS, execution_page
+from dashboard.executions import EXECUTION_SORTS, QUERY_PARAMETERS, execution_page
 from dashboard.db import execute_query
 from dashboard.observability import record_query, request_id
 from dashboard import cursors
@@ -138,7 +138,7 @@ def metadata():
         'execution_statuses': [wire.execution_status(code) for code in wire.EXECUTION_STATUSES],
         'executable_results': [wire.executable_result(code) for code in wire.EXECUTABLE_RESULTS],
         'logging_levels': [wire.logging_level(code) for code in wire.LOGGING_LEVELS],
-        'event_kinds': list(EVENT_QUERIES), 'execution_sorts': ['execution_id'],
+        'event_kinds': list(EVENT_QUERIES), 'execution_sorts': list(EXECUTION_SORTS),
     })
 
 

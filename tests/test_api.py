@@ -110,7 +110,7 @@ class APIHTTPTests(unittest.TestCase):
                 self.assert_response(response, schema)
                 self.assertNotIn('WWW-Authenticate', response.headers)
         data = self.client.get('/api/v1/meta').json['data']
-        self.assertEqual(data['execution_sorts'], ['execution_id'])
+        self.assertEqual(len(data['execution_sorts']), 12)
         self.assertEqual(data['execution_sorts'], self.contract.spec['components']['parameters']['ExecutionSort']['schema']['enum'])
         self.assertEqual(data['capabilities'], {'events': False, 'values': False, 'override_values': False})
         self.assertEqual(data['limits']['default_range_hours'], 360)

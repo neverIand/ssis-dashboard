@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from dashboard import api_validation as inputs, cursors, serialization as wire
 from dashboard.db import execute_query
+from dashboard.execution_order import EXECUTION_SORTS, encode_key, seek_values
 from dashboard.observability import record_query
 from dashboard.timestamps import as_timestamp, parse_timestamp, sql_timestamp
 from dashboard.validation import InvalidInput
@@ -29,7 +30,7 @@ def _selection(values, config, *, now, fixed_to):
     selection['limit'] = inputs.integer(values['limit']) if 'limit' in values else 50
     selection['sort'] = values.get('sort', 'execution_id')
     selection['direction'] = values.get('direction', 'desc')
-    if selection['sort'] != 'execution_id' or selection['direction'] not in ('asc', 'desc'):
+    if selection['sort'] not in EXECUTION_SORTS or selection['direction'] not in ('asc', 'desc'):
         raise InvalidInput('Unsupported execution order.')
     if 'cursor' in values and not {'from', 'to'} <= values.keys():
         raise cursors.InvalidCursor()
@@ -86,6 +87,7 @@ def execution_page(values, config, *, fixed_to):
             last = inputs.execution_id(state['last_id'])
             if last > upper:
                 raise cursors.InvalidCursor()
+        seek = seek_values(state, selection['sort'])
     except cursors.InvalidCursor:
         raise
     except InvalidInput:
@@ -108,16 +110,21 @@ def execution_page(values, config, *, fixed_to):
         last = None
         if upper is not None:
             wire.bigint(upper)
-    rows = [] if upper is None else query('api-executions-page.sql', (
-        *parameters, selection['limit'] + 1, upper, last, int(selection['direction'] == 'desc')))
+    page_parameters = (*parameters, selection['limit'] + 1, upper, last, int(selection['direction'] == 'desc'))
+    resource = 'api-executions-page.sql'
+    if selection['sort'] != 'execution_id':
+        resource = 'api-executions-sort.sql'
+        page_parameters += (selection['sort'], *seek)
+    rows = [] if upper is None else query(resource, page_parameters)
     has_more = len(rows) > selection['limit']
     page = rows[:selection['limit']]
     data = [serialize_execution(row, as_of=as_of) for row in page]
     token = None
     if has_more:
-        token = cursors.seal({'v': 1, 'resource': 'v1/executions', 'selection': selection_digest,
+        key, nulls = encode_key(page[-1], selection['sort'])
+        token = cursors.seal({'v': 2, 'resource': 'v1/executions', 'selection': selection_digest,
                               'scope': scope, 'as_of': as_of.isoformat(), 'upper_id': wire.bigint(upper),
-                              'last_id': data[-1]['execution_id']})
+                              'last_id': data[-1]['execution_id'], 'sort_key': key, 'sort_nulls': nulls})
     return data, {'from': selection['from'], 'to': selection['to'], 'limit': selection['limit'],
                   'sort': selection['sort'], 'direction': selection['direction'], 'as_of': as_of.isoformat(),
                   'upper_id': None if upper is None else wire.bigint(upper), 'next_cursor': token,

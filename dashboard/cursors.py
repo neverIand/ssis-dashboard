@@ -60,8 +60,8 @@ def open_cursor(token, *, resource, selection, scope, now):
             raise ValueError('Invalid token signature.')
         payload = json.loads(_decode(body))
         if (not isinstance(payload, dict)
-                or set(payload) != {'v', 'resource', 'selection', 'scope', 'as_of', 'upper_id', 'last_id'}
-                or type(payload['v']) is not int or payload['v'] != 1
+                or set(payload) != {'v', 'resource', 'selection', 'scope', 'as_of', 'upper_id', 'last_id', 'sort_key', 'sort_nulls'}
+                or type(payload['v']) is not int or payload['v'] != 2
                 or payload['resource'] != resource
                 or not isinstance(payload['selection'], str) or not isinstance(payload['scope'], str)
                 or not hmac.compare_digest(payload['selection'], selection)
@@ -73,8 +73,7 @@ def open_cursor(token, *, resource, selection, scope, now):
             raise ValueError('Invalid paging time.')
         if age >= TTL_SECONDS * TICKS_PER_SECOND:
             raise InvalidCursor(expired=True)
-        # For the nonnullable execution-ID sort, last_id is both the raw key
-        # and the unique tie-breaker. Resource-specific validation checks IDs.
+        # The operation validates typed keys, NULL flags and IDs before SQL.
         return payload
     except InvalidCursor:
         raise

@@ -18,7 +18,7 @@ paths:
     get:
       operationId: getMeta
       summary: Non-secret API metadata and implemented capabilities
-      description: Implemented in C1c; no catalog query. Execution ID is the implemented C2a sort.
+      description: Implemented in C1c; no catalog query. C2a/C2b execution sorts are advertised after validation.
       x-implementation-status: implemented
       x-milestone: C1c
       parameters: []
@@ -162,8 +162,8 @@ paths:
     get:
       operationId: listExecutions
       summary: Bounded execution page with recorded event counts
-      description: Implemented in C2a with execution_id sort only. C2b adds other planned global
-        sorts. Use created_time bounds, an upper ID and authenticated filter-bound keyset cursors; no database snapshot.
+      description: Implemented in C2a/C2b with global allowlisted sorts, NULLs last and a same-direction ID tie-breaker.
+        Use created_time bounds, an upper ID and authenticated filter/sort-bound keyset cursors; no database snapshot.
       x-implementation-status: implemented
       x-milestone: C2a/C2b
       parameters:
@@ -1750,13 +1750,13 @@ components:
       name: sort
       in: query
       required: false
-      description: Global allowlisted order with unique-ID tie-breaker; NULLs last. C2a supports execution_id only;
-        other execution sorts below remain planned for C2b and currently return 400.
-      x-planned-values: [created_at, started_at, ended_at, project_name, package_name, environment, status,
-        logging_level, duration_seconds, warning_count, error_count]
+      description: Global order across the matching cohort; NULLs last in both directions and execution ID follows
+        the selected direction for ties. Environment compares folder then name with NULLs last for each component.
+        Duration uses actual end minus start and remains NULL without both; cursor keys preserve exact SQL ticks.
       schema:
         type: string
-        enum: [execution_id]
+        enum: [execution_id, created_at, started_at, ended_at, project_name, package_name, environment, status,
+          logging_level, duration_seconds, warning_count, error_count]
         default: execution_id
     FolderSort:
       name: sort
@@ -1989,7 +1989,8 @@ components:
           - {code: 4, name: runtime-lineage}
           - {code: 100, name: custom}
           event_kinds: [all, errors, warnings, duplicate-warnings, memory-warnings]
-          execution_sorts: [execution_id]
+          execution_sorts: [execution_id, created_at, started_at, ended_at, project_name, package_name, environment,
+            status, logging_level, duration_seconds, warning_count, error_count]
         meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z'}
     FoldersResponse:
       summary: Synthetic target response; not live output

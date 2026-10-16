@@ -166,7 +166,7 @@ class ExecutionAPITests(unittest.TestCase):
     def test_invalid_selectors_fail_before_sql(self):
         cases = [{'limit': value} for value in ('0', '201', '-1', '1.0', 'all', '١')]
         cases += [{'status': value} for value in ('0', 'all', '02', '2,2', '2, 7', '2,')]
-        cases += [{'sort': 'started_at'}, {'sort': 'execution_id;DROP'}, {'direction': 'DESC'},
+        cases += [{'sort': 'elapsed_seconds'}, {'sort': 'execution_id;DROP'}, {'direction': 'DESC'},
                   {'folder': 'x', 'folder_pattern': '*'}, {'project': 'x', 'project_pattern': '*'},
                   {'folder': 'x' * 129}, {'project': '😀' * 65}, {'folder_pattern': '*' * 513},
                   {'project_pattern': '\\a'}, {'project_pattern': 'x\\'},
