@@ -10,6 +10,7 @@ from werkzeug.exceptions import Forbidden, ServiceUnavailable
 from dashboard.api_validation import COHORT_PARAMETERS, fixed_as_of, query_arguments
 from dashboard.executions import EXECUTION_SORTS, QUERY_PARAMETERS, execution_page
 from dashboard.metrics import execution_summary
+from dashboard.timeline import execution_timeline
 from dashboard.navigation import QUERY_PARAMETERS as NAVIGATION_PARAMETERS, navigation_page
 from dashboard.db import execute_query
 from dashboard.observability import record_query, request_id
@@ -171,6 +172,14 @@ def projects():
 def summary():
     data, meta = execution_summary(g.api_query, current_app.config,
                                    fixed_to=current_app.extensions['api_fixed_as_of'])
+    return resource_response(data, meta=meta)
+
+
+@blueprint.get('/metrics/timeline', merge_slashes=False)
+@query_parameters(*COHORT_PARAMETERS, 'bucket')
+def timeline():
+    data, meta = execution_timeline(g.api_query, current_app.config,
+                                    fixed_to=current_app.extensions['api_fixed_as_of'])
     return resource_response(data, meta=meta)
 
 

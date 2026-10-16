@@ -129,9 +129,10 @@ paths:
     get:
       operationId: getTimeline
       summary: Zero-filled timezone-aware creation buckets
-      description: PLANNED; not implemented. Apply selected statuses before buckets; current status is not a historical
-        reconstruction. Return UTC bucket boundaries across DST.
-      x-implementation-status: planned
+      description: Implemented in C3c. Apply selected statuses before buckets; current status is not a historical
+        reconstruction. Return contiguous UTC bucket boundaries from the configured IANA timezone, including DST folds
+        and partial hours. Count only executions inside the effective creation bounds; preserve zero buckets.
+      x-implementation-status: implemented
       x-milestone: C3c
       parameters:
       - {$ref: '#/components/parameters/Folder'}
@@ -1004,8 +1005,9 @@ components:
         started_count: {type: integer, minimum: 0, maximum: 9007199254740991}
         succeeded_count: {type: integer, minimum: 0, maximum: 9007199254740991}
         failed_count: {type: integer, minimum: 0, maximum: 9007199254740991}
-      description: Group by created_time, with current status/start observations; edge bucket counts are clipped
-        to effective bounds.
+      description: Group by created_time, with current status/start observations; started_count means a non-NULL
+        actual start regardless of its date, succeeded_count uses status 7 and failed_count uses status 4.
+        Edge bucket counts are clipped to effective bounds. Complete UTC edges may span partial/non-24-hour local periods.
     Executable:
       type: object
       additionalProperties: false
