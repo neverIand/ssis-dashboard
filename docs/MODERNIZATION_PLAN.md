@@ -10,11 +10,12 @@ Keep Python, Flask, pyodbc and useful checked-in SQL. Serve a read-only API and 
 | --- | --- |
 | `dashboard/__init__.py`, `config.py` | Application construction and private configuration |
 | `api.py`, `api_validation.py`, `errors.py` | HTTP inputs, capabilities, safe response/status handling |
+| `frontend.py`, `templates/app/` | Native shell, validated packaged-entry assets, prefix-aware bootstrap URLs and build-failure response |
 | `executions.py`, `navigation.py`, `metrics.py`, `timeline.py`, inspection/event/value/history modules | Resource-specific query coordination and DTO assembly |
 | `db.py`, `query/` | Bound SQL, timeout settings and ownership of each connection/cursor |
 | `timestamps.py`, `serialization.py`, `cursors.py` | Exact typed data, explicit JSON primitives and authenticated paging state |
 | `ssis.py`, `views.py`, templates | Retained legacy presentation adapter |
-| `web/` and `dashboard/static/app/` | Browser source/build inputs and packaged production assets; Flask shell integration follows in D1b |
+| `web/` and `dashboard/static/app/` | Browser source/build inputs and ignored generated assets included in prepared deliveries |
 | Future update detector/stream modules | Change detection, subscription ownership, bounded notifications and shutdown |
 
 The initial mode is loopback under one configured SQL identity. Browser identity headers cannot select that identity. Separate query connections own their resources and use live catalog observations; a cursor is not a database snapshot. Read-only catalog access may create connection-local temporary tables; it must not modify SSISDB system objects or data.
@@ -39,7 +40,7 @@ Use vanilla ES modules, native DOM/events/fetch/EventSource, semantic HTML and a
 
 Keep frontend pages simple and functional. Use concise labels and useful status messages; omit slogans, marketing taglines and decorative filler copy.
 
-D1a uses a JS entry and Vite manifest with a relative asset base. Only `dashboard/static/app/` is generated/emptied; that output is ignored by Git and included in the prepared application delivery after building from the tracked `web/` source and lockfile. Development uses a loopback Vite harness and a same-origin `/api/v1` proxy to local Flask. The production shell will consume the manifest through Flask's prefix-aware static endpoint in D1b. Build commands, supported runtimes and packaged/ignored boundaries are in [installation](installation.md#build-the-browser-assets). Node's built-in test runner and existing Flask unittests provide focused coverage without another test dependency.
+D1a uses a JS entry and Vite manifest with a relative asset base. Only `dashboard/static/app/` is generated/emptied; that output is ignored by Git and included in the prepared application delivery after building from the tracked `web/` source and lockfile. Development uses a loopback Vite harness and a same-origin `/api/v1` proxy to local Flask. The D1b Flask shell consumes the manifest through Flask's prefix-aware static endpoint, including CSS from shared imports and optional module preloads. Shell requests read build files without SQL; absent/invalid builds return a safe 503 without preventing legacy/API/health startup. The manifest is reread for each shell request so a repaired build takes effect without recreating the app. Bootstrap JSON contains only application/API/execution URL bases; metadata and data loading follow in D2. Build commands, supported runtimes and packaged/ignored boundaries are in [installation](installation.md#build-the-browser-assets). Node's built-in test runner and existing Flask unittests provide focused coverage without another test dependency.
 
 Replace jQuery with native events/fetch, Bootstrap/SmartMenus with authored layout and keyboard-accessible controls, DataTables with bounded server-backed tables, and Morris/Raphael with SVG or a justified chart library. Provide chart text/table alternatives and small authored icons. Remove legacy assets only after reference checks and parity. Target corporate Edge/Chrome; include Firefox/Safari smoke checks when used, with no IE requirement.
 

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SSIS Dashboard</title>
+    {% for stylesheet in assets.styles %}
+    <link rel="stylesheet" href="{{ stylesheet }}">
+    {% endfor %}
+    {% for script in assets.preloads %}
+    <link rel="modulepreload" href="{{ script }}">
+    {% endfor %}
+    <script id="app-config" type="application/json">{{ app_config|tojson }}</script>
+    <script type="module" src="{{ assets.script }}"></script>
+</head>
+<body data-dashboard-app data-startup="starting">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <header class="page-header">
+        <div class="header-content">
+            <h1>SSIS Dashboard</h1>
+            <nav aria-label="Dashboard navigation">
+                <a href="{{ url_for('packages') }}">Legacy dashboard</a>
+            </nav>
+        </div>
+    </header>
+    <main id="main-content" tabindex="-1">
+        <section class="connection-state" aria-label="Connection status">
+            <p id="app-status" role="status" aria-live="polite" data-app-status>Starting dashboard. If this message remains, reload the page or use the legacy dashboard.</p>
+            <noscript><p>Enable JavaScript to use this page, or open the legacy dashboard.</p></noscript>
+        </section>
+
+        <section class="panel" aria-labelledby="filters-heading">
+            <h2 id="filters-heading">Filters</h2>
+            <form id="overview-filters">
+                <fieldset class="filter-grid" disabled aria-describedby="app-status">
+                    <legend class="visually-hidden">Execution filters</legend>
+                    <label for="folder">Folder
+                        <select id="folder" name="folder"><option value="">All folders</option></select>
+                    </label>
+                    <label for="project">Project
+                        <select id="project" name="project"><option value="">All projects</option></select>
+                    </label>
+                    <label for="status">Status
+                        <select id="status" name="status"><option value="">All statuses</option></select>
+                    </label>
+                    <label for="creation-window">Created
+                        <select id="creation-window" name="window"><option value="default">Default window</option></select>
+                    </label>
+                    <button type="submit">Apply</button>
+                </fieldset>
+            </form>
+        </section>
+
+        <section class="panel" aria-labelledby="summary-heading">
+            <div class="section-heading">
+                <h2 id="summary-heading">Summary</h2>
+                <p>All statuses</p>
+            </div>
+            <dl class="summary-grid">
+                <div><dt>Total executions</dt><dd aria-label="Not loaded">—</dd></div>
+                <div><dt>Running</dt><dd aria-label="Not loaded">—</dd></div>
+                <div><dt>Succeeded</dt><dd aria-label="Not loaded">—</dd></div>
+                <div><dt>Failed</dt><dd aria-label="Not loaded">—</dd></div>
+            </dl>
+        </section>
+
+        <section class="panel executions" aria-labelledby="executions-heading">
+            <h2 id="executions-heading">Executions</h2>
+            <div class="table-scroll" role="region" aria-labelledby="executions-heading" tabindex="0">
+                <table>
+                    <caption class="visually-hidden">Executions in the selected creation window</caption>
+                    <thead><tr>
+                        <th scope="col">ID</th>
+                        <th scope="col">Folder / project</th>
+                        <th scope="col">Package</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Created</th>
+                        <th scope="col">Duration</th>
+                        <th scope="col">Warnings</th>
+                        <th scope="col">Errors</th>
+                    </tr></thead>
+                    <tbody><tr><td class="empty-state" colspan="8">No data loaded.</td></tr></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

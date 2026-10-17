@@ -53,8 +53,10 @@ def create_app(config_overrides=None, *, config_path=None):
     from dashboard.errors import register_error_handlers
     from dashboard.observability import register_observability
     from dashboard.views import register_views
+    from dashboard.frontend import register_frontend
 
     register_views(app)
+    register_frontend(app)
     register_observability(app)
     register_api(app)
     register_error_handlers(app)
