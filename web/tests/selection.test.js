@@ -121,3 +121,23 @@ test('history restoration replaces draft and applied state; invalid URLs have no
   session.restore('');
   assert.deepEqual(session.applied, defaultSelection(settings));
 });
+
+test('table order changes applied scope without applying or losing pending filter edits', () => {
+  const session = createSelectionSession(settings);
+  assert.throws(() => session.order({ limit: 25 }), SelectionError);
+  session.restore('?folder=Applied&status=7');
+  session.update({ folder: 'Draft', from: 'invalid draft time', status: [2] });
+  const ordered = session.order({ sort: 'created_at', direction: 'asc', limit: 200 });
+  assert.equal(ordered.folder, 'Applied');
+  assert.equal(ordered.from, null);
+  assert.deepEqual(ordered.status, [7]);
+  assert.equal(session.draft.folder, 'Draft');
+  assert.equal(session.draft.from, 'invalid draft time');
+  assert.deepEqual(session.draft.status, [2]);
+  assert.equal(session.draft.limit, 200);
+  for (const limit of [0, 201, 1.5, NaN]) assert.throws(() => session.order({ limit }), SelectionError);
+  assert.equal(session.applied, ordered);
+  session.update({ from: null });
+  assert.equal(session.apply().folder, 'Draft');
+  assert.equal(session.applied.sort, 'created_at');
+});

@@ -4,7 +4,7 @@ Scope authority for modernization on `dev-next`. See [progress](PROGRESS.md) for
 
 ## Current product
 
-The retained Flask/Jinja dashboard reads SSISDB and uses the legacy jQuery/Bootstrap/DataTables/SmartMenus/Morris stack. It still refreshes the whole page after 180 seconds. A separate read-only JSON API and native `/app/` first-page overview with filters, all-status cards and legacy detail links are implemented; API acceptance, execution paging/refresh and replacement-screen parity remain tracked work.
+The retained Flask/Jinja dashboard reads SSISDB and uses the legacy jQuery/Bootstrap/DataTables/SmartMenus/Morris stack. It still refreshes the whole page after 180 seconds. A separate read-only JSON API and native `/app/` overview with filters, all-status cards, server sorting, cursor paging and legacy detail links are implemented; API acceptance, data refresh and replacement-screen parity remain tracked work.
 
 Scope is project deployment and public `SSISDB.catalog.*` views. Legacy `msdb` storage, starting/stopping packages, SQL Agent administration and unrelated automation are excluded.
 

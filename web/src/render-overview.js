@@ -12,6 +12,10 @@ export function mountOverview(root, { api, metadata, executionBase }) {
   const summaryRetry = root.querySelector('[data-summary-retry]');
   const bounds = root.querySelector('[data-cohort-window]');
   const header = root.querySelector('[data-app-status]');
+  const previous = root.querySelector('[data-executions-previous]');
+  const next = root.querySelector('[data-executions-next]');
+  const latest = root.querySelector('[data-executions-latest]');
+  const pageNotice = root.querySelector('[data-page-notice]');
   const cards = Object.fromEntries(['total', 'running', 'succeeded', 'failed']
     .map((key) => [key, root.querySelector(`[data-count="${key}"]`)]));
   let renderedPage = null;
@@ -39,8 +43,12 @@ export function mountOverview(root, { api, metadata, executionBase }) {
     body.replaceChildren(row);
   }
 
-  function renderRows(page) {
-    if (!page.data.length) { empty('No executions match these filters.'); return; }
+  function renderRows(page, pageNumber) {
+    if (!page.data.length) {
+      empty(pageNumber > 1 ? 'No executions remain on this page. Use Previous or Show latest.'
+        : 'No executions match these filters.');
+      return;
+    }
     const fragment = document.createDocumentFragment();
     for (const item of page.data) {
       const row = element('tr');
@@ -78,11 +86,15 @@ export function mountOverview(root, { api, metadata, executionBase }) {
     root.querySelector('[data-summary]').setAttribute('aria-busy', String(state.phase === 'loading-summary'));
     listRetry.hidden = state.phase !== 'list-error';
     summaryRetry.hidden = state.phase !== 'summary-error';
+    previous.disabled = !state.hasPrevious;
+    next.disabled = !state.hasNext;
+    latest.disabled = state.selection === null || ['loading-list', 'loading-summary'].includes(state.phase);
+    pageNotice.textContent = state.notice;
     header.textContent = ({ idle: 'No selection', 'loading-list': 'Loading executions…',
       'loading-summary': 'Loading summary…', ready: 'Loaded', 'list-error': 'Executions unavailable',
       'summary-error': 'Summary unavailable' })[state.phase];
     if (page !== renderedPage) {
-      if (page) renderRows(page);
+      if (page) renderRows(page, state.pageNumber);
       else empty(state.phase === 'loading-list' ? 'Loading executions…' : 'No data loaded.');
       renderedPage = page;
     } else if (page === null) {
@@ -90,7 +102,7 @@ export function mountOverview(root, { api, metadata, executionBase }) {
         : state.phase === 'list-error' ? 'Executions could not be loaded.' : 'No data loaded.');
     }
     listStatus.textContent = state.phase === 'list-error' ? failure(state.error)
-      : page ? `Showing ${display.count(page.data.length)} rows.${page.meta.has_more ? ' More results are available.' : ''}` : '';
+      : page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} rows · Live results` : '';
     summaryStatus.textContent = state.phase === 'summary-error' ? failure(state.error)
       : state.phase === 'loading-summary' ? 'Loading summary…' : '';
     bounds.hidden = page === null;
@@ -108,6 +120,12 @@ export function mountOverview(root, { api, metadata, executionBase }) {
   } });
   const retryList = () => { void owner.retryList(); };
   const retrySummary = () => { void owner.retrySummary(); };
+  const previousPage = () => { void owner.previous(); };
+  const nextPage = () => { void owner.next(); };
+  const latestPage = () => { void owner.latest(); };
+  previous.addEventListener('click', previousPage);
+  next.addEventListener('click', nextPage);
+  latest.addEventListener('click', latestPage);
   listRetry.addEventListener('click', retryList);
   summaryRetry.addEventListener('click', retrySummary);
   return {
@@ -116,6 +134,9 @@ export function mountOverview(root, { api, metadata, executionBase }) {
       owner.dispose();
       listRetry.removeEventListener('click', retryList);
       summaryRetry.removeEventListener('click', retrySummary);
+      previous.removeEventListener('click', previousPage);
+      next.removeEventListener('click', nextPage);
+      latest.removeEventListener('click', latestPage);
     },
   };
 }

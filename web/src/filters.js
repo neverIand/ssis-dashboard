@@ -14,6 +14,18 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
   const appliedText = form.querySelector('[data-applied-selection]');
   const reset = form.querySelector('[data-reset-filters]');
   const apply = form.querySelector('[data-apply-filters]');
+  const order = Object.fromEntries(['sort', 'direction', 'limit']
+    .map((key) => [key, root.querySelector(`[data-order="${key}"]`)]));
+  const orderNotice = root.querySelector('[data-order-notice]');
+  order.sort.replaceChildren(...metadata.execution_sorts.map((key) => {
+    const option = document.createElement('option');
+    option.value = key;
+    option.textContent = ({ execution_id: 'ID', created_at: 'Created', started_at: 'Started', ended_at: 'Ended',
+      project_name: 'Project', package_name: 'Package', environment: 'Environment', status: 'Status',
+      logging_level: 'Logging level', duration_seconds: 'Duration', warning_count: 'Warnings', error_count: 'Errors' })[key] ?? key;
+    return option;
+  }));
+  order.limit.max = String(metadata.limits.max_limit);
   const session = createSelectionSession(metadata);
   const removeListeners = [];
   let projectFolder = null;
@@ -109,14 +121,16 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
     custom.hidden = input['creation-window'].value !== 'custom';
   }
 
-  function showApplied(selection) {
+  function showApplied(selection, options) {
     const status = selection.status.length ? metadata.execution_statuses
       .filter((item) => selection.status.includes(item.code)).map(formatCode).join(', ') : 'All statuses';
     const windowText = selection.from !== null || selection.to !== null
       ? `${selection.from ?? 'Default start'} → ${selection.to ?? 'Default end'}` : 'Default window';
     appliedText.textContent = `Applied: ${selection.folder ?? 'All folders'} / ${selection.project ?? 'All projects'} · ${status} · ${windowText}`;
     appliedText.hidden = false;
-    onApplied(selection);
+    for (const [key, control] of Object.entries(order)) control.value = String(selection[key]);
+    orderNotice.textContent = '';
+    onApplied(selection, options);
   }
 
   function writeUrl(selection, replace) {
@@ -127,22 +141,25 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
     }
   }
 
-  function restore() {
+  function restore({ reusePage = true } = {}) {
     reset.disabled = false;
     try {
       const selection = session.restore(window.location.search);
       fieldset.disabled = false;
       apply.disabled = false;
+      for (const control of Object.values(order)) control.disabled = false;
       showDraft();
       notice.textContent = '';
       writeUrl(selection, true);
-      showApplied(selection);
+      showApplied(selection, { restore: reusePage });
       if (!foldersStarted) { foldersStarted = true; void folders.reset(); }
       loadProjects();
       if (selection.folder === null) projects.clear();
     } catch (error) {
       fieldset.disabled = true;
       apply.disabled = true;
+      for (const control of Object.values(order)) control.disabled = true;
+      orderNotice.textContent = '';
       appliedText.hidden = true;
       notice.textContent = `${error instanceof SelectionError ? error.message : 'Filters could not be restored.'} Reset filters to start again.`;
       folders.clear();
@@ -190,13 +207,24 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
   });
   listen(reset, 'click', () => {
     window.history.replaceState(null, '', appBase);
-    restore();
+    restore({ reusePage: false });
+  });
+  for (const [key, control] of Object.entries(order)) listen(control, 'change', () => {
+    try {
+      const selection = session.order({ [key]: key === 'limit' ? Number(control.value) : control.value });
+      writeUrl(selection, false);
+      showApplied(selection);
+    } catch (error) {
+      control.value = String(session.applied[key]);
+      orderNotice.textContent = error instanceof SelectionError ? error.message : 'The table could not be updated.';
+    }
   });
   listen(window, 'popstate', restore);
   restore();
   return () => {
     folders.dispose();
     projects.dispose();
+    for (const control of Object.values(order)) control.disabled = true;
     for (const remove of removeListeners) remove();
   };
 }

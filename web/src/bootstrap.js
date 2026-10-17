@@ -7,7 +7,7 @@ export function readMetadata(data, requestId = null) {
   const invalid = () => { throw new ApiError('invalid_metadata', { requestId }); };
   if (!record(data) || data.api_version !== 'v1' || !record(data.limits) || !record(data.capabilities)) invalid();
   const limits = data.limits;
-  for (const name of ['default_limit', 'max_limit', 'default_range_hours', 'max_range_hours']) {
+  for (const name of ['default_limit', 'max_limit', 'default_range_hours', 'max_range_hours', 'max_cursor_characters']) {
     if (!Number.isSafeInteger(limits[name]) || limits[name] < 1) invalid();
   }
   if (limits.default_limit > limits.max_limit || limits.default_range_hours > limits.max_range_hours) invalid();
@@ -89,6 +89,7 @@ export function mountBootstrap(root, { ready = () => {} } = {}) {
   root.querySelector('#overview-filters fieldset').disabled = true;
   root.querySelector('[data-apply-filters]').disabled = true;
   root.querySelector('[data-reset-filters]').disabled = true;
+  for (const control of root.querySelectorAll('[data-order]')) control.disabled = true;
   let disposeScreen;
   const loader = createMetadataLoader({
     request: (options) => api.get('meta', options),

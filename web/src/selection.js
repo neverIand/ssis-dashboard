@@ -133,6 +133,15 @@ export function createSelectionSession(metadata) {
       draft = { ...applied };
       return applied;
     },
+    order(changes) {
+      if (applied === null) invalid('Apply a valid selection before changing the table.');
+      const order = Object.fromEntries(['sort', 'direction', 'limit'].map((key) => [key,
+        key in changes ? changes[key] : applied[key]]));
+      applied = validateSelection({ ...applied, ...order }, metadata);
+      const { sort, direction, limit } = applied;
+      draft = { ...draft, sort, direction, limit };
+      return applied;
+    },
     restore(search) {
       applied = null;
       const restored = parseSelection(search, metadata);

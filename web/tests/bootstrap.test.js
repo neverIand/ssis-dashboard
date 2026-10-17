@@ -26,6 +26,8 @@ test('invalid metadata is a correlated failure instead of invented settings', ()
     (data) => { data.limits.default_limit = 201; },
     (data) => { data.limits.default_range_hours = 745; },
     (data) => { data.limits.max_limit = '200'; },
+    (data) => { delete data.limits.max_cursor_characters; },
+    (data) => { data.limits.max_cursor_characters = 0; },
     (data) => { data.capabilities.events = 'false'; },
     (data) => { data.capabilities.override_values = true; },
     (data) => { data.execution_statuses = []; },

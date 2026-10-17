@@ -13,7 +13,7 @@ if (root) {
       dispose = mountBootstrap(root, { ready: (metadata, api, config) => {
         const overview = mountOverview(root, { metadata, api, executionBase: config.execution_base });
         const filters = mountFilters(root, { metadata, api, appBase: config.app_base,
-          onApplied: (selection) => { void overview.apply(selection); } });
+          onApplied: (selection, options) => { void overview.apply(selection, options); } });
         return () => { filters(); overview.dispose(); };
       } });
     } catch {

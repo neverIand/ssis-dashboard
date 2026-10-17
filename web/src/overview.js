@@ -31,9 +31,13 @@ export function readExecutionPage(response, selection, metadata, display) {
     const { data, meta } = response;
     if (!Array.isArray(data) || data.length > selection.limit || meta.limit !== selection.limit
         || meta.sort !== selection.sort || meta.direction !== selection.direction
+        || meta.consistency !== 'live'
         || typeof meta.has_more !== 'boolean'
-        || (meta.has_more ? typeof meta.next_cursor !== 'string' || !meta.next_cursor || !data.length
+        || (meta.has_more ? typeof meta.next_cursor !== 'string' || !meta.next_cursor
+          || meta.next_cursor.length > metadata.limits.max_cursor_characters || !data.length
           : meta.next_cursor !== null)) throw new TypeError();
+    if (meta.upper_id === null) { if (data.length) throw new TypeError(); }
+    else formatId(meta.upper_id);
     wireTime(meta.from, display, false);
     wireTime(meta.to, display, false);
     wireTime(meta.as_of, display, false);
@@ -92,11 +96,34 @@ export function readSummary(response, page, metadata, display) {
 
 export function createOverview({ api, metadata, publish, timeoutMs = 30000, locale }) {
   const display = createDisplay({ timeZone: metadata.display_timezone, locale });
-  let state = { phase: 'idle', selection: null, page: null, summary: null, error: null };
+  let state = { phase: 'idle', selection: null, page: null, summary: null, error: null, notice: '' };
+  // Keep request paths only, never rows or cursor tokens in history.state or storage.
+  const contexts = new Map();
+  const key = (selection) => JSON.stringify(selectionParams(selection));
+  let context = null;
   let generation = 0;
   let active = null;
   let disposed = false;
-  const emit = (changes) => { state = { ...state, ...changes }; publish(state); };
+  const emit = (changes) => {
+    state = { ...state, ...changes };
+    const busy = ['loading-list', 'loading-summary'].includes(state.phase);
+    publish({ ...state, pageNumber: (context?.index ?? 0) + 1,
+      hasPrevious: !busy && Boolean(context?.index),
+      hasNext: !busy && Boolean(state.page?.meta.has_more) });
+  };
+
+  function remember() {
+    if (state.selection === null || context === null) return;
+    const id = key(state.selection);
+    contexts.delete(id);
+    contexts.set(id, { ...context, entries: [...context.entries] });
+    if (contexts.size > 8) contexts.delete(contexts.keys().next().value);
+  }
+
+  function denied() {
+    contexts.clear();
+    context = { entries: [null], index: 0, cohort: null };
+  }
 
   function cancel() {
     generation += 1;
@@ -130,33 +157,83 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
       emit({ phase: 'ready', summary: readSummary(response, page, metadata, display) });
     } catch (error) {
       if (!disposed && current === generation) {
-        if ([401, 403].includes(error.status)) emit({ phase: 'list-error', page: null, summary: null, error });
+        if ([401, 403].includes(error.status)) {
+          denied();
+          emit({ phase: 'list-error', page: null, summary: null, error });
+        }
         else emit({ phase: 'summary-error', error });
       }
     }
   }
 
-  async function apply(selection) {
-    if (disposed) return;
-    if (active && selection !== null && state.selection !== null
-        && JSON.stringify(selectionParams(selection)) === JSON.stringify(selectionParams(state.selection))) return;
+  async function load(index, notice = '') {
     cancel();
     const current = generation;
-    emit({ phase: selection === null ? 'idle' : 'loading-list', selection, page: null, summary: null, error: null });
-    if (selection === null) return;
+    const selection = state.selection;
+    context = { ...context, entries: [...context.entries], index };
+    const cursor = context.entries[index];
+    const cohort = context.cohort;
+    const params = { ...selectionParams(selection), ...(cohort ? { from: cohort.from, to: cohort.to } : {}),
+      ...(cursor === null ? {} : { cursor }) };
+    emit({ phase: 'loading-list', page: null, summary: null, error: null, notice });
     try {
-      const response = await request('executions', selectionParams(selection));
+      const response = await request('executions', params);
       if (disposed || current !== generation) return;
       const page = readExecutionPage(response, selection, metadata, display);
+      if (cohort && (page.meta.from !== cohort.from || page.meta.to !== cohort.to
+          || (cursor !== null && (page.meta.as_of !== cohort.as_of || page.meta.upper_id !== cohort.upper_id)))) {
+        throw badResponse(response);
+      }
+      // The API has no first-page cursor. Replaying page one establishes a new
+      // fence inside the retained bounds; rebuild its subsequent path.
+      context = { index, entries: context.entries.slice(0, index + 1),
+        cohort: { from: page.meta.from, to: page.meta.to, as_of: page.meta.as_of, upper_id: page.meta.upper_id } };
+      if (page.meta.has_more) context.entries.push(page.meta.next_cursor);
+      remember();
       await summary(current, selection, page);
     } catch (error) {
-      if (!disposed && current === generation) emit({ phase: 'list-error', error });
+      if (disposed || current !== generation) return;
+      if (cursor !== null && ['invalid_cursor', 'cursor_expired'].includes(error.code)) {
+        contexts.delete(key(selection));
+        context = { entries: [null], index: 0, cohort: null };
+        // This fallback has no cursor, so a second failure cannot reset again.
+        return load(0, 'The page link expired or is no longer valid. Reset to page one.');
+      }
+      if ([401, 403].includes(error.status)) denied();
+      emit({ phase: 'list-error', error });
     }
+  }
+
+  async function apply(selection, { restore = false } = {}) {
+    if (disposed) return;
+    if (active && selection !== null && state.selection !== null && key(selection) === key(state.selection)) return;
+    remember();
+    cancel();
+    if (selection === null) {
+      context = null;
+      emit({ phase: 'idle', selection: null, page: null, summary: null, error: null, notice: '' });
+      return;
+    }
+    const saved = restore ? contexts.get(key(selection)) : null;
+    context = saved ? { ...saved, entries: [...saved.entries] } : { entries: [null], index: 0, cohort: null };
+    state = { ...state, selection };
+    return load(context.index);
   }
 
   return {
     apply,
-    retryList() { if (!active && state.phase === 'list-error') return apply(state.selection); },
+    next() {
+      if (!disposed && !active && state.page?.meta.has_more) return load(context.index + 1);
+    },
+    previous() {
+      if (!disposed && !active && context?.index > 0) return load(context.index - 1);
+    },
+    latest() {
+      if (!disposed && !active && state.selection !== null) return apply(state.selection);
+    },
+    retryList() {
+      if (!disposed && !active && state.phase === 'list-error') return load(context.index, state.notice);
+    },
     retrySummary() {
       if (active || state.phase !== 'summary-error') return;
       cancel();
@@ -166,7 +243,9 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
       if (disposed) return;
       disposed = true;
       cancel();
-      emit({ phase: 'idle', selection: null, page: null, summary: null, error: null });
+      contexts.clear();
+      context = null;
+      emit({ phase: 'idle', selection: null, page: null, summary: null, error: null, notice: '' });
     },
   };
 }

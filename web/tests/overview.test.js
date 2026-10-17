@@ -18,6 +18,7 @@ const row = (changes = {}) => ({ execution_id: '9007199254740993', folder_name: 
   ended_at: null, duration_seconds: null, elapsed_seconds: 0.0000001, warning_count: 0, error_count: 1, ...changes });
 function page(rows = [row()], changes = {}) {
   return { ...envelope(rows), meta: { ...envelope().meta, from, to, as_of: wireTime,
+    upper_id: '9223372036854775807', consistency: 'live',
     limit: 50, sort: 'execution_id', direction: 'desc', has_more: false, next_cursor: null, ...changes } };
 }
 function summary(changes = {}, meta = {}) {
@@ -80,7 +81,9 @@ test('malformed rows and mismatched cohort/order metadata fail with a safe reque
     page([row({ started_at: null, elapsed_seconds: 0 })]), page([row({ duration_seconds: 0 })]),
     page([row({ folder_name: '' })]), page([], { limit: 25 }), page([], { sort: 'created_at' }),
     page([], { direction: 'asc' }), page([], { to: from }), page([], { next_cursor: 'unexpected' }),
-    page([], { has_more: true, next_cursor: 'opaque' })];
+    page([], { has_more: true, next_cursor: 'opaque' }), page([], { consistency: 'snapshot' }),
+    page(undefined, { upper_id: null }), page([], { upper_id: '01' }),
+    page(undefined, { has_more: true, next_cursor: 'x'.repeat(settings.limits.max_cursor_characters + 1) })];
   for (const response of invalid) {
     assert.throws(() => readExecutionPage(response, selection(), settings, display), (error) =>
       error.kind === 'invalid_response' && error.requestId === requestId);
@@ -231,5 +234,193 @@ test('deadline stops the current request without retry loops and duplicate apply
   assert.equal(states.at(-1).error.kind, 'timeout');
   t.mock.timers.tick(60000);
   assert.equal(calls, 1);
+  owner.dispose();
+});
+
+test('Next and Previous replay opaque entry cursors with exact cohort bounds and never sort rows', async () => {
+  const calls = [], opaque = 'opaque+/%=影狼';
+  const { owner, states } = setup(async (resource, { params }) => {
+    calls.push({ resource, params });
+    if (resource !== 'executions') return summary();
+    // Intentionally not numeric order: the server owns ordering, including ties/collation.
+    return params.cursor ? page([row({ execution_id: '5' }), row({ execution_id: '8' })])
+      : page([row({ execution_id: '2' }), row({ execution_id: '9' })], { has_more: true, next_cursor: opaque });
+  });
+  await owner.apply(selection({ folder: 'all + / 影狼', status: [2] }));
+  assert.equal(states.at(-1).pageNumber, 1);
+  assert.equal(states.at(-1).hasPrevious, false);
+  await owner.previous();
+  assert.equal(calls.length, 2);
+  await owner.next();
+  const continuation = calls[2].params;
+  assert.equal(continuation.cursor, opaque);
+  assert.equal(continuation.from, from);
+  assert.equal(continuation.to, to);
+  assert.equal(continuation.folder, 'all + / 影狼');
+  assert.equal(continuation.status, '2');
+  assert.equal(states.at(-1).pageNumber, 2);
+  assert.deepEqual(states.at(-1).page.data.map((item) => item.execution_id), ['5', '8']);
+  assert.equal(states.at(-1).hasPrevious, true);
+  assert.equal(states.at(-1).hasNext, false);
+  await owner.next();
+  assert.equal(calls.length, 4);
+  await owner.previous();
+  assert.equal(calls[4].params.cursor, undefined);
+  assert.equal(calls[4].params.from, from);
+  assert.equal(calls[4].params.to, to);
+  assert.equal(states.at(-1).pageNumber, 1);
+  owner.dispose();
+});
+
+test('transient continuation failure retries that entry rather than silently starting over', async () => {
+  const calls = [];
+  let failures = 0;
+  const run = setup(async (resource, { params }) => {
+    if (resource !== 'executions') return summary();
+    calls.push(params);
+    if (params.cursor && !failures++) throw new ApiError('http', { status: 503 });
+    return params.cursor ? page() : page(undefined, { has_more: true, next_cursor: 'entry' });
+  });
+  await run.owner.apply(selection());
+  await run.owner.next();
+  assert.equal(run.states.at(-1).phase, 'list-error');
+  assert.equal(run.states.at(-1).hasPrevious, true);
+  await run.owner.retryList();
+  assert.deepEqual(calls[1], calls[2]);
+  assert.equal(run.states.at(-1).pageNumber, 2);
+  run.owner.dispose();
+});
+
+test('invalid and expired continuations reset once, visibly, without retry loops', async () => {
+  for (const code of ['invalid_cursor', 'cursor_expired']) {
+    for (const fallbackFails of [false, true]) {
+      const calls = [];
+      const { owner, states } = setup(async (resource, { params }) => {
+        if (resource !== 'executions') return summary();
+        calls.push(params);
+        if (params.cursor || (calls.length === 3 && fallbackFails)) throw new ApiError('http', { status: 400, code });
+        return page(undefined, { has_more: true, next_cursor: 'invalid-entry' });
+      });
+      await owner.apply(selection());
+      await owner.next();
+      assert.equal(calls.length, 3);
+      assert.equal(calls[2].cursor, undefined);
+      assert.equal(calls[2].from, null);
+      assert.equal(calls[2].to, null);
+      assert.equal(states.at(-1).pageNumber, 1);
+      assert.match(states.at(-1).notice, /expired/);
+      assert.equal(states.at(-1).phase, fallbackFails ? 'list-error' : 'ready');
+      owner.dispose();
+    }
+  }
+});
+
+test('continuation cannot change any cohort bound, as_of or upper fence', async () => {
+  for (const changes of [{ from: '2026-10-17T00:00:00.0000002Z' },
+    { to: '2026-10-17T18:00:00.1234568Z' }, { as_of: from }, { upper_id: '99' }]) {
+    const { owner, states } = setup(async (resource, { params }) => resource !== 'executions' ? summary()
+      : params.cursor ? page(undefined, changes) : page(undefined, { has_more: true, next_cursor: 'entry' }));
+    await owner.apply(selection());
+    await owner.next();
+    assert.equal(states.at(-1).phase, 'list-error');
+    assert.equal(states.at(-1).error.kind, 'invalid_response');
+    assert.equal(states.at(-1).page, null);
+    owner.dispose();
+  }
+});
+
+test('an empty retained page keeps its page number and offers Previous or a fresh latest cohort', async () => {
+  const calls = [];
+  const { owner, states } = setup(async (resource, { params }) => {
+    if (resource !== 'executions') return summary();
+    calls.push(params);
+    return params.cursor ? page([]) : page(undefined, { has_more: true, next_cursor: 'retained' });
+  });
+  await owner.apply(selection());
+  await owner.next();
+  assert.equal(states.at(-1).page.data.length, 0);
+  assert.equal(states.at(-1).pageNumber, 2);
+  assert.equal(states.at(-1).hasPrevious, true);
+  assert.equal(states.at(-1).hasNext, false);
+  await owner.latest();
+  assert.equal(states.at(-1).pageNumber, 1);
+  assert.equal(calls.at(-1).from, null);
+  assert.equal(calls.at(-1).cursor, undefined);
+  owner.dispose();
+});
+
+test('history replays an in-memory entry without rows; new Apply and fresh owners start on page one', async () => {
+  const calls = [];
+  const api = async (resource, { params }) => {
+    if (resource !== 'executions') return summary();
+    calls.push(params);
+    return page(undefined, { has_more: true, next_cursor: params.cursor ? 'third' : 'second' });
+  };
+  const { owner, states } = setup(api);
+  const first = selection({ folder: 'First' }), second = selection({ folder: 'Second' });
+  await owner.apply(first);
+  await owner.next();
+  await owner.next();
+  await owner.apply(second);
+  await owner.apply(first, { restore: true });
+  assert.equal(calls.at(-1).cursor, 'third');
+  assert.equal(states.at(-1).pageNumber, 3);
+  await owner.previous();
+  assert.equal(calls.at(-1).cursor, 'second');
+  await owner.apply(first);
+  assert.equal(calls.at(-1).cursor, undefined);
+  assert.equal(calls.at(-1).from, null);
+  owner.dispose();
+  const fresh = setup(api);
+  await fresh.owner.apply(first, { restore: true });
+  assert.equal(calls.at(-1).cursor, undefined);
+  fresh.owner.dispose();
+});
+
+test('a sort or size change aborts an old page, resets the path and rejects late denial', async () => {
+  const pending = deferred(), calls = [];
+  const { owner, states } = setup(async (resource, options) => {
+    if (resource !== 'executions') return summary();
+    calls.push(options);
+    if (options.params.cursor) return pending.promise;
+    return page(undefined, { sort: options.params.sort, direction: options.params.direction,
+      limit: options.params.limit, has_more: true, next_cursor: 'entry' });
+  });
+  await owner.apply(selection());
+  const old = owner.next();
+  await owner.next();
+  assert.equal(calls.length, 2);
+  await owner.apply(selection({ sort: 'created_at', direction: 'asc', limit: 200 }));
+  assert.equal(calls[1].signal.aborted, true);
+  assert.equal(calls[2].params.cursor, undefined);
+  assert.equal(calls[2].params.limit, 200);
+  pending.reject(new ApiError('http', { status: 403 }));
+  await old;
+  assert.equal(states.at(-1).phase, 'ready');
+  assert.equal(states.at(-1).pageNumber, 1);
+  assert.equal(states.at(-1).selection.sort, 'created_at');
+  owner.dispose();
+});
+
+test('access denial discards retained paging contexts and removes continuation controls', async () => {
+  let denied = false;
+  const calls = [];
+  const { owner, states } = setup(async (resource, { params }) => {
+    if (resource !== 'executions') return summary();
+    calls.push(params);
+    if (denied) throw new ApiError('http', { status: 403 });
+    return page(undefined, { has_more: true, next_cursor: 'entry' });
+  });
+  const first = selection({ folder: 'First' });
+  await owner.apply(first);
+  await owner.next();
+  denied = true;
+  await owner.apply(selection({ folder: 'Denied' }));
+  assert.equal(states.at(-1).hasPrevious, false);
+  assert.equal(states.at(-1).hasNext, false);
+  assert.equal(states.at(-1).page, null);
+  denied = false;
+  await owner.apply(first, { restore: true });
+  assert.equal(calls.at(-1).cursor, undefined);
   owner.dispose();
 });

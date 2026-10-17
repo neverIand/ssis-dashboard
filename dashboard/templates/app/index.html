@@ -116,6 +116,13 @@
                 <h2 id="executions-heading">Executions</h2>
                 <button type="button" data-list-retry hidden>Retry executions</button>
             </div>
+            <div class="table-controls" aria-label="Execution order">
+                <label>Sort <select data-order="sort" disabled><option value="execution_id">ID</option></select></label>
+                <label>Direction <select data-order="direction" disabled><option value="desc">Descending</option><option value="asc">Ascending</option></select></label>
+                <label>Rows per page <input data-order="limit" type="number" min="1" step="1" inputmode="numeric" disabled></label>
+            </div>
+            <p class="resource-status" data-order-notice role="status"></p>
+            <p class="resource-status" data-page-notice role="status"></p>
             <p class="resource-status" data-executions-status role="status"></p>
             <div class="table-scroll" role="region" aria-labelledby="executions-heading" tabindex="0">
                 <table data-execution-table>
@@ -134,6 +141,11 @@
                     <tbody><tr><td class="empty-state" colspan="9">No data loaded.</td></tr></tbody>
                 </table>
             </div>
+            <nav class="execution-pages" aria-label="Execution pages">
+                <button type="button" data-executions-previous disabled>Previous</button>
+                <button type="button" data-executions-next disabled>Next</button>
+                <button type="button" data-executions-latest disabled>Show latest</button>
+            </nav>
         </section>
     </main>
 </body>
