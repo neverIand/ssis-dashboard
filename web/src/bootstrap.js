@@ -95,7 +95,7 @@ export function mountBootstrap(root, { ready = () => {} } = {}) {
     publish(state) {
       root.dataset.startup = state.phase;
       status.textContent = state.phase === 'loading' ? 'Loading settings…'
-        : state.phase === 'ready' ? 'Ready. Data not loaded.' : state.error.message;
+        : state.phase === 'ready' ? 'Ready' : state.error.message;
       retry.hidden = state.phase !== 'error';
       retry.disabled = state.phase === 'loading';
       correlation.hidden = state.phase !== 'error' || !state.error.requestId;
@@ -103,7 +103,8 @@ export function mountBootstrap(root, { ready = () => {} } = {}) {
       timezone.hidden = state.phase !== 'ready';
       if (state.phase === 'ready') {
         const metadata = state.metadata;
-        timezone.textContent = `Times: ${metadata.display_timezone}`;
+        timezone.textContent = metadata.display_timezone;
+        timezone.setAttribute('aria-label', `Display timezone: ${metadata.display_timezone}`);
         const options = [{ code: '', name: 'All statuses' }, ...metadata.execution_statuses];
         root.querySelector('[data-status-choices]').replaceChildren(...options.map((item) => {
           const label = document.createElement('label');

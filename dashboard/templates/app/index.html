@@ -18,20 +18,19 @@
     <header class="page-header">
         <div class="header-content">
             <h1>SSIS Dashboard</h1>
+            <section class="connection-state" aria-label="Connection status">
+                <p id="app-status" role="status" aria-live="polite" data-app-status>Starting dashboard. If this message remains, reload the page or use the legacy dashboard.</p>
+                <button type="button" data-retry aria-describedby="app-status" hidden>Retry settings</button>
+                <p data-request-id hidden></p>
+                <p data-display-timezone hidden></p>
+                <noscript><p>Enable JavaScript to use this page, or open the legacy dashboard.</p></noscript>
+            </section>
             <nav aria-label="Dashboard navigation">
-                <a href="{{ url_for('packages') }}">Legacy dashboard</a>
+                <a href="{{ url_for('packages') }}" aria-label="Legacy dashboard">Legacy</a>
             </nav>
         </div>
     </header>
     <main id="main-content" tabindex="-1">
-        <section class="connection-state" aria-label="Connection status">
-            <p id="app-status" role="status" aria-live="polite" data-app-status>Starting dashboard. If this message remains, reload the page or use the legacy dashboard.</p>
-            <button type="button" data-retry aria-describedby="app-status" hidden>Retry</button>
-            <p data-request-id hidden></p>
-            <p data-display-timezone hidden></p>
-            <noscript><p>Enable JavaScript to use this page, or open the legacy dashboard.</p></noscript>
-        </section>
-
         <section class="panel" aria-labelledby="filters-heading">
             <h2 id="filters-heading">Filters</h2>
             <form id="overview-filters" novalidate>
@@ -96,23 +95,30 @@
             </form>
         </section>
 
-        <section class="panel" aria-labelledby="summary-heading">
+        <section class="panel" aria-labelledby="summary-heading" data-summary>
             <div class="section-heading">
                 <h2 id="summary-heading">Summary</h2>
-                <p>All statuses</p>
+                <p>All statuses in the creation window</p>
+                <button type="button" data-summary-retry hidden>Retry summary</button>
             </div>
+            <p class="cohort-window" data-cohort-window hidden></p>
+            <p class="resource-status" data-summary-status role="status"></p>
             <dl class="summary-grid">
-                <div><dt>Total executions</dt><dd aria-label="Not loaded">—</dd></div>
-                <div><dt>Running</dt><dd aria-label="Not loaded">—</dd></div>
-                <div><dt>Succeeded</dt><dd aria-label="Not loaded">—</dd></div>
-                <div><dt>Failed</dt><dd aria-label="Not loaded">—</dd></div>
+                <div><dt>Total executions</dt><dd data-count="total" aria-label="Not loaded">—</dd></div>
+                <div><dt>Running</dt><dd data-count="running" aria-label="Not loaded">—</dd></div>
+                <div><dt>Succeeded</dt><dd data-count="succeeded" aria-label="Not loaded">—</dd></div>
+                <div><dt>Failed</dt><dd data-count="failed" aria-label="Not loaded">—</dd></div>
             </dl>
         </section>
 
         <section class="panel executions" aria-labelledby="executions-heading">
-            <h2 id="executions-heading">Executions</h2>
+            <div class="section-heading">
+                <h2 id="executions-heading">Executions</h2>
+                <button type="button" data-list-retry hidden>Retry executions</button>
+            </div>
+            <p class="resource-status" data-executions-status role="status"></p>
             <div class="table-scroll" role="region" aria-labelledby="executions-heading" tabindex="0">
-                <table>
+                <table data-execution-table>
                     <caption class="visually-hidden">Executions in the selected creation window</caption>
                     <thead><tr>
                         <th scope="col">ID</th>
@@ -120,11 +126,12 @@
                         <th scope="col">Package</th>
                         <th scope="col">Status</th>
                         <th scope="col">Created</th>
+                        <th scope="col">Started</th>
                         <th scope="col">Duration</th>
                         <th scope="col">Warnings</th>
                         <th scope="col">Errors</th>
                     </tr></thead>
-                    <tbody><tr><td class="empty-state" colspan="8">No data loaded.</td></tr></tbody>
+                    <tbody><tr><td class="empty-state" colspan="9">No data loaded.</td></tr></tbody>
                 </table>
             </div>
         </section>

@@ -149,6 +149,7 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
       projects.clear();
       foldersStarted = false;
       projectFolder = null;
+      onApplied(null);
     }
   }
 
@@ -183,7 +184,7 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
       const selection = session.apply();
       writeUrl(selection, false);
       showApplied(selection);
-      notice.textContent = 'Filters applied. Data not loaded.';
+      notice.textContent = 'Filters applied.';
       loadProjects();
     } catch (error) { notice.textContent = error instanceof SelectionError ? error.message : 'Filters could not be applied.'; }
   });

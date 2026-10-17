@@ -1,0 +1,172 @@
+import { ApiError } from './api.js';
+import { createDisplay, formatCode, formatId, formatText } from './display.js';
+import { selectionParams, timestampTicks } from './selection.js';
+
+const utc = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{7}Z$/;
+const badResponse = (response) => new ApiError('invalid_response', { requestId: response?.meta?.request_id });
+
+function wireTime(value, display, nullable = true) {
+  if (value === null && !nullable) throw new TypeError();
+  if (value !== null && (typeof value !== 'string' || !utc.test(value))) throw new TypeError();
+  display.timestamp(value);
+}
+
+function requiredCount(value, display) {
+  if (value === null) throw new TypeError();
+  display.count(value);
+}
+
+function code(value) {
+  if (value === null || value.code < -2147483648 || value.code > 2147483647) throw new TypeError();
+  formatCode(value);
+}
+
+function name(value, width) {
+  formatText(value);
+  if (!value || value.length > width || value.includes('\0')) throw new TypeError();
+}
+
+export function readExecutionPage(response, selection, metadata, display) {
+  try {
+    const { data, meta } = response;
+    if (!Array.isArray(data) || data.length > selection.limit || meta.limit !== selection.limit
+        || meta.sort !== selection.sort || meta.direction !== selection.direction
+        || typeof meta.has_more !== 'boolean'
+        || (meta.has_more ? typeof meta.next_cursor !== 'string' || !meta.next_cursor || !data.length
+          : meta.next_cursor !== null)) throw new TypeError();
+    wireTime(meta.from, display, false);
+    wireTime(meta.to, display, false);
+    wireTime(meta.as_of, display, false);
+    const span = timestampTicks(meta.to) - timestampTicks(meta.from);
+    if (span <= 0n || span > BigInt(metadata.limits.max_range_hours) * 36000000000n) throw new TypeError();
+    if ((selection.from !== null && timestampTicks(selection.from) !== timestampTicks(meta.from))
+        || (selection.to !== null && timestampTicks(selection.to) !== timestampTicks(meta.to))) throw new TypeError();
+    const ids = new Set();
+    for (const row of data) {
+      if (typeof row.execution_id !== 'string' || ids.has(row.execution_id)) throw new TypeError();
+      formatId(row.execution_id);
+      ids.add(row.execution_id);
+      name(row.folder_name, 128);
+      name(row.project_name, 128);
+      name(row.package_name, 260);
+      code(row.status);
+      wireTime(row.created_at, display, false);
+      const created = timestampTicks(row.created_at);
+      if (created < timestampTicks(meta.from) || created >= timestampTicks(meta.to)
+          || (selection.status.length && !selection.status.includes(row.status.code))) throw new TypeError();
+      wireTime(row.started_at, display);
+      wireTime(row.ended_at, display);
+      display.duration(row.duration_seconds);
+      display.duration(row.elapsed_seconds);
+      requiredCount(row.warning_count, display);
+      requiredCount(row.error_count, display);
+      if ((row.started_at === null && (row.duration_seconds !== null || row.elapsed_seconds !== null))
+          || (row.ended_at === null && row.duration_seconds !== null)) throw new TypeError();
+    }
+    return response;
+  } catch { throw badResponse(response); }
+}
+
+export function readSummary(response, page, metadata, display) {
+  try {
+    const { data, meta } = response;
+    if (meta.from !== page.meta.from || meta.to !== page.meta.to || meta.status_scope !== 'all'
+        || !Array.isArray(data.by_status) || data.by_status.length > 65536) throw new TypeError();
+    requiredCount(data.total, display);
+    const codes = new Set();
+    let total = 0n;
+    for (const item of data.by_status) {
+      code(item);
+      requiredCount(item.count, display);
+      if (codes.has(item.code)) throw new TypeError();
+      codes.add(item.code);
+      total += BigInt(item.count);
+    }
+    if (total !== BigInt(data.total) || [2, 4, 7].some((value) => !codes.has(value))
+        || metadata.execution_statuses.some((item) => !codes.has(item.code))) {
+      throw new TypeError();
+    }
+    return response;
+  } catch { throw badResponse(response); }
+}
+
+export function createOverview({ api, metadata, publish, timeoutMs = 30000, locale }) {
+  const display = createDisplay({ timeZone: metadata.display_timezone, locale });
+  let state = { phase: 'idle', selection: null, page: null, summary: null, error: null };
+  let generation = 0;
+  let active = null;
+  let disposed = false;
+  const emit = (changes) => { state = { ...state, ...changes }; publish(state); };
+
+  function cancel() {
+    generation += 1;
+    if (active) { clearTimeout(active.timer); active.controller.abort(); }
+    active = null;
+  }
+
+  async function request(resource, params) {
+    const controller = new AbortController();
+    let timedOut = false;
+    const job = { controller, timer: setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs) };
+    active = job;
+    try {
+      const response = await api.get(resource, { params, signal: controller.signal });
+      if (controller.signal.aborted) throw new ApiError('timeout');
+      return response;
+    } catch (error) {
+      throw timedOut ? new ApiError('timeout') : error instanceof ApiError ? error : new ApiError('invalid_response');
+    } finally {
+      clearTimeout(job.timer);
+      if (active === job) active = null;
+    }
+  }
+
+  async function summary(current, selection, page) {
+    emit({ phase: 'loading-summary', page, summary: null, error: null });
+    try {
+      const response = await request('metrics/summary', { folder: selection.folder, project: selection.project,
+        from: page.meta.from, to: page.meta.to });
+      if (disposed || current !== generation) return;
+      emit({ phase: 'ready', summary: readSummary(response, page, metadata, display) });
+    } catch (error) {
+      if (!disposed && current === generation) {
+        if ([401, 403].includes(error.status)) emit({ phase: 'list-error', page: null, summary: null, error });
+        else emit({ phase: 'summary-error', error });
+      }
+    }
+  }
+
+  async function apply(selection) {
+    if (disposed) return;
+    if (active && selection !== null && state.selection !== null
+        && JSON.stringify(selectionParams(selection)) === JSON.stringify(selectionParams(state.selection))) return;
+    cancel();
+    const current = generation;
+    emit({ phase: selection === null ? 'idle' : 'loading-list', selection, page: null, summary: null, error: null });
+    if (selection === null) return;
+    try {
+      const response = await request('executions', selectionParams(selection));
+      if (disposed || current !== generation) return;
+      const page = readExecutionPage(response, selection, metadata, display);
+      await summary(current, selection, page);
+    } catch (error) {
+      if (!disposed && current === generation) emit({ phase: 'list-error', error });
+    }
+  }
+
+  return {
+    apply,
+    retryList() { if (!active && state.phase === 'list-error') return apply(state.selection); },
+    retrySummary() {
+      if (active || state.phase !== 'summary-error') return;
+      cancel();
+      return summary(generation, state.selection, state.page);
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      cancel();
+      emit({ phase: 'idle', selection: null, page: null, summary: null, error: null });
+    },
+  };
+}

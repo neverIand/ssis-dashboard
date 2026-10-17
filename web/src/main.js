@@ -2,6 +2,7 @@ import 'vite/modulepreload-polyfill';
 import './styles.css';
 import { mountBootstrap } from './bootstrap.js';
 import { mountFilters } from './filters.js';
+import { mountOverview } from './render-overview.js';
 
 const root = document.querySelector('[data-dashboard-app]');
 if (root) {
@@ -9,8 +10,12 @@ if (root) {
   const start = () => {
     dispose?.();
     try {
-      dispose = mountBootstrap(root, { ready: (metadata, api, config) =>
-        mountFilters(root, { metadata, api, appBase: config.app_base }) });
+      dispose = mountBootstrap(root, { ready: (metadata, api, config) => {
+        const overview = mountOverview(root, { metadata, api, executionBase: config.execution_base });
+        const filters = mountFilters(root, { metadata, api, appBase: config.app_base,
+          onApplied: (selection) => { void overview.apply(selection); } });
+        return () => { filters(); overview.dispose(); };
+      } });
     } catch {
       root.dataset.startup = 'error';
       root.querySelector('[data-app-status]').textContent =
