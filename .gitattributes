@@ -3,6 +3,9 @@
 ###############################################################################
 * text=auto
 
+# Keep frontend build inputs consistent across platforms.
+/web/** text eol=lf
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #

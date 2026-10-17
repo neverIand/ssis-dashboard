@@ -65,6 +65,35 @@ Open [the legacy dashboard](http://127.0.0.1:5000/) or [API metadata](http://127
 
 `/healthz` and `/api/v1/meta` use no database. `/readyz` performs one zero-row SSISDB dependency check, independent of visible row count. Readiness is not workflow or hosting acceptance. API errors use safe `application/problem+json`; successes and failures have no-store and a server-generated request ID. Invalid inputs and denied capabilities fail before SQL.
 
+## Build the browser assets
+
+Frontend build tools are for developers only. Use **Node 22 LTS, at least 22.12.0 and below 23, with npm 10**; the local D1a baseline is Node 22.19.0 / npm 10.9.3 on Windows x64. `web/package.json` pins Vite 8.3.4, `web/package-lock.json` locks its dependency graph and integrity hashes, and `.npmrc` checks the supported engine range. No frontend framework or runtime package is installed.
+
+From the repository root:
+
+```sh
+npm --prefix web ci
+npm --prefix web run build
+npm --prefix web test
+python -m unittest tests.test_frontend_assets
+```
+
+`npm ci` replaces `web/node_modules/` from the lockfile. The source entry is `web/src/main.js`, with authored `styles.css` and vanilla ES modules. Production builds empty **only** `dashboard/static/app/` and generate `manifest.json`, hashed JS/CSS under `assets/` and `LICENSES.txt` for the bundled Vite modulepreload polyfill. The entire generated directory is ignored by Git; track source, build configuration and the lockfile in `web/`. Rebuild before packaging and include the complete updated output in the prepared application delivery. Frontend source uses LF line endings across platforms. Other legacy static directories remain outside the build output.
+
+**Application deliveries must include prebuilt `dashboard/static/app/` files alongside the Python application.** A source checkout requires the build commands above to produce them; deployment copying or archiving must retain the generated directory even though Git ignores it. Running the prepared application requires neither Node, npm nor `web/node_modules/`. The manifest maps `src/main.js` to its JS and CSS; Flask's shell will use its static endpoint to add the deployment prefix. Generated asset imports use a relative base, so a mounted deployment does not need a separate frontend build. The development HTML is excluded from production output. D1a establishes the assets; `/app/` shell integration follows in D1b.
+
+For source development, run Flask on `127.0.0.1:5000` as above, then in another terminal:
+
+```sh
+npm --prefix web run dev
+```
+
+Open [the development harness](http://127.0.0.1:5173/). Vite listens only on loopback, uses a strict port, serves native modules/HMR, and proxies `/api/v1/…` to `http://127.0.0.1:5000` with the path/query intact. The harness's metadata link checks that connection without SQL. It is a build/development check until the new shell is connected. No browser CORS setting or production Vite server is needed. HMR updates code; data refresh is separate D3 work. Stop each task-owned server with Ctrl+C when finished.
+
+Use Node's built-in `node:test` runner for focused frontend checks; run the build first, as its packaging check requires the generated manifest, JS/CSS and notice. The Vite development/proxy test owns ephemeral loopback listeners and closes them. Flask's existing unittest suite checks packaged manifest assets at root and a simulated `/dashboard` mount without SQL or Node. On an unbuilt source checkout only those two asset tests skip; a present but incomplete build fails. Neither test establishes browser interaction, independent-reader HTTP or real SSISDB acceptance.
+
+`web/node_modules/`, npm caches and test evidence remain ignored. If a local npm cache is needed, pass `--cache .local/npm-cache` to root-level npm commands. Disposable build experiments belong under `.local/tmp/`; retain selected build hashes, sizes and logs under `.local/reports/frontend/`. Pin updates require a clean `npm ci`, rebuild, frontend/backend checks and review of the generated assets. See the [Vite backend integration guide](https://vite.dev/guide/backend-integration.html) for manifest semantics.
+
 ## Test and diagnose
 
 ```sh

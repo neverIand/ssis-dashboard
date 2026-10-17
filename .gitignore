@@ -311,3 +311,6 @@ target/
 .venv/
 wheelhouse/
 .local/
+
+# Generated frontend delivery assets; rebuild from web/ before packaging.
+/dashboard/static/app/

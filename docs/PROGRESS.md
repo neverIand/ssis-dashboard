@@ -1,10 +1,10 @@
 # Implementation progress
 
-Updated 17 October 2026. Development base: `dev-next`; reviewed baseline: `36b48f8`. [Roadmap](roadmap.md) owns scope; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns status and next actions. Detailed results belong in [API validation](API_ACCEPTANCE.md) and the [backend checklist](BACKEND_CHECKLIST.md).
+Updated 17 October 2026. Development base: `dev-next`; planning baseline: `ce8d04e`. [Roadmap](roadmap.md) owns scope; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns status and next actions. Detailed results belong in [API validation](API_ACCEPTANCE.md) and the [backend checklist](BACKEND_CHECKLIST.md).
 
 **Stage C remains in progress.** All 14 GET operations and all 12 execution sorts are implemented; the three review remedies pass their [recorded local checks](API_ACCEPTANCE.md#sql-remedies-replay-17-october-2026). Representative workload, resource and independent API reader acceptance remain open. The first native overview's API prerequisites are available; frontend work is a separate milestone.
 
-**Next task: D1 / first native screen foundation.** On 17 October 2026 the user prioritized preparing delivery phase 3. The remaining C8 checks do not block local frontend development; retain them for API acceptance and before cutover/shared deployment. No Stage C acceptance item is waived or marked complete by this sequencing decision. Hosting remains deferred.
+**Next task: D1b / Flask application shell.** D1a's locked build and packaged assets pass local checks. On 17 October 2026 the user prioritized preparing delivery phase 3; the [nine tasks below](#phase-3--first-native-screen-preparation) refine D1–D3 into independently verifiable deliveries. The remaining C8 checks do not block local frontend development; retain them for API acceptance and before cutover/shared deployment. No Stage C acceptance item is waived or marked complete by this sequencing decision. Hosting remains deferred.
 
 ## Task sizing and status
 
@@ -87,16 +87,61 @@ Further consolidation reduces `docs/` from 14 files to 11 by combining API corre
 
 ## Later phase boundaries
 
-Phases 3–6 remain planned, with production validation deferred. [The roadmap](roadmap.md#delivery-phases) defines their deliverables and exit conditions; [the plan](MODERNIZATION_PLAN.md#rollout-and-rollback) defines coexistence and rollback.
+Phase 3 is in progress; phases 4–6 remain planned, with production validation deferred. [The roadmap](roadmap.md#delivery-phases) defines their deliverables and exit conditions; [the plan](MODERNIZATION_PLAN.md#rollout-and-rollback) defines coexistence and rollback.
 
 ### Phase 3 / first native screen preparation
 
-These bounded tasks implement the existing phase 3 scope; they do not start parity, production hosting or streaming work.
+Planning recorded 17 October 2026 against `ce8d04e`. The outcome is a usable `/app/` overview: choose a visible folder/project and creation-time/status scope, inspect summary cards and a bounded execution list, open the existing execution details, and refresh data in place. The legacy homepage stays available during this phase. Details/children/events/values/history/charts and legacy URL translation belong to phase 4; production detection/SSE belongs to phase 5; cutover and asset removal belong to phase 6.
 
-| ID | Status | Deliverable and validation |
-| --- | --- | --- |
-| D1 | Planned — next | Add the `/app/` shell and browser source/build boundary using vanilla modules and authored CSS. Serve packaged assets from Flask alongside legacy routes. Verify a reproducible production build, asset/base-path handling, and unchanged legacy/API/health routes. |
-| D2 | Planned | Connect folder/project/time/status filters, summary cards and the execution list. Preserve server-side global sorting and cursor paging, reuse resolved creation bounds across list/metrics, and link visible executions to existing details. Verify empty/error/loading states and the filter → list → detail-link path. |
-| D3 | Planned | Add manual and data-only polling refresh with preserved filters, sort, page, scroll and focus. Guard stale responses, prevent overlapping refreshes and resync after hidden-tab return. Verify browser behavior, keyboard/narrow layouts, literal text rendering and the recorded frontend bundle budget. |
+The parent milestones remain **D1 foundation**, **D2 usable overview** and **D3 refresh/acceptance**. D1 is in progress; D2/D3 remain planned, and a parent closes only when its children pass. Each task updates this file with its implementation, checks, evidence and remaining gaps. [Overview state and refresh](MODERNIZATION_PLAN.md#overview-state-and-refresh) owns the cross-task behavior; [API semantics](API_CONTRACT.md) remains authoritative for wire values and cursor rules.
+
+| ID | Status | Deliverable | Exit check |
+| --- | --- | --- | --- |
+| D1a | Complete locally | Establish `web/` with vanilla ES modules, authored CSS and a pinned Vite build/lockfile. Produce entry assets/manifest for `dashboard/static/app/`; document the supported build runtime, clean-install/build commands, development API path and packaged/ignored outputs in the installation guide. | Clean lockfile installation, repeated identical builds, asset sizes, root/prefix Flask asset serving, development proxy and legacy-file isolation pass. See the dated D1a record below. |
+| D1b | Planned — next | Serve a semantic `/app/` shell from Flask with packaged assets, application/API/detail-link bases and clear startup failure state. Establish labeled filter, summary, table and connection-status regions with keyboard focus and narrow-layout foundations. | Root and locally simulated deployment-prefix requests load the shell/assets without SQL work for the shell itself. Missing build artifacts fail clearly; legacy/API/health routes and their 404 behavior remain intact. The new shell makes no public font/script/analytics requests. |
+| D2a | Planned | Add a small same-origin API request boundary and `/meta` bootstrap: safe problem/request-ID handling, abort support, metadata-driven limits/statuses/sorts/timezone, and typed display helpers. Keep wire IDs/timestamps separate from display formatting. | Focused checks cover BIGINT strings, seven-digit timestamp round trips, NULL/zero/unknown codes, literal Unicode/HTML-looking text, failed/non-JSON responses and cancelled requests. Metadata failure offers retry without starting a request storm or inventing configuration defaults. |
+| D2b | Planned | Add paged folder/project navigation and exact-name, creation-time and status filters. Keep editable inputs separate from applied selection; represent “all” by omission. Restore valid selection/sort/limit from `/app/` URLs and browser back/forward; keep transient paging out of shareable URLs. | More than one navigation page remains reachable without fetching the entire catalog. Changing folder clears an incompatible project. Literal `all`, wildcard characters, plus/slash/Unicode names, empty scopes, invalid ranges and delayed old navigation responses behave correctly. Offset-aware custom bounds and server-returned bounds retain their exact strings. |
+| D2c | Planned | Render the first execution page and all-status summary cards for the same resolved creation cohort. Use the execution response's exact `meta.from`/`to` for summary requests. Show typed timings/counts, the display timezone, empty/loading/error states and links to existing execution details. | Complete filter → list → detail-link → return in a browser against local SSISDB. Cards clearly count all statuses, including when the table selects only one; they are not a table/page total. Unstarted executions, NULL timings, unknown statuses, no results, long names and partial request failure are represented accurately. |
+| D2d | Planned | Add all API-advertised execution sort keys/directions and bounded page sizes; implement Next and Previous using opaque cursors and an in-memory path of page-entry requests. Selection/sort/size changes start a fresh first page. | Global order comes from the server, including calculated sorts and NULL/tie cases. Default 50/max 200 limits, terminal pages, forward/back navigation, expired/invalid cursors and retention/visibility changes have explicit behavior. No local page-only sort, fabricated total-page count or snapshot guarantee is introduced. |
+| D3a | Planned | Add manual data-only refresh through one overview request owner. Apply request-generation checks and cancellation; update rows by identity while preserving selection, sort, current valid page, scroll and focus. Implement the documented default-window, fixed-window and cursor-reset rules. | Deliberately reorder responses while changing filters, sorting, paging and refreshing; old results never replace the current selection. First/deeper-page refresh, empty-page retention, cursor reset, detail-return navigation and partial failure follow the state table. Transient failures retain clearly stale data only for the same scope; denied access removes protected data. |
+| D3b | Planned | Add polling to the same refresh path with a documented interval/backoff based on observed request cost, pause/resume controls, last-success/error state, hidden-tab pause and return resync. Own timers, requests and listener teardown together. | Slow requests, repeated refresh clicks, transient errors, hidden/visible transitions and navigation never create overlapping refresh cycles or duplicate timers. Return performs one resync; disposal stops future work. Browser abort is not counted as proof of native SQL cancellation. |
+| D3c | Planned | Record integrated phase 3 browser acceptance, reproducible packaged-build checks and authored/total bundle sizes. Review the completed frontend for correctness, avoidable requests and lifecycle cleanup; update installation/use instructions and the retained evidence index. | Exercise the full path on local SSISDB in corporate Edge/Chrome, keyboard-only and narrow layouts; include Firefox/Safari smoke checks when used. Check root/prefix routing, bookmarks/back-forward, literal text, accessibility states, request races and polling recovery. Measure authored JS+CSS against the 150 KiB uncompressed target and record the whole bundle; label unrun cases and API/hosting gates separately. |
+
+**Execution order:** `D1a → D1b → D2a → D2b → D2c → D2d → D3a → D3b → D3c`. D2c is the first end-to-end usable screen; D2d completes its table interactions; D3c is the phase 3 acceptance checkpoint. Accessibility, text safety and useful failure states are built into each task and verified together at the end.
+
+Use the existing Flask test setup for route/build integration, focused frontend state/request tests for the hard cases, and actual browser runs for behavior. Choose the smallest adequate test tooling during D1a; do not add a framework or chart/table package for this overview. Build-only tests or mocked API responses do not establish browser/native acceptance. Keep reusable helpers and dated evidence under the existing [local-artifact rules](installation.md#local-artifacts); attribute/reuse running servers and stop task-owned resources before completion.
+
+#### D1a / source and packaged build — 17 October 2026
+
+Established `web/` with Vite **8.3.4**, a version-3 npm lockfile, vanilla ES modules and authored CSS. Build runtime: Windows x64, Node **22.19.0**, npm **10.9.3**; the declared build range is Node 22.12+ on 22.x / npm 10. Vite is the only direct development dependency. Node's built-in test runner adds no test package. The development-only harness proxies `/api/v1` to loopback Flask; the production JS entry, manifest and license notice are generated under `dashboard/static/app/`. [Installation](installation.md#build-the-browser-assets) owns the commands and artifact boundaries.
+
+Clean `npm ci` from the lockfile passes, including a cache-only replay. Two subsequent production builds match each other and the prepared output byte for byte; the lockfile is unchanged. The generated-directory stale-file probe is removed on rebuild, and all **41 legacy static files** retain their original SHA-256. Frontend source Git attributes enforce LF line endings. Generated `dashboard/static/app/` files are ignored and built before packaging, rather than committed. No Flask/SQL route or query implementation changes in this task.
+
+| Size measurement | Bytes, uncompressed |
+| --- | ---: |
+| Authored JS + CSS source | 396 |
+| Complete browser JS, including Vite's modulepreload polyfill | 670 |
+| Browser CSS | 256 |
+| Browser JS + CSS total | 926 (0.90 KiB); 597 bytes with Python gzip |
+| Manifest / license notice | 184 / 1,175 |
+| Entire packaged output | 2,285 |
+
+**Validation:** one Node integration test passes for native development modules, exact API proxy path/query and nonmatching-route 404s. The Python suite runs **346 tests: 343 PASS, three opt-in native SQL tests SKIP**. Its two new asset tests verify manifest dependencies, packaged notice, byte-identical JS/CSS serving at root and a simulated `/dashboard` WSGI mount, unknown-asset 404s and zero SQL connections. Documentation and whitespace checks pass. Selected install/build/dependency-tree/test logs and hashes are retained under `.local/reports/frontend/20261017-d1a/`; the reusable ignored verifier is `.local/tools/verify-frontend-build.py`.
+
+This is the source/build foundation. `/app/` rendering, browser interaction/HMR, overview requests, data refresh and real SSISDB frontend acceptance remain D1b–D3c. The existing C8, OBS-02 and deferred hosting gates retain their status.
+
+Before commit, recorded the user's frontend preference in `AGENTS.md` and the plan: simple, functional pages without slogans or decorative filler copy. Corrected the generated-asset boundary to ignore all of `dashboard/static/app/`, retaining source and lockfile. The Node suite additionally requires the build for packaging; Python asset checks skip only when the generated directory is absent, so a fresh backend-only source checkout remains testable.
+
+**Pre-commit validation:** with generated assets temporarily absent, all 346 Python cases finish with **341 PASS / five SKIP** (three native SQL and two build-dependent checks). After restoring and rebuilding, **343 PASS / three native SQL SKIP**; both Node packaging/development tests pass. All four output-file hashes match the retained build. Git ignore checks confirm the generated JS, CSS, manifest and notice are excluded while `web/` source/lockfile remain eligible. Document/whitespace checks pass; follow-up logs are in `.local/reports/frontend/20261017-d1a-commit/`. D1b remains next.
+
+#### Acceptance carried alongside phase 3
+
+| Gate | Remaining work and relationship to frontend delivery |
+| --- | --- |
+| C8.2b.2b / C8.2b.2c | Dense observation/value/text workloads and aggregate/history growth remain planned. Resume .2b then .2c when returning to API workload acceptance; a rendered overview does not close either. |
+| C8.2c / C8.3 | Sustained/concurrent resources and independent Windows-reader API HTTP remain planned. A local browser run under the configured identity is not independent-reader sign-in evidence. |
+| P0 / phase 4 | Record overview parity and intended API differences during D3c; replacement details, observations, event/value/history/chart workflows and legacy URL mapping remain later work. |
+| OBS-02 / B5c / phases 5–6 | Native cleanup-failure evidence remains open. Hosting, authentication/proxy/HTTPS, stream capacity and cutover retain their deferred gates. |
+| Performance | The execution-page test-network p95 target remains unpassed until the appropriate C8 measurements establish it. Record frontend request count, payload and rendering/build evidence separately from SQL, WSGI and network timings. |
 
 Stage C closes only after its remaining contract/SQL/HTTP/workload/resource/reader checks pass and deferred production gates are explicitly carried forward. Do not close it from operation coverage or this review alone.

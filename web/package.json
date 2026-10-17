@@ -1,0 +1,19 @@
+{
+  "name": "ssis-dashboard-web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0 <23",
+    "npm": "10.x"
+  },
+  "packageManager": "npm@10.9.3",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "vite": "8.3.4"
+  }
+}

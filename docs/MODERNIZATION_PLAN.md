@@ -14,7 +14,7 @@ Keep Python, Flask, pyodbc and useful checked-in SQL. Serve a read-only API and 
 | `db.py`, `query/` | Bound SQL, timeout settings and ownership of each connection/cursor |
 | `timestamps.py`, `serialization.py`, `cursors.py` | Exact typed data, explicit JSON primitives and authenticated paging state |
 | `ssis.py`, `views.py`, templates | Retained legacy presentation adapter |
-| Future `web/` and `dashboard/static/app/` | Browser source/build inputs and packaged production assets |
+| `web/` and `dashboard/static/app/` | Browser source/build inputs and packaged production assets; Flask shell integration follows in D1b |
 | Future update detector/stream modules | Change detection, subscription ownership, bounded notifications and shutdown |
 
 The initial mode is loopback under one configured SQL identity. Browser identity headers cannot select that identity. Separate query connections own their resources and use live catalog observations; a cursor is not a database snapshot. Read-only catalog access may create connection-local temporary tables; it must not modify SSISDB system objects or data.
@@ -37,9 +37,31 @@ Preserve parameter binding, exact 100-ns timestamps, BIGINT strings and explicit
 
 Use vanilla ES modules, native DOM/events/fetch/EventSource, semantic HTML and authored CSS. **Vite is allowed** for development/HMR and production builds. **Chart/table libraries are allowed when their complexity is justified**: compare required interactions, accessibility, maintenance, bundle size, licensing and update/teardown behavior. Pin tools, keep lockfiles, bundle libraries locally and deploy prebuilt assets; server users should not need npm. Production makes no public requests for fonts, scripts or analytics.
 
+Keep frontend pages simple and functional. Use concise labels and useful status messages; omit slogans, marketing taglines and decorative filler copy.
+
+D1a uses a JS entry and Vite manifest with a relative asset base. Only `dashboard/static/app/` is generated/emptied; that output is ignored by Git and included in the prepared application delivery after building from the tracked `web/` source and lockfile. Development uses a loopback Vite harness and a same-origin `/api/v1` proxy to local Flask. The production shell will consume the manifest through Flask's prefix-aware static endpoint in D1b. Build commands, supported runtimes and packaged/ignored boundaries are in [installation](installation.md#build-the-browser-assets). Node's built-in test runner and existing Flask unittests provide focused coverage without another test dependency.
+
 Replace jQuery with native events/fetch, Bootstrap/SmartMenus with authored layout and keyboard-accessible controls, DataTables with bounded server-backed tables, and Morris/Raphael with SVG or a justified chart library. Provide chart text/table alternatives and small authored icons. Remove legacy assets only after reference checks and parity. Target corporate Edge/Chrome; include Firefox/Safari smoke checks when used, with no IE requirement.
 
 Keep filters, sorting, paging, scroll, focus, selected execution and chart state during refresh. Abort obsolete requests and check request generations so stale responses cannot overwrite a newer selection. Coalesce notifications, avoid overlapping fetch/poll loops, pause hidden work and resync on return. Retain useful stale data with clear retry/connection state. Render catalog text with `textContent`, format typed values with `Intl`, show the timezone, and store only display preferences locally.
+
+### Overview state and refresh
+
+Phase 3 has [nine implementation tasks](PROGRESS.md#phase-3--first-native-screen-preparation). Keep browser modules around operations that share state: applying a selection, requesting an overview, rendering typed values and owning refresh lifetime. One coordinator owns the applied selection, effective creation bounds, page-entry cursor path and request generation; rendering and transport helpers do not maintain competing copies. A framework, general state library or domain class hierarchy is unnecessary for this screen.
+
+Separate draft filter inputs, applied selection and display preferences. Shareable `/app/` URLs contain validated selection/sort/limit; opaque cursors and catalog rows stay out of URLs and persistent storage. Back/forward restores the selection and an available valid in-memory page context; a fresh load starts on page one. Navigation choices load bounded pages on demand. “All folders/projects/statuses” omits the corresponding API parameter, so a literal name such as `all` remains selectable.
+
+On each new cohort, use one execution response to establish exact `meta.from`/`to`, then request summary cards with those bounds. Summary remains all-status and is not a filtered-list total. An overview generation prevents stale responses from another selection from being displayed as current; separate API requests still observe live catalog state and do not form an atomic snapshot. Keep BIGINT IDs, wire timestamps and cursors unchanged; `Intl`/browser date conversion is for display only. Custom time inputs must resolve to explicit offsets rather than silently using the browser's timezone.
+
+| Trigger | Planned window and page behavior |
+| --- | --- |
+| Apply selection, sort or page-size change | Clear cursor history and request page one. The configured default window is resolved by the server, including `AS_OF_DATE`; explicit bounds remain fixed. |
+| Refresh page one manually or by polling | Retain the selected filter mode, sort and size. Re-resolve the configured default window, or reuse explicit bounds; use the returned bounds for cards. Replace the old continuation path because this request establishes a new fence. |
+| Refresh a later page | Replay its entry cursor with the original exact bounds/selection. Preserve the current page context, scroll and focus. Cursor `as_of` and the upper-ID fence stay fixed; changing rows are not a snapshot. A visible “Show latest” action starts a new first-page cohort. |
+| Expired/invalid cursor, including after restart | Discard the invalid path, visibly explain the reset and attempt one new first page. Further failure uses the normal error state rather than a reset/retry loop. An empty retained page offers navigation or “Show latest”. |
+| Return from a hidden tab | Perform one refresh using the same page/window rules, then resume the single polling schedule. Do not create another polling owner. |
+
+Manual refresh, polling and visibility recovery share one request lifecycle; abort obsolete work and independently reject late generations. Preserve stale data only for a transient failure within the same authorized selection, with its last-success state visible. Clear protected data on denied access, and never label a previous selection's rows/cards as the newly selected scope. Dispose timers, listeners and pending browser requests together; backend timeouts/resource acceptance still own native SQL cleanup. Phase 5 can later reuse this refresh operation for coalesced notifications without treating phase 3 polling as streaming acceptance.
 
 ## Production live updates
 
