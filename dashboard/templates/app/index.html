@@ -26,6 +26,9 @@
     <main id="main-content" tabindex="-1">
         <section class="connection-state" aria-label="Connection status">
             <p id="app-status" role="status" aria-live="polite" data-app-status>Starting dashboard. If this message remains, reload the page or use the legacy dashboard.</p>
+            <button type="button" data-retry aria-describedby="app-status" hidden>Retry</button>
+            <p data-request-id hidden></p>
+            <p data-display-timezone hidden></p>
             <noscript><p>Enable JavaScript to use this page, or open the legacy dashboard.</p></noscript>
         </section>
 

@@ -74,6 +74,27 @@ main {
   font-size: 0.875rem;
 }
 
+.connection-state {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+[data-display-timezone] {
+  margin-left: auto;
+}
+
+[data-request-id] {
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
+}
+
+[data-retry] {
+  min-height: 2rem;
+  padding: 0.25rem 0.75rem;
+}
+
 .panel {
   min-width: 0;
   padding: 1.25rem;
@@ -212,6 +233,11 @@ th {
 }
 
 @media (max-width: 28rem) {
+  [data-display-timezone] {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
   .header-content {
     align-items: flex-start;
     flex-direction: column;
