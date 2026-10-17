@@ -1,6 +1,6 @@
 # Stage C API acceptance
 
-Updated: 16 October 2026. C8.1/C8.2a and C8.2b.1's [defined current-catalog workload](API_WORKLOAD.md) are complete locally. The existing 341-test application baseline is unchanged. Larger/full-page/reader SQL workloads and measured remedies remain C8.2b.2/.3; the one-second execution-page target is not passed. The [roadmap](roadmap.md) defines scope, [contract](API_CONTRACT.md) defines semantics and [OpenAPI](openapi.yaml) defines the response schemas. Individual SQL/fixture proofs remain in [progress](PROGRESS.md). Local baselines do not close C8.2b/C8.2c acceptance, C8.3 independent reader HTTP, or deferred hosting/stream work.
+Updated: 17 October 2026. C8.1/C8.2a/C8.2b.1 and C8.2b.2a's [execution-cardinality/reader SQL slice](API_WORKLOAD.md#c82b2a-retained-execution-cardinality-results) are complete locally. The existing 341-test application baseline is unchanged. Observation/aggregate/history workloads, measured remedies/budgets, resource acceptance and independent reader HTTP remain open; the test-network target is not passed. The [roadmap](roadmap.md), [contract](API_CONTRACT.md), [OpenAPI](openapi.yaml) and [progress](PROGRESS.md) retain their scope and separate integration gates.
 
 ## Operation matrix
 
@@ -64,6 +64,12 @@ The [protocol and complete result table](API_WORKLOAD.md) now define twenty scen
 
 Four sixteen-row execution pages have local WSGI p95 **1,064–1,092 ms**; the proposed full 50-row/network target is **not passed**. Execute phases dominate their medians; repeated statement compilation and ordinary logging enrichment are measured follow-ups. Cached plan metadata is not recurring compile time. Maximum body is **26,204 bytes** on a 50-event continuation; wide-text/full-page workloads remain open. Existing administrator visibility and fresh processes do not prove normal/restricted reader HTTP. No runtime/SQL/dependency change was made for this baseline.
 
+### C8.2b.2a execution-cardinality and SQL readers
+
+The [full result table and scope limits](API_WORKLOAD.md#c82b2a-retained-execution-cardinality-results) add 20,000 matching temporary executions, maximum-width names, full 50/max-200 pages, selective/deep cases and actual NULL-block continuations. **153 API responses / 242 queries**, **1,700 native samples / 3,000 batches**, **69 actual-plan/IO diagnostics** and **36 configured/normal/restricted SQL diagnostics plus twelve controls** pass. Ordinary materialization remains 51/201; calculated global cohorts retain their complete metrics. Model p95 is 303–584 ms for broad ordinary pages and 4,716–5,905 ms for calculated pages; source/cache/cleanup/transport differences prevent a network-budget or API-overhead inference.
+
+Fresh source plans capture spills in six scenarios and substantial calculated temporary work. Restricted SQL scope returns two rows with 16,557/16,633 persistent-source logical reads, versus 368/233 for the sixteen-row configured/global-reader scope. Reader SHOWPLAN permissions remain zero. C8.2b.3 must preserve exact results, global order and ordinary bounds while comparing these costs; independent sign-in/HTTP, capacity and remaining workloads stay open. The 341-test suite is a retained baseline, not a new test run for this documentation/native-workload task.
+
 | Check | Status / required evidence |
 | --- | --- |
 | Production-route boundary suite and existing regressions | PASS: 341 tests (337 at C8.1 + four binding/declaration tests); the four combined HTTP tests retain their 111 production-route requests, with no real database access. |
@@ -71,7 +77,8 @@ Four sixteen-row execution pages have local WSGI p95 **1,064–1,092 ms**; the p
 | Native readiness timeout and recovery | PASS: final C8.2a driver HYT00, safe 504 in 1,036 ms, one failed query with clean cleanup; liveness succeeds with zero queries and the next readiness returns ready in 25 ms with one query. This is a driver-cap observation, not an end-to-end deadline guarantee. |
 | C8.2a nullable-bind inventory/fix | PASS locally: all 25 resources profiled; all fourteen nullable-resource actual-plan/IO pairs, affected fixtures, long XML, exact typed results and combined reader-scope replay pass. |
 | C8.2b.1 defined current-catalog workload | PASS as a local baseline: twenty cases × 100 warm samples, seventy fresh-client first responses and 87 native diagnostics; all recorded data/outcome/cleanup checks pass. Four execution p95s exceed one second on sixteen rows; no production/network/full-page budget pass. |
-| C8.2b.2/.3 representative workload / measured fixes / budgets | NOT RUN for API-wide acceptance. Include full 50/max-200 pages, larger/deep/selective/repeated-key/wide-text/history cases, reader SQL IO and recurring compile/logging costs. The existing small baseline does not close these gates. |
+| C8.2b.2a execution-cardinality / reader SQL slice | PASS locally: 153 schema responses, seventeen cases × 100 native SQL samples, 69 source-work/plan diagnostics, 36 actual-catalog reader diagnostics plus twelve controls. Full 50/max-200/deep/NULL continuations and exact insert bounds pass. Temporary-source timing is not full-page/network acceptance. |
+| C8.2b.2b/.2c/.3 remaining workloads / fixes / budgets | OPEN. Dense observation/text, repeated keys, summary/1,000 buckets/history growth remain. Calculated-cohort/temporary work, captured sort spills, fresh compilation and restricted-reader public-view IO need measured remedies and budget accounting. |
 | C8.2c sustained/concurrent resource accumulation | NOT RUN. Clean owned resources in individual replays/final audits do not prove repeated/concurrent capacity. |
 | C8.3 independent normal/restricted Windows-reader HTTP | NOT RUN for Stage C. Older Stage B actual-reader checks do not cover the completed API. Record actual process identity, sanitized request manifest and independent SQL for the same identity; never administrator impersonation as a substitute. |
 | Reader SHOWPLAN and real Scale Out/active workloads | NOT RUN where permission/workload is unavailable. Keep explicit coverage gaps; no permission changes or package runs are implied. |

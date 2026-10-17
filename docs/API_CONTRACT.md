@@ -1,6 +1,6 @@
 # Read-only API contract
 
-Updated: 16 October 2026. Milestones: C1a–C7b implemented, C8.1 combined acceptance, C8.2a measured NULL binding and C8.2b.1's [current-catalog workload baseline](API_WORKLOAD.md) complete locally. **All 14 Stage C GET operations, including bounded exact-package history and prior-success estimates, are implemented.** C8.2b.2/.3 larger workload/fix/budget acceptance, C8.2c resources and C8.3 independent reader HTTP remain required. [OpenAPI](openapi.yaml) defines fields, parameters, examples and response schemas; this document defines cross-field rules and local access policy. The [acceptance matrix](API_ACCEPTANCE.md) records deliberate legacy differences, combined native checks and remaining gates. Track delivery in [PROGRESS](PROGRESS.md#stage-c--read-only-api-delivery-phase-2). The [roadmap](roadmap.md) governs scope.
+Updated: 17 October 2026. C1a–C7b, C8.1/C8.2a/C8.2b.1 and C8.2b.2a's [execution-cardinality/reader SQL slice](API_WORKLOAD.md#c82b2a-retained-execution-cardinality-results) are complete locally. **All 14 Stage C GET operations are implemented.** C8.2b.2b/.2c/.3 workloads/fixes/budgets, C8.2c resources and C8.3 independent reader HTTP remain required. [OpenAPI](openapi.yaml) defines schemas; this document defines cross-field rules and local policy. The [acceptance matrix](API_ACCEPTANCE.md), [progress](PROGRESS.md#stage-c--read-only-api-delivery-phase-2) and [roadmap](roadmap.md) retain their distinct validation and delivery scope.
 
 ## Delivery and compatibility
 
