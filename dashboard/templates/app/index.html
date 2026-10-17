@@ -34,23 +34,65 @@
 
         <section class="panel" aria-labelledby="filters-heading">
             <h2 id="filters-heading">Filters</h2>
-            <form id="overview-filters">
-                <fieldset class="filter-grid" disabled aria-describedby="app-status">
+            <form id="overview-filters" novalidate>
+                <fieldset class="filter-fields" disabled aria-describedby="app-status">
                     <legend class="visually-hidden">Execution filters</legend>
-                    <label for="folder">Folder
-                        <select id="folder" name="folder"><option value="">All folders</option></select>
-                    </label>
-                    <label for="project">Project
-                        <select id="project" name="project"><option value="">All projects</option></select>
-                    </label>
-                    <label for="status">Status
-                        <select id="status" name="status"><option value="">All statuses</option></select>
-                    </label>
-                    <label for="creation-window">Created
-                        <select id="creation-window" name="window"><option value="default">Default window</option></select>
-                    </label>
-                    <button type="submit">Apply</button>
+                    <div class="filter-grid">
+                        <div class="navigation-field">
+                            <label for="folder">Folder
+                                <input id="folder" name="folder" type="text" maxlength="128" placeholder="All folders" autocomplete="off" aria-describedby="folder-navigation-status">
+                            </label>
+                            <select id="folder-options" aria-label="Folder choices" disabled><option value="">Choose from this page</option></select>
+                            <div class="navigation-controls" data-navigation="folders">
+                                <button type="button" data-previous aria-label="Previous folders" disabled>Previous</button>
+                                <button type="button" data-next aria-label="Next folders" disabled>Next</button>
+                                <button type="button" data-navigation-retry aria-label="Retry folders" hidden>Retry</button>
+                                <p id="folder-navigation-status" role="status"></p>
+                            </div>
+                        </div>
+                        <div class="navigation-field">
+                            <label for="project">Project
+                                <input id="project" name="project" type="text" maxlength="128" placeholder="All projects" autocomplete="off" aria-describedby="project-navigation-status">
+                            </label>
+                            <select id="project-options" aria-label="Project choices" disabled><option value="">Choose from this page</option></select>
+                            <div class="navigation-controls" data-navigation="projects">
+                                <button type="button" data-previous aria-label="Previous projects" disabled>Previous</button>
+                                <button type="button" data-next aria-label="Next projects" disabled>Next</button>
+                                <button type="button" data-navigation-retry aria-label="Retry projects" hidden>Retry</button>
+                                <p id="project-navigation-status" role="status"></p>
+                            </div>
+                        </div>
+                        <label for="creation-window">Created
+                            <select id="creation-window" name="window">
+                                <option value="default">Default window</option>
+                                <option value="custom">Custom window</option>
+                            </select>
+                        </label>
+                    </div>
+                    <fieldset id="status" class="status-options">
+                        <legend>Status</legend>
+                        <div data-status-choices>
+                            <label><input type="checkbox" name="status" value="" checked>All statuses</label>
+                        </div>
+                    </fieldset>
+                    <div class="custom-window" data-custom-window hidden>
+                        <label for="from">From (inclusive)
+                            <input id="from" name="from" type="text" maxlength="33" spellcheck="false" placeholder="2026-10-17T09:00:00+01:00" aria-describedby="time-input-help">
+                        </label>
+                        <label for="to">To (exclusive)
+                            <input id="to" name="to" type="text" maxlength="33" spellcheck="false" placeholder="2026-10-18T09:00:00+01:00" aria-describedby="time-input-help">
+                        </label>
+                        <p id="time-input-help">Use Z or an explicit offset, with up to 7 fractional digits. A blank bound uses the server default.</p>
+                    </div>
                 </fieldset>
+                <div class="filter-actions">
+                    <p data-filter-notice role="status"></p>
+                    <div class="filter-buttons">
+                        <button type="submit" data-apply-filters disabled>Apply</button>
+                        <button type="button" data-reset-filters disabled>Reset filters</button>
+                    </div>
+                </div>
+                <p class="applied-selection" data-applied-selection hidden></p>
             </form>
         </section>
 

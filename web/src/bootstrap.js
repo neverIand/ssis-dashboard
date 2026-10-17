@@ -78,7 +78,7 @@ export function createMetadataLoader({ request, publish, timeoutMs = 10000 }) {
   };
 }
 
-export function mountBootstrap(root) {
+export function mountBootstrap(root, { ready = () => {} } = {}) {
   const document = root.ownerDocument;
   const status = root.querySelector('[data-app-status]');
   const retry = root.querySelector('[data-retry]');
@@ -86,6 +86,10 @@ export function mountBootstrap(root) {
   const timezone = root.querySelector('[data-display-timezone]');
   const config = JSON.parse(document.getElementById('app-config').textContent);
   const api = createApi(config.api_base, { origin: document.location.origin });
+  root.querySelector('#overview-filters fieldset').disabled = true;
+  root.querySelector('[data-apply-filters]').disabled = true;
+  root.querySelector('[data-reset-filters]').disabled = true;
+  let disposeScreen;
   const loader = createMetadataLoader({
     request: (options) => api.get('meta', options),
     publish(state) {
@@ -101,15 +105,21 @@ export function mountBootstrap(root) {
         const metadata = state.metadata;
         timezone.textContent = `Times: ${metadata.display_timezone}`;
         const options = [{ code: '', name: 'All statuses' }, ...metadata.execution_statuses];
-        root.querySelector('#status').replaceChildren(...options.map((item) => {
-          const option = document.createElement('option');
-          option.value = String(item.code);
-          option.textContent = item.code === '' ? item.name : formatCode(item);
-          return option;
+        root.querySelector('[data-status-choices]').replaceChildren(...options.map((item) => {
+          const label = document.createElement('label');
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.name = 'status';
+          checkbox.value = String(item.code);
+          checkbox.checked = item.code === '';
+          label.append(checkbox, document.createTextNode(item.code === '' ? item.name : formatCode(item)));
+          return label;
         }));
         const display = createDisplay({ timeZone: metadata.display_timezone });
         root.querySelector('#creation-window option').textContent =
           `Default window (${display.count(metadata.limits.default_range_hours)} h)`;
+        disposeScreen?.();
+        disposeScreen = ready(metadata, api, config);
       }
     },
   });
@@ -118,6 +128,7 @@ export function mountBootstrap(root) {
   void loader.load();
   return () => {
     loader.dispose();
+    disposeScreen?.();
     retry.removeEventListener('click', reload);
   };
 }
