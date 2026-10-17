@@ -15,15 +15,11 @@ The purpose of this project is to provide a web-based, user-friendly, useful and
 
 ## Documentation
 
-* [Install, Configure & Run](docs/installation.md)    
-* [Install, Configure & Run on Docker](docs/docker-support.md)
-* [Release Notes](docs/release-notes.md)
-* [Roadmap](docs/roadmap.md)
-* [Modernization Plan](docs/MODERNIZATION_PLAN.md)
-* [Implementation Progress](docs/PROGRESS.md)
-* [Draft Read-only API Contract](docs/API_CONTRACT.md) and [OpenAPI](docs/openapi.yaml)
-* [Backend Validation: Checklist, Procedures & Results](docs/BACKEND_CHECKLIST.md)
-* [SSIS Test Project Guide](docs/SSIS_FIXTURE_PROJECT_GUIDE.md)
+* [Install, configure and run](docs/installation.md)
+* [Documentation index](docs/README.md)
+* [Roadmap and scope](docs/roadmap.md)
+* [Current progress and review](docs/PROGRESS.md)
+* [Read-only API contract](docs/API_CONTRACT.md) and [OpenAPI](docs/openapi.yaml)
 
 ## Development on dev-next
 
@@ -41,7 +37,7 @@ python -m pip install -r requirements-dev.txt
 python -m unittest discover -s tests -v
 ```
 
-See [installation](docs/installation.md) for configuration and environment setup. Python 3.14.8 on Windows x64 passes the database-free suite; real SSISDB and production hosting checks remain tracked work.
+See [installation](docs/installation.md) for configuration and environment setup. Python 3.14.8 on Windows x64 passes the database-free suite and recorded local SSISDB checks. Remaining API workload/reader acceptance and deferred production hosting are tracked in progress.
 
 ## Legacy Platforms & Tools
 

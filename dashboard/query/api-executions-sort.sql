@@ -9,17 +9,19 @@ DECLARE @from datetimeoffset(7) = CONVERT(datetimeoffset(7), ?),
         @sort nvarchar(40) = ?, @last_null1 bit = ?, @last_number bigint = ?,
         @last_time datetimeoffset(7) = CONVERT(datetimeoffset(7), ?),
         @last_text1 nvarchar(260) = ?, @last_null2 bit = ?, @last_text2 nvarchar(128) = ?;
--- Only calculated sorts use this whole-cohort path. Ordinary catalog keys
--- seek/page directly in api-executions-ordered-page.sql. Non-ID shapes share
--- the same fixed seek binds; this one needs only the first numeric/null key.
--- SELECT INTO retains the catalog name columns' collation.
-SELECT e.execution_id, e.folder_name, e.project_name, e.package_name,
-       e.project_lsn, e.environment_folder_name, e.environment_name, e.status,
-       e.created_time AS created_at, e.start_time AS started_at, e.end_time AS ended_at,
-       CAST(NULL AS int) AS logging_level, CAST(NULL AS bigint) AS duration_ticks,
+-- Only global sort keys and reusable counts cross the cohort boundary.
+-- UTC seconds plus fractional ticks preserve 100-ns precision without the
+-- nanosecond BIGINT overflow of long durations. Missing times keep a NULL key.
+SELECT e.execution_id, CAST(NULL AS int) AS logging_level,
+       CASE WHEN @sort = N'duration_seconds' THEN
+           DATEDIFF_BIG(second, t.started, t.ended) * CONVERT(bigint, 10000000)
+           + (DATEPART(nanosecond, t.ended) - DATEPART(nanosecond, t.started)) / 100
+       END AS duration_ticks,
        CAST(NULL AS bigint) AS warning_count, CAST(NULL AS bigint) AS error_count
 INTO #execution_cohort
 FROM catalog.executions AS e
+CROSS APPLY (SELECT CONVERT(datetime2(7), SWITCHOFFSET(e.start_time, '+00:00')) AS started,
+                    CONVERT(datetime2(7), SWITCHOFFSET(e.end_time, '+00:00')) AS ended) AS t
 WHERE e.created_time >= @from AND e.created_time < @to
   AND (@folder IS NULL OR e.folder_name = @folder)
   AND (@project IS NULL OR e.project_name = @project)
@@ -30,21 +32,11 @@ WHERE e.created_time >= @from AND e.created_time < @to
 OPTION (RECOMPILE);
 
 IF @sort = N'logging_level'
-    UPDATE c SET logging_level = CONVERT(int, v.parameter_value)
+    UPDATE c SET logging_level = CONVERT(int, CASE WHEN v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL' THEN v.parameter_value END)
     FROM #execution_cohort AS c
     INNER JOIN catalog.execution_parameter_values AS v ON v.execution_id = c.execution_id
     WHERE v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL'
     OPTION (RECOMPILE);
-
-IF @sort = N'duration_seconds'
-    -- UTC seconds plus fractional ticks avoid nanosecond BIGINT overflow for long
-    -- runs and keep the seventh digit. NULL actual times produce a NULL key.
-    UPDATE c SET duration_ticks =
-        DATEDIFF_BIG(second, t.started, t.ended) * CONVERT(bigint, 10000000)
-        + (DATEPART(nanosecond, t.ended) - DATEPART(nanosecond, t.started)) / 100
-    FROM #execution_cohort AS c
-    CROSS APPLY (SELECT CONVERT(datetime2(7), SWITCHOFFSET(c.started_at, '+00:00')) AS started,
-                        CONVERT(datetime2(7), SWITCHOFFSET(c.ended_at, '+00:00')) AS ended) AS t;
 
 IF @sort IN (N'warning_count', N'error_count')
 BEGIN
@@ -55,7 +47,7 @@ BEGIN
     FROM #execution_cohort AS c
     LEFT JOIN catalog.event_messages AS m ON m.operation_id = c.execution_id AND m.event_name IN (N'OnWarning', N'OnError')
     GROUP BY c.execution_id
-    OPTION (RECOMPILE);
+    OPTION (RECOMPILE, FORCE ORDER);
 
     UPDATE c SET warning_count = recorded.warning_count, error_count = recorded.error_count
     FROM #execution_cohort AS c INNER JOIN #execution_counts AS recorded ON recorded.execution_id = c.execution_id;
@@ -86,7 +78,8 @@ ORDER BY sort_null1 ASC,
          CASE WHEN @descending = 0 THEN execution_id END ASC, CASE WHEN @descending = 1 THEN execution_id END DESC
 OPTION (RECOMPILE);
 
--- Fetch only the remaining presentation metrics for the bounded page.
+-- Fetch remaining metrics only for the bounded page. FORCE ORDER keeps the
+-- selected IDs ahead of the public event view's permission expansion.
 IF @sort NOT IN (N'warning_count', N'error_count')
 BEGIN
     SELECT p.execution_id,
@@ -96,20 +89,25 @@ BEGIN
     FROM #execution_page AS p
     LEFT JOIN catalog.event_messages AS m ON m.operation_id = p.execution_id AND m.event_name IN (N'OnWarning', N'OnError')
     GROUP BY p.execution_id
-    OPTION (RECOMPILE);
+    OPTION (RECOMPILE, FORCE ORDER);
 
     UPDATE p SET warning_count = recorded.warning_count, error_count = recorded.error_count
     FROM #execution_page AS p INNER JOIN #page_counts AS recorded ON recorded.execution_id = p.execution_id;
 END;
 
 IF @sort <> N'logging_level'
-    UPDATE p SET logging_level = CONVERT(int, v.parameter_value)
+    UPDATE p SET logging_level = CONVERT(int, CASE WHEN v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL' THEN v.parameter_value END)
     FROM #execution_page AS p
     INNER JOIN catalog.execution_parameter_values AS v ON v.execution_id = p.execution_id
     WHERE v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL'
     OPTION (RECOMPILE);
 
-SELECT * FROM #execution_page
+-- Recheck public execution visibility when fetching page metadata.
+SELECT p.*, e.folder_name, e.project_name, e.package_name, e.project_lsn,
+       e.environment_folder_name, e.environment_name, e.status,
+       e.created_time AS created_at, e.start_time AS started_at, e.end_time AS ended_at
+FROM #execution_page AS p
+INNER JOIN catalog.executions AS e ON e.execution_id = p.execution_id
 ORDER BY sort_null1 ASC,
          CASE WHEN @descending = 0 THEN sort_number END ASC, CASE WHEN @descending = 1 THEN sort_number END DESC,
-         CASE WHEN @descending = 0 THEN execution_id END ASC, CASE WHEN @descending = 1 THEN execution_id END DESC;
+         CASE WHEN @descending = 0 THEN p.execution_id END ASC, CASE WHEN @descending = 1 THEN p.execution_id END DESC;

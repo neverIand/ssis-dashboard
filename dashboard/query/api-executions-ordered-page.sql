@@ -61,6 +61,7 @@ ORDER BY sort_null1 ASC,
          CASE WHEN @descending = 0 THEN r.execution_id END ASC, CASE WHEN @descending = 1 THEN r.execution_id END DESC
 OPTION (RECOMPILE);
 
+-- Preserve bounded-page join order before expanding public-view permissions.
 SELECT p.execution_id,
        SUM(CASE WHEN m.event_name = N'OnWarning' THEN CONVERT(bigint, 1) ELSE CONVERT(bigint, 0) END) AS warning_count,
        SUM(CASE WHEN m.event_name = N'OnError' THEN CONVERT(bigint, 1) ELSE CONVERT(bigint, 0) END) AS error_count
@@ -68,13 +69,13 @@ INTO #page_counts
 FROM #execution_page AS p
 LEFT JOIN catalog.event_messages AS m ON m.operation_id = p.execution_id AND m.event_name IN (N'OnWarning', N'OnError')
 GROUP BY p.execution_id
-OPTION (RECOMPILE);
+OPTION (RECOMPILE, FORCE ORDER);
 
 SELECT p.*, loglevel.logging_level, recorded.warning_count, recorded.error_count
 FROM #execution_page AS p
 INNER JOIN #page_counts AS recorded ON recorded.execution_id = p.execution_id
 OUTER APPLY (
-    SELECT CONVERT(int, v.parameter_value) AS logging_level
+    SELECT CONVERT(int, CASE WHEN v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL' THEN v.parameter_value END) AS logging_level
     FROM catalog.execution_parameter_values AS v
     WHERE v.execution_id = p.execution_id AND v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL'
 ) AS loglevel
@@ -84,5 +85,4 @@ ORDER BY sort_null1 ASC,
          CASE WHEN @descending = 0 THEN sort_text1 END ASC, CASE WHEN @descending = 1 THEN sort_text1 END DESC,
          sort_null2 ASC,
          CASE WHEN @descending = 0 THEN sort_text2 END ASC, CASE WHEN @descending = 1 THEN sort_text2 END DESC,
-         CASE WHEN @descending = 0 THEN p.execution_id END ASC, CASE WHEN @descending = 1 THEN p.execution_id END DESC
-OPTION (RECOMPILE);
+         CASE WHEN @descending = 0 THEN p.execution_id END ASC, CASE WHEN @descending = 1 THEN p.execution_id END DESC;

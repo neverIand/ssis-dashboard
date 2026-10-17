@@ -1,35 +1,21 @@
 # Local development on dev-next
 
-Use the personal fork's `dev-next` branch. The preferred development runtime is standard, GIL-enabled **CPython 3.14**, validated on **3.14.8 / Windows x64** with Flask **3.1.3**, pyodbc **5.3.0**, and the complete runtime graph pinned in [`constraints.txt`](../constraints.txt). Native driver/catalog compatibility, current container images, and shared production hosting remain tracked work in [implementation progress](PROGRESS.md).
+Use a fresh standard CPython 3.14 environment. The recorded native baseline is Windows x64 / CPython 3.14.8 / pyodbc 5.3.0 / ODBC Driver 17.10.0006 / SQL Server 2022 16.0.1000.6. Other SQL/driver/platform combinations require their own validation; the README's legacy compatibility list is historical. Production hosting is deferred. See [the documentation index](README.md) for API use and validation.
 
 ## Create an environment
 
-Create a fresh environment when changing Python minor versions; use a new ignored path such as `.local/venv314` if `.venv` already belongs to another interpreter. From the project root on Windows, with a registered standard CPython 3.14 interpreter:
+From the repository root in PowerShell, select the intended Python interpreter explicitly:
 
-```bat
-py -3.14 -m venv .venv
-.venv\Scripts\activate
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+python -m pip check
 ```
 
-For an interpreter installed without launcher registration, use its full `python.exe` path in place of `py -3.14`. B5a2 used the official [CPython 3.14.8 NuGet package](https://www.nuget.org/packages/python/3.14.8) under `.local/python-3.14.8/`, then created `.local/venv-b5a2`. This follows Python's [local CI runtime documentation](https://docs.python.org/3.14/using/windows.html#the-nuget-org-packages) and does not require a system-wide installer or PATH change.
+On a POSIX shell, activate with `. .venv/bin/activate`. Recreate the environment when changing Python minor versions. `requirements.txt` applies the exact runtime pins in `constraints.txt`; development tools have separate requirements/constraints. Pins cover Python packages, not interpreter/OS/ODBC versions or artifact hashes. Dependency updates require a clean install, `pip check`, tests, entry-point discovery and affected native checks.
 
-On other systems, use an explicitly selected standard CPython 3.14 interpreter and activate `.venv/bin/activate`; those platforms still need their own validation. A SQL Server ODBC driver and an SSIS Catalog are required for real monitoring pages; application construction and the test suite do not connect to SQL Server.
-
-### Runtime and dependency policy
-
-- Standard CPython 3.14 is the preferred development baseline. B5a2 validated Windows x64/3.14.8, the `cp314-win_amd64` ABI, matching pyodbc/MarkupSafe wheels, native imports, and all 77 database-free tests. B5a1's CPython 3.11.4 environment remains earlier compatibility evidence. Free-threaded builds, other platforms/architectures, and actual driver/catalog compatibility are unverified; native integration remains B5a3. Record the actual interpreter patch, architecture, and evidence when changing them.
-- Python 3.6-era Visual Studio/IIS settings and the Ubuntu 16.04 Docker recipe are historical, unsupported configurations for this checkout. Current hosting is B5c work; installing the Python dependencies does not update those hosts or provide a production server.
-- [`requirements.txt`](../requirements.txt) declares Flask, pyodbc and first-party `tzdata`, and automatically includes `constraints.txt`. The constraint file fixes all nine required runtime distributions, including transitive dependencies. Normal `python -m pip install -r requirements.txt` applies the reviewed pins; avoid separate unconstrained installs.
-- Review stable published versions and their release notes before changing pins. The B5a1 snapshot includes the reviewed Flask 3.1.3, Werkzeug 3.1.9, MarkupSafe 3.0.4, and Click 8.5.0 updates. The C1a review adds [tzdata 2026.5](https://pypi.org/project/tzdata/2026.5/) for hosts without an IANA timezone database, including Windows. No optional Flask extras are required. Installer/build tooling such as pip and setuptools is separate from the application runtime graph.
-- [`requirements-dev.txt`](../requirements-dev.txt) includes the runtime plus OpenAPI/JSON Schema/YAML validation tools, pinned separately in [`constraints-dev.txt`](../constraints-dev.txt). These are development dependencies; production installs use `requirements.txt`. The test runner remains standard-library `unittest`.
-- These constraints make package-version selection repeatable; they do not lock interpreter/system-driver versions or wheel hashes. Native wheel/driver compatibility and production artifact validation require separate evidence. A wheelhouse belongs in the ignored `wheelhouse/` directory and contains platform/interpreter-specific artifacts.
-
-This follows pip's [constraints-file semantics](https://pip.pypa.io/en/stable/user_guide/#constraints-files) and [repeatable-install guidance](https://pip.pypa.io/en/stable/topics/repeatable-installs/). Release information comes from the maintainers' [Flask](https://flask.palletsprojects.com/en/stable/changes/), [Werkzeug](https://werkzeug.palletsprojects.com/en/stable/changes/), [MarkupSafe](https://markupsafe.palletsprojects.com/en/stable/changes/), and [Click](https://github.com/pallets/click/releases/tag/8.5.0) releases, plus [pyodbc's published requirements and wheels](https://pypi.org/project/pyodbc/5.3.0/). Pin updates require a clean environment, dependency consistency, the database-free suite, and application entry-point checks before committing the new snapshot.
-
-### Download and install offline
-
-For an interpreter/platform with compatible published wheels, prepare the wheelhouse while online, then install into a new environment without using an index:
+For offline installation, download wheels with the target interpreter/platform while online, then install them into the fresh environment:
 
 ```sh
 python -m pip download --only-binary=:all: --dest wheelhouse -r requirements.txt
@@ -37,91 +23,96 @@ python -m pip install --no-index --only-binary=:all: --find-links wheelhouse -r 
 python -m pip check
 ```
 
-Download wheels using the intended interpreter and platform. `--only-binary=:all:` fails if a compatible wheel is unavailable; source builds and their toolchains are outside this validated workflow. The B5a1 clean install used pip 23.1.2, also worked from outside the project directory with an absolute requirements path, and matched every installed runtime distribution to its declared constraint. Repeating the install proposed no package changes. Recreate the environment when reviewing the graph so unused packages from an older installation do not obscure the result.
+Keep `.venv/`, `wheelhouse/`, private config and reusable temporary scripts ignored. A successful pyodbc import does not establish an installed SQL Server ODBC driver or catalog access.
 
 ## Configure
 
-The application starts with defaults from `dashboard/config.py`, including `DEBUG=False`. To configure SSISDB locally, copy the relevant options into the ignored project-root `config.cfg`, or use `DASHBOARD_CONFIG` to point to a private Python configuration file:
+Copy the needed options from [defaults](../dashboard/config.py) into ignored project-root `config.cfg`, or select a private Python configuration file:
 
-```bat
-set DASHBOARD_CONFIG=C:\private\ssis-dashboard-config.cfg
+```powershell
+$env:DASHBOARD_CONFIG = 'C:\private\ssis-dashboard-config.cfg'
 ```
 
-Set `CONNECTION_STRING["main"]`, `HOUR_SPAN`, `AS_OF_DATE`, and `EXECUTION_COUNT` as needed. Keep connection strings and credentials out of Git. Explicit and environment file paths may be absolute; relative paths retain the legacy convention of being relative to the `dashboard` package. Without an explicit file or environment variable, the optional `config.cfg` is resolved at the project root, independent of the shell's working directory. A missing explicitly selected file or malformed Python configuration file fails startup; a missing optional root file uses defaults. Configuration loading does not modify `DASHBOARD_CONFIG` or print its contents.
+Set `CONNECTION_STRING['main']` to the approved SSISDB connection using an installed matching-architecture driver and the intended SQL identity. Keep credentials out of Git and logs. List installed driver names with `python -c "import pyodbc; print(pyodbc.drivers())"`.
 
-For tests or programmatic construction, `create_app({...})` uses defaults plus that mapping and skips automatic environment/root-file loading. `create_app({...}, config_path=...)` explicitly loads the selected file before applying the mapping. Each app owns its configuration; monitoring reads the active Flask app context.
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `DEBUG` | `False` | Local debugging only |
+| `DISPLAY_TIMEZONE` | `Europe/London` | Loadable IANA zone for API buckets and offset-free fixed dates; pinned `tzdata` supplies a fallback |
+| `AS_OF_DATE` | `NOW` | Default API upper creation bound; a fixed date/time must resolve to one instant |
+| `HOUR_SPAN` | `360` | Default elapsed-hour window; positive and no larger than `API_MAX_RANGE_HOURS` |
+| `EXECUTION_COUNT` | `1000` | Legacy list limit; API pages use their own 50/200 limits |
+| `DB_LOGIN_TIMEOUT_SECONDS` / `DB_QUERY_TIMEOUT_SECONDS` | `10` / `30` | Positive 32-bit integer driver limits; not an overall HTTP deadline |
+| `API_MAX_RANGE_HOURS` | `744` | Maximum API creation-window span |
+| `API_MAX_TIMELINE_BUCKETS` | `1000` | Allowed range 1–1000 |
+| `API_READINESS_TIMEOUT_SECONDS` | `2` | Allowed 1–2; caps both readiness driver timeouts without increasing lower global limits |
+| `API_EVENTS_ENABLED` | `False` | Permit API event text/search for the configured SQL scope |
+| `API_VALUES_ENABLED` | `False` | Permit API nonsensitive parameters and override metadata |
+| `API_OVERRIDE_VALUES_ENABLED` | `False` | Permit nonsensitive override values; requires values enabled |
+| `LOG_LEVEL` | `INFO` | Safe request/query events; validated Python logger level |
 
-`DISPLAY_TIMEZONE` defaults to `Europe/London` and must be a loadable IANA timezone name of 1–128 characters. Application construction validates it before any database access; invalid names or missing timezone data fail startup with configuration guidance. The pinned `tzdata` package supplies a fallback when no system IANA database is available, as described in [Python's zoneinfo documentation](https://docs.python.org/3.14/library/zoneinfo.html#data-sources). This setting prepares the API's time-window interpretation and calendar buckets; the retained legacy SQL display formatting is unchanged.
+API capability settings require actual booleans. Sensitive values are always redacted. These API flags do not change legacy page access. All 14 Stage C GET operations are implemented; [the contract](API_CONTRACT.md) defines their selectors, paging and response semantics. Browser identity/proxy headers do not grant access or change SQL identity.
 
-### Database timeouts and query resources
-
-`DB_LOGIN_TIMEOUT_SECONDS` defaults to **10** and is passed to `pyodbc.connect(..., timeout=...)`. `DB_QUERY_TIMEOUT_SECONDS` defaults to **30** and is set on the connection before creating its cursor. Both must be positive integers from 1 to 2,147,483,647; zero (an unbounded timeout), booleans, strings, and fractions are rejected at application construction and by the standalone query operation. These are initial configurable limits to tune with the real catalog, not measured performance targets.
-
-The limits are driver-level login/query settings, not an end-to-end HTTP deadline. Actual timeout enforcement must be checked with the deployed ODBC driver and SSISDB. See pyodbc's [connection timeout](https://github.com/mkleehammer/pyodbc/wiki/The-pyodbc-Module#connect) and [query timeout](https://github.com/mkleehammer/pyodbc/wiki/Connection#timeout) documentation.
-
-SQL loads from package-relative `dashboard/query` resources, using UTF-8 with optional BOM, before opening a connection. Only flat `.sql` resource names are accepted. Each query explicitly attempts cursor and connection closing, including after execution/fetch failures; a cleanup error does not replace the original operation error. Transaction defaults, parameter binding, SQL text, and legacy dictionary/list/empty-result shapes are preserved.
-
-For new typed queries, `execute_query(..., typed_timestamps=True)` installs the connection-local datetimeoffset converter before creating a cursor. [Timestamp helpers](../dashboard/timestamps.py) retain seven fractional digits as exact UTC ticks; [serializers](../dashboard/serialization.py) explicitly produce JSON primitives. Parse offset-aware inputs with `parse_timestamp()`, then bind `sql_timestamp()` strings using `CONVERT(datetimeoffset(7), ?)` in SQL. Keep the default option for retained legacy queries. C1b's [native proof](BACKEND_CHECKLIST.md#typed-datetimeoffset-resolution--c1b) covers Windows/Driver 17 on the recorded baseline; other platforms/drivers and API endpoint behavior need their own checks.
-
-### API configuration and health
-
-C1c implements `GET /api/v1/meta`, `GET /healthz` and `GET /readyz`. The other documented resources remain planned. Metadata and liveness perform no SQL; metadata exposes version, timezone, code vocabularies, limits and API policy flags, with no execution sorts until C2a. Bind the launcher to loopback for this local mode. Browser identity/proxy headers do not select a SQL identity or grant a capability.
-
-`API_EVENTS_ENABLED`, `API_VALUES_ENABLED` and `API_OVERRIDE_VALUES_ENABLED` default to `False` and require actual Booleans. Override display requires values enabled. These flags govern the API; retained legacy pages continue their existing SQL-identity access. The events/values endpoints remain C5/C6 work. `API_MAX_RANGE_HOURS` defaults to 744 and must be a positive integer; `HOUR_SPAN` must be a positive integer fitting that cap. `API_MAX_TIMELINE_BUCKETS` defaults to 1000 and accepts 1–1000. Default/as-of cohort resolution is C2a work.
-
-Readiness compiles one zero-row read of `catalog.executions` in the configured SSISDB, so empty/restricted execution visibility can still be ready. `API_READINESS_TIMEOUT_SECONDS` accepts integers 1–2, default 2, and caps both driver timeouts without increasing a lower global timeout. Connection/driver failures and query timeouts use safe 503/504 problems; query-permission/conversion/cleanup failures remain safe 500. Readiness is not a total HTTP deadline or a workflow/hosting acceptance check.
-
-API/health responses use `Cache-Control: no-store` and server-generated request IDs. Errors use `application/problem+json`, including unmatched API paths/methods; protocol headers such as `Allow` and a future configured authentication challenge are retained. All three implemented resources reject query parameters and GET/HEAD bodies before SQL. The shared parser rejects malformed UTF-8/percent encoding, duplicates, unknown/empty values and NUL without echoing inputs or logging them. [Contract details](API_CONTRACT.md) describe the remaining resource semantics.
-
-### Legacy inputs and errors
-
-Execution routes accept positive SQL Server `BIGINT` IDs from 1 to 9,223,372,036,854,775,807. Zero and out-of-range integer IDs that reach the view return 400 before a query. Negative or non-integer path segments do not match the route; segments exceeding Python's enabled integer-conversion limit also return 404. Status names are case-sensitive: `all`, `created`, `running`, `cancelled`, `failed`, `pending`, `halted`, `succeeded`, `stopping`, or `completed`. Supported event categories are `all`, `errors`, `warnings`, `duplicate-warnings`, and `memory-warnings`. Event and internal detail operations select from fixed SQL resource maps. Unsupported selectors return 400 without querying SSISDB. This validation retains the existing history query's scope; the status path segment does not yet change its SQL filter.
-
-Unknown pages, missing static assets, and unsupported HTTP methods return database-independent HTML errors. Execution details, events, and values first look up the requested execution; no visible record returns 404 and skips subsequent queries. This does not distinguish a missing execution from one hidden by catalog row visibility.
-
-The application maps ODBC timeout states `HYT00`/`HYT01` to 504, connection states in class `08` and database-login/driver states `28000`/`IM002`/`IM003` to 503. Other driver errors and unexpected application failures return 500. SQL syntax/access errors are not assumed to be a browser authorization failure, and database login failures do not challenge the browser for credentials. These are application error-policy choices based on ODBC's [SQLSTATE definitions](https://learn.microsoft.com/en-us/sql/odbc/reference/appendixes/appendix-a-odbc-error-codes) and pyodbc's [exception mapping](https://github.com/mkleehammer/pyodbc/wiki/Exceptions); real driver/identity results still require integration checks.
-
-Error pages use fixed safe messages, carry `Cache-Control: no-store`, and display a server-generated request ID matching `X-Request-ID`. HTTP exception headers such as 405's `Allow` are preserved, following Flask's [error-handler guidance](https://flask.palletsprojects.com/en/stable/errorhandling/). Database/unexpected-error application events include the request ID, safe status information, exception type and up to eight application frames (module, function, line number). Symbols are bounded and restricted to identifier characters; locations come only from Python files inside the dashboard package. Exception text/arguments/notes/chains, frame locals, source lines, absolute paths, SQL, values, credentials and formatted tracebacks are omitted. The current legacy responses are HTML; problem JSON, API access controls, and streaming errors belong to their later phases.
-
-For controlled local debugging or tests, explicitly set Flask's `PROPAGATE_EXCEPTIONS=True` together with `DEBUG=True` or `TESTING=True`. Unexpected and database failures are logged safely, then re-raised with the original traceback; Flask emits its normal exception signal and passes the error to the debugger or test caller. Database resources have already been closed. This mode intentionally exposes the original exception to those local debugging tools. Debug/testing alone keeps safe responses, and the propagation flag is ignored by these handlers when both debug and testing are off. Expected validation and HTTP failures retain their normal responses. Use `DEBUG=False` and keep propagation disabled for shared hosting.
-
-### Request and query timing
-
-Application event messages are JSON, correlated by the server-generated `X-Request-ID`. `LOG_LEVEL` defaults to `INFO` and accepts `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. Logger levels configure Python's process-wide `dashboard` logger; request IDs/counters are context-local. `LOG_LEVEL` does not enable Flask's interactive debugger. The default Flask formatter may add its usual timestamp/level prefix around the JSON message; production formatting/collection remains a hosting choice.
-
-| Event | Safe fields / meaning |
-| --- | --- |
-| `query_completed` | Resource basename, per-request index, `ok`/`error`/`cancelled` outcome, milliseconds, successful row count or null, failure stage, cleanup-failure flag, request ID |
-| `request_completed` | Fixed endpoint name, standard method (unknown methods use `OTHER`), HTTP status or null for aborted dispatch, outcome, milliseconds, query count/failures/summed query milliseconds, request ID |
-| `database_error` / `request_error` | Safe status and validated SQLSTATE where available; request ID; exception type and up to eight application module/function/line locations; no original exception text, source, locals, paths or formatted traceback |
-
-Query timing starts after SQL-resource/parameter preparation, before connection acquisition, and finishes after cursor/connection cleanup. Counts include failed acquisition attempts. Empty successful results have zero rows; failures have null rows. A cleanup failure preserves the original query failure and sets `cleanup_failed`; timing observers cannot replace an active operation error. Ordinary log/observer failures do not change database results or HTTP errors. Cancellation still propagates after resources are closed.
-
-Request timing ends at response preparation, includes query work and rendering, and excludes body transfer/network/stream lifetime. Query and request timers use a monotonic clock; they are not deadlines. Successful completions are INFO events; query failures, 5xx/aborted request completions, and safe errors are ERROR events. Raising `LOG_LEVEL` suppresses lower-level events.
-
-Application events omit raw URLs/paths/query strings, request bodies/headers, SQL text/parameters, configuration content, credentials and row values. WSGI/proxy/access/startup output is separate and needs its own host review. Follow the tracked [manual backend checklist](BACKEND_CHECKLIST.md) for real driver/catalog, recovery, performance and host validation after the B milestones.
-
-### Legacy query scope
-
-Pages query only their displayed data and required shared navigation. A successful overview request uses six logical queries, execution details seven, an event page four, values five, and history two. These counts are regression-tested with synthetic query traces; they are not measured SQL Server timings. The complete before/after record is in [implementation progress](PROGRESS.md#b4-work-record).
-
-The monitoring adapter provides explicit `get_aggregate_event_kpi()` and `get_execution_event_kpi(execution_id)` operations. The aggregate operation retains legacy folder/project/start-time filtering and binds SQL's internal `-1` aggregate selector. The execution operation accepts only a positive BIGINT ID and does not inherit the screen's folder/project or selected-execution filters. Other execution resource operations require a valid selected ID rather than silently querying execution zero. Overview status cards use their existing status-count query and do not request unused event KPIs. Checked-in SQL and existing history/time-filter semantics remain unchanged pending the API milestone.
+Defaults load first. An explicit `config_path` takes precedence over `DASHBOARD_CONFIG`; absent both, optional root `config.cfg` loads independently of the working directory. Relative explicitly selected paths are relative to the `dashboard` package. A missing explicitly selected or malformed config fails startup. `create_app({...})` uses defaults plus the mapping and skips automatic file loading; `create_app({...}, config_path=...)` applies the mapping after that file.
 
 ## Run locally
 
-```bat
+```sh
 python -m flask --app dashboard:create_app run --host=127.0.0.1
 ```
 
-Open <http://127.0.0.1:5000/> with a working SSISDB configuration. `run.bat` invokes the same local command. `python runserver.py` remains available for Visual Studio at <http://127.0.0.1:5555/>; `SERVER_HOST` and `SERVER_PORT` retain their existing override behaviour. Both launchers use the application factory. Hosts requiring a WSGI application object should use `dashboard.wsgi:app` (IIS's dotted handler form is `dashboard.wsgi.app`); the legacy IIS Python path still needs the separate runtime/deployment milestone.
+Open [the legacy dashboard](http://127.0.0.1:5000/) or [API metadata](http://127.0.0.1:5000/api/v1/meta). `run.bat` uses this loopback command. `python runserver.py` retains the Visual Studio entry point on port 5555 with `SERVER_HOST`/`SERVER_PORT` overrides. The WSGI object is `dashboard.wsgi:app` (IIS dotted form `dashboard.wsgi.app`); production launcher and legacy IIS runtime-path changes remain separate hosting work.
 
-The Flask development server is for local development. Shared hosting requires the authorization and production-server/proxy work described in the [modernization plan](MODERNIZATION_PLAN.md).
+`/healthz` and `/api/v1/meta` use no database. `/readyz` performs one zero-row SSISDB dependency check, independent of visible row count. Readiness is not workflow or hosting acceptance. API errors use safe `application/problem+json`; successes and failures have no-store and a server-generated request ID. Invalid inputs and denied capabilities fail before SQL.
 
-## Run the database-free tests
+## Test and diagnose
 
-```bat
+```sh
 python -m pip install -r requirements-dev.txt
 python -m unittest discover -s tests -v
 ```
 
-The tests use `unittest` and synthetic monitor data, render the existing templates, and reject ODBC connection attempts. The tracked API contract tests validate the OpenAPI structure, local references, response examples and invalid instances, including sensitive redaction and the full SQL INT status range. Timezone tests exercise startup failures and London DST transitions with system timezone lookup disabled. A fresh checkout needs only the tracked development requirements and this command; no ignored helper or live SQL Server is required. Real SQL/driver/authentication and deployment validation are separate integration checks.
+The tracked suite is database-free and includes legacy pages, API routes, schemas/examples, inputs, typed serialization, cursor/redaction rules and fake-driver cleanup. Native SQL, actual reader sign-in and network checks have separate evidence in [API acceptance](API_ACCEPTANCE.md) and the [backend checklist](BACKEND_CHECKLIST.md). Local native helpers and evidence are under ignored `.local/backend-validation/`; do not treat their absence in a fresh checkout as a unit-test prerequisite.
+
+Application logs emit `query_completed`, `request_completed`, `database_error` and `request_error`, correlated by `X-Request-ID`. Query timing includes acquisition through cleanup; request timing ends at response preparation. Logs retain resource/endpoint labels, outcomes, counts, SQLSTATE and bounded exception locations, excluding raw URLs, inputs, SQL, messages, values and diagnostic exception text. External host/proxy/access logs require separate validation. Explicit `PROPAGATE_EXCEPTIONS=True` with debug/testing restores local exception propagation; production retains safe responses.
+
+## Local artifacts
+
+All private tools, evidence and configuration stay ignored. Commit sanitized results to [API validation](API_ACCEPTANCE.md) or the [backend checklist](BACKEND_CHECKLIST.md); keep milestone status in [PROGRESS](PROGRESS.md).
+
+| Material | Location and retention |
+| --- | --- |
+| Working configuration, Python environments/runtime, SSIS fixture and installer recovery sources | Keep their existing paths. They are not cleanup targets. |
+| Reusable helpers | `.local/tools/`; related native probes stay together in `.local/backend-validation/tools/` for shared imports. |
+| Disposable experiments, extracted copies and intermediate output | `.local/tmp/<task>-<run>/`; remove after selecting useful evidence. |
+| Selected native evidence | `.local/backend-validation/runs/<milestone>-<UTC>/`; retain inputs/source version, outcomes, raw measurements and limitations together. |
+| Closed historical evidence | `.local/backend-validation/archive/`; ZIP archives retain original bytes and a per-file SHA-256 manifest. |
+| Offline reports and cleanup receipts | `.local/reports/<topic>/`; keep one current summary and the evidence it references. |
+
+Create output directories in the probe's execution entry point, not during shared-module import. A running task puts `.active` in its temporary directory and removes it only after owned processes have exited. Check ownership before cleanup; markers do not discover unmarked legacy processes. Do not reuse another task's output directory or classify a run as failed merely because its filename says `fixtures`.
+
+Use an existing verified environment. Contract tools use the checked-in `requirements-dev.txt` / `constraints-dev.txt` and `python -m unittest tests.test_api_contract`; do not maintain another `pip --target` package tree or regenerate the current contract from an old draft-authoring script.
+
+### Cleanup and recovery
+
+The ignored helper below is available in this working copy. It needs only Python's standard library and is not a fresh-checkout prerequisite. From the repository root:
+
+```powershell
+$pythonExe = '.local/contract-review-venv314/Scripts/python.exe'
+& $pythonExe -B .local/tools/organize-local.py --preview
+& $pythonExe -B .local/tools/organize-local.py --apply PATH_TO_PRINTED_PLAN
+& $pythonExe -B .local/tools/organize-local.py --index
+& $pythonExe -B .local/tools/check-docs.py
+```
+
+The default preview selects bytecode caches, unmarked temporary output and empty native-run directories. Apply checks the absolute root, rejects links/junctions, and rejects files added or changed since preview. It never automatically removes a nonempty evidence run, environment, configuration, tool or report. `-B` avoids recreating bytecode during short maintenance commands.
+
+For milestone closure, review completed runs and their references first. Put selected directory names in an ignored JSON list and pass `--preview --archive-runs PATH_TO_LIST`. Keep active runs, current acceptance/workload inputs and hard-coded tool inputs unpacked. Apply writes and reads back the ZIP, verifies every SHA-256 and rechecks originals before removing them. A new preview is required after source changes; an interrupted apply may leave both an archive and originals for inspection.
+
+The local `backend-validation/runs/INDEX.md` distinguishes unpacked and archived evidence. Restore one run to its original path before using a historical helper:
+
+```powershell
+& $pythonExe -B .local/tools/organize-local.py --restore PATH_TO_ZIP RUN_DIRECTORY_NAME
+```
+
+Restore verifies hashes and refuses to overwrite changed content. Retain the ZIP for the other runs. Historical reports keep their original paths and dates; archive location does not change a validation result. Keep older one-off migration/verifier scripts with their dated records, not as current workflow entry points.

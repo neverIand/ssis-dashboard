@@ -1,35 +1,45 @@
 # Roadmap
 
-Updated 17 October 2026. See [the modernization plan](MODERNIZATION_PLAN.md) for the audit, API contract, delivery phases, and validation criteria. The roadmap describes migration targets; [implementation progress](PROGRESS.md) distinguishes completed submilestones from remaining work and integration checks.
+Scope authority for modernization on `dev-next`. See [progress](PROGRESS.md) for current status, [the plan](MODERNIZATION_PLAN.md) for architecture and [the documentation index](README.md) for procedures and evidence.
 
-The [backend checklist](BACKEND_CHECKLIST.md) holds procedures, results and the Windows/SQL Server baseline: **25 of 30 cases now PASS**, including all designed fixtures and both actual Windows reader accounts. [SSIS fixture steps 7–10](SSIS_FIXTURE_PROJECT_GUIDE.md) are complete. C1b now proves opt-in typed datetimeoffset conversion on that baseline; native cleanup-failure observation remains open and B5a3/P0b retain their incomplete status.
+## Current product
 
-**Hosting is on hold at the user's request (15 October 2026).** Defer B5c, HOST-01/02/03, service/container deployment, production authentication/proxy/HTTPS/host-log configuration, and production stream/proxy capacity validation until reprioritized. Continue local database permissions, fixtures, application behavior and non-hosting implementation independently. The migration targets below remain in scope for later delivery.
+The retained Flask/Jinja dashboard reads SSISDB and uses the legacy jQuery/Bootstrap/DataTables/SmartMenus/Morris stack. It still refreshes the whole page after 180 seconds. A separate read-only JSON API is implemented; API acceptance and the replacement frontend remain tracked work.
 
-**Stage C / delivery phase 2, the read-only API, is in progress.** C1a defines the [draft contract and local access policy](API_CONTRACT.md), with concrete schemas/examples in [OpenAPI](openapi.yaml). C1b/C1c implement exact typed SQL/JSON and shared HTTP boundaries, metadata and health resources. C2a/C2b add bounded executions and all 12 global sorts; C3a adds navigation, and C3b/C3c add summary and IANA calendar/DST timelines. C4a/C4b/C4c add execution detail, executable statistics and conservative child observations. C5 adds searchable Unicode event pages and explicit unknown coverage for missing numeric IDs; C6 adds separate value sections with SQL and serializer redaction. C7a adds exact folder/project/package history with explicit status scope, bounded ID paging and actual timings; C7b adds separate estimates from the latest five valid visible successes completed by each target start. All fourteen operations are implemented; 341 local tests, native SQL/reader-scope comparisons, measured plans and reader I/O checks pass. Ordinary pages select bounded IDs before enrichment; event aggregation is isolated from logging joins, navigation reuses cached plans, and execution recompilation costs remain under review. Actual source scans, compilation, timings and reader/workload tradeoffs remain recorded. C8.1 combined acceptance, C8.2a measured NULL binding, C8.2b.1's [current-catalog baseline](API_WORKLOAD.md) and C8.2b.2a's [execution-cardinality/reader SQL slice](API_WORKLOAD.md#c82b2a-retained-execution-cardinality-results) pass their local checks. The latter adds 153 API responses, 1,700 native samples, exact 51/201-row ordinary materialization and actual reader IO; calculated temporary work/spills and restricted-reader costs retain measured follow-ups. Four local execution-page p95s exceed one second on sixteen rows; the full-page/network target remains open. C8.2b.2b/.2c observation/aggregate/history workloads, C8.2b.3 measured fixes/budgets, C8.2c resource accumulation and C8.3 independent reader acceptance remain required. Operation coverage and local estimates do not complete Stage C. Reader SHOWPLAN, independent reader HTTP, real Scale Out/active data, remaining observation/deep/repeated-key/history work and workload acceptance remain C8. The [Stage C task breakdown](PROGRESS.md#stage-c--read-only-api-delivery-phase-2) records dependencies and exit checks. Native cleanup-failure observation stays open; hosting remains deferred. The first native screen's prerequisites pass locally; full API and production live-update completion retain their separate gates.
-
-The [C2/C3 performance follow-up](PROGRESS.md) separates ordinary and calculated sorting, materializes page event counts before unrelated joins, and reuses navigation plans. Native plans prove fewer event scans/reads and a 201-row ordinary-page materialization bound on a transient 20,000-row cohort. Future query changes must assess operation counts and compilation as well as latency; the broader C8 workload/p95 checks remain open.
-
-## Current
-
-- Flask/Jinja renders the dashboard from SSISDB catalog queries.
-- The frontend uses legacy jQuery, Bootstrap, DataTables, SmartMenus, and Morris/Raphael assets.
-- Automatic refresh reloads the whole page after 180 seconds.
+Scope is project deployment and public `SSISDB.catalog.*` views. Legacy `msdb` storage, starting/stopping packages, SQL Agent administration and unrelated automation are excluded.
 
 ## Modernization
 
-1. Establish the workflow/query baseline and refactor configuration, database access, connection ownership, and error handling.
-2. Expose a documented, read-only `/api/v1` JSON API with filtering, bounded pagination, typed data, and appropriate access controls.
+1. Establish workflow/query baselines and isolate configuration, database ownership, timeouts and errors.
+2. Expose a documented read-only `/api/v1` API with typed data, explicit access/redaction policy, filtering, global sorting and bounded pagination.
 3. Build the frontend with vanilla ES modules and authored CSS. **Vite is allowed** for development and production builds; deploy prebuilt assets.
-4. Replace obsolete frontend dependencies. **Chart and table libraries are allowed when complexity justifies them**; compare capability, accessibility, maintenance, size, and licensing. Bundle chosen libraries locally.
-5. Preserve execution filtering, details, child packages, searchable events, parameters/overrides, history, and charts while migrating screen by screen.
-6. **Eliminate full-page refresh for automatic and manual dashboard updates.** Add an HTTP stream using SSE as the initial recommendation, or WebSockets if bidirectional needs justify them. Update affected views in place and preserve filters, sorting, paging, scroll, focus, and chart state.
-7. Make live updates resilient: reconnect/resync, heartbeats, bounded queues, hidden-tab recovery, visible connection status, and data-only HTTP polling fallback. Share backend SSISDB change detection across subscribers and validate proxy/worker capacity; a browser stream does not itself detect database changes.
-8. Validate feature parity, permissions, production builds, query load, stream reliability, and rollback before retiring the legacy UI.
+4. Replace obsolete browser dependencies. **Chart and table libraries are allowed when complexity justifies them**; compare accessibility, maintenance, size, licensing and lifecycle behavior, then bundle them locally.
+5. Preserve execution filters, details, executable/child observations, searchable events, parameters/overrides, history and charts while migrating screen by screen.
+6. **Automatic and manual updates must change data in place without reloading the page.** Preserve filters, sorting, paging, scroll, focus and chart state.
+7. Deliver resilient production updates using SSE initially, or WebSockets if bidirectional requirements justify them. Include shared SSISDB change detection, reconnect/resync, heartbeats, bounded queues, hidden-tab recovery, visible connection state and data-only polling fallback. A browser stream alone does not detect database changes.
+8. Validate parity, permissions, builds, database work, stream/proxy capacity and rollback before retiring the legacy UI.
+
+**Hosting is on hold at the user's request, 15 October 2026.** B5c, HOST-01/02/03, production service/container deployment, authentication/proxy/HTTPS/host logs and production stream capacity remain deferred. Local application, SQL and fixture work can continue. These eventual delivery gates remain in scope.
+
+Vite HMR is a development feature. Data-only polling can deliver the first usable screen and serve as fallback; phase 5 still requires a working production stream when hosting resumes.
+
+## Delivery phases
+
+| Phase | Deliverable and exit condition |
+| --- | --- |
+| 0 — baseline | Workflow/field parity and intended bug fixes distinguished; real query/identity baseline recorded |
+| 1 — backend | Factory/configuration, pinned runtime, owned resources, safe failures and legacy adapter validated |
+| 2 — Stage C API | Read-only operations, contract, typed SQL/JSON, bounded pages and access/redaction; workload/resource/reader acceptance |
+| 3 — first native screen | `/app/` shell, filters/list/cards, data-only in-place refresh; complete filter → list → detail-link path |
+| 4 — parity | Details/children/events/values/history/charts, keyboard/responsive behavior and legacy URL mapping |
+| 5 — live updates | Shared detection, production stream and [recovery/capacity checks](MODERNIZATION_PLAN.md#production-live-updates) |
+| 6 — cutover | Prebuilt install, parity/load/host checks, rollback rehearsal, then obsolete UI/assets removal |
+
+## Acceptance budgets
+
+Proposed budgets remain **targets**: 50-row execution page test-network p95 below one second, maximum 200 rows per list page, authored frontend JS+CSS below 150 KiB uncompressed. Record the entire bundle including selected libraries. Measure calculated sorts separately and deliberately document any target revision. Set detector latency/load, queues/replay and concurrent stream/API budgets after the prototype. Keep local SQL, WSGI, TCP and production measurements distinct.
 
 ## Later
 
-- Improve execution-duration forecasting after historical data and basic estimates are reliable; advanced models are optional.
-- Revisit richer table/chart interactions and streaming infrastructure based on measured usage.
-
-Vite's development HMR and production monitoring updates are separate features. The live-update milestone requires a working production stream, even if ordinary data fetching provides the first usable migration screen.
+- Improve duration forecasting after reliable historical data and basic estimates; advanced models are optional.
+- Revisit richer table/chart interactions and stream infrastructure when measured use justifies them.

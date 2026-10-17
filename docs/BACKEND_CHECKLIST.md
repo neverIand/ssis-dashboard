@@ -1,14 +1,12 @@
 # Backend validation
 
-Updated: 15 October 2026. Development base: `dev-next`. This is the single checklist, runbook and result record for backend validation. [Implementation progress](PROGRESS.md) records delivery milestones; [the SSIS fixture guide](SSIS_FIXTURE_PROJECT_GUIDE.md) contains package creation and reader-permission instructions.
+This is the Stage B/legacy manual checklist. Keep its case IDs, repeatable procedures and dated results; [API validation](API_ACCEPTANCE.md) owns Stage C correctness and workload evidence. [Progress](PROGRESS.md) owns remaining tasks.
 
 ## Current status and next step
 
-The completed local runs now fully pass **25 of 30 cases**. **OBS-02** retains the unobserved native cleanup-failure assertion; **OBS-03 and HOST-01/02/03** retain deferred production-host checks. The [latest fixture results](#completed-fixture-validation-15-october-2026) and [initial environment/timing baseline](#recorded-baseline-15-october-2026) are recorded below.
+**25/30 cases fully PASS** on the 15 October 2026 Windows/SQL baseline, including deployed fixtures and both actual Windows reader accounts. Remaining: OBS-02 native cleanup-failure observation; OBS-03's host portion and HOST-01/02/03 are deferred by the user's hosting hold. The extra typed datetimeoffset issue was resolved by C1b; the bare unconverted driver still reports type -155. This resolution does not close OBS-02 or change the checklist total.
 
-The two-package fixture is deployed and guide steps 7–10 are complete. Both actual Windows reader accounts passed native SQL and HTTP replay with their intended roles/visibility. History, controlled values/property overrides, sensitive masking, failure, repeated/parallel children, running cases and second-folder scope are validated. No further fixture creation or reader setup is needed for these completed checks.
-
-**Hosting is on hold at the user's request.** B5c, HOST-01/02/03 and production host/proxy/access/startup logging remain NOT RUN until reprioritized. C1b now proves opt-in native datetimeoffset conversion as recorded below. Native cleanup-failure observation and measured KPI cost remain follow-ups. B5a3/P0b stay open.
+For a repeat, use the existing fixture/reader setup and record fresh evidence. Do not recreate accounts or rerun grants/package executions merely to inspect prior results. Keep an unavailable assertion NOT RUN and retain the expected evidence below.
 
 ## How to use this checklist
 
@@ -53,7 +51,7 @@ Record versions, timezone, actual driver/server/catalog, authentication and comm
 | CFG-02 | [NOW](#prepare-the-runtime-and-private-config) | In a temporary private config, try login/query timeouts of `0`, a string, and a boolean; try an invalid `LOG_LEVEL`. Run route discovery rather than a DB page. Restore valid settings. | Startup rejects invalid settings before database acquisition; errors identify the setting without echoing its value. `DEBUG=False` remains the intended host default. | PASS — 2026-10-15: all seven invalid timeout/log-level launches reject settings safely before database acquisition. |
 | DB-01 | [DB](#native-connection-and-value-probe) | Open the overview with the intended monitoring identity and check its server label against the private test alias. | Successful connection, expected catalog, readable results, correct Unicode and native value conversion; six successful query events and one request summary. | PASS — 2026-10-15: actual Windows monitoring reader opens the populated Unicode/quote fixture overview with six queries; intended identity, non-admin roles, native catalog reads and header verified. |
 | DB-02 | [MIXED](#reader-visibility) | Repeat the workflow with an approved identity having narrower catalog visibility, including an execution visible to the first identity but hidden to this one. | Results respect catalog visibility. A successful empty execution lookup returns the same 404 as an absent execution and runs no follow-up queries. A SQL permission error is a safe backend error, not automatically a browser 403. | PASS — 2026-10-15: actual normal/restricted Windows processes verify the selected two-versus-one visibility pair. Hidden details/events/values return the same safe 404 bodies as absent IDs after one zero-row lookup. |
-| DB-03 | [DB](#native-connection-and-value-probe) | Check timestamps, Unicode names/messages, NULL end times, numeric durations, nonsensitive typed values, and BIGINT binding using representative rows. A checked-absent maximum BIGINT execution ID can test binding without creating a row. | Values render without conversion/overflow errors; absent valid IDs return 404 after one lookup. Preserve private examples and driver types for mismatches. | PASS — 2026-10-15: populated Unicode/quote names/messages, active NULL end times, formatted timestamps, native Int32/Boolean/NULL values and BIGINT binding checked. The additional raw datetimeoffset -155 limitation remains separately recorded for future typed data. |
+| DB-03 | [DB](#native-connection-and-value-probe) | Check timestamps, Unicode names/messages, NULL end times, numeric durations, nonsensitive typed values, and BIGINT binding using representative rows. A checked-absent maximum BIGINT execution ID can test binding without creating a row. | Values render without conversion/overflow errors; absent valid IDs return 404 after one lookup. Preserve private examples and driver types for mismatches. | PASS — 2026-10-15: populated Unicode/quote names/messages, active NULL end times, formatted timestamps, native Int32/Boolean/NULL values and BIGINT binding checked. C1b subsequently resolved raw datetimeoffset conversion for opted-in API queries. |
 
 ## Browser workflow and query parity
 
@@ -64,7 +62,7 @@ For each request, copy its `X-Request-ID` from browser developer tools and find 
 | UI-01 | [MIXED](#page-walkthrough-and-sql-parity) | Open `/`, folder, project, and valid status-filter navigation; compare the table/cards/chart with the checked-in SQL for the same private settings. | Server header, folder/project navigation, cards, daily chart, execution links, warnings/errors, status/logging labels, and table fields render. **6** queries. Preserve discrepancies as P0b baseline evidence. | PASS — 2026-10-15: overview/folder/project/status requests, four rows, cards/chart/navigation, SQL parity and six-query counts; browser rendering checked. |
 | UI-02 | [MIXED](#page-walkthrough-and-sql-parity) | Open a visible execution's `/execution/<id>` page, including children and incomplete executables where available. | Correct execution identity/version, event KPIs, executables, children, durations/statuses and navigation. **7** queries. NULL/parallel/incomplete children must not make the page fail. | PASS — 2026-10-15: four completed repeated/parallel child calls match an independent path-specific event oracle; two active parallel children render without end times; both long runs later complete. Details/SQL parity and seven-query counts pass. |
 | UI-03 | [MIXED](#page-walkthrough-and-sql-parity) | Open the same execution's five event categories: `all`, `errors`, `warnings`, `duplicate-warnings`, `memory-warnings`. | Correct category and escaped message text, package/component/path fields, and KPI links. **4** queries per page. Compare category results with the corresponding resource, including legacy text-pattern heuristics. | PASS — 2026-10-15: all five category routes match SQL, including populated duplicate/memory fixture messages; controlled Unicode/quote/HTML text is escaped literally. Existing populated errors/warnings evidence retained; four queries per page. |
-| UI-04 | [MIXED](#page-walkthrough-and-sql-parity) | Open `/execution/<id>/values` for controlled nonsensitive parameter and property-override fixtures. | Both sections, native values and Set/Override flags render correctly; event KPIs and identity remain correct. **5** queries. Check actual catalog handling of sensitive values; API capability/redaction enforcement is still phase 2 work. | PASS — 2026-10-15: actual readers see controlled numeric/Boolean/string values, native types, Set/Override flags and a Description property override. The unique sensitive dummy is NULL/masked and absent from HTML, application events and catalog event messages; five queries. |
+| UI-04 | [MIXED](#page-walkthrough-and-sql-parity) | Open `/execution/<id>/values` for controlled nonsensitive parameter and property-override fixtures. | Both sections, native values and Set/Override flags render correctly; event KPIs and identity remain correct. **5** queries. Check actual catalog handling of sensitive values; Stage C API capability/redaction checks are recorded separately. | PASS — 2026-10-15: actual readers see controlled numeric/Boolean/string values, native types, Set/Override flags and a Description property override. The unique sensitive dummy is NULL/masked and absent from HTML, application events and catalog event messages; five queries. |
 | UI-05 | [MIXED](#page-walkthrough-and-sql-parity) | Follow the package-history link for a package with repeated runs and a currently running example, if available. | Table, durations, averages and chart render; any running estimate is compared with the legacy query's current formula. **2** queries. Record unreliable/missing estimates for the API/history work. | PASS — 2026-10-15: six seeded runs plus later successes verify the independent six-row moving average; running estimates render and match the retained legacy contract. Exact primary/secondary/all-folder histories contain 8/1/9 rows; two queries per page. |
 | UI-06 | [MIXED](#page-walkthrough-and-sql-parity) | Use Unicode/spaces and a quote-containing test name where available; exercise the existing `*` wildcard behaviour. Check an execution older than the configured overview window. | Parameters remain bound, names/messages stay readable, and an explicitly visible execution remains accessible with its own KPIs. Literal `%`/`_`, long-name truncation, and `all` ambiguities must be recorded against legacy semantics. | PASS — 2026-10-15: populated Unicode/apostrophe catalog folder and special messages render through bound routes. Prior wildcard/injection/empty filters and older-execution own-KPI checks remain passing baseline evidence. |
 | UI-07 | [DB](#reader-visibility) | Compare browser table/chart results with private direct SQL results using the same selected identity and settings. | Record field/cohort/ordering differences and representative counts, not just screenshots. Do not infer SQL parity from a rendered page alone. | PASS — 2026-10-15: 29 independent native SQL dataset comparisons plus status cards/aggregate event KPIs match current fields/counts/order; private actual plans retained. |
@@ -106,30 +104,14 @@ As of 15 October 2026, HOST-01/02/03 and the production host/proxy/access/startu
 | --- | --- | --- | --- | --- |
 | HOST-01 | [LATER](#events-timing-and-resources) | Use the selected production server's documented launcher, Python/runtime, bind address, WSGI target and private config. | Reproducible startup with debug off and intended loopback/private binding. Native dependency/driver checks repeat under the service identity. Exact commands remain pending B5c. | NOT RUN — 2026-10-15: B5c production launcher/service identity not selected; loopback WSGI harness does not pass hosting. |
 | HOST-02 | [LATER](#events-timing-and-resources) | Exercise restart, unavailable DB, shutdown and owned-resource cleanup on the chosen host. If a container is selected, build/run its actual recipe and repeat native checks there. | Healthy restart/recovery, safe errors, consistent versions/config and no leaked owned workers. The historical Ubuntu 16.04/Python 3.6 image is not current evidence. | NOT RUN — 2026-10-15: production service/container restart/outage/shutdown checks await B5c. |
-| HOST-03 | [LATER](#events-timing-and-resources) | Inspect access/authentication/proxy boundaries, log redaction and transport policy before sharing the host. | Deployment restrictions work for the intended audience. API authorization/redaction is phase 2; production streaming buffering/capacity/heartbeats are phase 5 and cannot be marked complete here. | NOT RUN — 2026-10-15: production authentication/proxy/transport/logging boundaries await B5c. |
+| HOST-03 | [LATER](#events-timing-and-resources) | Inspect access/authentication/proxy boundaries, log redaction and transport policy before sharing the host. | Deployment restrictions work for the intended audience. API authorization/redaction is tracked separately; production streaming buffering/capacity/heartbeats are phase 5 and cannot be marked complete here. | NOT RUN — 2026-10-15: production authentication/proxy/transport/logging boundaries await B5c. |
 
 ## Known semantics and open gates
 
-- Legacy status cards use a `start_time` cohort; the execution list uses `created_time`. Several resources have only a lower time bound. Status selection does not narrow the aggregate event-KPI operation. Shared-cohort/both-bound API semantics remain phase 2 work; capture baseline differences rather than treating the current pages as that future contract.
+- Legacy status cards use a `start_time` cohort; the execution list uses `created_time`. Several resources have only a lower time bound. Status selection does not narrow the aggregate event-KPI operation. The API uses explicit creation-cohort bounds; compare the retained legacy pages with their own baseline, as recorded in [the API contract](API_CONTRACT.md).
 - Overview status cards use `engine-kpi.sql`; the explicit `get_aggregate_event_kpi()` backend operation is not displayed as an overview event card. Its legacy `-1` branch and bound parameters have automated coverage, but real aggregate SQL results still need P0b evidence if that operation is used.
-- History's status path segment is validated but does not change its SQL scope. History limits/estimates, exact-name filtering, name-length handling, future status codes, pagination and typed JSON remain API work. Full-page refresh and existing browser libraries remain until their frontend milestones.
+- History's status path segment is validated but does not change its SQL scope. The API separately implements bounded history/estimates, exact-name filtering, explicit name/type limits and future numeric codes. Full-page refresh and existing browser libraries remain until their frontend milestones.
 - Synthetic/native-negative checks do not establish real authentication, catalog row visibility, sensitive-value access, data correctness, query plans, native timeout enforcement or physical pooling behaviour. Keep failed/not-run native cases open and bring them back after the consolidated check.
-
-## Consolidated result record
-
-| Field | Value |
-| --- | --- |
-| Date / tester | 15 October 2026 / local Codex validation |
-| Commit / host alias | `37bc7ac00015906bbdd16f55e74daa48333b4962` / `local-lab` |
-| Python / architecture / GIL | CPython 3.14.8 / Windows x64 / enabled |
-| Runtime pins / installer | All eight constraints match; pip 26.2.1, clean offline binary-wheel install, pip check and 101 tests PASS |
-| Driver / catalog version / authentication mode | Driver 17.10.0006 / SQL 2022 16.0.1000.6, SSISDB schema 7 / Windows NTLM; administrator setup plus actual normal/restricted reader replay |
-| Private config/evidence location (no credentials) | Ignored `.local/backend-validation/`; working config `dashboard.cfg`; original evidence `runs/2026-10-15/`; latest fixture run selected by `runs/fixture-current.private.json` |
-| Passed / failed / not-run case IDs | 25 full PASS; OBS-02/03 and HOST-01/02/03 retain NOT RUN assertions. Additional raw datetimeoffset probe FAIL (-155); see recorded baseline below |
-| Cold/warm timings and query-plan evidence | First-process overview 2,419 ms; warm overview/details/events/values/history medians 448/1,735/1,360/1,406/10 ms; 17 query resources have private actual plans |
-| Known differences / follow-up tasks | [Recorded findings](#recorded-baseline-15-october-2026) and [completed fixture validation](#completed-fixture-validation-15-october-2026); B5a3/P0b and B5c remain open |
-
-After results exist, update the case statuses and `docs/PROGRESS.md` with a sanitized summary. B5a3/P0b and the parent backend phase stay incomplete until the relevant real-data/host evidence passes; do not mark them complete from this checklist's existence.
 
 ## Native connection and value probe
 
@@ -209,7 +191,7 @@ finally:
 sys.exit(1 if failed else 0)
 ```
 
-The direct probe establishes driver behavior, not full catalog/HTTP parity. Additionally inspect actual Unicode names/messages, typed values, NULL end times and durations through the fixture pages. Current SQL formats/casts many values; a rendered timestamp does not establish raw datetimeoffset support. The additional raw type failure remains in the findings below.
+The direct probe establishes driver behavior, not full catalog/HTTP parity. Additionally inspect Unicode names/messages, typed values, NULL end times and durations through the fixture pages. Legacy SQL formats/casts many values; a rendered timestamp does not establish raw datetimeoffset support. The bare-driver limitation and C1b's typed conversion resolution are recorded below.
 
 ## Page walkthrough and SQL parity
 
@@ -260,9 +242,26 @@ Where available, use an authorized separate DBA session to observe active reques
 
 Stop only the task-owned server/browser resources. Check command/creation/ancestry metadata and listeners, preserve unrelated reused PIDs, then verify fresh valid startup/recovery if required. A free port alone does not prove process cleanup. B5c and production service/container/proxy/transport/logging/stream-capacity checks remain deferred.
 
+## Consolidated result record
+
+| Field | Recorded baseline |
+| --- | --- |
+| Application/date | `37bc7ac00015906bbdd16f55e74daa48333b4962`, 15 October 2026; subsequent API evidence has its own revisions |
+| Runtime | Windows x64, standard CPython 3.14.8/GIL; clean offline eight-package baseline, pip check and 101 tests passed; tzdata was added later for the API |
+| Driver/catalog | ODBC Driver 17.10.0006 x64; SQL Server 2022 Developer 16.0.1000.6, SSISDB schema 7; Windows NTLM |
+| Identity/transport | Administrator setup plus actual normal/restricted Windows reader replay; local shared memory. The private lab uses certificate trust bypass, which is not production certificate validation |
+| Evidence | `.local/backend-validation/runs/2026-10-15/`; deployed fixture run selected by `runs/fixture-current.private.json`; configs/raw names/values remain private |
+| Outcome | 25 full PASS; OBS-02/03 and HOST-01/02/03 retain the assertions listed above |
+
+The original run made 105 scripted HTTP requests, compared 29 independent SQL datasets plus cards/KPIs, and captured plans for 17 resources. The first-process overview took 2,419 ms; five-sample warm route medians were 448/1,735/1,360/1,406/10 ms for overview/details/events/values/history. These are historical local observations, not p95 or production targets. KPI compilation/query cost motivated later API work.
+
+Direct WAITFOR timed out with HYT00 at 1.014 s; the unchanged legacy KPI produced an actual HTTP 504 at about 1.285 s and recovered. Overlapping clients retained independent counters. Across 129 DMV samples active requests/transactions returned to zero with two stable idle pooled sessions. All owned validation server lifecycles/listeners ended; unrelated processes and SQL Server/Agent were preserved.
+
+Known legacy semantics remain documented behavior: mixed start/creation cohorts, wildcard names, status-independent aggregate/history scope, NULL display counts and a history heading/limit mismatch. API corrections do not change the legacy adapter's parity baseline.
+
 ## Completed fixture validation: 15 October 2026
 
-Guide steps **7–10 PASS** at the same application commit, using the deployed `DashboardValidation` project and native Driver 17.10.0006. The main deployment stayed unchanged. The optional scope test deployed the identical `.ispac` to `DashboardValidationOther`; no existing different project was overwritten.
+Guide steps 7–10 passed on the same baseline using the deployed two-package fixture. The optional second folder used the identical project artifact. The recorded results are:
 
 | Evidence | Recorded result |
 | --- | --- |
@@ -275,67 +274,12 @@ Guide steps **7–10 PASS** at the same application commit, using the deployed `
 | HTTP/native assertions | 84 real loopback HTTP requests and 628 passing assertions across actual readers, explicit session-impersonation probes, running and completion/scope checks. Nine independent native assertions pass. Hidden/absent bodies match for all three detail routes apart from request IDs. |
 | Cleanup | All six owned servers stopped, with zero remaining owned processes/listeners; all 12 fixture executions are terminal. SQL Server/Agent remained running. |
 
-The private run pointer is `.local/backend-validation/runs/fixture-current.private.json`. Its directory contains preflight/deployed `.ispac`, execution/grant records, native comparisons, actual/impersonated HTTP results and bodies, scope results, summary and cleanup audit. Reader passwords were entered only in the local secure prompt; none were saved. The application/SQL resources/dependency pins were unchanged, so the 101-test suite was not repeated; its earlier Windows evidence remains the baseline.
-
-Remaining: **OBS-02** native cleanup-failure observation and the four deferred host/logging cases. C1b subsequently proves typed datetimeoffset conversion as recorded below. The legacy running estimate is evidence of current query behavior, not a prediction-accuracy guarantee. B5a3/P0b remain open for their native follow-ups; hosting stays deferred.
-
-## Recorded baseline: 15 October 2026
-
-The following is historical evidence from `37bc7ac00015906bbdd16f55e74daa48333b4962`, not a rerun during documentation cleanup. The initial run used the existing Windows administrator and four completed sample executions (two succeeded/two failed), Basic logging, 1,379 events including 12 errors/one warning, and two successful history rows. Dedicated fixture runs and actual reader HTTP were unavailable in that initial run; their completion is recorded above.
-
-| Item | Recorded environment |
-| --- | --- |
-| Host alias | `local-lab`; Windows x64, Europe/London (Windows `GMT Standard Time`, observed UTC+01:00) |
-| Python | Standard CPython 3.14.8, 64 bits, GIL enabled; official NuGet runtime already present locally; fresh `.local/validation-venv314` |
-| Installation | Offline binary-wheel install from `requirements.txt` and `wheelhouse`; pip 26.2.1; `pip check` passed |
-| Runtime pins | Flask 3.1.3, pyodbc 5.3.0, blinker 1.9.0, click 8.5.0, itsdangerous 2.2.0, Jinja2 3.1.6, MarkupSafe 3.0.4, Werkzeug 3.1.9 |
-| Driver | ODBC Driver 17 for SQL Server, `msodbcsql17.dll` 17.10.0006, x64 |
-| SQL/catalog | SQL Server 2022 Developer Edition (64-bit), 16.0.1000.6; SSISDB schema version 7/build 16.0.1000.6 |
-| Identity | Current Windows identity, NTLM, **sysadmin**; dedicated monitoring/restricted identities unavailable and explicitly deferred by the user |
-| Transport | Local shared memory; native connection reports encryption enabled. Private lab config uses explicit certificate-trust bypass; trusted-certificate/remote transport checks remain open |
-| Application | Absolute private config; debug/testing/exception propagation off; INFO events; login timeout 5 seconds, query timeout 30 seconds; 24-hour overview, 50-row limit, `AS_OF_DATE='NOW'` |
-| Server | Temporary loopback Werkzeug WSGI validation harness using the real factory/routes/driver, plus Flask CLI replay; production hosting remains B5c |
-
-The fresh Windows runtime passed 101 database-free tests. The integration run made 105 scripted HTTP requests, compared 29 independent SQL datasets plus cards/aggregate KPIs, and retained actual plans for 17 resources. Browser review covered charts/tables/navigation, 672 event rows with search reducing to 50, and no observed console errors. Initial helper quote/CRLF/SQLSTATE assumptions were corrected by reviewing preserved bodies/events; no exercised application assertion remained unresolved.
-
-A direct WAITFOR probe returned HYT00 at 1.014 seconds with observed native cancellation. A real details request timed out in unchanged KPI SQL with HTTP 504/HYT00 at about 1.285 seconds and recovered. The overlapping clients had about 525 ms overlap with independent 6/7-query counts. Across 129 DMV samples, active work returned to zero requests/transactions with two stable idle pooled sessions. All 12 owned server lifecycles and their listeners ended; an unrelated reused PID was preserved, and SQL Server/Agent remained running.
-
-The first process overview took **2,419 ms** at response preparation. The table below records a later first-observed request and the median of five sequential repetitions; these are small local samples, not p95 measurements. SQL Server caches were not cleared, and browser/transfer timing is separate.
-
-| Page | First observed in timing batch (ms) | Warm median, application (ms) | Warm median, HTTP client (ms) |
-| --- | ---: | ---: | ---: |
-| Overview | 465.338 | 448.409 | 457.259 |
-| Details | 1,469.658 | 1,735.255 | 1,736.894 |
-| Events, failed fixture | 2,581.740 | 1,359.915 | 1,371.772 |
-| Values | 1,132.314 | 1,405.735 | 1,408.048 |
-| History | 23.469 | 9.670 | 12.953 |
-
-`package-kpi.sql` dominated details/events/values: its per-query warm medians were about **1,502/1,340/1,394 ms**. The overview list query took about **424 ms**. A captured aggregate KPI plan recorded **2,412 ms compilation** and **98 ms execution**; compilation cost merits investigation when the SQL/API milestone addresses this operation. No query was changed in this validation task, and no current latency threshold was invented to turn this baseline into a pass/fail budget.
-
-The additional raw `SELECT SYSDATETIMEOFFSET()` probe **FAILS** with pyodbc's unsupported SQL type **-155**. Current checked-in page queries explicitly format/cast their timestamps, and those actual responses passed. Separate native BIGINT, Unicode NVARCHAR, NULL datetime2, Decimal, Boolean and datetime2 probes passed. This initial bare-driver limitation is resolved for opted-in typed queries by the C1b converter proof below; the default unconverted driver behavior remains unchanged.
-
-Known legacy behavior was retained: different start/created-time cohorts, NULL warning/error display, status-independent aggregate/history scope, wildcard rather than exact-name semantics, and a history heading/limit mismatch. The initial single-project fixture could not establish isolation of identically named packages across multiple projects. The later fixture run above verifies the designed same-project/package history scope across two folders.
-
-After the user created the reader logins and applied the initial grants, a separate read-only session-impersonation audit found enabled mapped logins, sysadmin/db_owner/ssis_admin zero for both, ssis_logreader one only for the normal reader, and four-versus-one execution visibility. The administrator context was restored. Actual reader sign-in/HTTP was NOT RUN at that stage and is now completed as recorded above.
-
-Private original evidence is in `.local/backend-validation/runs/2026-10-15/`: inventory/configuration, test output, raw/reviewed/final request reports, responses/template snapshots, logs/plans, DMV samples, browser notes and ownership/cleanup records. The original retired docs and relocation hashes are under `runs/organization-2026-10-15/`. Old snapshots contain original absolute paths; use the relocation manifest to find moved files. The earlier documentation consolidation did not rerun SQL/packages/tests or change case results; subsequent fixture validation above completed nine cases.
-
+The private `fixture-current.private.json` pointer selects execution/grant/native/HTTP/cleanup evidence. Actual reader passwords were entered only through a local secure prompt. This completes the designed Stage B fixtures and reader replay; it does not establish Stage C API reader HTTP, native cleanup-failure observation or production hosting.
 
 ## Typed datetimeoffset resolution / C1b
 
-15 October 2026: the application now offers `execute_query(..., typed_timestamps=True)` with a connection-local -155 output converter. It keeps exact 100-nanosecond UTC instants until explicit serialization and binds canonical timestamp strings through `CONVERT(datetimeoffset(7), ?)` so Python datetime cannot truncate the seventh digit. The default legacy path remains unchanged.
-
-On standard Windows x64 CPython 3.14.8 / pyodbc 5.3.0 / Driver 17.10.0006 / SQL 2022 16.00.1000, a read-only native run passed **26 assertions over 15 application queries**. Controlled source-offset and canonical input round-trips, +05:45/-00:30 and +/-14-hour offsets, date/year rollover, adjacent 100-nanosecond instants, large/max IDs, NULLs, Decimal/Boolean/counts and unknown codes survive strict JSON. Three real catalog rows' raw created/start/end timestamps agree with separate SQL UTC projections. A subsequent unconverted logical connection reproduces the unsupported type, and legacy formatted text stays unchanged. Every observed logical query completed cleanup. The full **130-test** database-free suite and `pip check` pass.
-
-The current private validation connection supplied the SQL identity; normal/restricted reader HTTP was not replayed for this conversion task. Only bounded SELECTs were run; no server or catalog mutation was required. Private evidence is `.local/backend-validation/runs/c1b-20261015T202103Z/result.private.json`; the reusable ignored probe is `.local/backend-validation/tools/probe-typed-data.py`. The restricted execution context failed Windows encryption/credential setup before any query; the approved native run used the same config outside that restriction.
-
-This closes the extra typed datetimeoffset compatibility follow-up on this baseline. It does not close **OBS-02**, change the **25/30** checklist total, complete B5a3/P0b, or establish API endpoint, other-driver/platform or hosting acceptance. Registration/decoder failure cleanup remains covered synthetically; deliberate native cleanup failure remains NOT RUN. See [C1b progress](PROGRESS.md#c1b--exact-typed-sql-to-json-boundary).
-
+On 15 October, the opt-in connection-local converter passed 26 native assertions / 15 queries, preserving 100-ns timestamps, offset/input round trips, BIGINTs, NULLs and strict JSON while leaving legacy conversion unchanged. Evidence: `.local/backend-validation/runs/c1b-20261015T202103Z/result.private.json`. The bare driver remains unsupported for raw -155; use the typed boundary. Other drivers/platforms and native cleanup-failure observation require separate checks.
 
 ## API HTTP foundation / C1c
 
-15 October 2026: C1c implements `/api/v1/meta`, `/healthz` and `/readyz`. Metadata/liveness are database-free. Readiness performs one zero-row catalog read in the configured SSISDB, so empty execution visibility is not an outage. Each driver timeout is capped by `API_READINESS_TIMEOUT_SECONDS` (1–2 seconds, default 2) and the corresponding global timeout. API failures use safe JSON problems and retain request IDs/no-store/protocol headers; legacy HTML behavior is unchanged.
-
-The pinned Windows/CPython 3.14.8 environment passes **148 database-free tests**, including contract schemas and the shared 400/401/403/404/405/500/503/504, validation/capability, HEAD/OPTIONS, cleanup, canary and legacy checks. A separate native run through Flask's WSGI test client passes **42 assertions over 9 schema-validated responses and 4 native query attempts**: real readiness succeeds, a controlled WAITFOR hits the one-second driver query timeout and returns 504, readiness recovers, and a missing driver returns 503/IM002 without its canary. Query cleanup reports succeed. No TCP server or catalog mutation was needed.
-
-Private evidence: `.local/backend-validation/runs/c1c-20261015T203747Z/result.private.json`; reusable ignored probe: `.local/backend-validation/tools/probe-api-http.py`. This uses the existing validation SQL identity and does not replay actual reader HTTP or validate a production network/proxy/log stack. C2a and later resources retain their independent SQL/actual-reader comparisons; the backend checklist remains **25/30**, with OBS-02 and deferred hosting unchanged. See [C1c progress](PROGRESS.md#c1c--api-http-boundary-metadata-and-health).
+The initial metadata/health replay passed 42 assertions / 9 schema responses / 4 native query attempts, including native timeout/recovery and missing-driver handling. All fourteen API operations are now implemented; current cross-operation results are maintained in [API acceptance](API_ACCEPTANCE.md). API reader impersonation is separate from the actual-account legacy replay above.

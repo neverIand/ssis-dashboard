@@ -12,7 +12,7 @@ For a fresh project, build/deploy with steps 1–6, then use steps 7–10 for ex
 
 ## 1. Check the designer
 
-Visual Studio 2022 Community is installed on this computer. The availability of its SSIS designer extension has not been confirmed.
+Before building a fresh fixture, check the SSIS designer and VSTA components below.
 
 1. Open Visual Studio 2022, then **Create a new project** and search for **Integration Services Project**.
 2. If the template is absent, use **Extensions > Manage Extensions** to find Microsoft's **SQL Server Integration Services Projects 2022**. Install it using its installer, closing Visual Studio when requested, then reopen Visual Studio. Installing the SQL Server runtime alone does not install the package designer. Follow [Microsoft's SSIS installation guidance](https://learn.microsoft.com/en-us/sql/integration-services/install-windows/install-integration-services?view=sql-server-ver17).
@@ -330,13 +330,9 @@ Under the normal reader, both fixture IDs must be visible. Under the limited rea
 
 The user deployed the project; the assistant inspected/exported its actual catalog `.ispac` and completed steps 7–9. Both actual Windows reader accounts then completed native SQL and HTTP replay through the secure local helper. All four steps are recorded as PASS in the private run summary.
 
-The Windows reader accounts and database mappings already exist. A read-only administrator audit on 15 October confirmed both mappings are enabled, with sysadmin/db_owner/ssis_admin all zero; only the normal reader has ssis_logreader. Session impersonation saw four existing executions for the normal reader and one for the limited reader. That validates the inspected catalog visibility, but does not prove separate account sign-in or dashboard HTTP behavior.
-
 Actual identity checks now pass: each reader process completed 15 HTTP requests with the intended non-admin roles. For repeats, use the local `tools/run-reader-validation.ps1` helper or launch SSMS/Python with **Run as different user**. Passwords stay in the local secure prompt; a browser profile does not change SQL identity. See [the reader reference below](#reader-permissions-and-sign-in-reference) for configuration.
 
-The project enables the remaining representative portions of DB-03 and UI-02/03/04/05/06, plus repeatable identity tests DB-01/02 and HTTP-02 when combined with the readers. Native cleanup-failure observation, raw datetimeoffset conversion and query-cost follow-ups remain separate investigations. HOST-01/02/03 and production hosting/logging remain NOT RUN/on hold.
-
-**Execution evidence is now recorded:** the deployed packages ran successfully, including 60-second cases, and both actual reader identities passed their HTTP replay. The earlier API-compilation/PARSEONLY checks remain preparation evidence; the new native/HTTP results establish the completed fixture behavior. Native cleanup-failure observation, raw datetimeoffset conversion and the deferred hosting checks remain separate from these completed steps.
+The project enables the remaining representative portions of DB-03 and UI-02/03/04/05/06, plus repeatable identity tests DB-01/02 and HTTP-02 when combined with the readers. Native cleanup-failure observation and API workload follow-ups remain separate; C1b resolved typed datetimeoffset conversion. HOST-01/02/03 and production hosting/logging remain NOT RUN/on hold.
 
 ## Reader permissions and sign-in reference
 
