@@ -17,7 +17,7 @@
     <a class="skip-link" href="#main-content">Skip to content</a>
     <header class="page-header">
         <div class="header-content">
-            <h1>SSIS Dashboard</h1>
+            <p class="brand">SSIS Dashboard</p>
             <section class="connection-state" aria-label="Connection status">
                 <p id="app-status" role="status" aria-live="polite" data-app-status>Starting dashboard. If this message remains, reload the page or use the legacy dashboard.</p>
                 <button type="button" data-retry aria-describedby="app-status" hidden>Retry settings</button>
@@ -31,7 +31,14 @@
         </div>
     </header>
     <main id="main-content" tabindex="-1">
-        <section class="panel" aria-labelledby="filters-heading">
+        <div class="page-heading">
+            <h1>Overview</h1>
+            <div class="section-actions">
+                <button type="button" data-overview-refresh disabled>Refresh</button>
+                <button type="button" data-poll-toggle disabled>Pause auto refresh</button>
+            </div>
+        </div>
+        <section class="panel filters" aria-labelledby="filters-heading">
             <h2 id="filters-heading">Filters</h2>
             <form id="overview-filters" novalidate>
                 <fieldset class="filter-fields" disabled aria-describedby="app-status">
@@ -87,7 +94,7 @@
                 <div class="filter-actions">
                     <p data-filter-notice role="status"></p>
                     <div class="filter-buttons">
-                        <button type="submit" data-apply-filters disabled>Apply</button>
+                        <button class="button-primary" type="submit" data-apply-filters disabled>Apply</button>
                         <button type="button" data-reset-filters disabled>Reset filters</button>
                     </div>
                 </div>
@@ -95,7 +102,7 @@
             </form>
         </section>
 
-        <section class="panel" aria-labelledby="summary-heading" data-summary>
+        <section aria-labelledby="summary-heading" data-summary>
             <div class="section-heading">
                 <h2 id="summary-heading">Summary</h2>
                 <p>All statuses in the creation window</p>
@@ -103,54 +110,56 @@
             </div>
             <p class="cohort-window" data-cohort-window hidden></p>
             <p class="resource-status" data-summary-status role="status"></p>
-            <dl class="summary-grid">
+            <dl class="panel summary-grid">
                 <div><dt>Total executions</dt><dd data-count="total" aria-label="Not loaded">—</dd></div>
-                <div><dt>Running</dt><dd data-count="running" aria-label="Not loaded">—</dd></div>
-                <div><dt>Succeeded</dt><dd data-count="succeeded" aria-label="Not loaded">—</dd></div>
-                <div><dt>Failed</dt><dd data-count="failed" aria-label="Not loaded">—</dd></div>
+                <div><dt class="metric-running">Running</dt><dd data-count="running" aria-label="Not loaded">—</dd></div>
+                <div><dt class="metric-succeeded">Succeeded</dt><dd data-count="succeeded" aria-label="Not loaded">—</dd></div>
+                <div><dt class="metric-failed">Failed</dt><dd data-count="failed" aria-label="Not loaded">—</dd></div>
             </dl>
         </section>
 
-        <section class="panel executions" aria-labelledby="executions-heading">
+        <section class="executions" aria-labelledby="executions-heading">
             <div class="section-heading">
                 <h2 id="executions-heading">Executions</h2>
-                <div class="section-actions">
-                    <button type="button" data-overview-refresh disabled>Refresh</button>
-                    <button type="button" data-poll-toggle disabled>Pause auto refresh</button>
-                    <button type="button" data-list-retry hidden>Retry executions</button>
+                <button type="button" data-list-retry hidden>Retry executions</button>
+            </div>
+            <p class="resource-status" data-poll-status role="status"></p>
+            <div class="panel">
+                <div class="table-toolbar">
+                    <div class="table-controls" aria-label="Execution order">
+                        <label>Sort <select data-order="sort" disabled><option value="execution_id">ID</option></select></label>
+                        <label>Direction <select data-order="direction" disabled><option value="desc">Descending</option><option value="asc">Ascending</option></select></label>
+                        <label>Rows per page <input data-order="limit" type="number" min="1" step="1" inputmode="numeric" disabled></label>
+                    </div>
+                    <p class="resource-status" data-order-notice role="status"></p>
+                    <p class="resource-status" data-page-notice role="status"></p>
+                </div>
+                <div class="table-scroll" role="region" aria-labelledby="executions-heading" tabindex="0">
+                    <table data-execution-table>
+                        <caption class="visually-hidden">Executions in the selected creation window</caption>
+                        <thead><tr>
+                            <th scope="col">ID</th>
+                            <th scope="col">Folder / project</th>
+                            <th scope="col">Package</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Created</th>
+                            <th scope="col">Started</th>
+                            <th class="number-cell" scope="col">Duration</th>
+                            <th class="number-cell" scope="col">Warnings</th>
+                            <th class="number-cell" scope="col">Errors</th>
+                        </tr></thead>
+                        <tbody><tr><td class="empty-state" colspan="9">No data loaded.</td></tr></tbody>
+                    </table>
+                </div>
+                <div class="table-footer">
+                    <p class="resource-status" data-executions-status role="status"></p>
+                    <nav class="execution-pages" aria-label="Execution pages">
+                        <button type="button" data-executions-previous disabled>Previous</button>
+                        <button type="button" data-executions-next disabled>Next</button>
+                        <button type="button" data-executions-latest disabled>Show latest</button>
+                    </nav>
                 </div>
             </div>
-            <div class="table-controls" aria-label="Execution order">
-                <label>Sort <select data-order="sort" disabled><option value="execution_id">ID</option></select></label>
-                <label>Direction <select data-order="direction" disabled><option value="desc">Descending</option><option value="asc">Ascending</option></select></label>
-                <label>Rows per page <input data-order="limit" type="number" min="1" step="1" inputmode="numeric" disabled></label>
-            </div>
-            <p class="resource-status" data-order-notice role="status"></p>
-            <p class="resource-status" data-page-notice role="status"></p>
-            <p class="resource-status" data-poll-status role="status"></p>
-            <p class="resource-status" data-executions-status role="status"></p>
-            <div class="table-scroll" role="region" aria-labelledby="executions-heading" tabindex="0">
-                <table data-execution-table>
-                    <caption class="visually-hidden">Executions in the selected creation window</caption>
-                    <thead><tr>
-                        <th scope="col">ID</th>
-                        <th scope="col">Folder / project</th>
-                        <th scope="col">Package</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Created</th>
-                        <th scope="col">Started</th>
-                        <th scope="col">Duration</th>
-                        <th scope="col">Warnings</th>
-                        <th scope="col">Errors</th>
-                    </tr></thead>
-                    <tbody><tr><td class="empty-state" colspan="9">No data loaded.</td></tr></tbody>
-                </table>
-            </div>
-            <nav class="execution-pages" aria-label="Execution pages">
-                <button type="button" data-executions-previous disabled>Previous</button>
-                <button type="button" data-executions-next disabled>Next</button>
-                <button type="button" data-executions-latest disabled>Show latest</button>
-            </nav>
         </section>
     </main>
 </body>

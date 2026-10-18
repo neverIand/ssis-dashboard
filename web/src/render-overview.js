@@ -82,11 +82,13 @@ export function mountOverview(root, { api, metadata, executionBase, retainedPath
         const row = element('tr');
         row.dataset.executionId = item.execution_id;
         const cells = Array.from({ length: 9 }, (_, index) => element('td', undefined,
-          [1, 2].includes(index) ? 'name-cell' : [4, 5].includes(index) ? 'time-cell' : index >= 6 ? 'number-cell' : ''));
+          index === 0 ? 'id-cell' : index === 1 ? 'name-cell' : index === 2 ? 'name-cell package-cell'
+            : [4, 5].includes(index) ? 'time-cell' : index >= 6 ? 'number-cell' : ''));
         const link = element('a', formatId(item.execution_id));
         link.href = executionBase + item.execution_id;
         cells[0].append(link);
         cells[1].append(element('span'), element('span', undefined, 'cell-detail'));
+        cells[3].append(element('span', undefined, 'status-badge'));
         row.append(...cells);
         record = { row, cells, item: null };
         rows.set(item.execution_id, record);
@@ -96,7 +98,8 @@ export function mountOverview(root, { api, metadata, executionBase, retainedPath
       text(cells[1].children[0], item.folder_name);
       text(cells[1].children[1], item.project_name);
       text(cells[2], item.package_name);
-      text(cells[3], formatCode(item.status));
+      text(cells[3].firstChild, formatCode(item.status));
+      cells[3].firstChild.dataset.status = String(item.status?.code ?? '');
       for (const [index, key] of [[4, 'created_at'], [5, 'started_at']]) {
         if (previous?.[key] !== item[key]) cells[index].replaceChildren(time(item[key]));
       }
@@ -108,6 +111,8 @@ export function mountOverview(root, { api, metadata, executionBase, retainedPath
       }
       text(cells[7], display.count(item.warning_count));
       text(cells[8], display.count(item.error_count));
+      cells[7].dataset.level = item.warning_count > 0 ? 'warning' : 'quiet';
+      cells[8].dataset.level = item.error_count > 0 ? 'error' : 'quiet';
       record.item = item;
       if (row !== cursor) body.insertBefore(row, cursor);
       cursor = row.nextSibling;

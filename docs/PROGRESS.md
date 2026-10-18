@@ -4,7 +4,7 @@ Updated 18 October 2026. Development base: `dev-next`; planning baseline: `ce8d0
 
 **Stage C remains in progress.** All 14 GET operations and all 12 execution sorts are implemented; the three review remedies pass their [recorded local checks](API_ACCEPTANCE.md#sql-remedies-replay-17-october-2026). Representative workload, resource and independent API reader acceptance remain open. The first native overview's API prerequisites are available; frontend work is a separate milestone.
 
-**Next task: finish D3c browser acceptance.** D1 and D2 pass their local checks; the [independent review findings](#independent-stage-d-review--18-october-2026) for exact names and pagination focus are fixed and verified. Actual hidden-tab transitions, browser-cache restoration and corporate-browser checks remain [open](#remaining-browser-acceptance). On 17 October 2026 the user prioritized preparing delivery phase 3; the [nine tasks below](#phase-3--first-native-screen-preparation) refine D1–D3 into independently verifiable deliveries. C8 workload/resource/reader checks remain separate API acceptance gates before shared deployment/cutover. Hosting remains deferred.
+**Next task: finish D3c browser acceptance.** The D-REV-01/02 fixes are committed as `1a79c7d`; the [native design system](#native-design-system--18-october-2026) passes its local integration checks. D1 and D2 pass their local checks; actual hidden-tab transitions, browser-cache restoration and corporate-browser checks remain [open](#remaining-browser-acceptance). On 17 October 2026 the user prioritized preparing delivery phase 3; the [nine tasks below](#phase-3--first-native-screen-preparation) refine D1–D3 into independently verifiable deliveries. C8 workload/resource/reader checks remain separate API acceptance gates before shared deployment/cutover. Hosting remains deferred.
 
 ## Task sizing and status
 
@@ -326,6 +326,21 @@ Kept the existing operation owners and corrected their DOM boundaries. Paginatio
 **Connected browser validation:** the packaged Flask screen passes real 30-second scheduled Next/Previous focus checks and keeps Show latest focused while an automatic list/summary cycle is pending. Next remains focused and inactive when retention empties page two; Previous returns to page one. During an 8-second list plus 8-second summary refresh, all three paging activations are ignored; moving focus to Folder persists after completion. Exact-name synthetic choices distinguish `Fold\r\ner` from `Folder`. URL restore, unchanged Apply, status-only edits, choice selection, ordinary Back and reselecting the same folder preserve `Fold\r\ner` / `Pro\r\nject` in URLs and HTTP queries. Explicitly editing the displayed folder to `Folder` correctly switches scope and clears the project. These are frontend fixture checks, not native catalog-name creation or production workload evidence.
 
 Evidence is retained under `.local/reports/frontend/20261018-stage-d-fixes/`, including before/after regression logs, complete test/build logs, browser observations, HTTP receipts and cleanup. The task-owned preview and four browser tabs were closed. **D3c.1 is complete locally; D3c.2/.3 and parent D3 retain their existing visibility/cache/corporate-browser gates.**
+
+#### Native design system — 18 October 2026
+
+Apply the revised 17 October sample's neutral-grey surfaces, indigo actions, readable typography, flat panels and 4 px spacing scale to `/app/`. Keep the existing operation owners, exact wire values, bounded choices and nine-column execution table. The retained legacy screens continue through the existing navigation; replacement-screen parity remains phase 4 work.
+
+| Submilestone | Status | Exit evidence |
+| --- | --- | --- |
+| DS.1 | Complete locally | Shared `--sd-*` palette/radius tokens, 15 px system-font base, Overview heading, connected summary cards, aligned table controls/footer, text status badges and warning/error emphasis. No new dependencies or animation. |
+| DS.2 | Complete locally | Production build, all 104 Node tests and nine Flask shell/packaged-asset tests pass. Connected-browser checks pass at 1280/768/360 px, with native filters/sorts/cursor paging/detail return and automatic-refresh focus, plus synthetic failure/retry/empty-state checks. |
+
+The existing local SSISDB identity returned 16 executions in the retained exact-bound window. A five-row Next page kept its cursor path and Next focus through a real 30-second automatic refresh. Server package sorting restarted at page one; folder/project/Failed selection preserved exact bounds and returned execution 17 while the all-status summary correctly retained 11 executions. The legacy detail link and ordinary Back restored the selection and native styling. Known status colours, literal catalog text and unknown-code neutral styling were inspected in the browser. At 768 px filters use two columns; at 360 px they stack and summary cards use two columns. Document width stays within the viewport and horizontal scrolling belongs to the table. Controlled summary failures retain or clear counts appropriately, show a wrapping request ID and recover through Retry; empty selections show zero counts and a useful message. These frontend checks do not close the remaining API workload or identity gates.
+
+Final authored JS+CSS is **76,652 bytes** against the 150 KiB target; packaged JS+CSS is **45,068 bytes**, **15,056 bytes gzip**. Package manifests/lockfile are unchanged. Evidence, build hashes, test logs, native/synthetic HTTP receipts and desktop/mobile screenshots are retained under `.local/reports/frontend/20261018-design-system/`. All four task-owned browser tabs and the loopback preview were closed; its PID and port 5180 have no remaining process/listener, and the temporary viewport override was reset.
+
+D3c visibility/cache/corporate-browser, C8, OBS-02 and deferred hosting/stream/cutover gates stay open independently of this visual milestone.
 
 #### Acceptance carried alongside phase 3
 
