@@ -1,5 +1,5 @@
 import { ApiError, createApi } from './api.js';
-import { createDisplay, formatCode } from './display.js';
+import { createDisplay } from './display.js';
 
 const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -86,12 +86,6 @@ export function mountBootstrap(root, { ready = () => {} } = {}) {
   const timezone = root.querySelector('[data-display-timezone]');
   const config = JSON.parse(document.getElementById('app-config').textContent);
   const api = createApi(config.api_base, { origin: document.location.origin });
-  root.querySelector('#overview-filters fieldset').disabled = true;
-  root.querySelector('[data-apply-filters]').disabled = true;
-  root.querySelector('[data-reset-filters]').disabled = true;
-  for (const control of root.querySelectorAll('[data-order]')) control.disabled = true;
-  root.querySelector('[data-overview-refresh]').disabled = true;
-  root.querySelector('[data-poll-toggle]').disabled = true;
   let disposeScreen;
   const loader = createMetadataLoader({
     request: (options) => api.get('meta', options),
@@ -108,20 +102,6 @@ export function mountBootstrap(root, { ready = () => {} } = {}) {
         const metadata = state.metadata;
         timezone.textContent = metadata.display_timezone;
         timezone.setAttribute('aria-label', `Display timezone: ${metadata.display_timezone}`);
-        const options = [{ code: '', name: 'All statuses' }, ...metadata.execution_statuses];
-        root.querySelector('[data-status-choices]').replaceChildren(...options.map((item) => {
-          const label = document.createElement('label');
-          const checkbox = document.createElement('input');
-          checkbox.type = 'checkbox';
-          checkbox.name = 'status';
-          checkbox.value = String(item.code);
-          checkbox.checked = item.code === '';
-          label.append(checkbox, document.createTextNode(item.code === '' ? item.name : formatCode(item)));
-          return label;
-        }));
-        const display = createDisplay({ timeZone: metadata.display_timezone });
-        root.querySelector('#creation-window option').textContent =
-          `Default window (${display.count(metadata.limits.default_range_hours)} h)`;
         disposeScreen?.();
         disposeScreen = ready(metadata, api, config);
       }

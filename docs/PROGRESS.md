@@ -4,11 +4,15 @@ Updated 18 October 2026. Development base: `dev-next`; planning baseline: `ce8d0
 
 **Stage C remains in progress.** All 14 GET operations and all 12 execution sorts are implemented; the three review remedies pass their [recorded local checks](API_ACCEPTANCE.md#sql-remedies-replay-17-october-2026). Representative workload, resource and independent API reader acceptance remain open. The first native overview's API prerequisites are available; frontend work is a separate milestone.
 
-**Next task: finish D3c browser acceptance.** The D-REV-01/02 fixes are committed as `1a79c7d`; the [native design system](#native-design-system--18-october-2026) passes its local integration checks. D1 and D2 pass their local checks; actual hidden-tab transitions, browser-cache restoration and corporate-browser checks remain [open](#remaining-browser-acceptance). On 17 October 2026 the user prioritized preparing delivery phase 3; the [nine tasks below](#phase-3--first-native-screen-preparation) refine D1–D3 into independently verifiable deliveries. C8 workload/resource/reader checks remain separate API acceptance gates before shared deployment/cutover. Hosting remains deferred.
+**Next local code task: P4.1b — detail refresh and overview return.** [P4.1a](#p41a--native-execution-detail-foundation--18-october-2026) is complete locally: direct native detail routes, typed metadata/counts, safe retry and root/prefix checks pass. Reuse the completed design system at `3c41da7`. The [phase 4 tasks](#phase-4--native-execution-workflows) retain P4.1b's refresh/return lifetime and P4.1c's overview-link integration as separate deliveries.
+
+**Environment-dependent acceptance is parked at the user's request, 18 October 2026.** Actual hidden-tab transitions, browser-cache restoration and corporate-browser checks remain [NOT RUN](#remaining-browser-acceptance), with [manual procedures](FRONTEND_ACCEPTANCE.md) for the user to review. Other checks that need unavailable reader sessions, permissions or representative workloads retain their explicit gaps. These do not block local phase 4 work; Stage C/D3, shared deployment and cutover remain unaccepted where their gates are open. Hosting remains deferred under the separate 15 October instruction.
 
 ## Task sizing and status
 
 Deliver one coherent, independently verifiable task at a time. Record submilestones before expanding scope. **Complete locally** means the stated checks passed on the recorded setup; it does not imply all platforms, workloads or production hosting passed. **Deferred** means the user explicitly put the work on hold.
+
+Planning a task or writing a test procedure is not implementation or acceptance evidence. Record `NOT RUN` with the missing condition when an environment cannot exercise a case; do not substitute owner simulations, administrator impersonation or ordinary Back navigation for the missing real condition. Local workload/resource work remains planned even while environment-dependent checks wait.
 
 ## Baseline and backend foundation
 
@@ -87,7 +91,7 @@ Further consolidation reduces `docs/` from 14 files to 11 by combining API corre
 
 ## Later phase boundaries
 
-Phase 3 is in progress; phases 4–6 remain planned, with production validation deferred. [The roadmap](roadmap.md#delivery-phases) defines their deliverables and exit conditions; [the plan](MODERNIZATION_PLAN.md#rollout-and-rollback) defines coexistence and rollback.
+Phase 3 implementation and the design system pass their recorded local checks; D3 still has deferred environment acceptance. Phase 4 has delivered P4.1a locally, with P4.1b next; phases 5–6 remain later work with production hosting/validation deferred. [The roadmap](roadmap.md#delivery-phases) defines their deliverables and exit conditions; [the plan](MODERNIZATION_PLAN.md#rollout-and-rollback) defines coexistence and rollback.
 
 ### Phase 3 / first native screen preparation
 
@@ -116,8 +120,8 @@ D3c submilestones recorded before acceptance work on 18 October 2026:
 | ID | Status | Scope and exit evidence |
 | --- | --- | --- |
 | D3c.1 | Complete locally | Request/render/lifecycle review and build/packaging/size checks pass. Both original findings and independent D-REV-01/02 are corrected; nine new regressions fail before the fixes and pass after them, with actual browser confirmation. |
-| D3c.2 | Partial — visibility/cache open | Nineteen in-app browser checks pass using configured local SSISDB and controlled fixtures. Actual hidden-document transition and cached-document restoration remain NOT RUN; the browser exposed neither condition. |
-| D3c.3 | Planned | Run corporate Edge/Chrome and any used Firefox/Safari smoke checks in their actual environments. Keep independent-reader, workload/p95 and deferred hosting/stream gates separate from local browser acceptance. |
+| D3c.2 | Partial — environment checks deferred | Nineteen in-app browser checks pass using configured local SSISDB and controlled fixtures. Actual hidden-document transition and cached-document restoration remain NOT RUN; the browser exposed neither condition. The user will review how to test these conditions. |
+| D3c.3 | Deferred — environment unavailable | Corporate Edge/Chrome and any used Firefox/Safari smoke checks remain NOT RUN. Follow the manual browser procedures when the environment is available; independent-reader, workload/p95 and hosting/stream gates remain separate. |
 
 #### D1a / source and packaged build — 17 October 2026
 
@@ -296,11 +300,13 @@ Selected evidence is retained under `.local/reports/frontend/20261018-d3c/`:
 
 #### Remaining browser acceptance
 
+On 18 October the user agreed to leave unavailable-environment checks pending while local development continues. The following statuses are unchanged acceptance gaps, not failures or completed checks. [Frontend acceptance](FRONTEND_ACCEPTANCE.md) owns preparation, numbered steps and evidence templates; this table owns current status.
+
 | Check | Status | Required action and expected evidence |
 | --- | --- | --- |
-| Actual hidden-tab return | NOT RUN | In an ordinary connected browser, hide/return both while idle and during delayed list/summary work. Observe no hidden polling, one resync or queued resync, no duplicate timer, preserved user pause and no automatic retry after denial. Repeat summary-only retry across return. Current controlled tabs always reported visible; simulated owner events do not close this check. |
-| Cached-document return | NOT RUN | From a deeper page with focus/scroll and user pause, open detail and return through an actual retained browser document. Observe metadata revalidation, exactly one restored page fetch, unchanged pause and restored view anchors. Exercise an expired retained cursor and verify one visible reset. Ordinary fresh-document fallback already passes. |
-| Corporate/cross-browser acceptance | NOT RUN | Run the overview path, keyboard/narrow layout, failures, timer recovery and the two conditions above in actual corporate Edge/Chrome. Include Firefox/Safari smoke checks when used. The connected in-app browser does not establish those environments. |
+| Actual hidden-tab return | Deferred — NOT RUN | [VIS-01–03](FRONTEND_ACCEPTANCE.md#hidden-tab-return): observe actual hidden/visible transitions, no new hidden poll cycle, one resync or queued resync, no duplicate timer, preserved pause and stopping after denial. Repeat summary-only retry across return. Current controlled tabs always reported visible. |
+| Cached-document return | Deferred — NOT RUN | [CACHE-01–02](FRONTEND_ACCEPTANCE.md#cached-document-return): prove a retained document returned, then observe metadata revalidation, one restored page fetch, pause/view restoration and one visible reset for an expired cursor. Ordinary fresh-document fallback already passes. |
+| Corporate/cross-browser acceptance | Deferred — NOT RUN | [BROWSER-01](FRONTEND_ACCEPTANCE.md#corporate-browser-walkthrough): repeat the workflow, keyboard/narrow layouts, failure and lifecycle cases in actual corporate Edge/Chrome; include Firefox/Safari when used. Record the environment and per-case outcome. |
 
 D3c.2/.3 and parent D3 remain open until their applicable checks pass. C8 workload/resource/reader, OBS-02 and deferred hosting/stream/cutover gates retain their existing status.
 
@@ -329,7 +335,7 @@ Evidence is retained under `.local/reports/frontend/20261018-stage-d-fixes/`, in
 
 #### Native design system — 18 October 2026
 
-Apply the revised 17 October sample's neutral-grey surfaces, indigo actions, readable typography, flat panels and 4 px spacing scale to `/app/`. Keep the existing operation owners, exact wire values, bounded choices and nine-column execution table. The retained legacy screens continue through the existing navigation; replacement-screen parity remains phase 4 work.
+Completed and committed as `3c41da7`: the revised 17 October sample's neutral-grey surfaces, indigo actions, readable typography, flat panels and 4 px spacing scale are applied to `/app/`. The existing operation owners, exact wire values, bounded choices and nine-column execution table are preserved. The retained legacy screens continue through the existing navigation; replacement-screen parity remains phase 4 work.
 
 | Submilestone | Status | Exit evidence |
 | --- | --- | --- |
@@ -353,3 +359,67 @@ D3c visibility/cache/corporate-browser, C8, OBS-02 and deferred hosting/stream/c
 | Performance | The execution-page test-network p95 target remains unpassed until the appropriate C8 measurements establish it. Record frontend request count, payload and rendering/build evidence separately from SQL, WSGI and network timings. |
 
 Stage C closes only after its remaining contract/SQL/HTTP/workload/resource/reader checks pass and deferred production gates are explicitly carried forward. Do not close it from operation coverage or this review alone.
+
+## Phase 4 / native execution workflows
+
+Planning recorded 18 October 2026 against `3c41da7`, following the user's instruction to leave unavailable-environment acceptance pending and decompose the next stage. **P4.1a is complete locally; P4.1b is next and the remaining P4 tasks are planned.** DS.1/DS.2 and D-REV-01/02 are completed prerequisites, not new tasks. [Native detail architecture](MODERNIZATION_PLAN.md#native-execution-detail-and-section-ownership) owns the boundaries; [API semantics](API_CONTRACT.md) remains authoritative.
+
+### First delivery: execution detail
+
+The first integrated increment is **overview → execution metadata/counts → refresh → return to the overview**, with a retained legacy detail link. It excludes observation tables, event text, values, history, charts, package controls and production streaming. `/app/executions/{id}` is available directly after P4.1a; overview execution links continue to use the legacy route until P4.1c. Preserve the legacy route during coexistence.
+
+| Task | Status / dependency | Deliverable | Exit evidence |
+| --- | --- | --- | --- |
+| P4.1a | Complete locally — 18 October 2026 | Prefix-aware native detail shell and metadata-driven `/api/v1/executions/{id}` read. Identity/package/environment, status/logging, timestamps/actual duration, separate observed active elapsed and recorded event counts. Shared styles/transport/display with screen-specific binding; loading, safe error, retry and legacy/overview navigation. | 114 Node tests, 357 Python cases (354 PASS, three opt-in native SQL skips), reproducible build and 82 native HTTP checks pass. Root/prefix, exact BIGINT, NULL/zero/unknown/literal text, no-SQL shell, safe failures and available browser/layout checks pass. See the dated completion record below; actual reader/active data and environment gates remain open. |
+| P4.1b | Planned; after P4.1a | Give the detail screen one request/refresh lifetime: deadlines, cancellation/generation checks, manual Refresh, pause/resume polling and visibility hooks. Define validated overview-return context and keep existing cached-document versus fresh-navigation semantics. | Slow response for execution A cannot overwrite B or clear it with A's late denial. Same-ID transient failure is labeled stale; missing/denied execution clears protected data. Refresh preserves current focus/scroll without taking focus back. Repeated activation coalesces; disposal removes requests/timers/listeners. Return preserves valid selection; a valid retained page path is re-fetched, otherwise page one is the explicit fallback. Actual visibility/cache checks remain separately NOT RUN until exercised. |
+| P4.1c | Planned; after P4.1a/P4.1b | Connect overview execution links to the accepted native route, retain an explicit legacy detail link and record field/behavior parity. Complete the local workflow acceptance against the packaged build. | Fresh Node and affected Flask/packaging checks pass. Local native HTTP and available browser checks cover direct links, root/prefix, a deeper overview page, created/running/completed/failed examples where available, refresh/retry, safe failures and Back fallback. Check 1280/768/360 px and keyboard flow; record request counts, payload/build sizes and cleanup. Separate synthetic edge evidence from native observations and carry unavailable cases forward. |
+
+**Execution order:** P4.1a → P4.1b → P4.1c. P4.1a confirmed its route/bootstrap and consumed DTO fields against the existing contract; no API/SQL change was needed. Confirm any new consumed fields before subsequent tasks; expand the API only as a separate justified task. Keep native overview links on their current destination until the P4.1c integration is ready. Completion of P4.1c establishes a locally integrated detail workflow, not completion of phase 4, D3 environment acceptance or C8.
+
+#### P4.1a / native execution detail foundation — 18 October 2026
+
+Added the explicit database-free `/app/executions/{id}` shell with canonical positive BIGINT-string validation, shared manifest/build-failure handling and prefix-aware application/API/legacy destinations. A shared native template owns the assets, header and startup messages. Shared metadata startup no longer requires overview controls: `overview-screen.js` owns those bindings; detail mounts its own request and renderer. No dependencies, API contract or SQL resources changed.
+
+The detail consumes execution identity, exact folder/project/package names and project LSN, separate nullable environment fields, status/logging codes, observed timestamps/actual duration, active elapsed time and the five recorded event counts from C4a. `meta.generated_at` labels the observation time. IDs/LSNs and timestamp attributes retain exact wire strings; only display uses locale/timezone projection. Zero is distinct from missing data; active elapsed is shown separately only when a start exists without an end. Names render as text, including CR/LF and markup-like content. Inconsistent or malformed DTOs fail safely before rendering. Initial load and manual retry coalesce; the 30-second request deadline and disposal abort belong to this initial-read owner. Polling, same-ID stale refresh and validated selection return remain P4.1b.
+
+**Automated/build evidence:** all **114 Node tests PASS**, including ten added detail/startup cases and the existing overview suites. All **357 Python cases finish: 354 PASS, three opt-in native SQL tests skipped**; 13 shell/packaging cases include four additions. Shell/metadata do no SQL; invalid IDs fail before build loading or SQL. Missing builds return safe 503, while API/health/legacy routes retain their behavior. Clean offline installation and repeated builds are byte-identical, all 41 legacy static files and the lockfile remain unchanged. Authored JS+CSS is **86,042 bytes**; packaged JS+CSS is **50,662 bytes**, **16,344 bytes gzip**. Generated output remains ignored and must accompany an application delivery.
+
+**Native and browser evidence:** 16 visible local SSISDB executions (13 succeeded, three failed) pass 82 HTTP checks. Root/prefix detail DTOs match each other and all corresponding overview fields; detail reads are independent of overview date/status inputs. Successful detail responses are **686–713 bytes** and use **two existing SQL queries**, with no eager section requests. Browser checks cover native success/failure, prefixed links, explicit legacy navigation, completed ordinary Back fallback and safe native absence. Synthetic cases separately cover created/active observations, the maximum BIGINT, nullable/zero/unknown values, long Unicode/markup-like names, hidden/absent/denied/malformed responses and keyboard detail/settings retry. Actual 1280/768/360 px browser viewports have no document/field horizontal overflow. Overview regression restores five-row pages and the 16-execution all-status summary, walks Next and retains legacy execution destinations. The resumed browser run records 40 successful query cleanups; this is local cleanup evidence, not sustained C8.2c resource acceptance.
+
+Evidence, private HTTP/DTO receipts, build hashes, screenshots and test logs are retained with verified hashes under `.local/reports/frontend/20261018-p4-1a/`. Reusable probe/preview/check helpers stay under `.local/tools/`. The initial sandbox could not connect to local SQL (08001); the same approved read-only local configuration passes outside that sandbox. The first preview ended before the resumed turn; its reused PID was attributed to a different executable and left alone. The resumed preview exited through its stop file and port 5180 is closed; viewport overrides were reset and the completed UI tab was closed. A failed temporary connection-error tab is left to the browser host's normal turn cleanup because its error document cannot be rebound through the supported access check.
+
+**Remaining:** P4.1b refresh/return and P4.1c overview integration are planned. The real catalog contains no current created/running observations; those browser cases are synthetic. Actual independent-reader visibility, hidden-tab/cache/corporate-browser, C8 workload/resource, OBS-02 and deferred hosting/stream/cutover gates remain unchanged. Ordinary Back above does not establish `pageshow.persisted: true` acceptance.
+
+### Subsequent deliveries
+
+Each row is a separate implementation task with its own tests and progress entry. Load a section only when it is opened, retain its bounded page/query state during refresh, and use only the sorts its API supports. Pair the listed workloads with the feature; local UI completion does not close a C8 gate without its measurements.
+
+| Task | Dependency | Scope and concrete exit condition | Related workload |
+| --- | --- | --- | --- |
+| P4.2a — executable observations | P4.1c | Page `/executables` with server order and stable statistics IDs. Repeated invocations stay separate; use executable-result vocabulary, nullable timing and explicit availability. Verify deep/empty/expired pages, unknown results, ID switching and retained focus. | C8.2b.2b: full/max observation pages and metadata enrichment. |
+| P4.2b — child observations | P4.2a | Page `/children` by observation ID and display exact paths, incomplete timing and coverage. An observed pre/post pair is not a separate execution or a child result. Verify repeated keys, missing identities/ends and continuation updates without fabricated links or success labels. | C8.2b.2b: dense repeated child keys and source rows read. |
+| P4.3 — searchable events | P4.1c; scheduled after P4.2b | Capability-aware event categories and literal server-side search with cursor paging. Preserve NULL/empty/markup-like text, truncation and unidentified coverage. Applying search/category resets its page; verify full-source matches beyond the displayed prefix, query races, denial and safe unavailable state. | C8.2b.2b: dense events, wide Unicode/LOB values and response bytes. |
+| P4.4a — parameters | P4.1c; scheduled after P4.3 | Load the parameter section only when values are enabled and opened. Distinguish sensitive/policy-redacted NULL, actual NULL and empty text; preserve type labels and stable IDs. Verify disabled capability sends no value request, paging, policy change and execution switching. | C8.2b.2b: maximum parameter pages, conversion and redaction. |
+| P4.4b — overrides | P4.4a | Add a separate override page/cursor and bounded property/value display. Respect override-value policy independently of permitted metadata. Verify long paths/text, truncation, sensitive precedence and old policy-bound cursor invalidation. | C8.2b.2b: wide overrides and bounded output versus source work. |
+| P4.5 — package history | P4.1c; scheduled after P4.4b | Page exact folder/project/package history with explicit status scope. Show actual timings and existing estimates separately, including sample count and missing/zero-mean cases. Do not inherit overview dates. Verify exact names, live retention, both supported directions and navigation to another execution. | C8.2b.2c: growing prior-success history and complete estimate equality. |
+| P4.6a — overview timeline | P4.1c; scheduled after P4.5 | Use server timeline buckets and the overview's exact effective bounds/selected statuses. Provide a text/table alternative; preserve chart selection during refresh. Verify DST repeated/missing hours, zero/edge buckets, bucket limits and stale-response handling. Label this creation cohort rather than start/end throughput. | C8.2b.2c: broad/selective summaries and up to 1,000 buckets. |
+| P4.6b — history visualization | P4.5 | Add a bounded history duration/estimate view from the accepted history data. Label loaded-page/sample scope; do not imply the entire history was fetched. Verify missing/zero/large durations, actual versus estimate, keyboard access and refresh state. Record any justified chart dependency before adding it. | Reuse P4.5 measurements; repeat affected payload/render checks. |
+| P4.7 — workflow parity and bookmark mapping | All preceding P4 deliveries | Review legacy workflows/fields and intentional API differences, including category links and value sections. Map supported legacy URLs to native destinations with prefix-safe return/fallback behavior. Preserve existing routes and assets; avoid automatic fallback that bypasses a denied API capability. | Local end-to-end request budgets, relevant C8 results and the environment matrix. Legacy retirement/default-route cutover belongs to phase 6. |
+
+The default order follows the table; dependency-independent tasks may be reordered explicitly in this file when evidence warrants it. Do not combine all sections into one change. A task requiring multiple independently testable pieces must record further submilestones before implementation grows.
+
+### API validation alongside phase 4
+
+| Existing gate | Next action and relationship to delivery |
+| --- | --- |
+| C8.2b.2b | First workload priority alongside P4.2–P4.4. Prepare dense events/repeated child keys, full/default/max/deep observation/value pages and wide Unicode/LOB distributions. Compare complete DTOs and bounded materialization against source rows/scans, regular/LOB reads, compilation, bytes and warm distributions. Retain existing-reader IO where available; record missing permissions separately. |
+| C8.2b.2c | Alongside P4.5/P4.6, grow prior-success history and test broad/selective summaries and 1,000 timeline buckets. Check exact aggregates/estimates and source growth before introducing caching, lookback limits or altered semantics. |
+| C8.2c | Start resource acceptance as the detail refresh/section lifecycle is introduced. Exercise repeated/concurrent success, failure, browser cancellation and bounded native timeouts; prove isolation and no accumulation of requests, logical connections/cursors or owned processes. Browser abort alone is insufficient. |
+| C8.3 | Retain actual Windows-reader API sign-in/HTTP, hidden/absent equivalence and network timings as a separate gate. If the required identity/session is unavailable, leave the affected cases NOT RUN while the user prepares it; do not replace them with administrator impersonation. |
+| OBS-02 and representative environments | Keep native cleanup-failure, real active/Scale Out and unavailable reader SHOWPLAN evidence open. Use their existing controlled procedures when the conditions exist; local correctness or synthetic workloads do not close them. |
+
+[API validation](API_ACCEPTANCE.md#workload-protocol) owns measurement procedures and results. [Frontend acceptance](FRONTEND_ACCEPTANCE.md#other-environment-dependent-gates) provides the handoff index for unavailable environments. Shared deployment/cutover still requires the applicable workload/resource/identity/browser gates and resumed hosting work; the execution-page network p95 target remains unpassed.
+
+### Per-task completion record
+
+Record the task ID, changed behavior and API dependencies; focused automated checks and packaged root/prefix checks; native versus synthetic browser/data evidence; request/payload/source/bundle measurements where affected; remaining environment cases with reason; and ownership-aware process cleanup. Store private runs under the existing ignored artifact layout and link sanitized results here. P4.1a's dated record above establishes its local completion; P4.1b is the next implementation task.

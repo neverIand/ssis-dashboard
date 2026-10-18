@@ -46,6 +46,16 @@ class PackagedFrontendTests(unittest.TestCase):
                          (ASSET_ROOT.parents[2] / 'web/LICENSES.txt').read_bytes())
         self.connect.assert_not_called()
 
+    def test_packaged_detail_uses_the_current_entry_at_root_and_prefix(self):
+        for prefix in ['', '/dashboard']:
+            client = Client(DispatcherMiddleware(Flask('mount'), {prefix: self.app}), Response) if prefix else self.app.test_client()
+            with client.get(f'{prefix}/app/executions/9223372036854775807') as response:
+                self.assertEqual(response.status_code, 200)
+                html = response.get_data(as_text=True)
+                self.assertIn(f'{prefix}/static/app/{self.manifest["src/main.js"]["file"]}', html)
+                self.assertIn('data-screen="execution"', html)
+        self.connect.assert_not_called()
+
     def test_manifest_assets_load_at_root_and_mounted_prefix_without_sql(self):
         files = {chunk['file'] for chunk in self.manifest.values()} | {'LICENSES.txt'}
         files.update(filename for chunk in self.manifest.values() for filename in chunk.get('css', []))

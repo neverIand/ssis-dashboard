@@ -1,8 +1,8 @@
 import 'vite/modulepreload-polyfill';
 import './styles.css';
 import { mountBootstrap } from './bootstrap.js';
-import { mountFilters } from './filters.js';
-import { mountOverview } from './render-overview.js';
+import { mountDetail } from './render-detail.js';
+import { mountOverviewScreen } from './overview-screen.js';
 
 const root = document.querySelector('[data-dashboard-app]');
 if (root) {
@@ -15,15 +15,14 @@ if (root) {
     retained = null;
     checkpoint = () => null;
     try {
-      dispose = mountBootstrap(root, { ready: (metadata, api, config) => {
-        const overview = mountOverview(root, { metadata, api, executionBase: config.execution_base,
-          retainedPaths: saved?.paths, restoreView: saved?.view });
-        if (saved) { saved.paths.length = 0; saved.view = null; }
+      if (root.dataset.screen === 'execution') {
+        dispose = mountBootstrap(root, { ready: (metadata, api, config) =>
+          mountDetail(root, { metadata, api, executionId: config.execution_id }) });
+      } else if (root.dataset.screen === 'overview') {
+        const overview = mountOverviewScreen(root, saved);
+        dispose = overview.dispose;
         checkpoint = overview.checkpoint;
-        const filters = mountFilters(root, { metadata, api, appBase: config.app_base,
-          onApplied: (selection, options) => { void overview.apply(selection, options); } });
-        return () => { filters(); overview.dispose(); };
-      } });
+      } else throw new TypeError('Unknown screen.');
     } catch {
       root.dataset.startup = 'error';
       root.querySelector('[data-app-status]').textContent =

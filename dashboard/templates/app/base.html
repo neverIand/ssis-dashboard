@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}SSIS Dashboard{% endblock %}</title>
+    {% for stylesheet in assets.styles %}
+    <link rel="stylesheet" href="{{ stylesheet }}">
+    {% endfor %}
+    {% for script in assets.preloads %}
+    <link rel="modulepreload" href="{{ script }}">
+    {% endfor %}
+    <script id="app-config" type="application/json">{{ app_config|tojson }}</script>
+    <script type="module" src="{{ assets.script }}"></script>
+</head>
+<body data-dashboard-app data-screen="{% block screen %}{% endblock %}" data-startup="starting">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <header class="page-header">
+        <div class="header-content">
+            <p class="brand">SSIS Dashboard</p>
+            <section class="connection-state" aria-label="Connection status">
+                <p id="app-status" role="status" aria-live="polite" data-app-status>Starting dashboard. If this message remains, reload the page or use the legacy dashboard.</p>
+                <button type="button" data-retry aria-describedby="app-status" hidden>Retry settings</button>
+                <p data-request-id hidden></p>
+                <p data-display-timezone hidden></p>
+                <noscript><p>Enable JavaScript to use this page, or open the legacy dashboard.</p></noscript>
+            </section>
+            <nav aria-label="Dashboard navigation">
+                {% block navigation %}<a href="{{ url_for('packages') }}" aria-label="Legacy dashboard">Legacy</a>{% endblock %}
+            </nav>
+        </div>
+    </header>
+    <main id="main-content" tabindex="-1">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

@@ -1,0 +1,54 @@
+{% extends "app/base.html" %}
+{% block title %}Execution {{ app_config.execution_id }} · SSIS Dashboard{% endblock %}
+{% block screen %}execution{% endblock %}
+{% block navigation %}
+<a href="{{ app_config.app_base }}">Overview</a>
+<a href="{{ app_config.execution_base }}{{ app_config.execution_id }}">Legacy detail</a>
+{% endblock %}
+{% block content %}
+        <div class="page-heading">
+            <h1 class="detail-heading">Execution {{ app_config.execution_id }}</h1>
+        </div>
+        <div class="detail-state">
+            <p class="resource-status" data-detail-status role="status">Waiting for settings.</p>
+            <p class="resource-status" data-detail-request-id hidden></p>
+            <button type="button" data-detail-retry hidden>Retry execution</button>
+        </div>
+        <div class="detail-grid" data-execution-detail hidden aria-busy="false">
+            <section class="panel detail-panel" aria-labelledby="identity-heading">
+                <h2 id="identity-heading">Execution</h2>
+                <dl class="detail-fields">
+                    <div><dt>Status</dt><dd><span class="status-badge" data-detail-field="status">—</span></dd></div>
+                    <div><dt>Logging level</dt><dd data-detail-field="logging">—</dd></div>
+                    <div><dt>Folder</dt><dd data-detail-field="folder">—</dd></div>
+                    <div><dt>Project</dt><dd data-detail-field="project">—</dd></div>
+                    <div><dt>Package</dt><dd data-detail-field="package">—</dd></div>
+                    <div><dt>Project version LSN</dt><dd data-detail-field="lsn">—</dd></div>
+                    <div><dt>Environment folder</dt><dd data-detail-field="environment-folder">—</dd></div>
+                    <div><dt>Environment</dt><dd data-detail-field="environment">—</dd></div>
+                </dl>
+            </section>
+            <section class="panel detail-panel" aria-labelledby="timing-heading">
+                <h2 id="timing-heading">Timing</h2>
+                <dl class="detail-fields">
+                    <div><dt>Created</dt><dd><time data-detail-field="created">—</time></dd></div>
+                    <div><dt>Started</dt><dd><time data-detail-field="started">—</time></dd></div>
+                    <div><dt>Ended</dt><dd><time data-detail-field="ended">—</time></dd></div>
+                    <div><dt>Actual duration</dt><dd data-detail-field="duration">—</dd></div>
+                    <div data-active-elapsed hidden><dt>Active elapsed (observed)</dt><dd data-detail-field="elapsed">—</dd></div>
+                </dl>
+            </section>
+            <section class="panel detail-panel" aria-labelledby="events-heading">
+                <h2 id="events-heading">Recorded events</h2>
+                <dl class="detail-fields">
+                    <div><dt>All events</dt><dd data-detail-field="all">—</dd></div>
+                    <div><dt>Warnings</dt><dd data-detail-field="warnings">—</dd></div>
+                    <div><dt>Errors</dt><dd data-detail-field="errors">—</dd></div>
+                    <div><dt>Duplicate warnings</dt><dd data-detail-field="duplicate_warnings">—</dd></div>
+                    <div><dt>Memory warnings</dt><dd data-detail-field="memory_warnings">—</dd></div>
+                </dl>
+                <p class="detail-note">Duplicate warnings are included in Warnings. Memory warnings are counted separately.</p>
+            </section>
+            <p class="resource-status detail-observed" data-detail-observed></p>
+        </div>
+{% endblock %}

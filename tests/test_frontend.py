@@ -97,6 +97,61 @@ class FrontendShellTests(unittest.TestCase):
         self.assertEqual(urlsplit(redirect.location).query, 'status=2')
         self.connect.assert_not_called()
 
+    def test_detail_deep_links_are_database_free_exact_and_prefix_aware(self):
+        for prefix in ['', '/ops/monitor']:
+            client = Client(DispatcherMiddleware(Flask('mount'), {prefix: self.app}), Response) if prefix else self.client
+            for identifier in ['1', '9223372036854775807']:
+                with self.subTest(prefix=prefix, identifier=identifier):
+                    response = client.get(f'{prefix}/app/executions/{identifier}?status=4&from=ignored')
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response.headers['Cache-Control'], 'no-store')
+                    html = response.get_data(as_text=True)
+                    self.assertEqual(shell_config(html), {
+                        'app_base': f'{prefix}/app/', 'api_base': f'{prefix}/api/v1/',
+                        'execution_base': f'{prefix}/execution/', 'execution_id': identifier,
+                    })
+                    for markup in ['data-screen="execution"', f'Execution {identifier}',
+                                   f'href="{prefix}/app/"', f'href="{prefix}/execution/{identifier}"',
+                                   f'src="{prefix}/static/app/assets/main.js"',
+                                   'aria-labelledby="identity-heading"', 'aria-labelledby="timing-heading"',
+                                   'aria-labelledby="events-heading"', 'data-execution-detail hidden',
+                                   'Actual duration', 'Active elapsed (observed)', 'Retry execution', '<noscript>']:
+                        self.assertIn(markup, html)
+                    for markup in ['overview-filters', 'data-status-choices', 'data-execution-table']:
+                        self.assertNotIn(markup, html)
+        self.connect.assert_not_called()
+
+    def test_invalid_detail_ids_fail_before_build_loading_or_sql(self):
+        self.manifest_path.unlink()
+        for identifier in ['0', '00', '01', '-1', '+1', '1.0', '1e2', 'abc',
+                           '9223372036854775808', '%EF%BC%91', '%3Cscript%3E']:
+            with self.subTest(identifier=identifier):
+                response = self.client.get(f'/app/executions/{identifier}')
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.headers['Cache-Control'], 'no-store')
+                self.assertNotIn('Traceback', response.get_data(as_text=True))
+        for path in ['/app/executions/', '/app/executions/42/unknown', '/app/executions/42/']:
+            self.assertEqual(self.client.get(path).status_code, 404)
+        self.connect.assert_not_called()
+
+    def test_detail_uses_shared_safe_build_failure_and_preserves_protocol(self):
+        self.manifest_path.write_text('{incomplete build', encoding='utf-8')
+        response = self.client.get('/app/executions/42')
+        self.assertEqual(response.status_code, 503)
+        html = response.get_data(as_text=True)
+        self.assertIn('Application unavailable', html)
+        self.assertIn(response.headers['X-Request-ID'], html)
+        self.assertNotIn('manifest.json', html)
+        self.assertEqual(self.client.get('/api/v1/meta').status_code, 200)
+        self.write_manifest(self.manifest)
+        head = self.client.head('/app/executions/42')
+        self.assertEqual(head.status_code, 200)
+        self.assertEqual(head.data, b'')
+        post = self.client.post('/app/executions/42')
+        self.assertEqual(post.status_code, 405)
+        self.assertIn('GET', post.headers['Allow'])
+        self.connect.assert_not_called()
+
     def test_shared_chunks_load_their_styles_and_preload_once_even_with_cycles(self):
         shared = {'file': 'assets/shared.js', 'css': ['assets/main.css', 'assets/shared.css'],
                   'imports': ['src/main.js']}

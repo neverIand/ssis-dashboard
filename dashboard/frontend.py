@@ -6,6 +6,7 @@ from pathlib import Path, PurePosixPath
 
 from flask import Blueprint, current_app, make_response, render_template, url_for
 
+from dashboard.api_validation import identifier
 from dashboard.observability import log_event, request_id
 
 
@@ -58,8 +59,7 @@ def _entry_assets():
     return {'script': visit('src/main.js'), 'styles': styles, 'preloads': preloads}
 
 
-@blueprint.get('/', merge_slashes=False)
-def overview():
+def _shell(template, **config):
     try:
         assets = _entry_assets()
     except (OSError, ValueError, KeyError):
@@ -70,13 +70,25 @@ def overview():
             request_id=request_id(),
         ), 503)
     else:
-        response = make_response(render_template('app/index.html', assets=assets, app_config={
+        response = make_response(render_template(template, assets=assets, app_config={
             'app_base': url_for('frontend.overview'),
             'api_base': url_for('api.metadata').rsplit('/', 1)[0] + '/',
             'execution_base': url_for('execution', execution_id=0).rsplit('/', 1)[0] + '/',
+            **config,
         }))
     response.headers['Cache-Control'] = 'no-store'
     return response
+
+
+@blueprint.get('/', merge_slashes=False)
+def overview():
+    return _shell('app/index.html')
+
+
+@blueprint.get('/executions/<execution_id>', merge_slashes=False)
+def execution(execution_id):
+    identifier(execution_id)
+    return _shell('app/execution.html', execution_id=execution_id)
 
 
 def register_frontend(app):

@@ -23,6 +23,10 @@ Scope is project deployment and public `SSISDB.catalog.*` views. Legacy `msdb` s
 
 Vite HMR is a development feature. Data-only polling can deliver the first usable screen and serve as fallback; phase 5 still requires a working production stream when hosting resumes.
 
+**Phase 4 local delivery, agreed 18 October 2026:** use the native design system at `3c41da7`, following the review fixes at `1a79c7d`. Deliver a read-only native execution detail page, its refresh/return behavior and an integrated local walkthrough. Then add observations, events, values, history and charts in bounded tasks. Pair each screen with the relevant Stage C workload checks. [Progress](PROGRESS.md#phase-4--native-execution-workflows) owns the task order, dependencies and exit evidence.
+
+Environment-dependent acceptance may wait while the user prepares the test environment. Actual hidden-tab/cache behavior, corporate-browser checks and unavailable reader/workload conditions remain explicitly unverified; they do not block local phase 4 development or count as passed. [Frontend acceptance](FRONTEND_ACCEPTANCE.md) explains the browser procedures. This sequencing does not close Stage C/D3, authorize shared deployment, or resume the deferred hosting work.
+
 ## Delivery phases
 
 | Phase | Deliverable and exit condition |
@@ -31,7 +35,7 @@ Vite HMR is a development feature. Data-only polling can deliver the first usabl
 | 1 — backend | Factory/configuration, pinned runtime, owned resources, safe failures and legacy adapter validated |
 | 2 — Stage C API | Read-only operations, contract, typed SQL/JSON, bounded pages and access/redaction; workload/resource/reader acceptance |
 | 3 — first native screen | `/app/` shell, filters/list/cards, data-only in-place refresh; complete filter → list → detail-link path. [D1a–D3c](PROGRESS.md#phase-3--first-native-screen-preparation) define the nine bounded tasks and local acceptance. |
-| 4 — parity | Details/children/events/values/history/charts, keyboard/responsive behavior and legacy URL mapping |
+| 4 — parity | First deliver native execution detail, in-place refresh and return to the overview; then observations/children/events/values/history/charts, keyboard/responsive behavior and legacy URL mapping. [P4.1a–P4.7](PROGRESS.md#phase-4--native-execution-workflows) define the independently verifiable tasks. |
 | 5 — live updates | Shared detection, production stream and [recovery/capacity checks](MODERNIZATION_PLAN.md#production-live-updates) |
 | 6 — cutover | Prebuilt install, parity/load/host checks, rollback rehearsal, then obsolete UI/assets removal |
 
