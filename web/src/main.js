@@ -16,8 +16,12 @@ if (root) {
     checkpoint = () => null;
     try {
       if (root.dataset.screen === 'execution') {
-        dispose = mountBootstrap(root, { ready: (metadata, api, config) =>
-          mountDetail(root, { metadata, api, executionId: config.execution_id }) });
+        dispose = mountBootstrap(root, { ready: (metadata, api, config) => {
+          const detail = mountDetail(root, { metadata, api, executionId: config.execution_id,
+            appBase: config.app_base, restoreView: saved?.detail });
+          checkpoint = () => ({ detail: detail.checkpoint() });
+          return detail.dispose;
+        } });
       } else if (root.dataset.screen === 'overview') {
         const overview = mountOverviewScreen(root, saved);
         dispose = overview.dispose;

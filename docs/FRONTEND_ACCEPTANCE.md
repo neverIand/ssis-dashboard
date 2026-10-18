@@ -102,6 +102,17 @@ Run the following in actual corporate Edge/Chrome and each additional supported 
 
 When P4.1c is available, extend this walkthrough to native execution detail, direct ID links, execution switching, detail refresh and the retained legacy link. Do not mark planned detail/section workflows passed from the current overview checks. [Phase 4 tasks](PROGRESS.md#phase-4--native-execution-workflows) define each later section's additional cases.
 
+## Native detail refresh and return
+
+P4.1b provides this behavior on direct `/app/executions/{id}` links. P4.1c still owns switching overview links and full workflow parity. Keep native observations separate from controlled failure/active/unknown fixtures.
+
+1. Open a native detail directly and under an available prefix. Check settings then one detail request, exact ID/timing/counts and retained Legacy detail navigation. Manual Refresh, polling and Resume must share that request owner. Hold a delayed cycle, activate Refresh repeatedly and move focus/scroll elsewhere before it completes; verify no overlapping request or focus taken back. Use a scroll position away from its current limit; record browser clamping separately when content height shrinks.
+2. Pause auto refresh, wait beyond the interval and use manual Refresh. Resume should update once when idle or join pending work. Exercise transient failure, 401/403/404 and malformed responses in isolated fixtures. Only transient same-ID failures may retain labeled old observations and their original time; other failures clear every protected field and stop automatic retry. Retry recovers after the cause is resolved.
+3. Use a detail link with valid selection-only `overview` context. Verify its Overview destination preserves exact names/times/status/order/limit and opens page one, with a visible explanation. Invalid, repeated or external-looking context must fall back to the local default overview without constraining the detail read. Compare Browser Back independently; a fresh document starts at page one, while a real retained overview re-fetches its saved path and resets an expired path once.
+4. Extend VIS-01–03 to detail using one detail request per cycle instead of list plus summary. Extend CACHE-01–02 to detail with actual `pageshow.persisted: true`: metadata and detail must be re-fetched before restoring a still-applicable pause/view checkpoint. Move focus/scroll during revalidation and check that completion respects that new position. Never infer this condition from owner simulations or ordinary Back. Record an unavailable hidden/cache condition as NOT RUN.
+
+Repeat keyboard and 1280/768/360 px checks with long literal names, request IDs and both Refresh and Pause/Resume controls. Returning after a settings failure must not leave old result fields, active schedule hints or an unwired Retry execution control. Update the owning [P4.1b/P4.1c records](PROGRESS.md#phase-4--native-execution-workflows) only for the exact cases observed; these procedures do not close their environment gates.
+
 ## Other environment-dependent gates
 
 These gates keep their existing owners and result status. Missing environments can wait; local workload/resource work that can run should remain scheduled alongside phase 4.

@@ -117,6 +117,9 @@ class FrontendShellTests(unittest.TestCase):
                                    'aria-labelledby="events-heading"', 'data-execution-detail hidden',
                                    'Actual duration', 'Active elapsed (observed)', 'Retry execution', '<noscript>']:
                         self.assertIn(markup, html)
+                    for markup in ['data-detail-refresh disabled', 'data-detail-poll-toggle disabled',
+                                   'data-overview-link', 'data-legacy-detail-link', 'data-overview-return-notice hidden']:
+                        self.assertIn(markup, html)
                     for markup in ['overview-filters', 'data-status-choices', 'data-execution-table']:
                         self.assertNotIn(markup, html)
         self.connect.assert_not_called()

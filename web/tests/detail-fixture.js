@@ -13,24 +13,37 @@ export function detailResponse(executionId = '9223372036854775807') {
 
 // DOM double for mounted startup/render behavior; no browser/layout claims.
 export function detailDOM() {
+  let document;
   class Node extends EventTarget {
     constructor() { super(); this.textContent = ''; this.hidden = false; this.dataset = {}; this.attributes = new Map(); }
     setAttribute(key, value) { this.attributes.set(key, String(value)); }
     removeAttribute(key) { this.attributes.delete(key); }
+    focus() { if (!this.disabled) document.activeElement = this; }
+    contains(node) { return node === this; }
   }
   const nodes = new Map();
   for (const key of ['app-status', 'retry', 'request-id', 'display-timezone', 'execution-detail',
-    'detail-status', 'detail-retry', 'detail-request-id', 'detail-observed', 'active-elapsed']) {
+    'detail-status', 'detail-retry', 'detail-request-id', 'detail-observed', 'active-elapsed',
+    'detail-refresh', 'detail-poll-toggle', 'detail-poll-status', 'overview-link', 'legacy-detail-link',
+    'overview-return-notice']) {
     nodes.set(`[data-${key}]`, new Node());
   }
   const fields = ['folder', 'project', 'package', 'lsn', 'environment-folder', 'environment', 'status', 'logging',
     'created', 'started', 'ended', 'duration', 'elapsed', 'all', 'warnings', 'errors', 'duplicate_warnings', 'memory_warnings']
     .map(key => Object.assign(new Node(), { dataset: { detailField: key } }));
-  const document = { location: { origin: 'https://example.test' }, getElementById(id) {
+  const window = Object.assign(new EventTarget(), { location: { origin: 'https://example.test', search: '' },
+    scrollX: 0, scrollY: 0, scrollTo(x, y) { this.scrollX = x; this.scrollY = y; } });
+  const main = new Node();
+  document = Object.assign(new EventTarget(), { location: window.location, defaultView: window,
+    visibilityState: 'visible', body: new Node(), getElementById(id) {
+    if (id === 'main-content') return main;
     if (id !== 'app-config') throw new Error('Unexpected element');
     return { textContent: JSON.stringify({ app_base: '/ops/app/', api_base: '/ops/api/v1/',
       execution_base: '/ops/execution/', execution_id: '9223372036854775807' }) };
-  } };
+  } });
+  document.activeElement = document.body;
+  nodes.get('[data-execution-detail]').contains = node => fields.includes(node);
+  nodes.get('[data-detail-retry]').hidden = true;
   const root = { ownerDocument: document, dataset: {}, querySelector(selector) {
     if (!nodes.has(selector)) throw new Error(`No overview controls on detail: ${selector}`);
     return nodes.get(selector);
@@ -38,5 +51,6 @@ export function detailDOM() {
     if (selector !== '[data-detail-field]') throw new Error(`Unexpected selector: ${selector}`);
     return fields;
   } };
-  return { root, get: key => nodes.get(`[data-${key}]`), field: key => fields.find(node => node.dataset.detailField === key) };
+  return { root, document, window, main, get: key => nodes.get(`[data-${key}]`),
+    field: key => fields.find(node => node.dataset.detailField === key) };
 }

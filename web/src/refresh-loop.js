@@ -1,4 +1,4 @@
-// Scheduling owns one timer; all data requests still belong to the overview.
+// Scheduling owns one timer; data requests belong to the mounted screen's owner.
 export function createRefreshLoop({ refresh, publish, intervalMs = 30000, maxIntervalMs = 300000,
   paused = false, visible = true }) {
   let timer = null, nextAt = null, generation = 0;

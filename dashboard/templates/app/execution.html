@@ -2,13 +2,19 @@
 {% block title %}Execution {{ app_config.execution_id }} · SSIS Dashboard{% endblock %}
 {% block screen %}execution{% endblock %}
 {% block navigation %}
-<a href="{{ app_config.app_base }}">Overview</a>
-<a href="{{ app_config.execution_base }}{{ app_config.execution_id }}">Legacy detail</a>
+<a href="{{ app_config.app_base }}" data-overview-link>Overview</a>
+<a href="{{ app_config.execution_base }}{{ app_config.execution_id }}" data-legacy-detail-link>Legacy detail</a>
 {% endblock %}
 {% block content %}
         <div class="page-heading">
             <h1 class="detail-heading">Execution {{ app_config.execution_id }}</h1>
+            <div class="section-actions">
+                <button type="button" data-detail-refresh disabled>Refresh</button>
+                <button type="button" data-detail-poll-toggle disabled>Pause auto refresh</button>
+            </div>
         </div>
+        <p class="resource-status" data-overview-return-notice hidden></p>
+        <p class="resource-status" data-detail-poll-status role="status"></p>
         <div class="detail-state">
             <p class="resource-status" data-detail-status role="status">Waiting for settings.</p>
             <p class="resource-status" data-detail-request-id hidden></p>

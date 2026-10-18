@@ -1,5 +1,6 @@
 import { ApiError, safeRequestId } from './api.js';
 import { createDisplay, formatCode, formatId, formatText } from './display.js';
+import { createRefreshLoop } from './refresh-loop.js';
 
 export function readExecutionDetail(response, executionId, display) {
   try {
@@ -48,39 +49,82 @@ export function readExecutionDetail(response, executionId, display) {
   } catch { throw new ApiError('invalid_response', { requestId: response?.meta?.request_id }); }
 }
 
-// Own the initial read and explicit retry for one shell ID. Refresh belongs to P4.1b.
-export function createDetailLoader({ api, executionId, metadata, publish, timeoutMs = 30000, locale }) {
+const transient = error => ['network', 'timeout'].includes(error.kind)
+  || (error.kind === 'http' && (error.status >= 500 || [408, 429].includes(error.status)));
+
+export function createDetailLoader({ api, executionId, metadata, publish, timeoutMs = 30000, locale,
+  autoRefresh = true, visible = true, pollIntervalMs = 30000, maxPollIntervalMs = 300000 }) {
   if (executionId === null) throw new TypeError('Missing execution ID.');
   formatId(executionId);
   const display = createDisplay({ timeZone: metadata.display_timezone, locale });
   let active = null;
   let disposed = false;
+  let generation = 0;
+  let state = { phase: 'idle', executionId, response: null, error: null, stale: false, operation: 'initial' };
+  const busy = () => state.phase === 'loading';
+  const show = poll => publish({ ...state, busy: busy(), poll });
+  const loop = createRefreshLoop({ refresh: load, publish: show, paused: !autoRefresh, visible,
+    intervalMs: pollIntervalMs, maxIntervalMs: maxPollIntervalMs });
+  function emit(changes) {
+    state = { ...state, ...changes };
+    show(loop.update({ busy: busy(), eligible: true, failed: state.phase === 'error',
+      retryable: state.error === null || transient(state.error),
+      coversReturn: state.operation === 'initial' || state.operation === 'select' }));
+  }
+  function cancel() {
+    generation += 1;
+    if (active) { clearTimeout(active.timer); active.controller.abort(); }
+    active = null;
+  }
   async function load() {
     if (disposed || active) return;
+    const current = ++generation;
+    const id = state.executionId;
+    const previous = state.response;
     const controller = new AbortController();
     const job = { controller, timer: null };
     active = job;
     let timedOut = false;
     job.timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
-    publish({ phase: 'loading', response: null, error: null });
+    emit({ phase: 'loading', response: previous, error: null, stale: previous !== null });
     try {
-      const response = await api.get(`executions/${executionId}`, { signal: controller.signal });
-      if (disposed) return;
+      const response = await api.get(`executions/${id}`, { signal: controller.signal });
+      if (disposed || current !== generation) return;
       if (controller.signal.aborted) throw new ApiError('timeout');
-      publish({ phase: 'ready', response: readExecutionDetail(response, executionId, display), error: null });
+      emit({ phase: 'ready', response: readExecutionDetail(response, id, display), error: null,
+        stale: false, operation: 'refresh' });
     } catch (error) {
-      if (!disposed) publish({ phase: 'error', response: null, error: timedOut ? new ApiError('timeout')
-        : error instanceof ApiError ? error : new ApiError('invalid_response') });
+      if (!disposed && current === generation) {
+        const failure = timedOut ? new ApiError('timeout')
+          : error instanceof ApiError ? error : new ApiError('invalid_response');
+        const keep = previous !== null && transient(failure);
+        emit({ phase: 'error', response: keep ? previous : null, error: failure, stale: keep, operation: 'refresh' });
+      }
     } finally {
       clearTimeout(job.timer);
       if (active === job) active = null;
     }
   }
-  return { load, dispose() {
-    disposed = true;
-    if (active) { clearTimeout(active.timer); active.controller.abort(); }
-    active = null;
-  } };
+  return { load, refresh: load,
+    select(id) {
+      if (id === null) throw new TypeError('Missing execution ID.');
+      formatId(id);
+      if (disposed) return;
+      if (id === state.executionId) return load();
+      cancel();
+      loop.reset();
+      state = { phase: 'idle', executionId: id, response: null, error: null, stale: false, operation: 'select' };
+      return load();
+    },
+    setVisible: loop.setVisible,
+    togglePolling: () => loop.togglePaused(),
+    dispose() {
+      disposed = true;
+      loop.dispose();
+      cancel();
+      state = { ...state, response: null, error: null, stale: false };
+    },
+  };
 }
 
 export function detailFields(response, display) {
