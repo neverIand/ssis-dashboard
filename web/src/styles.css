@@ -149,6 +149,7 @@ main {
 }
 
 .name-cell {
+  min-width: 10rem;
   max-width: 22rem;
   overflow-wrap: anywhere;
 }

@@ -1,10 +1,10 @@
 # Implementation progress
 
-Updated 17 October 2026. Development base: `dev-next`; planning baseline: `ce8d04e`. [Roadmap](roadmap.md) owns scope; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns status and next actions. Detailed results belong in [API validation](API_ACCEPTANCE.md) and the [backend checklist](BACKEND_CHECKLIST.md).
+Updated 18 October 2026. Development base: `dev-next`; planning baseline: `ce8d04e`. [Roadmap](roadmap.md) owns scope; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns status and next actions. Detailed results belong in [API validation](API_ACCEPTANCE.md) and the [backend checklist](BACKEND_CHECKLIST.md).
 
 **Stage C remains in progress.** All 14 GET operations and all 12 execution sorts are implemented; the three review remedies pass their [recorded local checks](API_ACCEPTANCE.md#sql-remedies-replay-17-october-2026). Representative workload, resource and independent API reader acceptance remain open. The first native overview's API prerequisites are available; frontend work is a separate milestone.
 
-**Next task: D2d / execution paging and sorting controls.** D1 and D2a–D2c pass their local checks. On 17 October 2026 the user prioritized preparing delivery phase 3; the [nine tasks below](#phase-3--first-native-screen-preparation) refine D1–D3 into independently verifiable deliveries. The remaining C8 checks do not block local frontend development; retain them for API acceptance and before cutover/shared deployment. No Stage C acceptance item is waived or marked complete by this sequencing decision. Hosting remains deferred.
+**Next task: finish D3c browser acceptance.** D1 and D2 pass locally; D3's implementation and available in-app browser checks pass after the two review fixes recorded below. Actual hidden-tab transitions, browser-cache restoration and corporate-browser checks remain [open](#remaining-browser-acceptance). On 17 October 2026 the user prioritized preparing delivery phase 3; the [nine tasks below](#phase-3--first-native-screen-preparation) refine D1–D3 into independently verifiable deliveries. C8 workload/resource/reader checks remain separate API acceptance gates before shared deployment/cutover. Hosting remains deferred.
 
 ## Task sizing and status
 
@@ -93,7 +93,7 @@ Phase 3 is in progress; phases 4–6 remain planned, with production validation 
 
 Planning recorded 17 October 2026 against `ce8d04e`. The outcome is a usable `/app/` overview: choose a visible folder/project and creation-time/status scope, inspect summary cards and a bounded execution list, open the existing execution details, and refresh data in place. The legacy homepage stays available during this phase. Details/children/events/values/history/charts and legacy URL translation belong to phase 4; production detection/SSE belongs to phase 5; cutover and asset removal belong to phase 6.
 
-The parent milestones remain **D1 foundation**, **D2 usable overview** and **D3 refresh/acceptance**. D1 and D2 are complete locally; D3 is in progress. D3a and D3b are implemented with connected-browser acceptance still open. A parent closes only when its children pass. Each task updates this file with its implementation, checks, evidence and remaining gaps. [Overview state and refresh](MODERNIZATION_PLAN.md#overview-state-and-refresh) owns the cross-task behavior; [API semantics](API_CONTRACT.md) remains authoritative for wire values and cursor rules.
+The parent milestones remain **D1 foundation**, **D2 usable overview** and **D3 refresh/acceptance**. D1 and D2 are complete locally; D3 is in progress. D3a/D3b implementation and available local browser checks pass; cache/visibility and corporate-browser acceptance remain open. A parent closes only when its children pass. Each task updates this file with its implementation, checks, evidence and remaining gaps. [Overview state and refresh](MODERNIZATION_PLAN.md#overview-state-and-refresh) owns the cross-task behavior; [API semantics](API_CONTRACT.md) remains authoritative for wire values and cursor rules.
 
 | ID | Status | Deliverable | Exit check |
 | --- | --- | --- | --- |
@@ -103,13 +103,21 @@ The parent milestones remain **D1 foundation**, **D2 usable overview** and **D3 
 | D2b | Complete locally | Paged folder/project choices, exact-name and offset-aware creation filters, multi-status checkboxes, separate draft/applied state and shareable selection/sort/limit URLs. | 16 new state/navigation cases and browser checks pass for second pages, literal names, empty scopes, invalid ranges, late responses, Back/Forward and reset. Seven-digit bounds remain exact; see the dated D2b record below. |
 | D2c | Complete locally | First execution page, exact-bound all-status cards, typed rows and legacy detail links, safe partial failure/retry and a compact responsive header. | Native local browser filter → list → detail → Back passes. Twelve new overview cases plus controlled browser NULL/unknown/long-text/failure/race checks pass; see the dated D2c record below. |
 | D2d | Complete locally | All advertised execution sorts/directions and bounded page sizes; Next/Previous use opaque cursors and an in-memory page-entry path. Apply/order/size changes start at page one. | Nine new state cases, 24 native HTTP sort/direction walks and browser paging/history/limit/expiry/retention/NULL/tie checks pass. Default 50/max 200 and live results have explicit behavior without local sorting or a fabricated total-page count; see the dated record below. |
-| D3a | Implemented — browser acceptance open | Manual data-only refresh, same-scope stale observations, keyed rows, focus/scroll handling and an in-memory browser-cache return checkpoint. | 16 new state/DOM-double tests and 11 actual HTTP owner scenarios pass, including local SQL. Real connected-browser focus/scroll, keyboard, visible stale-state and detail-return checks remain NOT RUN: CUA exposes no browser connection. See the dated record and pending checklist below. |
-| D3b | Implemented — browser acceptance open | Poll through the existing refresh owner with one completion-based timer, cost-aware delay, bounded failure backoff, pause/resume and hidden-tab recovery. Dispose timers, requests and listeners together. | All 95 Node tests and five actual HTTP owner scenarios pass, including a real 30-second native polling cycle and configured-identity request-cost measurements. Connected-browser pause/resume, hidden return, cache restoration and narrow-layout acceptance remain NOT RUN. See the dated record below; native SQL cancellation is not inferred from browser abort. |
-| D3c | Planned | Record integrated phase 3 browser acceptance, reproducible packaged-build checks and authored/total bundle sizes. Review the completed frontend for correctness, avoidable requests and lifecycle cleanup; update installation/use instructions and the retained evidence index. | Exercise the full path on local SSISDB in corporate Edge/Chrome, keyboard-only and narrow layouts; include Firefox/Safari smoke checks when used. Check root/prefix routing, bookmarks/back-forward, literal text, accessibility states, request races and polling recovery. Measure authored JS+CSS against the 150 KiB uncompressed target and record the whole bundle; label unrun cases and API/hosting gates separately. |
+| D3a | Implemented — cache acceptance open | Manual data-only refresh, same-scope stale observations, keyed rows, focus/scroll handling and an in-memory browser-cache return checkpoint. | State/HTTP checks plus actual in-app browser keyboard, focus/scroll, failure states and ordinary detail-Back fallback pass. Cached-document restoration remains unexercised; see D3c's record and remaining checks. |
+| D3b | Implemented — visibility/cache acceptance open | Poll through the existing refresh owner with one completion-based timer, cost-aware delay, bounded failure backoff, pause/resume and hidden-tab recovery. Dispose timers, requests and listeners together. | All 95 Node tests, prior HTTP owner scenarios and actual browser pause/resume, slow automatic cycles, retry/backoff and narrow layout pass. Actual hidden-tab and cached-return behavior remain open. Browser abort is not native SQL cancellation evidence. |
+| D3c | Partial — local review/checks pass | Record integrated phase 3 browser acceptance, reproducible packaged-build checks and authored/total bundle sizes. Review the completed frontend for correctness, avoidable requests and lifecycle cleanup; update installation/use instructions and the retained evidence index. | Nineteen available browser checks pass; two remain NOT RUN. Two review findings are fixed and rechecked against final assets. Corporate/cross-browser and API/hosting gates remain explicit. See the bounded submilestones and dated record below. |
 
 **Execution order:** `D1a → D1b → D2a → D2b → D2c → D2d → D3a → D3b → D3c`. D2c is the first end-to-end usable screen; D2d completes its table interactions; D3c is the phase 3 acceptance checkpoint. Accessibility, text safety and useful failure states are built into each task and verified together at the end.
 
 Use the existing Flask test setup for route/build integration, focused frontend state/request tests for the hard cases, and actual browser runs for behavior. Choose the smallest adequate test tooling during D1a; do not add a framework or chart/table package for this overview. Build-only tests or mocked API responses do not establish browser/native acceptance. Keep reusable helpers and dated evidence under the existing [local-artifact rules](installation.md#local-artifacts); attribute/reuse running servers and stop task-owned resources before completion.
+
+D3c submilestones recorded before acceptance work on 18 October 2026:
+
+| ID | Status | Scope and exit evidence |
+| --- | --- | --- |
+| D3c.1 | Complete locally | Request/render/lifecycle and overview-parity review complete. Clean source builds, root/prefix packaging, size budget and indexed evidence pass; two review findings are corrected. |
+| D3c.2 | Partial — visibility/cache open | Nineteen in-app browser checks pass using configured local SSISDB and controlled fixtures. Actual hidden-document transition and cached-document restoration remain NOT RUN; the browser exposed neither condition. |
+| D3c.3 | Planned | Run corporate Edge/Chrome and any used Firefox/Safari smoke checks in their actual environments. Keep independent-reader, workload/p95 and deferred hosting/stream gates separate from local browser acceptance. |
 
 #### D1a / source and packaged build — 17 October 2026
 
@@ -212,16 +220,16 @@ The renderer reuses rows/links by execution ID, patches cells and restores the s
 
 **Actual HTTP/native scope:** the real request owner through Node fetch passes **11 scenarios / 56 list-summary requests** against the owned Flask preview. The configured local SQL identity verifies fixed/default first-page refresh, exact second-page entry replay with unchanged bounds/`as_of`/upper fence, historical total 16 and current-default total zero. All **12 native responses** pass the tracked schemas. Controlled HTTP fixtures verify list/summary 503 retry, changed-window card clearing, denial, expiry, retained-empty pages, coalescing, changed rows/counts and transport cancellation. Across the run, **14 native query attempts** report success and successful cleanup. Final root and `/dashboard` HTTP shells each contain one Refresh button and serve byte-identical current JS/CSS. Preview process/listener are closed; no browser tab was created, and the CUA session was reset. Evidence is retained under `.local/reports/frontend/20261018-d3a/`.
 
-**Connected-browser acceptance remains NOT RUN.** CUA reported no available browsers on 18 October; no alternative browser-control mechanism was used. Keep D3a open until the following checks produce actual browser evidence:
+**Browser acceptance update, 18 October:** the initial D3a run had no CUA connection. D3c subsequently ran the connected in-app browser; the following results replace that initial NOT RUN status. Cached-document restoration remains open.
 
 | Check | Status | Required action and expected evidence |
 | --- | --- | --- |
-| Refresh and keyboard | NOT RUN | Activate Refresh by keyboard and repeatedly during a delayed response. The document does not reload, pending filter edits remain, order/size/page stay selected, and exactly one list-summary cycle runs. |
-| Row identity, focus and scroll | NOT RUN | During a delayed fixture refresh, focus an execution link and scroll the page/table. Update/reorder/insert/remove rows; surviving link focus and completion-time scroll persist, while removing the focused row focuses the table region. Check wrapped controls and no document overflow at 360 pixels. |
-| Visible failure states | NOT RUN | Exercise list/summary 503, changed default bounds and denied access. Previous rows/counts show their update times only for matching scope/bounds; changed bounds remove old counts, denied access removes protected data, and explicit retry recovers without diagnostics leaking into text. |
-| Detail return | NOT RUN | Open a legacy detail from a deeper page and return. When the browser supplies a cached document, refetch its valid entry and restore view anchors; when it does not, restore URL selection on page one. Also verify expired cached cursors reset visibly once. |
+| Refresh and keyboard | PASS locally | Actual keyboard refresh preserves draft inputs, scope/order/size and the native second page. Repeated activations during delayed work coalesce; HTTP receipts confirm the cycles. |
+| Row identity, focus and scroll | PASS locally | Delayed browser refresh preserves current execution-link focus and document scroll; removing the focused row falls back to the table region. Insert/remove/reorder, keyboard horizontal scrolling and 360-pixel wrapping pass. Node tests additionally verify row/link object identity. |
+| Visible failure states | PASS locally after review fix | List/summary 503, changed default bounds, denial and recovery behave as scoped. D3c corrects an idle retained-summary label that incorrectly said Refreshing; final browser replay passes. |
+| Detail return | Partial — cache branch NOT RUN | Native execution 20's legacy detail and ordinary Back fallback pass with URL selection on page one. This browser did not cache the document, so deeper-page/pause/view restoration and expiry on cached return remain open. |
 
-D3b polling is recorded below; D3c integrated/corporate/cross-browser acceptance remains planned. Independent-reader HTTP/sign-in, C8, OBS-02 and deferred hosting gates retain their existing status; this work does not close them.
+D3b polling and D3c's integrated local results are recorded below. Independent-reader HTTP/sign-in, C8, OBS-02 and deferred hosting gates retain their existing status; this work does not close them.
 
 #### D3b / owned polling and visibility recovery — 18 October 2026
 
@@ -243,15 +251,58 @@ Complete list-summary HTTP cycles under the configured local SQL identity were m
 
 The 30-second floor substantially exceeds these observed cycle costs; the adaptive delay also spaces out slower cycles. These are local Node-fetch HTTP measurements, not browser rendering, workload/p95, independent-reader or production-capacity acceptance. No SQL implementation change is inferred or justified by them. Evidence is retained under `.local/reports/frontend/20261018-d3b/`. The preview and probe exited, the listener is closed, no task browser tabs were created and the CUA session was reset.
 
-**Connected-browser acceptance remains NOT RUN:** CUA still exposes no browser connection. D3a's checklist above stays open, alongside these D3b checks:
+**Browser acceptance update, 18 October:** D3c's connected in-app run verifies the available controls and timer behavior. Actual hidden-document and cached-document conditions remain open:
 
 | Check | Status | Required action and expected evidence |
 | --- | --- | --- |
-| Poll controls and keyboard | NOT RUN | Pause/resume by keyboard, refresh manually while paused, and edit filters during an automatic cycle. Pause persists through selection changes; one request owner runs, labels show the next attempt/error, and controls wrap without overflow at 360 pixels. |
-| Real visibility and browser-cache return | NOT RUN | Hide and return to the actual browser tab, including during a delayed refresh. Observe no scheduled hidden polling and one return resync. Repeat while user-paused, then navigate to detail and return through browser cache; pause survives and the restored page fetch does not trigger a second startup cycle. |
-| Long/error cycles and view preservation | NOT RUN | Delay list/summary across several intervals, interleave manual refresh and tab switches, and exercise transient failure/recovery plus denial. Confirm no overlapping cycles or duplicate timers, bounded retries, correct stale times, cleared denied data, retained current focus/scroll and no requests after page exit. |
+| Poll controls and keyboard | PASS locally | Keyboard pause/resume, manual refresh while paused, pending edits and pause across selection changes pass. Next/retry labels and wrapped actions remain usable at 360 pixels. |
+| Real visibility and browser-cache return | NOT RUN | Both controlled tabs reported visible, and actual detail Back loaded a new document. Verify genuine hidden/visible transitions, one queued return resync, paused return, cached pause/anchors and no duplicate startup cycle in a browser exposing those conditions. |
+| Long/error cycles and view preservation | Partial — actual tab switches open | A real 34-second browser cycle, repeated refresh activations, current-cycle completion while paused, automatic transient retry/backoff, denial, retained focus/scroll and disposal pass. Actual hidden/visible interleaving remains open; owner-level transitions have separate automated evidence. |
 
-D3c integrated/corporate/cross-browser acceptance remains planned. C8, OBS-02, independent-reader HTTP/sign-in and deferred hosting gates remain open.
+D3c local review and browser results follow. C8, OBS-02, independent-reader HTTP/sign-in and deferred hosting gates remain open.
+
+#### D3c / local browser acceptance — 18 October 2026
+
+Reviewed `92466ec` and exercised the connected in-app browser against the configured local SSISDB identity plus explicitly synthetic edge/failure mounts. **19 browser checks PASS; two conditions remain NOT RUN.** This closes D3c.1 and the available portion of D3c.2; D3, D3a and D3b retain their remaining browser gates. Corporate Edge/Chrome and Firefox/Safari smoke checks were not run.
+
+Two review findings were corrected and the affected cases replayed against final production assets. After a list refresh fails, retained summary counts now say **Previous counts shown** with their observed time, without falsely reporting an active refresh. The regression is reproduced before the fix and passes after it, while pending work still shows Refreshing. Name columns now keep a **10rem minimum width** inside the horizontally scrollable table. With a 260-UTF-16-unit package name at a 360-pixel viewport, the name cell widens from about 95 to 160 pixels and its row height falls from about 931 to 427 pixels. The document remains 345 pixels wide after the browser's scrollbar, with no document overflow; table scrolling remains contained.
+
+The actual browser run verifies keyboard/manual refresh with unapplied drafts, native second-page refresh and exact cursor replay, a legacy execution-20 detail and ordinary Back fallback, completion-time link focus and document scroll, removed-row focus fallback, insert/remove/reorder, literal Unicode/markup, unknown status, NULL/zero display, status selection with all-status cards, partial/list failures, changed-bound count clearing, denial/recovery, expiry/reset, retained empty pages, obsolete slow denial, pause/resume and narrow controls. Horizontal table scroll remains at **320 pixels** across a delayed summary update with the table focused. Scroll at the document bottom is naturally clamped when a stale notice disappears; a position inside the new range is preserved exactly.
+
+HTTP receipts independently confirm **99 list/summary attempts: 97 from browser interactions and two final schema/payload probes**. A production timer starts the next browser cycle **30,030.7 ms** after initial completion; that cycle takes **34,020.5 ms** across its delayed list/summary and creates no overlapping poll cycle. Repeated activations coalesce, pause allows current work to finish and removes the next timer, and no later cycle appears after exit. A real transient retry starts **30,028.9 ms** after failure; the next retry label backs off to 60 seconds, with explicit retry recovering and resetting the schedule. Native deep refresh repeats the exact entry query. All **33 native query attempts** succeed with successful cleanup. An old cancelled fixture request can still finish on the server after a new selection; browser cancellation is not native SQL-cancellation evidence.
+
+Final root and `/dashboard` shells return 200 with one refresh/polling control each and byte-identical prepared JS/CSS. Two additional native responses validate against the tracked schemas: the historical limit-50 response has **16 rows / 8,344 bytes**, and its exact-bound all-status summary has **16 executions / 581 bytes**. These small local payloads and cycle observations establish neither workload/p95 nor independent-reader/production capacity. The native overview records no warning/error console entries.
+
+**Final automated/build checks:** **95 Node PASS; 353 Python tests: 350 PASS / three opt-in native SQL SKIP**. Cache-only clean install and two identical final production builds pass; lockfile and all 41 legacy static hashes remain unchanged. Authored JS+CSS is **71,942 bytes**, below 150 KiB. Prepared JS/CSS is **36,281 / 5,063 bytes**, **41,344 total** (14,177 with Python gzip); manifest/notice add 184 / 1,175 bytes, making **42,703 bytes** of ignored generated output. No dependency, API, SQL or legacy implementation changed. Both owned preview sessions exited; all five task tabs closed, viewport override reset, CUA reset and port/process audit is clean.
+
+Overview parity and intentional differences reviewed during D3c:
+
+| Workflow | Current native behavior and evidence |
+| --- | --- |
+| Folder/project/status | Exact names and literal `all` remain selectable; paged choices and multi-status table filtering use the API contract. Unknown status and Unicode/markup are displayed literally. |
+| Time scope and cards | Table and cards share exact creation bounds, including not-yet-started executions; cards count all statuses. Legacy start-time card cohorts remain their own baseline rather than a native equality claim. |
+| Order and paging | Metadata-advertised global order and bounded cursor pages replace local sorting of a loaded list. Deep refresh repeats its entry; expiry resets once and an empty deep page retains recovery controls. |
+| Details and updates | Native IDs link to existing legacy details. Data refresh preserves the applied view and pending drafts without reloading; ordinary Back restores URL selection on page one. Cached return and actual hidden-tab recovery remain open. |
+| Remaining parity | Details/children/events/values/history/charts, legacy URL translation and full replacement parity remain phase 4 / P0a work. This overview review does not close those gates. |
+
+Selected evidence is retained under `.local/reports/frontend/20261018-d3c/`:
+
+| Evidence | Retained path within that directory |
+| --- | --- |
+| Browser cases, findings, screenshots and native console | `d3c-20261018/browser-checks.json`, `native-overview-final.jpg`, `narrow-overview.jpg`, `list-stale-fixed.jpg`, `native-console.json` |
+| Request/cycle/schema/payload and resource receipts | `d3c-20261018/acceptance-receipt.json`, `http-checks.json`, private request/payload captures, both preview logs and `cleanup.json` |
+| Final install/build/test hashes, sizes and Node checks | `frontend-build-20261018T022800Z/result.json` and its logs |
+| Python suite and regression before/after | `d3c-20261018/python-tests.log`, `stale-label-before.log`, `stale-label-after.log` |
+
+#### Remaining browser acceptance
+
+| Check | Status | Required action and expected evidence |
+| --- | --- | --- |
+| Actual hidden-tab return | NOT RUN | In an ordinary connected browser, hide/return both while idle and during delayed list/summary work. Observe no hidden polling, one resync or queued resync, no duplicate timer, preserved user pause and no automatic retry after denial. Repeat summary-only retry across return. Current controlled tabs always reported visible; simulated owner events do not close this check. |
+| Cached-document return | NOT RUN | From a deeper page with focus/scroll and user pause, open detail and return through an actual retained browser document. Observe metadata revalidation, exactly one restored page fetch, unchanged pause and restored view anchors. Exercise an expired retained cursor and verify one visible reset. Ordinary fresh-document fallback already passes. |
+| Corporate/cross-browser acceptance | NOT RUN | Run the overview path, keyboard/narrow layout, failures, timer recovery and the two conditions above in actual corporate Edge/Chrome. Include Firefox/Safari smoke checks when used. The connected in-app browser does not establish those environments. |
+
+D3c.2/.3 and parent D3 remain open until their applicable checks pass. C8 workload/resource/reader, OBS-02 and deferred hosting/stream/cutover gates retain their existing status.
 
 #### Acceptance carried alongside phase 3
 

@@ -6,6 +6,7 @@
 | Understand scope, delivery phases and budgets | [Roadmap](roadmap.md) |
 | Understand architecture, hosting and rollback | [Modernization plan](MODERNIZATION_PLAN.md) |
 | Find current status, open gates and the next task | [Progress](PROGRESS.md) |
+| Repeat remaining native overview browser checks | [Frontend acceptance](PROGRESS.md#remaining-browser-acceptance) |
 | Build an API client | [API semantics](API_CONTRACT.md), [OpenAPI schemas/examples](openapi.yaml) |
 | Validate API correctness and performance | [API validation](API_ACCEPTANCE.md) |
 | Repeat legacy/backend manual checks | [Backend checklist](BACKEND_CHECKLIST.md) |

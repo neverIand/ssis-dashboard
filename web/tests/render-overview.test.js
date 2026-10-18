@@ -77,7 +77,7 @@ test('removing a focused execution moves focus to the table region; unchanged ro
   view.dispose();
 });
 
-test('transient refresh errors retain and label existing DOM; denial removes it and clears all counts', async () => {
+test('transient refresh errors retain and label existing DOM; denial removes it and clears all counts', async t => {
   const dom = overviewDOM();
   let lists = 0;
   const view = mountOverview(dom.root, { metadata: settings, executionBase: '/execution/',
@@ -87,12 +87,16 @@ test('transient refresh errors retain and label existing DOM; denial removes it 
       if (lists === 3) throw new ApiError('http', { status: 403 });
       return page([item('3')]);
     } } });
+  t.after(() => view.dispose());
   await view.apply(defaultSelection(settings));
   const row = dom.body.children[0];
-  await view.refresh();
+  const refreshing = view.refresh();
+  assert.match(dom.get('summary-status').textContent, /^Refreshing/);
+  await refreshing;
   assert.equal(dom.body.children[0], row);
   assert.match(dom.get('executions-status').textContent, /Previous results shown.*Updated/);
   assert.match(dom.get('summary-status').textContent, /Previous counts shown.*Updated/);
+  assert.doesNotMatch(dom.get('summary-status').textContent, /Refreshing/);
   assert.equal(dom.get('app-status').textContent, 'Refresh failed');
   await view.refresh();
   assert.equal(row.isConnected, false);

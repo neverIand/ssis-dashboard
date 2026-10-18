@@ -166,7 +166,7 @@ export function mountOverview(root, { api, metadata, executionBase, retainedPath
       : state.pageStale ? `Refreshing… Previous results shown. ${pageDetails}` : pageDetails;
     const summaryDetails = state.summaryStale ? ` Previous counts shown. Updated ${display.timestamp(state.summary.meta.generated_at)}.` : '';
     summaryStatus.textContent = state.phase === 'summary-error' ? failure(state.error) + summaryDetails
-      : state.summaryStale ? 'Refreshing…' + summaryDetails
+      : state.summaryStale ? (state.busy ? 'Refreshing…' + summaryDetails : summaryDetails.trimStart())
       : state.phase === 'loading-summary' ? 'Loading summary…' : '';
     bounds.hidden = page === null;
     if (page) {
