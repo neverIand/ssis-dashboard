@@ -133,3 +133,68 @@ test('a browser-cache checkpoint retains only paths/view anchors and restores th
   assert.equal(dom.scroll.scrollLeft, 0);
   changed.dispose();
 });
+
+test('pause/resume controls, manual refresh and a paused return checkpoint preserve user intent', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
+  const dom = overviewDOM();
+  let calls = 0;
+  const config = { metadata: settings, executionBase: '/execution/', api: { get: async resource => {
+    calls += 1;
+    return resource === 'executions' ? page([item('3')]) : summary();
+  } } };
+  const view = mountOverview(dom.root, config);
+  await view.apply(defaultSelection(settings));
+  assert.equal(dom.get('poll-toggle').textContent, 'Pause auto refresh');
+  dom.get('poll-toggle').dispatchEvent(new Event('click'));
+  assert.equal(dom.get('poll-toggle').textContent, 'Resume auto refresh');
+  dom.document.visibilityState = 'hidden';
+  dom.document.dispatchEvent(new Event('visibilitychange'));
+  dom.document.visibilityState = 'visible';
+  dom.document.dispatchEvent(new Event('visibilitychange'));
+  t.mock.timers.tick(60000);
+  assert.equal(calls, 2);
+  await view.refresh();
+  assert.equal(calls, 4);
+  assert.equal(dom.get('poll-status').textContent, 'Auto refresh paused.');
+  const saved = view.checkpoint();
+  assert.equal(saved.view.autoPaused, true);
+  view.dispose();
+  const restored = mountOverview(dom.root, { ...config, retainedPaths: saved.paths, restoreView: saved.view });
+  await restored.apply(defaultSelection(settings), { restore: true });
+  t.mock.timers.tick(60000);
+  assert.equal(calls, 6);
+  assert.equal(dom.get('poll-toggle').textContent, 'Resume auto refresh');
+  dom.get('poll-toggle').dispatchEvent(new Event('click'));
+  t.mock.timers.tick(0);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls, 8);
+  restored.dispose();
+});
+
+test('visibility listener performs one return refresh and is removed with the overview', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
+  const dom = overviewDOM();
+  let calls = 0;
+  const view = mountOverview(dom.root, { metadata: settings, executionBase: '/execution/',
+    api: { get: async resource => { calls += 1; return resource === 'executions' ? page([item('3')]) : summary(); } } });
+  await view.apply(defaultSelection(settings));
+  dom.document.visibilityState = 'hidden';
+  dom.document.dispatchEvent(new Event('visibilitychange'));
+  assert.match(dom.get('poll-status').textContent, /hidden/);
+  t.mock.timers.tick(60000);
+  assert.equal(calls, 2);
+  dom.document.visibilityState = 'visible';
+  dom.document.dispatchEvent(new Event('visibilitychange'));
+  dom.document.dispatchEvent(new Event('visibilitychange'));
+  t.mock.timers.tick(0);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls, 4);
+  view.dispose();
+  dom.document.visibilityState = 'hidden';
+  dom.document.dispatchEvent(new Event('visibilitychange'));
+  dom.document.visibilityState = 'visible';
+  dom.document.dispatchEvent(new Event('visibilitychange'));
+  t.mock.timers.tick(60000);
+  assert.equal(calls, 4);
+  assert.equal(dom.get('poll-toggle').disabled, true);
+});

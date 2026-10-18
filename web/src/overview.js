@@ -1,6 +1,7 @@
 import { ApiError } from './api.js';
 import { createDisplay, formatCode, formatId, formatText } from './display.js';
 import { selectionParams, timestampTicks } from './selection.js';
+import { createRefreshLoop } from './refresh-loop.js';
 
 const utc = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{7}Z$/;
 const badResponse = (response) => new ApiError('invalid_response', { requestId: response?.meta?.request_id });
@@ -99,7 +100,8 @@ export function readSummary(response, page, metadata, display) {
   } catch { throw badResponse(response); }
 }
 
-export function createOverview({ api, metadata, publish, timeoutMs = 30000, locale, retainedPaths = [] }) {
+export function createOverview({ api, metadata, publish, timeoutMs = 30000, locale, retainedPaths = [],
+  autoRefresh = true, visible = true, pollIntervalMs = 30000, maxPollIntervalMs = 300000 }) {
   const display = createDisplay({ timeZone: metadata.display_timezone, locale });
   let state = { phase: 'idle', selection: null, page: null, summary: null, error: null, notice: '',
     operation: null, pageStale: false, summaryStale: false };
@@ -111,11 +113,19 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
   let active = null;
   let disposed = false;
   const busy = () => ['loading-list', 'loading-summary'].includes(state.phase);
-  const emit = (changes) => {
-    state = { ...state, ...changes };
-    publish({ ...state, busy: busy(), pageNumber: (context?.index ?? 0) + 1,
+  const show = (poll) => {
+    publish({ ...state, poll, busy: busy(), pageNumber: (context?.index ?? 0) + 1,
       hasPrevious: !busy() && Boolean(context?.index),
       hasNext: !busy() && Boolean(state.page?.meta.has_more) });
+  };
+  const loop = createRefreshLoop({ refresh, publish: show, paused: !autoRefresh, visible,
+    intervalMs: pollIntervalMs, maxIntervalMs: maxPollIntervalMs });
+  const emit = (changes) => {
+    state = { ...state, ...changes };
+    show(loop.update({ busy: busy(), eligible: state.selection !== null,
+      coversReturn: state.operation === 'page',
+      failed: ['list-error', 'summary-error'].includes(state.phase),
+      retryable: state.error === null || transient(state.error) }));
   };
 
   function remember() {
@@ -224,6 +234,7 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
         && state.selection !== null && key(selection) === key(state.selection)) return;
     remember();
     cancel();
+    loop.reset();
     if (selection === null) {
       context = null;
       emit({ phase: 'idle', selection: null, page: null, summary: null, error: null, notice: '',
@@ -236,11 +247,15 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
     return load(context.index);
   }
 
+  function refresh() {
+    if (!disposed && !busy() && state.selection !== null) return load(context.index, { operation: 'refresh' });
+  }
+
   return {
     apply,
-    refresh() {
-      if (!disposed && !busy() && state.selection !== null) return load(context.index, { operation: 'refresh' });
-    },
+    refresh,
+    setVisible: loop.setVisible,
+    togglePolling: () => loop.togglePaused(),
     checkpoint() {
       remember();
       return [...contexts].map(([id, path]) => [id, copyPath(path)]);
@@ -262,11 +277,13 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
     retrySummary() {
       if (disposed || busy() || state.phase !== 'summary-error') return;
       cancel();
+      state = { ...state, operation: 'summary-retry' };
       return summary(generation, state.selection, state.page);
     },
     dispose() {
       if (disposed) return;
       disposed = true;
+      loop.dispose();
       cancel();
       contexts.clear();
       context = null;

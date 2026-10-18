@@ -114,8 +114,11 @@
         <section class="panel executions" aria-labelledby="executions-heading">
             <div class="section-heading">
                 <h2 id="executions-heading">Executions</h2>
-                <button type="button" data-overview-refresh disabled>Refresh</button>
-                <button type="button" data-list-retry hidden>Retry executions</button>
+                <div class="section-actions">
+                    <button type="button" data-overview-refresh disabled>Refresh</button>
+                    <button type="button" data-poll-toggle disabled>Pause auto refresh</button>
+                    <button type="button" data-list-retry hidden>Retry executions</button>
+                </div>
             </div>
             <div class="table-controls" aria-label="Execution order">
                 <label>Sort <select data-order="sort" disabled><option value="execution_id">ID</option></select></label>
@@ -124,6 +127,7 @@
             </div>
             <p class="resource-status" data-order-notice role="status"></p>
             <p class="resource-status" data-page-notice role="status"></p>
+            <p class="resource-status" data-poll-status role="status"></p>
             <p class="resource-status" data-executions-status role="status"></p>
             <div class="table-scroll" role="region" aria-labelledby="executions-heading" tabindex="0">
                 <table data-execution-table>

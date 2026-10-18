@@ -91,6 +91,7 @@ export function mountBootstrap(root, { ready = () => {} } = {}) {
   root.querySelector('[data-reset-filters]').disabled = true;
   for (const control of root.querySelectorAll('[data-order]')) control.disabled = true;
   root.querySelector('[data-overview-refresh]').disabled = true;
+  root.querySelector('[data-poll-toggle]').disabled = true;
   let disposeScreen;
   const loader = createMetadataLoader({
     request: (options) => api.get('meta', options),

@@ -19,6 +19,10 @@ export function mountOverview(root, { api, metadata, executionBase, retainedPath
   const latest = root.querySelector('[data-executions-latest]');
   const pageNotice = root.querySelector('[data-page-notice]');
   const refresh = root.querySelector('[data-overview-refresh]');
+  const pollToggle = root.querySelector('[data-poll-toggle]');
+  const pollStatus = root.querySelector('[data-poll-status]');
+  const pollTime = new Intl.DateTimeFormat(undefined, { timeZone: metadata.display_timezone,
+    hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' });
   const scroll = table.parentElement;
   const rows = new Map();
   const cards = Object.fromEntries(['total', 'running', 'succeeded', 'failed']
@@ -26,6 +30,7 @@ export function mountOverview(root, { api, metadata, executionBase, retainedPath
   let renderedPage = null;
   let returning = restoreView;
   let selectionKey = null;
+  let autoPaused = restoreView?.autoPaused === true;
 
   function position() {
     return { x: window.scrollX, y: window.scrollY, left: scroll.scrollLeft, top: scroll.scrollTop };
@@ -116,25 +121,34 @@ export function mountOverview(root, { api, metadata, executionBase, retainedPath
     return `${error.message}${error.requestId ? ` Request ID: ${error.requestId}` : ''}`;
   }
 
-  const owner = createOverview({ api, metadata, retainedPaths, publish(state) {
+  const owner = createOverview({ api, metadata, retainedPaths, autoRefresh: !autoPaused,
+    visible: document.visibilityState !== 'hidden', publish(state) {
     const page = state.page;
+    const refreshing = state.operation === 'refresh' || state.operation === 'summary-retry';
     selectionKey = state.selection === null ? null : JSON.stringify(selectionParams(state.selection));
     if (returning && returning.selectionKey !== selectionKey) returning = null;
-    const currentPosition = state.operation === 'refresh' && page !== null ? position() : null;
+    const currentPosition = refreshing && page !== null ? position() : null;
     const focused = document.activeElement;
     const rowFocus = body.contains(focused);
     table.setAttribute('aria-busy', String(state.phase === 'loading-list'));
     root.querySelector('[data-summary]').setAttribute('aria-busy', String(state.phase === 'loading-summary'
-      || (state.operation === 'refresh' && state.busy)));
+      || (refreshing && state.busy)));
     refresh.disabled = state.selection === null;
     refresh.setAttribute('aria-disabled', String(state.busy));
+    autoPaused = state.poll.paused;
+    pollToggle.disabled = state.selection === null;
+    pollToggle.textContent = autoPaused ? 'Resume auto refresh' : 'Pause auto refresh';
+    pollStatus.textContent = state.poll.mode === 'scheduled'
+      ? `${state.poll.failures ? 'Retry' : 'Next refresh'}: ${pollTime.format(state.poll.nextAt)}.`
+      : ({ idle: '', paused: 'Auto refresh paused.', hidden: 'Auto refresh paused while this tab is hidden.',
+        updating: 'Auto refresh on.', blocked: 'Auto refresh stopped. Retry or change the selection.' })[state.poll.mode];
     listRetry.hidden = state.phase !== 'list-error';
     summaryRetry.hidden = state.phase !== 'summary-error';
     previous.disabled = !state.hasPrevious;
     next.disabled = !state.hasNext;
     latest.disabled = state.selection === null || ['loading-list', 'loading-summary'].includes(state.phase);
     pageNotice.textContent = state.notice;
-    header.textContent = state.operation === 'refresh' && state.busy ? 'Refreshing…'
+    header.textContent = refreshing && state.busy ? 'Refreshing…'
       : state.pageStale ? 'Refresh failed' : ({ idle: 'No selection', 'loading-list': 'Loading executions…',
       'loading-summary': 'Loading summary…', ready: 'Loaded', 'list-error': 'Executions unavailable',
       'summary-error': 'Summary unavailable' })[state.phase];
@@ -186,6 +200,10 @@ export function mountOverview(root, { api, metadata, executionBase, retainedPath
   const nextPage = () => { void owner.next(); };
   const latestPage = () => { void owner.latest(); };
   const refreshPage = () => { void owner.refresh(); };
+  const togglePolling = () => owner.togglePolling();
+  const visibilityChanged = () => owner.setVisible(document.visibilityState !== 'hidden');
+  document.addEventListener('visibilitychange', visibilityChanged);
+  pollToggle.addEventListener('click', togglePolling);
   refresh.addEventListener('click', refreshPage);
   previous.addEventListener('click', previousPage);
   next.addEventListener('click', nextPage);
@@ -200,11 +218,13 @@ export function mountOverview(root, { api, metadata, executionBase, retainedPath
     refresh: owner.refresh,
     checkpoint() {
       const focusId = [...rows].find(([, record]) => record.row.contains(document.activeElement))?.[0] ?? null;
-      return { paths: owner.checkpoint(), view: { position: position(), focusId, selectionKey,
+      return { paths: owner.checkpoint(), view: { position: position(), focusId, selectionKey, autoPaused,
         tableFocused: document.activeElement === scroll } };
     },
     dispose() {
       owner.dispose();
+      document.removeEventListener('visibilitychange', visibilityChanged);
+      pollToggle.removeEventListener('click', togglePolling);
       listRetry.removeEventListener('click', retryList);
       summaryRetry.removeEventListener('click', retrySummary);
       previous.removeEventListener('click', previousPage);

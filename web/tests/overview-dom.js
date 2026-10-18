@@ -45,14 +45,15 @@ class Node extends EventTarget {
 
 export function overviewDOM() {
   const window = { scrollX: 0, scrollY: 0, scrollTo(x, y) { this.scrollX = x; this.scrollY = y; } };
-  const document = { defaultView: window, activeElement: null,
+  const document = Object.assign(new EventTarget(), { defaultView: window, activeElement: null, visibilityState: 'visible',
     createElement: tag => new Node(document, tag),
-    createTextNode: text => new Node(document, '#text', text) };
+    createTextNode: text => new Node(document, '#text', text) });
   const root = new Node(document, 'root');
   const elements = new Map();
   for (const key of ['executions-status', 'summary-status', 'list-retry', 'summary-retry', 'cohort-window',
-    'app-status', 'executions-previous', 'executions-next', 'executions-latest', 'page-notice', 'overview-refresh', 'summary']) {
-    const node = new Node(document, key.includes('retry') || key === 'overview-refresh' ? 'button' : 'p');
+    'app-status', 'executions-previous', 'executions-next', 'executions-latest', 'page-notice', 'overview-refresh', 'summary',
+    'poll-toggle', 'poll-status']) {
+    const node = new Node(document, key.includes('retry') || ['overview-refresh', 'poll-toggle'].includes(key) ? 'button' : 'p');
     elements.set(`[data-${key}]`, node);
     root.append(node);
   }

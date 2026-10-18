@@ -30,7 +30,7 @@ function summary(changes = {}, meta = {}) {
 const setup = (get) => {
   const states = [];
   return { states, owner: createOverview({ api: { get }, metadata: settings,
-    publish: (state) => states.push(state), locale: 'en-GB' }) };
+    publish: (state) => states.push(state), locale: 'en-GB', autoRefresh: false }) };
 };
 
 test('list establishes exact bounds before all-status summary, without changing wire data', async () => {
