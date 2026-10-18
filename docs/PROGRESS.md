@@ -61,7 +61,7 @@ Backend checklist: **25/30 full PASS**. OBS-02 is partly unobserved; OBS-03's ho
 | C8.2a | Complete locally | Explicit SQL NULL binding removes measured type-discovery overhead; typed results, plans and affected fixtures compared. |
 | C8.2b.1 | Complete locally | Current catalog: 20 cases × 100 WSGI samples, 70 fresh-client requests and all 25 SQL resource diagnostics. See [retained baseline](API_ACCEPTANCE.md#c82b1-retained-baseline). |
 | C8.2b.2a | Complete locally | 20,000 matching synthetic executions; full/deep/NULL pages, all sorts/directions, 1,700 native samples and real reader SQL IO. See [results](API_ACCEPTANCE.md#c82b2a-retained-execution-cardinality-results). |
-| C8.2b.2b | Planned — next workload | Dense events, repeated child keys, full/max executable/event/value pages and wide Unicode/LOB payloads. Check complete DTOs, candidate/enrichment bounds, source work, bytes and warm distributions; include reader SQL IO. |
+| C8.2b.2b | Local measurements complete — pairing follow-up open | 67 native WSGI responses, 72 plan/IO diagnostics, 192 bounded insert checks, 1,500 warm samples and 30 existing-reader SQL diagnostics pass their recorded local checks. Repeated-child pairing still grows with historical keyed events; .2b.R1 remains open. See [results and scope](API_ACCEPTANCE.md#c82b2b-observation-and-text-results). |
 | C8.2b.2c | Planned | 1,000 timeline buckets, broad/selective summaries and growing prior-success history. Check exact aggregates/estimates, scans, compilation and distributions. |
 | C8.2b.3 | Complete locally | .3a narrow calculated cohorts, .3b cached ID selection/ordinary logging and .3c measured event join order. 80 paired diagnostic cases and 254 materialization checks pass; 880 alternating warm samples preserve results; combined native acceptance passes. Small-catalog tradeoffs and unresolved network budgets are recorded in [workloads](API_ACCEPTANCE.md#c82b3-execution-query-remedies). |
 | C8.2c | Planned | Repeated/concurrent success, failure and cancellation; verify request isolation and no accumulation of logical connections/cursors, active requests or owned processes. |
@@ -69,11 +69,22 @@ Backend checklist: **25/30 full PASS**. OBS-02 is partly unobserved; OBS-03's ho
 
 The C8.2b.2 parent remains open until .2b/.2c finish. Reader SHOWPLAN is NOT RUN without the required existing permission; do not add grants to make a check pass. Real active/Scale Out workloads retain explicit gaps. The proposed 50-row execution-page test-network p95 below one second is **not passed**. Synthetic SQL distributions and in-process WSGI timings are different measurements.
 
+C8.2b.2b local validation tasks, started 18 October 2026:
+
+| Task | Status | Exit evidence |
+| --- | --- | --- |
+| .2b.1 — fixtures and complete responses | Complete locally | 37 initial native WSGI responses and 30 cursor/true-empty replays pass complete independent DTO/schema checks. Actual next cursors cover both orders/directions of all three observation resources and both value sections; full-source Unicode search and sensitive/policy redaction pass. |
+| .2b.2 — source work and growth | Measured — follow-up open | 72 actual-plan/IO/TIME diagnostics at 2,000/20,000 sources preserve 51/201-row candidate/enrichment bounds. Repeated-child-key pairing still expands source work and can spill; .2b.R1 below owns that optimization. |
+| .2b.3 — distributions and scope | Complete locally | 15 cases × 100 warm SQL samples / 4,200 calls; 30 excluded warmups / 84 calls; 30 existing-reader SQL IO checks. Offline reconciliation, unchanged catalog fingerprints, successful logical closes and 131 focused database-free tests pass. Both reader SHOWPLAN permissions are zero; actual sign-in/HTTP, network, sustained resources and production remain separate gates. |
+| .2b.R1 — repeated child pairing | Planned | Reduce whole-key historical pairing work while preserving complete DTOs, exact path/source/trailing-space identity, missing/consecutive starts, unidentified events, end events beyond the start fence and both cursor orders. Compare scans/rows/regular and LOB reads, spills, compilation and warm distributions at both sizes and existing reader scopes; retain measured gains without arbitrary history caps or speculative caches. |
+
+The .2b measurement work is complete; the acceptance item remains open for .2b.R1. At 2,000/20,000 repeated starts, a 201-candidate/four-key child page reads 20,648/121,810 event-source rows and 18,522/89,824 complete-batch logical pages. Extreme 200-row event JSON reaches 43,238,902 bytes. Preserve both findings; SQL-only p95 and a row cap do not pass transfer/render or production capacity. No application, SQL, frontend, contract or dependency change was made. Selected summaries and verified archive receipts are retained in `.local/reports/backend/20261018-c82b2b/`.
+
 ### Review of Stage C — 17 October 2026
 
 C8.2b.3 resolves wide calculated cohorts, unnecessary recompilation and repeated reader permission scans; [API validation](API_ACCEPTANCE.md#sql-remedies-replay-17-october-2026) owns the review, regression and measurement records.
 
-Two follow-ups remain in the table above: child pairing can grow with all events for repeated selected keys (C8.2b.2b), and history materializes prior-success timestamps through the latest page start (C8.2b.2c). Measure source growth before adding caches, arbitrary lookback caps or changing semantics. Shared-worker cursor-key coordination remains B5c.
+Two follow-ups remain in the table above: child pairing growth is now measured and tracked as C8.2b.2b.R1, and history materializes prior-success timestamps through the latest page start (C8.2b.2c). Preserve the measured source work before adding caches, arbitrary lookback caps or changing semantics. Shared-worker cursor-key coordination remains B5c.
 
 After C8: code review: performance and correctness
 
@@ -352,7 +363,7 @@ D3c visibility/cache/corporate-browser, C8, OBS-02 and deferred hosting/stream/c
 
 | Gate | Remaining work and relationship to frontend delivery |
 | --- | --- |
-| C8.2b.2b / C8.2b.2c | Dense observation/value/text workloads and aggregate/history growth remain planned. Resume .2b then .2c when returning to API workload acceptance; a rendered overview does not close either. |
+| C8.2b.2b / C8.2b.2c | Observation/value/text measurements are complete locally; repeated-child pairing optimization .2b.R1 remains open. Aggregate/history growth .2c remains planned. Frontend rendering does not close either acceptance item. |
 | C8.2c / C8.3 | Sustained/concurrent resources and independent Windows-reader API HTTP remain planned. A local browser run under the configured identity is not independent-reader sign-in evidence. |
 | P0 / phase 4 | Record overview parity and intended API differences during D3c; replacement details, observations, event/value/history/chart workflows and legacy URL mapping remain later work. |
 | OBS-02 / B5c / phases 5–6 | Native cleanup-failure evidence remains open. Hosting, authentication/proxy/HTTPS, stream capacity and cutover retain their deferred gates. |
@@ -412,7 +423,7 @@ The default order follows the table; dependency-independent tasks may be reorder
 
 | Existing gate | Next action and relationship to delivery |
 | --- | --- |
-| C8.2b.2b | First workload priority alongside P4.2–P4.4. Prepare dense events/repeated child keys, full/default/max/deep observation/value pages and wide Unicode/LOB distributions. Compare complete DTOs and bounded materialization against source rows/scans, regular/LOB reads, compilation, bytes and warm distributions. Retain existing-reader IO where available; record missing permissions separately. |
+| C8.2b.2b | Local observation/value/text measurements are complete. .2b.R1 repeated-child pairing is the remaining backend optimization alongside P4.2–P4.4; reuse the retained dense/max/deep/Unicode controls and compare source work, spills, compilation and warm distributions. Preserve the 43 MB extreme payload finding and missing reader/environment conditions separately. |
 | C8.2b.2c | Alongside P4.5/P4.6, grow prior-success history and test broad/selective summaries and 1,000 timeline buckets. Check exact aggregates/estimates and source growth before introducing caching, lookback limits or altered semantics. |
 | C8.2c | Start resource acceptance as the detail refresh/section lifecycle is introduced. Exercise repeated/concurrent success, failure, browser cancellation and bounded native timeouts; prove isolation and no accumulation of requests, logical connections/cursors or owned processes. Browser abort alone is insufficient. |
 | C8.3 | Retain actual Windows-reader API sign-in/HTTP, hidden/absent equivalence and network timings as a separate gate. If the required identity/session is unavailable, leave the affected cases NOT RUN while the user prepares it; do not replace them with administrator impersonation. |

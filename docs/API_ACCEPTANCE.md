@@ -103,6 +103,16 @@ Keep two timing channels separate. Three prepared-connection WSGI observations p
 
 Fresh-session diagnostics collect actual rows/materialization, regular/LOB IO and per-execution compile messages for each distinct retained resource/parameter set. Their diagnostic SQL changes only `NOCOUNT` to preserve statement messages. Temporary object identity/cache behavior differs from public catalog views, so synthetic compilation cannot establish recurring catalog cost. Existing reader comparisons use the actual catalog's public views with administrator-session impersonation, independent native controls and IO/TIME; missing reader SHOWPLAN remains `NOT RUN`. Check catalog fingerprints before/after each phase and release every sampler-owned connection.
 
+### C8.2b.2b observation and text protocol
+
+Use connection-local temporary sources for dense executable/event/value pages, repeated child identities and maximum valid Unicode fields. The retained source sizes are 2,000 and 20,000 observations/starts/value rows, with 250 executable definitions, paired/missing/ambiguous child events and separate maximum-path observations. Full-message search tokens occur beyond the 16,384-character display prefix. Include supplementary characters at UTF-16 clipping boundaries, nullable timings/results, unknown codes, sensitive values, policy-redacted overrides, NULL and empty text.
+
+Compare complete DTOs with independently ordered source projections and Python pairing/redaction controls. Cover both observation orders/directions, 50/200 rows, a direct deep entry, NULL-time continuation, actual server-issued next cursors and truly empty sources. Each prepared WSGI query owns and closes a separate native connection; acquisition/fixture population precede the handler timer. These single-case handler observations establish bytes and correctness, not WSGI p95. The visibility query uses the common execution/logging sources; fence/page queries use the full family fixture.
+
+Run three actual-plan/IO/TIME diagnostics for each selected page shape at both source sizes. Inspect candidate, metadata and pairing materializations, source rows read, scans, regular/LOB reads, spill warnings and per-execution compile messages. Diagnostic batches change only NOCOUNT; a sampler-owned prepared session retains sources between the three repeats, and query-owned temporary pages are reset outside statistics collection. Last-plan compile metadata is not recurring compilation cost. Temporary sources/indexes are not SSISDB public-view security or physical-plan replicas.
+
+Keep warm latency separate: two untimed warmups followed by 100 fixed round-robin samples per selected case, through unmodified checked-in SQL with source-name substitution. Time execute/fetch/native result collection/cursor close; exclude acquisition, fixture/reset, hashing, schema checks, API serialization and transport. Preserve every sample and report per-case median, nearest-rank p95 and maximum. Existing normal/restricted reader sessions supply separate read-only public-view SQL IO and independent ordered IDs; administrator-session impersonation does not pass independent Windows sign-in/HTTP. Missing reader SHOWPLAN stays NOT RUN; no permission changes, package runs, cache flushes or server/service changes are part of this protocol.
+
 ## Recorded results
 
 ### Review replay: 17 October 2026
@@ -346,3 +356,89 @@ The same alternating protocol on the actual catalog used **30 repetitions per va
 Small administrator/global-reader calculated pages pay for the extra metadata read and compilation; this is an observed tradeoff, not a universal speedup. Tail timings also remain variable. Retain the substantial large-cohort and restricted-reader work reduction without adding a second small-cohort implementation. A further 32 diagnostic samples of cached calculated-page logging showed unchanged reads and inconsistent timing/compilation benefit, so that candidate was not retained. All timings, including regressions, remain in the raw evidence; these limited SQL samples do not establish a full-page/network p95 target.
 
 Reusable probes, rejected candidates, original SQL, raw plans/IO, warm samples and checks are ignored under `.local/sql-remedies-20261017/`. The checked-in [native regression suite](../tests/native/README.md) reproduces SQL correctness with temporary sources on an existing SQL Server connection; it does not substitute for public-view reader validation. No catalog writes, grants, package runs, cache flushes or TCP server were used.
+
+### C8.2b.2b observation and text results
+
+**18 October 2026, application/SQL baseline `ac9663b`: local measurements complete; repeated-child pairing acceptance remains open.** Application, SQL, API contracts, frontend and dependencies are unchanged. The existing Windows x64 CPython **3.14.8**, pyodbc **5.3.0**, ODBC Driver **17.10.0006** and SQL Server **16.00.1000** ran the [observation/text protocol](#c82b2b-observation-and-text-protocol). All fixtures were connection-local; real catalog counts/execution fingerprints remain unchanged before and after every selected phase.
+
+**Correctness:** **67 native WSGI responses / 175 application queries PASS**: 37 initial cases and 30 actual-next/true-empty replays. Complete independent DTOs cover both sorts and directions of executable/child/event pages, first 50, maximum 200, direct rank-1,000 continuation, a NULL-time continuation, maximal valid paths/names, nullable/unknown results, missing/ambiguous/time-reversed child ends and an unidentified post. Fourteen server-issued next cursors preserve exact `as_of`, upper fence and ordered DTOs. Full-source literal search finds Unicode/punctuation beyond the displayed prefix. Sensitive/policy-redacted values never appear in responses or safe application events; native replay also confirms their SQL-projected value is NULL before the driver boundary.
+
+The initial case named `parameters-empty` contains one logging parameter and is counted as a logging-only case. The supplemental replay uses a different visible execution with genuinely empty parameter/override sources and verifies zero rows, NULL ceiling and no continuation for both. Initial WSGI cases populate full fixtures on each query connection; supplemental visibility queries use only common execution/logging sources. Native warm sessions retain the complete family fixture for all resource calls. These channels have different connection/preparation work and must not be subtracted to infer API overhead. Handler observations are single-case correctness/size measurements, without WSGI p95.
+
+Selected **uncompressed UTF-8 JSON** sizes; the maximum fields are deliberately combined, rather than representative catalog payloads:
+
+| Prepared case | Rows | Response bytes |
+| --- | ---: | ---: |
+| Executables, ID ascending, maximum page | 200 | 28,811,772 |
+| Executables, ID ascending, default page | 50 | 7,203,513 |
+| Children, repeated short identity | 200 | 60,330 |
+| Children, maximal path/source metadata | 200 | 15,712,815 |
+| Events, literal full-source search / maximal text | 200 | 43,238,902 |
+| Parameters, maximal names/variant text and redaction | 200 | 1,277,130 |
+| Overrides, values permitted | 200 | 11,860,306 |
+| Overrides, values disabled by policy | 200 | 2,424,310 |
+
+The 200-row cap bounds cardinality, while maximal per-row text can still produce about **43 MB**. Preserve this payload finding for phase 4's on-demand sections and eventual network/browser acceptance; this measurement does not change the wire contract or pass a transfer/render budget.
+
+#### Source work and compilation
+
+**72 actual-plan/IO/TIME diagnostics PASS 192 candidate/enrichment insertion checks.** Twelve page shapes each run three times at 2,000 and 20,000 source rows/starts. Every candidate, metadata, event/value row and selected-child-end materialization stays at **51/201** rows; repeated child identities collapse to **four** pairing keys, or **one** for the maximal-path case. The 20,000-start execution has **59,803** source events, including a NULL-ID post; another execution has **900** maximal-path start/post events. There are 20,000 executable observations / 250 definitions, 20,000 generated parameters plus logging rows, and 20,000 overrides.
+
+Retained third diagnostics below show complete-batch logical reads, including query-temporary work. They are two source cardinalities, not a before/after optimization. Source plan choices can differ between the cardinalities.
+
+| Page shape | 2,000-source regular / LOB reads | 20,000-source regular / LOB reads |
+| --- | ---: | ---: |
+| Executables, first 200 | 1,134 / 32,783 | 1,535 / 32,779 |
+| Children, first 50 | 17,607 / 0 | 88,281 / 0 |
+| Children, first 200 | 18,522 / 0 | 89,824 / 0 |
+| Children, deep 200 | 18,522 / 0 | 89,824 / 0 |
+| Children, maximal path 200 | 6,088 / 116,132 | 7,258 / 114,644 |
+| Events, ID first 50 | 426 / 0 | 512 / 0 |
+| Events, full-source search / maximal text 200 | 1,639 / 162,853 | 42,017 / 120,307 |
+| Parameters, first 200 | 875 / 1,157 | 1,911 / 571 |
+| Overrides, values permitted, first 200 | 3,063 / 31,203 | 2,640 / 31,223 |
+| Overrides, values disabled, first 200 | 3,063 / 28 | 2,640 / 28 |
+
+**The child-pairing growth finding remains open as C8.2b.2b.R1 in [progress](PROGRESS.md#remaining-acceptance).** For a 201-candidate page with four exact identities, cumulative event-source rows read grow **20,648 → 121,810**, source scans **4 → 204**, and complete-batch regular reads **18,522 → 89,824**. Both sizes preserve the same candidate/key/end bounds. Thus bounded output/enrichment does not bound the historical keyed-event stream used by the window pairing. Some diagnostics capture `SpillToTempDb`/`SortSpillDetails`; smaller candidate limits still pay the historical work. Temporary-source indexes/security differ from public views, so these figures identify a measured query-shape risk, not production reader scan counts.
+
+Retain all three repeats, individual parse/compile messages, cache flags, last-plan metadata and warnings. At 20,000 sources the third diagnostics emit one to three compile messages per page; message-sum elapsed ranges **1–5 ms**. These diagnostic message sums are not an exclusive wall-clock partition or compile p95. Last-plan compile metadata is not added to every warm sample. No RECOMPILE, join hint, cache or history cap was introduced to make this check pass.
+
+#### Warm native SQL distributions
+
+**1,500 samples / 4,200 SQL calls PASS**, plus **30 excluded warmup samples / 84 calls**. Each of 15 cases retains 100 serial fixed-order observations with stable complete typed SQL outputs and closed cursors. Four sampler-owned prepared sessions close at completion. Query-owned page reset, fixture creation, connection acquisition, result hashing, schemas, API serialization and network are outside these SQL timers. Task samplers ran sequentially; this is not an isolated-capacity test. Every outlier is retained. Milliseconds:
+
+| Case | Median | p95 | Maximum |
+| --- | ---: | ---: | ---: |
+| Executables, ID first 200 | 422.0 | 596.4 | 995.7 |
+| Executables, time first 200 | 221.9 | 349.9 | 700.7 |
+| Executables, ID first 50 | 117.7 | 156.7 | 209.6 |
+| Executables, deep 200 | 240.0 | 329.9 | 384.8 |
+| Executables, NULL-time 200 | 212.7 | 288.6 | 365.3 |
+| Children, ID first 200 | 1,391.2 | 1,754.0 | 2,066.7 |
+| Children, ID first 50 | 1,408.5 | 1,751.2 | 1,978.7 |
+| Children, deep 200 | 1,556.0 | 1,813.0 | 2,338.7 |
+| Children, maximal path 200 | 649.5 | 1,588.9 | 2,371.7 |
+| Events, ID first 50 | 12.0 | 82.8 | 153.7 |
+| Events, Unicode warning search | 519.5 | 1,299.6 | 2,091.4 |
+| Events, full-source search / maximal text 200 | 1,214.6 | 2,722.6 | 4,161.7 |
+| Parameters, first 200 | 50.8 | 91.6 | 148.9 |
+| Overrides, values permitted, first 200 | 187.9 | 329.9 | 376.3 |
+| Overrides, values disabled, first 200 | 49.5 | 65.6 | 224.8 |
+
+These prepared SQL tails do not close any HTTP/network/browser budget. In particular, similar 50/200-row child costs support investigating historical pairing work rather than treating the row cap as a complete performance bound.
+
+#### Existing reader SQL IO and remaining gates
+
+**30 public-view SQL diagnostics PASS**: both existing nonprivileged reader mappings, five page resources, three repeats each; IDs match independent public-view order and projected results remain stable. Session impersonation is explicit. Both readers retain sysadmin/db_owner/ssis_admin **0** and SHOWPLAN **0**; only the normal reader has `ssis_logreader`. No permissions changed. Third-repeat regular/LOB reads:
+
+| Page | Normal: rows; regular / LOB reads | Restricted: rows; regular / LOB reads |
+| --- | ---: | ---: |
+| Executables | 14; 150 / 0 | 2; 152 / 0 |
+| Children | 4; 631 / 6 | 0; 38 / 0 |
+| Events | 120; 1,507 / 465 | 20; 740 / 63 |
+| Parameters | 10; 108 / 9 | 15; 484 / 14 |
+| Overrides, values disabled | 0; 12 / 0 | 1; 84 / 0 |
+
+These are actual visible small/empty pages, not populated/full-page reader workloads. Reader SHOWPLAN, independent Windows sign-in/API HTTP, real active/Scale Out data, network p95, C8.2b.2c aggregate/history growth, C8.2c sustained/concurrent resources, OBS-02 and deferred hosting retain their own open gates. Successful per-query closes do not pass sustained resource or native cleanup-failure acceptance.
+
+The independent offline verifier reconciles response bytes/data fingerprints, all 100-sample distributions, SQL/query counts, 192 actual insert cardinalities, reader scopes and unchanged catalog fingerprints. **131 focused database-free contract/observation/value/resource tests PASS**. Reusable probes/verifier/retention helpers remain in `.local/backend-validation/tools/`. Selected summaries, reconciliation, source snapshots and promotion/archive receipts are retained under `.local/reports/backend/20261018-c82b2b/`; complete raw phase evidence is recoverable from the hash-checked `.local/backend-validation/archive/c82b2b-20261018.zip` using the [local artifact workflow](installation.md#cleanup-and-recovery). Pilot/parser failures are excluded from acceptance counts and stay classified as disposable temporary output.
