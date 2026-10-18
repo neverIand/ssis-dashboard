@@ -1,8 +1,9 @@
 import { createDisplay, formatCode, formatId } from './display.js';
+import { executionHref } from './detail-navigation.js';
 import { createOverview } from './overview.js';
 import { selectionParams } from './selection.js';
 
-export function mountOverview(root, { api, metadata, executionBase, retainedPaths, restoreView = null }) {
+export function mountOverview(root, { api, metadata, appBase, retainedPaths, restoreView = null }) {
   const document = root.ownerDocument;
   const window = document.defaultView;
   const display = createDisplay({ timeZone: metadata.display_timezone });
@@ -66,7 +67,7 @@ export function mountOverview(root, { api, metadata, executionBase, retainedPath
     body.replaceChildren(row);
   }
 
-  function renderRows(page, pageNumber) {
+  function renderRows(page, pageNumber, selection) {
     if (!page.data.length) {
       empty(pageNumber > 1 ? 'No executions remain on this page. Use Previous or Show latest.'
         : 'No executions match these filters.');
@@ -85,7 +86,6 @@ export function mountOverview(root, { api, metadata, executionBase, retainedPath
           index === 0 ? 'id-cell' : index === 1 ? 'name-cell' : index === 2 ? 'name-cell package-cell'
             : [4, 5].includes(index) ? 'time-cell' : index >= 6 ? 'number-cell' : ''));
         const link = element('a', formatId(item.execution_id));
-        link.href = executionBase + item.execution_id;
         cells[0].append(link);
         cells[1].append(element('span'), element('span', undefined, 'cell-detail'));
         cells[3].append(element('span', undefined, 'status-badge'));
@@ -94,6 +94,8 @@ export function mountOverview(root, { api, metadata, executionBase, retainedPath
         rows.set(item.execution_id, record);
       }
       const { row, cells, item: previous } = record;
+      const href = executionHref(item.execution_id, selection, { appBase, origin: window.location.origin, metadata });
+      if (cells[0].firstChild.getAttribute('href') !== href) cells[0].firstChild.setAttribute('href', href);
       const text = (node, value) => { if (node.textContent !== value) node.textContent = value; };
       text(cells[1].children[0], item.folder_name);
       text(cells[1].children[1], item.project_name);
@@ -161,7 +163,7 @@ export function mountOverview(root, { api, metadata, executionBase, retainedPath
       'loading-summary': 'Loading summary…', ready: 'Loaded', 'list-error': 'Executions unavailable',
       'summary-error': 'Summary unavailable' })[state.phase];
     if (page !== renderedPage) {
-      if (page) renderRows(page, state.pageNumber);
+      if (page) renderRows(page, state.pageNumber, state.selection);
       else empty(state.phase === 'loading-list' ? 'Loading executions…' : 'No data loaded.');
       renderedPage = page;
     } else if (page === null) {

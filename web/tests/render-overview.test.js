@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ApiError } from '../src/api.js';
 import { mountOverview } from '../src/render-overview.js';
-import { defaultSelection } from '../src/selection.js';
+import { mountDetail } from '../src/render-detail.js';
+import { defaultSelection, parseSelection } from '../src/selection.js';
 import { deferred, envelope, metadata, wireTime } from './fixtures.js';
+import { detailDOM, detailResponse } from './detail-fixture.js';
 import { overviewDOM } from './overview-dom.js';
 
 const settings = metadata();
@@ -27,7 +29,7 @@ for (const control of ['previous', 'next', 'latest']) {
     const more = page([item('3')]);
     more.meta.has_more = true;
     more.meta.next_cursor = 'opaque+/%';
-    const view = mountOverview(dom.root, { metadata: settings, executionBase: '/execution/',
+    const view = mountOverview(dom.root, { metadata: settings, appBase: '/app/',
       api: { get: async (resource, options) => {
         calls.push({ resource, params: options.params });
         if (delayed) return resource === 'executions' ? pendingList.promise : pendingSummary.promise;
@@ -84,12 +86,12 @@ for (const control of ['previous', 'next', 'latest']) {
 test('keyed rendering reuses rows and links, patches values, removes/adds/reorders and restores current focus/scroll', async () => {
   const dom = overviewDOM(), pending = deferred();
   let lists = 0;
-  const view = mountOverview(dom.root, { metadata: settings, executionBase: '/dashboard/execution/',
+  const view = mountOverview(dom.root, { metadata: settings, appBase: '/dashboard/app/',
     api: { get: async resource => resource === 'executions' ? ++lists === 1
       ? page([item('3'), item('2'), item('1')]) : pending.promise : summary() } });
   await view.apply(defaultSelection(settings));
   const oldRows = [...dom.body.children], link = oldRows[1].children[0].firstChild;
-  assert.equal(link.href, '/dashboard/execution/2');
+  assert.equal(link.href, '/dashboard/app/executions/2');
   const refreshing = view.refresh();
   link.focus();
   dom.window.scrollX = 7;
@@ -126,7 +128,7 @@ test('keyed rendering reuses rows and links, patches values, removes/adds/reorde
 test('removing a focused execution moves focus to the table region; unchanged rows stay intact', async () => {
   const dom = overviewDOM(), pending = deferred();
   let lists = 0;
-  const view = mountOverview(dom.root, { metadata: settings, executionBase: '/execution/',
+  const view = mountOverview(dom.root, { metadata: settings, appBase: '/app/',
     api: { get: async resource => resource === 'executions' ? ++lists === 1
       ? page([item('3'), item('2')]) : pending.promise : summary() } });
   await view.apply(defaultSelection(settings));
@@ -143,7 +145,7 @@ test('removing a focused execution moves focus to the table region; unchanged ro
 test('transient refresh errors retain and label existing DOM; denial removes it and clears all counts', async t => {
   const dom = overviewDOM();
   let lists = 0;
-  const view = mountOverview(dom.root, { metadata: settings, executionBase: '/execution/',
+  const view = mountOverview(dom.root, { metadata: settings, appBase: '/app/',
     api: { get: async resource => {
       if (resource !== 'executions') return summary();
       if (++lists === 2) throw new ApiError('http', { status: 503 });
@@ -172,7 +174,7 @@ test('transient refresh errors retain and label existing DOM; denial removes it 
 
 test('a browser-cache checkpoint retains only paths/view anchors and restores them after fresh requests', async () => {
   const dom = overviewDOM();
-  const config = { metadata: settings, executionBase: '/execution/',
+  const config = { metadata: settings, appBase: '/app/',
     api: { get: async resource => resource === 'executions' ? page([item('3'), item('2')]) : summary() } };
   const view = mountOverview(dom.root, config);
   await view.apply(defaultSelection(settings));
@@ -205,7 +207,7 @@ test('pause/resume controls, manual refresh and a paused return checkpoint prese
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
   const dom = overviewDOM();
   let calls = 0;
-  const config = { metadata: settings, executionBase: '/execution/', api: { get: async resource => {
+  const config = { metadata: settings, appBase: '/app/', api: { get: async resource => {
     calls += 1;
     return resource === 'executions' ? page([item('3')]) : summary();
   } } };
@@ -242,7 +244,7 @@ test('visibility listener performs one return refresh and is removed with the ov
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
   const dom = overviewDOM();
   let calls = 0;
-  const view = mountOverview(dom.root, { metadata: settings, executionBase: '/execution/',
+  const view = mountOverview(dom.root, { metadata: settings, appBase: '/app/',
     api: { get: async resource => { calls += 1; return resource === 'executions' ? page([item('3')]) : summary(); } } });
   await view.apply(defaultSelection(settings));
   dom.document.visibilityState = 'hidden';
@@ -265,3 +267,57 @@ test('visibility listener performs one return refresh and is removed with the ov
   assert.equal(calls, 4);
   assert.equal(dom.get('poll-toggle').disabled, true);
 });
+
+for (const appBase of ['/app/', '/ops/monitor/app/']) {
+  test(`overview links open native detail and return the applied selection at page one under ${appBase}`, async t => {
+    const settings = { ...metadata(), execution_statuses: [
+      ...metadata().execution_statuses, { code: 4, name: 'failed' }, { code: 7, name: 'succeeded' }],
+      execution_sorts: [...metadata().execution_sorts, 'package_name'] };
+    const dom = overviewDOM(), calls = [], detailCalls = [];
+    const selection = { ...defaultSelection(settings), folder: 'Folder + / 影狼\r\nline',
+      project: 'Project %ZZ', status: [4, 7], from, to, sort: 'package_name', direction: 'asc', limit: 1 };
+    const id = '9223372036854775807';
+    const api = { async get(resource, { params }) {
+      calls.push({ resource, params });
+      if (resource === 'metrics/summary') return summary();
+      assert.equal(resource, 'executions', 'Overview must not eagerly load detail resources');
+      const response = page([item(id, { status: { code: 7, name: 'succeeded' } })]);
+      Object.assign(response.meta, { upper_id: id, sort: params.sort, direction: params.direction, limit: params.limit,
+        has_more: !params.cursor, next_cursor: params.cursor ? null : 'private-page-path' });
+      return response;
+    } };
+    const view = mountOverview(dom.root, { metadata: settings, appBase, api });
+    t.after(() => view.dispose());
+    await view.apply(selection);
+    dom.get('executions-next').dispatchEvent(new Event('click'));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.match(dom.get('executions-status').textContent, /^Page 2/);
+    const link = new URL(dom.body.children[0].children[0].firstChild.href, dom.window.location.origin);
+    assert.equal(link.pathname, `${appBase}executions/${id}`);
+    assert.doesNotMatch(link.search, /cursor|private-page-path|package_name%253DProbe/);
+    const detail = detailDOM();
+    detail.window.location.search = link.search;
+    const screen = mountDetail(detail.root, { metadata: settings, executionId: id, appBase,
+      api: { async get(resource, options) { detailCalls.push({ resource, options }); return detailResponse(id); } } });
+    t.after(() => screen.dispose());
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(detailCalls.length, 1);
+    assert.equal(detailCalls[0].resource, `executions/${id}`);
+    assert.equal(detailCalls[0].options.params, undefined, 'Overview filters must not constrain the detail read');
+    assert.match(detail.get('overview-return-notice').textContent, /page one/);
+    const destination = new URL(detail.get('overview-link').href, dom.window.location.origin);
+    assert.equal(destination.pathname, appBase);
+    assert.deepEqual(parseSelection(destination.search, settings), selection);
+    const returned = overviewDOM();
+    const fresh = mountOverview(returned.root, { metadata: settings, appBase, api });
+    t.after(() => fresh.dispose());
+    await fresh.apply(parseSelection(destination.search, settings));
+    assert.equal(calls.at(-2).params.cursor, undefined);
+    assert.match(returned.get('executions-status').textContent, /^Page 1/);
+    await view.apply({ ...selection, folder: 'Another folder', direction: 'desc' });
+    const changed = new URL(dom.body.children[0].children[0].firstChild.href, dom.window.location.origin);
+    const context = parseSelection(changed.searchParams.get('overview'), settings);
+    assert.equal(context.folder, 'Another folder');
+    assert.equal(context.direction, 'desc');
+  });
+}

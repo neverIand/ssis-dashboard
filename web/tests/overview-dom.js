@@ -8,6 +8,7 @@ class Node extends EventTarget {
   get textContent() { return this.text + this.children.map(node => node.textContent).join(''); }
   set textContent(value) { this.replaceChildren(); this.text = String(value); }
   get firstChild() { return this.children[0] ?? null; }
+  get href() { return this.getAttribute('href') ?? ''; }
   get disabled() { return this.isDisabled; }
   set disabled(value) {
     this.isDisabled = value;
@@ -45,11 +46,13 @@ class Node extends EventTarget {
   }
   focus() { if (!this.disabled) this.ownerDocument.activeElement = this; }
   setAttribute(key, value) { this.attributes.set(key, String(value)); }
+  getAttribute(key) { return this.attributes.get(key) ?? null; }
   removeAttribute(key) { this.attributes.delete(key); }
 }
 
 export function overviewDOM() {
-  const window = { scrollX: 0, scrollY: 0, scrollTo(x, y) { this.scrollX = x; this.scrollY = y; } };
+  const window = { location: { origin: 'https://example.test' },
+    scrollX: 0, scrollY: 0, scrollTo(x, y) { this.scrollX = x; this.scrollY = y; } };
   const document = Object.assign(new EventTarget(), { defaultView: window, activeElement: null, visibilityState: 'visible',
     createElement: tag => new Node(document, tag),
     createTextNode: text => new Node(document, '#text', text) });

@@ -25,7 +25,7 @@ export function mountOverviewScreen(root, saved = null) {
     const display = createDisplay({ timeZone: metadata.display_timezone });
     root.querySelector('#creation-window option').textContent =
       `Default window (${display.count(metadata.limits.default_range_hours)} h)`;
-    const overview = mountOverview(root, { metadata, api, executionBase: config.execution_base,
+    const overview = mountOverview(root, { metadata, api, appBase: config.app_base,
       retainedPaths: saved?.paths, restoreView: saved?.view });
     if (saved) { saved.paths.length = 0; saved.view = null; }
     checkpoint = overview.checkpoint;
