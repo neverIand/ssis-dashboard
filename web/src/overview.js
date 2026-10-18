@@ -4,6 +4,9 @@ import { selectionParams, timestampTicks } from './selection.js';
 
 const utc = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{7}Z$/;
 const badResponse = (response) => new ApiError('invalid_response', { requestId: response?.meta?.request_id });
+const transient = (error) => ['network', 'timeout'].includes(error.kind)
+  || (error.kind === 'http' && (error.status >= 500 || [408, 429].includes(error.status)));
+const copyPath = (path) => ({ ...path, entries: [...path.entries] });
 
 function wireTime(value, display, nullable = true) {
   if (value === null && !nullable) throw new TypeError();
@@ -41,6 +44,7 @@ export function readExecutionPage(response, selection, metadata, display) {
     wireTime(meta.from, display, false);
     wireTime(meta.to, display, false);
     wireTime(meta.as_of, display, false);
+    wireTime(meta.generated_at, display, false);
     const span = timestampTicks(meta.to) - timestampTicks(meta.from);
     if (span <= 0n || span > BigInt(metadata.limits.max_range_hours) * 36000000000n) throw new TypeError();
     if ((selection.from !== null && timestampTicks(selection.from) !== timestampTicks(meta.from))
@@ -74,6 +78,7 @@ export function readExecutionPage(response, selection, metadata, display) {
 export function readSummary(response, page, metadata, display) {
   try {
     const { data, meta } = response;
+    wireTime(meta.generated_at, display, false);
     if (meta.from !== page.meta.from || meta.to !== page.meta.to || meta.status_scope !== 'all'
         || !Array.isArray(data.by_status) || data.by_status.length > 65536) throw new TypeError();
     requiredCount(data.total, display);
@@ -94,29 +99,30 @@ export function readSummary(response, page, metadata, display) {
   } catch { throw badResponse(response); }
 }
 
-export function createOverview({ api, metadata, publish, timeoutMs = 30000, locale }) {
+export function createOverview({ api, metadata, publish, timeoutMs = 30000, locale, retainedPaths = [] }) {
   const display = createDisplay({ timeZone: metadata.display_timezone, locale });
-  let state = { phase: 'idle', selection: null, page: null, summary: null, error: null, notice: '' };
+  let state = { phase: 'idle', selection: null, page: null, summary: null, error: null, notice: '',
+    operation: null, pageStale: false, summaryStale: false };
   // Keep request paths only, never rows or cursor tokens in history.state or storage.
-  const contexts = new Map();
+  const contexts = new Map(retainedPaths.map(([id, path]) => [id, copyPath(path)]));
   const key = (selection) => JSON.stringify(selectionParams(selection));
   let context = null;
   let generation = 0;
   let active = null;
   let disposed = false;
+  const busy = () => ['loading-list', 'loading-summary'].includes(state.phase);
   const emit = (changes) => {
     state = { ...state, ...changes };
-    const busy = ['loading-list', 'loading-summary'].includes(state.phase);
-    publish({ ...state, pageNumber: (context?.index ?? 0) + 1,
-      hasPrevious: !busy && Boolean(context?.index),
-      hasNext: !busy && Boolean(state.page?.meta.has_more) });
+    publish({ ...state, busy: busy(), pageNumber: (context?.index ?? 0) + 1,
+      hasPrevious: !busy() && Boolean(context?.index),
+      hasNext: !busy() && Boolean(state.page?.meta.has_more) });
   };
 
   function remember() {
     if (state.selection === null || context === null) return;
     const id = key(state.selection);
     contexts.delete(id);
-    contexts.set(id, { ...context, entries: [...context.entries] });
+    contexts.set(id, copyPath(context));
     if (contexts.size > 8) contexts.delete(contexts.keys().next().value);
   }
 
@@ -149,33 +155,39 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
   }
 
   async function summary(current, selection, page) {
-    emit({ phase: 'loading-summary', page, summary: null, error: null });
+    const previous = state.summary?.meta.from === page.meta.from && state.summary.meta.to === page.meta.to
+      ? state.summary : null;
+    emit({ phase: 'loading-summary', page, pageStale: false, summary: previous, summaryStale: previous !== null, error: null });
     try {
       const response = await request('metrics/summary', { folder: selection.folder, project: selection.project,
         from: page.meta.from, to: page.meta.to });
       if (disposed || current !== generation) return;
-      emit({ phase: 'ready', summary: readSummary(response, page, metadata, display) });
+      emit({ phase: 'ready', summary: readSummary(response, page, metadata, display), summaryStale: false });
     } catch (error) {
       if (!disposed && current === generation) {
         if ([401, 403].includes(error.status)) {
           denied();
-          emit({ phase: 'list-error', page: null, summary: null, error });
+          emit({ phase: 'list-error', page: null, summary: null, pageStale: false, summaryStale: false, error });
         }
-        else emit({ phase: 'summary-error', error });
+        else emit({ phase: 'summary-error', summary: transient(error) ? previous : null,
+          summaryStale: transient(error) && previous !== null, error });
       }
     }
   }
 
-  async function load(index, notice = '') {
+  async function load(index, { notice = '', operation = 'page' } = {}) {
+    const previousPage = operation === 'refresh' ? state.page : null;
+    const previousSummary = operation === 'refresh' ? state.summary : null;
     cancel();
     const current = generation;
     const selection = state.selection;
     context = { ...context, entries: [...context.entries], index };
     const cursor = context.entries[index];
-    const cohort = context.cohort;
+    const cohort = operation === 'refresh' && index === 0 ? null : context.cohort;
     const params = { ...selectionParams(selection), ...(cohort ? { from: cohort.from, to: cohort.to } : {}),
       ...(cursor === null ? {} : { cursor }) };
-    emit({ phase: 'loading-list', page: null, summary: null, error: null, notice });
+    emit({ phase: 'loading-list', page: previousPage, summary: previousSummary,
+      pageStale: previousPage !== null, summaryStale: previousSummary !== null, operation, error: null, notice });
     try {
       const response = await request('executions', params);
       if (disposed || current !== generation) return;
@@ -197,21 +209,25 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
         contexts.delete(key(selection));
         context = { entries: [null], index: 0, cohort: null };
         // This fallback has no cursor, so a second failure cannot reset again.
-        return load(0, 'The page link expired or is no longer valid. Reset to page one.');
+        return load(0, { notice: 'The page link expired or is no longer valid. Reset to page one.' });
       }
       if ([401, 403].includes(error.status)) denied();
-      emit({ phase: 'list-error', error });
+      const keep = transient(error) && previousPage !== null;
+      emit({ phase: 'list-error', page: keep ? previousPage : null, summary: keep ? previousSummary : null,
+        pageStale: keep, summaryStale: keep && previousSummary !== null, error });
     }
   }
 
   async function apply(selection, { restore = false } = {}) {
     if (disposed) return;
-    if (active && selection !== null && state.selection !== null && key(selection) === key(state.selection)) return;
+    if (busy() && state.operation === 'page' && context?.index === 0 && selection !== null
+        && state.selection !== null && key(selection) === key(state.selection)) return;
     remember();
     cancel();
     if (selection === null) {
       context = null;
-      emit({ phase: 'idle', selection: null, page: null, summary: null, error: null, notice: '' });
+      emit({ phase: 'idle', selection: null, page: null, summary: null, error: null, notice: '',
+        operation: null, pageStale: false, summaryStale: false });
       return;
     }
     const saved = restore ? contexts.get(key(selection)) : null;
@@ -222,20 +238,29 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
 
   return {
     apply,
+    refresh() {
+      if (!disposed && !busy() && state.selection !== null) return load(context.index, { operation: 'refresh' });
+    },
+    checkpoint() {
+      remember();
+      return [...contexts].map(([id, path]) => [id, copyPath(path)]);
+    },
     next() {
-      if (!disposed && !active && state.page?.meta.has_more) return load(context.index + 1);
+      if (!disposed && !busy() && state.page?.meta.has_more) return load(context.index + 1);
     },
     previous() {
-      if (!disposed && !active && context?.index > 0) return load(context.index - 1);
+      if (!disposed && !busy() && context?.index > 0) return load(context.index - 1);
     },
     latest() {
-      if (!disposed && !active && state.selection !== null) return apply(state.selection);
+      if (!disposed && !busy() && state.selection !== null) return apply(state.selection);
     },
     retryList() {
-      if (!disposed && !active && state.phase === 'list-error') return load(context.index, state.notice);
+      if (!disposed && !busy() && state.phase === 'list-error') {
+        return load(context.index, { notice: state.notice, operation: state.operation });
+      }
     },
     retrySummary() {
-      if (active || state.phase !== 'summary-error') return;
+      if (disposed || busy() || state.phase !== 'summary-error') return;
       cancel();
       return summary(generation, state.selection, state.page);
     },
@@ -245,7 +270,8 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
       cancel();
       contexts.clear();
       context = null;
-      emit({ phase: 'idle', selection: null, page: null, summary: null, error: null, notice: '' });
+      emit({ phase: 'idle', selection: null, page: null, summary: null, error: null, notice: '',
+        operation: null, pageStale: false, summaryStale: false });
     },
   };
 }

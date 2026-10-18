@@ -338,7 +338,8 @@ button {
 }
 
 select:disabled,
-button:disabled {
+button:disabled,
+button[aria-disabled="true"] {
   color: #687384;
   background: #f3f5f7;
 }
