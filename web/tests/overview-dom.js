@@ -8,6 +8,11 @@ class Node extends EventTarget {
   get textContent() { return this.text + this.children.map(node => node.textContent).join(''); }
   set textContent(value) { this.replaceChildren(); this.text = String(value); }
   get firstChild() { return this.children[0] ?? null; }
+  get disabled() { return this.isDisabled; }
+  set disabled(value) {
+    this.isDisabled = value;
+    if (value && this.ownerDocument.activeElement === this) this.ownerDocument.activeElement = null;
+  }
   get nextSibling() {
     return this.parentElement?.children[this.parentElement.children.indexOf(this) + 1] ?? null;
   }
@@ -38,7 +43,7 @@ class Node extends EventTarget {
     this.parentElement = null;
     this.ownerDocument.onMutation?.();
   }
-  focus() { this.ownerDocument.activeElement = this; }
+  focus() { if (!this.disabled) this.ownerDocument.activeElement = this; }
   setAttribute(key, value) { this.attributes.set(key, String(value)); }
   removeAttribute(key) { this.attributes.delete(key); }
 }
@@ -53,7 +58,8 @@ export function overviewDOM() {
   for (const key of ['executions-status', 'summary-status', 'list-retry', 'summary-retry', 'cohort-window',
     'app-status', 'executions-previous', 'executions-next', 'executions-latest', 'page-notice', 'overview-refresh', 'summary',
     'poll-toggle', 'poll-status']) {
-    const node = new Node(document, key.includes('retry') || ['overview-refresh', 'poll-toggle'].includes(key) ? 'button' : 'p');
+    const node = new Node(document, key.includes('retry') || ['overview-refresh', 'poll-toggle',
+      'executions-previous', 'executions-next', 'executions-latest'].includes(key) ? 'button' : 'p');
     elements.set(`[data-${key}]`, node);
     root.append(node);
   }

@@ -144,9 +144,12 @@ export function mountOverview(root, { api, metadata, executionBase, retainedPath
         updating: 'Auto refresh on.', blocked: 'Auto refresh stopped. Retry or change the selection.' })[state.poll.mode];
     listRetry.hidden = state.phase !== 'list-error';
     summaryRetry.hidden = state.phase !== 'summary-error';
-    previous.disabled = !state.hasPrevious;
-    next.disabled = !state.hasNext;
-    latest.disabled = state.selection === null || ['loading-list', 'loading-summary'].includes(state.phase);
+    // Native disabling blurs a focused button on every automatic refresh. Keep
+    // paging focusable; the owner rejects busy and unavailable page actions.
+    for (const control of [previous, next, latest]) control.disabled = state.selection === null;
+    previous.setAttribute('aria-disabled', String(!state.hasPrevious));
+    next.setAttribute('aria-disabled', String(!state.hasNext));
+    latest.setAttribute('aria-disabled', String(state.busy || state.selection === null));
     pageNotice.textContent = state.notice;
     header.textContent = refreshing && state.busy ? 'Refreshing…'
       : state.pageStale ? 'Refresh failed' : ({ idle: 'No selection', 'loading-list': 'Loading executions…',

@@ -18,6 +18,69 @@ const summary = () => ({ ...envelope({ total: 3, by_status: [{ code: 1, name: 'c
   { code: 2, name: 'running', count: 3 }, { code: 4, name: 'failed', count: 0 }, { code: 7, name: 'succeeded', count: 0 }] }),
   meta: { ...envelope().meta, from, to, status_scope: 'all' } });
 
+for (const control of ['previous', 'next', 'latest']) {
+  test(`automatic refresh preserves ${control} focus, blocks busy paging and respects later focus movement`, async t => {
+    t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
+    const dom = overviewDOM(), pendingList = deferred(), pendingSummary = deferred();
+    const calls = [];
+    let delayed = false;
+    const more = page([item('3')]);
+    more.meta.has_more = true;
+    more.meta.next_cursor = 'opaque+/%';
+    const view = mountOverview(dom.root, { metadata: settings, executionBase: '/execution/',
+      api: { get: async (resource, options) => {
+        calls.push({ resource, params: options.params });
+        if (delayed) return resource === 'executions' ? pendingList.promise : pendingSummary.promise;
+        return resource === 'executions' ? more : summary();
+      } } });
+    t.after(() => view.dispose());
+    await view.apply(defaultSelection(settings));
+    dom.get('executions-next').dispatchEvent(new Event('click'));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(calls[2].params.cursor, 'opaque+/%');
+    const button = dom.get(`executions-${control}`);
+    button.focus();
+    assert.equal(dom.document.activeElement, button);
+    delayed = true;
+    t.mock.timers.tick(30000);
+    assert.equal(calls.length, 5);
+    assert.equal(dom.document.activeElement, button);
+    for (const key of ['previous', 'next', 'latest']) {
+      const paging = dom.get(`executions-${key}`);
+      assert.equal(paging.attributes.get('aria-disabled'), 'true');
+      paging.dispatchEvent(new Event('click'));
+    }
+    assert.equal(calls.length, 5, 'Busy controls must not start or cancel a request');
+    // Retention can remove the last row while the user is on a deeper page.
+    pendingList.resolve(page([]));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(calls.length, 6);
+    assert.equal(dom.document.activeElement, button);
+    assert.match(dom.body.textContent, /No executions remain/);
+    dom.get('executions-latest').dispatchEvent(new Event('click'));
+    assert.equal(calls.length, 6, 'Summary loading must also block paging');
+    // Completion must not restore an old focus target after the user moves away.
+    if (control === 'latest') dom.get('poll-toggle').focus();
+    pendingSummary.resolve(summary());
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(dom.document.activeElement, control === 'latest' ? dom.get('poll-toggle') : button);
+    assert.equal(dom.get('executions-next').attributes.get('aria-disabled'), 'true');
+    assert.equal(dom.get('executions-previous').attributes.get('aria-disabled'), 'false');
+    assert.equal(dom.get('executions-latest').attributes.get('aria-disabled'), 'false');
+    dom.get('executions-next').dispatchEvent(new Event('click'));
+    assert.equal(calls.length, 6, 'The terminal Next control must remain inactive');
+    delayed = false;
+    dom.get('executions-previous').dispatchEvent(new Event('click'));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(calls.length, 8);
+    assert.equal(dom.get('executions-previous').attributes.get('aria-disabled'), 'true');
+    dom.get('executions-previous').dispatchEvent(new Event('click'));
+    assert.equal(calls.length, 8, 'Previous on page one must remain inactive');
+    await view.apply(null);
+    for (const key of ['previous', 'next', 'latest']) assert.equal(dom.get(`executions-${key}`).disabled, true);
+  });
+}
+
 test('keyed rendering reuses rows and links, patches values, removes/adds/reorders and restores current focus/scroll', async () => {
   const dom = overviewDOM(), pending = deferred();
   let lists = 0;

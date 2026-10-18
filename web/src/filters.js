@@ -71,9 +71,11 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
     listen(retry, 'click', () => { void owner.retry(); });
     listen(choices, 'change', () => {
       if (!choices.value) return;
-      input[kind === 'folders' ? 'folder' : 'project'].value = choices.value;
-      if (kind === 'folders') { folderEdited(); loadProjects(); }
-      else changed();
+      const key = kind === 'folders' ? 'folder' : 'project';
+      const name = choices.value;
+      input[key].value = name;
+      nameEdited(key, name);
+      if (kind === 'folders') loadProjects();
     });
     return owner;
   }
@@ -82,7 +84,7 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
   const projects = navigation('projects');
 
   function loadProjects() {
-    const folder = input.folder.value || null;
+    const folder = session.draft.folder;
     if (folder === projectFolder) return;
     projectFolder = folder;
     try { if (folder !== null) catalogName(folder); }
@@ -91,11 +93,9 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
   }
 
   function readDraft() {
-    const folder = input.folder.value || null;
-    if (folder !== session.draft.folder) input.project.value = '';
-    session.update({ folder });
-    session.update({ project: input.project.value || null,
-      status: [...input.status.querySelectorAll('input:checked')].filter((checkbox) => checkbox.value !== '')
+    // Exact catalog names belong to the session. Single-line inputs strip CR/LF,
+    // so only explicit name edits may replace a restored or chosen name.
+    session.update({ status: [...input.status.querySelectorAll('input:checked')].filter((checkbox) => checkbox.value !== '')
         .map((checkbox) => Number(checkbox.value)).sort((a, b) => a - b),
       from: input['creation-window'].value === 'custom' ? input.from.value || null : null,
       to: input['creation-window'].value === 'custom' ? input.to.value || null : null });
@@ -105,7 +105,7 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
     readDraft();
     for (const key of ['folder', 'project']) {
       const choices = form.querySelector(`#${key}-options`);
-      if (choices.value !== input[key].value) choices.value = '';
+      if (choices.value !== session.draft[key]) choices.value = '';
     }
     notice.textContent = JSON.stringify(session.draft) === JSON.stringify(session.applied) ? '' : 'Changes not applied.';
   }
@@ -170,15 +170,21 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
     }
   }
 
-  function folderEdited() {
+  function nameEdited(key, value) {
+    const name = value || null;
+    const folderChanged = key === 'folder' && name !== session.draft.folder;
+    session.update({ [key]: name });
+    if (folderChanged) {
+      input.project.value = '';
+      projectFolder = null;
+      projects.clear();
+    }
     changed();
-    projectFolder = null;
-    projects.clear();
   }
-  listen(input.folder, 'input', folderEdited);
+  for (const key of ['folder', 'project']) listen(input[key], 'input', () => nameEdited(key, input[key].value));
   listen(input.folder, 'change', loadProjects);
   listen(input.folder, 'blur', loadProjects);
-  for (const key of ['project', 'from', 'to']) listen(input[key], 'input', changed);
+  for (const key of ['from', 'to']) listen(input[key], 'input', changed);
   listen(input['creation-window'], 'change', () => {
     custom.hidden = input['creation-window'].value !== 'custom';
     changed();
