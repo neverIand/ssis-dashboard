@@ -133,7 +133,18 @@ Four findings from a backend review of `72b774a`:
 
 **Validation:** the Python suite runs **366 tests: 360 PASS, six opt-in native SQL SKIP**, including nine new tests. Separately, each fix was reverted in a scratch copy and its matching test failed.
 
-A follow-up review (`.local/reports/reviews/20261022-claude-backend-patch/`) found that `configure()` replaced one process-wide key, so a second app with another secret broke the first app's cursors (HTTP 200 → 400 `invalid_cursor`), even when the second app then failed startup. After the per-app fix, the suite runs **368 tests: 365 PASS, three opt-in native SQL SKIP** (CPython 3.14.8, Flask 3.1.3). The new interleaved-app, failed-startup and derived-key tests fail against the process-wide `configure()`. The review probe `.local/tools/check-cursor-key-isolation.py` now reports every app accepting only its own cursors, with no database calls. **NOT RUN:** native SQL Server execution of the changed `api-execution.sql` (no SQL Server was available) and a real multi-worker host with a shared secret (hosting remains deferred). Rerun the native detail checks before relying on the SQL change in acceptance evidence.
+A follow-up review (`.local/reports/reviews/20261022-claude-backend-patch/`) found that `configure()` replaced one process-wide key, so a second app with another secret broke the first app's cursors (HTTP 200 → 400 `invalid_cursor`), even when the second app then failed startup. After the per-app fix, the suite runs **368 tests: 365 PASS, three opt-in native SQL SKIP** (CPython 3.14.8, Flask 3.1.3). The new interleaved-app, failed-startup and derived-key tests fail against the process-wide `configure()`. The review probe `.local/tools/check-cursor-key-isolation.py` now reports every app accepting only its own cursors, with no database calls.
+
+**Native recheck, 22 October, at `96f63e0` (includes these fixes):** the earlier three skips were opt-in skips because `SSIS_DASHBOARD_NATIVE_TEST_CONFIG` was unset. No database connection was attempted, so the earlier "no SQL Server was available" note was wrong. With the private `.local/backend-validation/dashboard.cfg` on the local `SSISDB`:
+
+- The three native execution-SQL tests pass (25.1 s).
+- Through Flask's in-process client, the real-catalog 15 October window returns 16 list rows with no continuation and a summary total of 16.
+- All 16 detail lookups return 200, so the guarded `api-execution.sql` runs on actual catalog rows.
+- The default 24-hour window returns 0 rows because all retained executions are older.
+
+Evidence and hashes are in `.local/reports/backend/20261022-native-recheck-96f63e0/`. The SQL identity was the local Windows administrator (`sysadmin=1`).
+
+**NOT RUN:** independent-reader visibility, a workload measurement of the changed query, and a real multi-worker host with a shared secret (hosting remains deferred).
 
 ## Later phase boundaries
 
