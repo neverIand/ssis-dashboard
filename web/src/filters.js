@@ -1,23 +1,27 @@
 import { formatCode } from './display.js';
-import { createNavigation } from './navigation.js';
+import { createCatalogSearch } from './catalog-search.js';
+import { mountRangeEditor } from './range-editor.js';
 import { catalogName, createSelectionSession, SelectionError, selectionSearch } from './selection.js';
+import { rangeLabel } from './time-range.js';
 
 export function mountFilters(root, { metadata, api, appBase, onApplied = () => {} }) {
-  const document = root.ownerDocument;
-  const window = document.defaultView;
+  const document = root.ownerDocument, window = document.defaultView;
   const form = root.querySelector('#overview-filters');
-  const fieldset = form.querySelector('fieldset');
-  const input = Object.fromEntries(['folder', 'project', 'status', 'creation-window', 'from', 'to']
-    .map((name) => [name, form.querySelector(`#${name}`)]));
-  const custom = form.querySelector('[data-custom-window]');
-  const notice = form.querySelector('[data-filter-notice]');
-  const appliedText = form.querySelector('[data-applied-selection]');
-  const reset = form.querySelector('[data-reset-filters]');
-  const apply = form.querySelector('[data-apply-filters]');
+  const get = selector => form.querySelector(selector);
+  const fieldset = get('fieldset'), notice = get('[data-filter-notice]');
+  const apply = get('[data-apply-filters]'), reset = get('[data-reset-filters]');
+  const recover = get('[data-recover-filters]'), status = get('#status');
   const order = Object.fromEntries(['sort', 'direction', 'limit']
-    .map((key) => [key, root.querySelector(`[data-order="${key}"]`)]));
+    .map(key => [key, root.querySelector(`[data-order="${key}"]`)]));
   const orderNotice = root.querySelector('[data-order-notice]');
-  order.sort.replaceChildren(...metadata.execution_sorts.map((key) => {
+  const session = createSelectionSession(metadata), removers = [];
+  const pickers = new Map();
+  let opened = null, searchTimer = null;
+  function listen(element, event, handler) {
+    element.addEventListener(event, handler);
+    removers.push(() => element.removeEventListener(event, handler));
+  }
+  order.sort.replaceChildren(...metadata.execution_sorts.map(key => {
     const option = document.createElement('option');
     option.value = key;
     option.textContent = ({ execution_id: 'ID', created_at: 'Created', started_at: 'Started', ended_at: 'Ended',
@@ -26,211 +30,204 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
     return option;
   }));
   order.limit.max = String(metadata.limits.max_limit);
-  const session = createSelectionSession(metadata);
-  const removeListeners = [];
-  let projectFolder = null;
-  let foldersStarted = false;
 
-  function listen(element, event, handler) {
-    element.addEventListener(event, handler);
-    removeListeners.push(() => element.removeEventListener(event, handler));
+  function close({ focus = false } = {}) {
+    if (!opened) return;
+    clearTimeout(searchTimer);
+    const { panel, trigger, key } = opened;
+    panel.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+    pickers.get(key)?.cancel();
+    if (key === 'created') range.cancel();
+    opened = null;
+    if (focus) trigger.focus();
   }
-
-  function navigation(kind) {
-    const container = form.querySelector(`[data-navigation="${kind}"]`);
-    const choices = form.querySelector(`#${kind === 'folders' ? 'folder' : 'project'}-options`);
-    const message = container.querySelector('[role="status"]');
-    const previous = container.querySelector('[data-previous]');
-    const next = container.querySelector('[data-next]');
-    const retry = container.querySelector('[data-navigation-retry]');
-    const owner = createNavigation({ api, kind, limit: metadata.limits.default_limit,
-      publish(state) {
-        const placeholder = document.createElement('option');
-        placeholder.value = '';
-        placeholder.textContent = 'Choose from this page';
-        choices.replaceChildren(placeholder, ...state.rows.map((row) => {
-          const option = document.createElement('option');
-          option.value = row.name;
-          option.textContent = row.name;
-          return option;
-        }));
-        choices.disabled = state.phase !== 'ready' || !state.rows.length;
-        previous.disabled = !state.hasPrevious;
-        next.disabled = !state.hasNext;
-        retry.hidden = state.phase !== 'error';
-        message.textContent = state.phase === 'loading' ? `Loading ${kind}…`
-          : state.phase === 'idle' ? (kind === 'projects' ? 'Choose a folder to browse projects.' : '')
-          : state.phase === 'error' ? `${state.error.message}${state.error.requestId ? ` Request ID: ${state.error.requestId}` : ''}`
-          : `Page ${state.page} · ${state.rows.length} ${kind}`;
-        if (state.phase === 'error' && ['invalid_cursor', 'cursor_expired'].includes(state.error.code)) {
-          message.textContent = 'Choices expired. Retry starts at page one.';
-        }
-      } });
-    listen(previous, 'click', () => { void owner.previous(); });
-    listen(next, 'click', () => { void owner.next(); });
-    listen(retry, 'click', () => { void owner.retry(); });
-    listen(choices, 'change', () => {
-      if (!choices.value) return;
-      const key = kind === 'folders' ? 'folder' : 'project';
-      const name = choices.value;
-      input[key].value = name;
-      nameEdited(key, name);
-      if (kind === 'folders') loadProjects();
-    });
-    return owner;
+  function position() {
+    if (!opened) return;
+    const box = form.getBoundingClientRect(), anchor = opened.trigger.getBoundingClientRect();
+    const width = opened.panel.getBoundingClientRect().width;
+    opened.panel.style.left = `${Math.max(0, Math.min(anchor.left - box.left, box.width - width))}px`;
+    opened.panel.style.top = `${anchor.bottom - box.top + 8}px`;
   }
-
-  const folders = navigation('folders');
-  const projects = navigation('projects');
-
-  function loadProjects() {
-    const folder = session.draft.folder;
-    if (folder === projectFolder) return;
-    projectFolder = folder;
-    try { if (folder !== null) catalogName(folder); }
-    catch { projectFolder = null; projects.clear(); return; }
-    void projects.reset(folder);
+  function label(key, value) {
+    get(`[data-filter-label="${key}"]`).textContent = value;
+    const trigger = get(`[data-open-filter="${key}"]`);
+    trigger.setAttribute('aria-label', `${key === 'created' ? 'Created' : key[0].toUpperCase() + key.slice(1)}: ${value}`);
+    trigger.title = value;
   }
-
-  function readDraft() {
-    // Exact catalog names belong to the session. Single-line inputs strip CR/LF,
-    // so only explicit name edits may replace a restored or chosen name.
-    session.update({ status: [...input.status.querySelectorAll('input:checked')].filter((checkbox) => checkbox.value !== '')
-        .map((checkbox) => Number(checkbox.value)).sort((a, b) => a - b),
-      from: input['creation-window'].value === 'custom' ? input.from.value || null : null,
-      to: input['creation-window'].value === 'custom' ? input.to.value || null : null });
-  }
-
-  function changed() {
-    readDraft();
-    for (const key of ['folder', 'project']) {
-      const choices = form.querySelector(`#${key}-options`);
-      if (choices.value !== session.draft[key]) choices.value = '';
-    }
-    notice.textContent = JSON.stringify(session.draft) === JSON.stringify(session.applied) ? '' : 'Changes not applied.';
-  }
-
   function showDraft() {
-    const selection = session.draft;
-    for (const key of ['folder', 'project', 'from', 'to']) input[key].value = selection[key] ?? '';
-    for (const key of ['folder', 'project']) form.querySelector(`#${key}-options`).value = '';
-    for (const checkbox of input.status.querySelectorAll('input')) {
-      checkbox.checked = checkbox.value === '' ? selection.status.length === 0 : selection.status.includes(Number(checkbox.value));
+    const draft = session.draft;
+    label('folder', draft.folder ?? 'All folders');
+    label('project', draft.project ?? 'All projects');
+    for (const checkbox of status.querySelectorAll('input')) {
+      checkbox.checked = checkbox.value === '' ? !draft.status.length : draft.status.includes(Number(checkbox.value));
     }
-    input['creation-window'].value = selection.from !== null || selection.to !== null ? 'custom' : 'default';
-    custom.hidden = input['creation-window'].value !== 'custom';
+    const names = metadata.execution_statuses.filter(item => draft.status.includes(item.code)).map(formatCode);
+    label('status', names.length ? names.join(', ') : 'All statuses');
+    label('created', rangeLabel(draft, metadata.display_timezone));
+    const changed = JSON.stringify(draft) !== JSON.stringify(session.applied);
+    apply.disabled = !changed;
+    notice.textContent = changed ? 'Changes not applied.' : '';
   }
-
   function showApplied(selection, options) {
-    const status = selection.status.length ? metadata.execution_statuses
-      .filter((item) => selection.status.includes(item.code)).map(formatCode).join(', ') : 'All statuses';
-    const windowText = selection.from !== null || selection.to !== null
-      ? `${selection.from ?? 'Default start'} → ${selection.to ?? 'Default end'}` : 'Default window';
-    appliedText.textContent = `Applied: ${selection.folder ?? 'All folders'} / ${selection.project ?? 'All projects'} · ${status} · ${windowText}`;
-    appliedText.hidden = false;
     for (const [key, control] of Object.entries(order)) control.value = String(selection[key]);
     orderNotice.textContent = '';
     onApplied(selection, options);
   }
-
-  function writeUrl(selection, replace) {
+  function writeUrl(selection, replace = false) {
     const url = appBase + selectionSearch(selection, metadata) + window.location.hash;
     if (replace) window.history.replaceState(null, '', url);
-    else if (url !== window.location.pathname + window.location.search + window.location.hash) {
-      window.history.pushState(null, '', url);
-    }
+    else if (url !== window.location.pathname + window.location.search + window.location.hash) window.history.pushState(null, '', url);
   }
-
-  function restore({ reusePage = true } = {}) {
-    reset.disabled = false;
+  function chooseScope(key, name) {
     try {
-      const selection = session.restore(window.location.search);
-      fieldset.disabled = false;
-      apply.disabled = false;
-      for (const control of Object.values(order)) control.disabled = false;
+      if (name !== null) catalogName(name);
+      const selection = session.scope({ [key]: name });
+      close({ focus: true });
+      writeUrl(selection);
       showDraft();
-      notice.textContent = '';
-      writeUrl(selection, true);
-      showApplied(selection, { restore: reusePage });
-      if (!foldersStarted) { foldersStarted = true; void folders.reset(); }
-      loadProjects();
-      if (selection.folder === null) projects.clear();
-    } catch (error) {
-      fieldset.disabled = true;
-      apply.disabled = true;
-      for (const control of Object.values(order)) control.disabled = true;
-      orderNotice.textContent = '';
-      appliedText.hidden = true;
-      notice.textContent = `${error instanceof SelectionError ? error.message : 'Filters could not be restored.'} Reset filters to start again.`;
-      folders.clear();
-      projects.clear();
-      foldersStarted = false;
-      projectFolder = null;
-      onApplied(null);
-    }
+      showApplied(selection);
+    } catch (error) { notice.textContent = error instanceof SelectionError ? error.message : 'Scope could not be changed.'; }
   }
 
-  function nameEdited(key, value) {
-    const name = value || null;
-    const folderChanged = key === 'folder' && name !== session.draft.folder;
-    session.update({ [key]: name });
-    if (folderChanged) {
-      input.project.value = '';
-      projectFolder = null;
-      projects.clear();
-    }
-    changed();
+  for (const key of ['folder', 'project']) {
+    const search = get(`#${key}-search`), choices = get(`[data-catalog-choices="${key}"]`);
+    const message = get(`[data-catalog-status="${key}"]`), more = get(`[data-catalog-more="${key}"]`);
+    const retry = get(`[data-catalog-retry="${key}"]`), exact = get(`[data-exact-scope="${key}"]`);
+    const owner = createCatalogSearch({ api, kind: `${key}s`, limit: metadata.limits.default_limit,
+      publish(state) {
+        const focused = document.activeElement;
+        const focusId = choices.contains(focused) ? focused?.dataset?.catalogId : undefined;
+        const previousCount = choices.children.length;
+        choices.replaceChildren(...state.rows.map(row => {
+          const button = document.createElement('button');
+          button.type = 'button'; button.className = 'catalog-choice'; button.textContent = row.name;
+          button.dataset.catalogId = row[`${key}_id`];
+          button.setAttribute('aria-pressed', String(session.applied?.[key] === row.name));
+          button.addEventListener('click', () => chooseScope(key, row.name));
+          return button;
+        }));
+        more.hidden = state.complete || state.phase === 'idle' || state.phase === 'error';
+        // Keep the request control focusable while its owner ignores duplicates.
+        more.setAttribute('aria-disabled', String(state.phase === 'loading'));
+        more.textContent = search.value ? 'Search more' : 'Load more';
+        retry.hidden = state.phase !== 'error';
+        message.textContent = state.phase === 'idle' ? 'Choose a folder to browse projects, or enter an exact project name across all folders.'
+          : state.phase === 'loading' ? (search.value ? 'Searching the catalog…' : 'Loading…')
+          : state.phase === 'error' ? `${state.error.message}${state.error.requestId ? ` Request ID: ${state.error.requestId}` : ''}`
+          : state.complete ? (state.rows.length ? `${state.rows.length} ${search.value ? 'matches' : `${key}s`}` : 'No matches.')
+          : search.value ? `${state.rows.length} matches so far. Search more to continue through the catalog.` : '';
+        if (state.phase === 'error' && ['invalid_cursor', 'cursor_expired'].includes(state.error.code)) {
+          message.textContent = 'Choices expired. Retry restarts the search.';
+        }
+        if (focusId !== undefined) {
+          ([...choices.children].find(button => button.dataset.catalogId === focusId)
+            ?? (state.phase === 'error' ? retry : search)).focus();
+        } else if (focused === more && state.phase !== 'loading') {
+          (state.phase === 'error' ? retry : choices.children[previousCount] ?? (more.hidden ? search : more)).focus();
+        }
+      } });
+    pickers.set(key, owner);
+    const searchNow = () => { void owner.search(search.value, key === 'project' ? session.applied.folder : null); };
+    listen(search, 'input', () => {
+      owner.cancel(); clearTimeout(searchTimer);
+      choices.replaceChildren(); more.hidden = true; retry.hidden = true;
+      message.textContent = 'Searching…';
+      exact.hidden = !search.value;
+      searchTimer = setTimeout(searchNow, 250);
+    });
+    listen(search, 'keydown', event => {
+      if (event.key === 'Enter') { event.preventDefault(); clearTimeout(searchTimer); searchNow(); }
+    });
+    listen(more, 'click', () => { void owner.more(); });
+    listen(retry, 'click', () => { void owner.retry(); });
+    listen(exact, 'click', () => chooseScope(key, search.value));
+    listen(get(`[data-all-scope="${key}"]`), 'click', () => chooseScope(key, null));
   }
-  for (const key of ['folder', 'project']) listen(input[key], 'input', () => nameEdited(key, input[key].value));
-  listen(input.folder, 'change', loadProjects);
-  listen(input.folder, 'blur', loadProjects);
-  for (const key of ['from', 'to']) listen(input[key], 'input', changed);
-  listen(input['creation-window'], 'change', () => {
-    custom.hidden = input['creation-window'].value !== 'custom';
-    changed();
+
+  const range = mountRangeEditor(form, { metadata, api, listen, onChoose(bounds) {
+    session.update(bounds); close({ focus: true }); showDraft();
+  } });
+  for (const trigger of form.querySelectorAll('[data-open-filter]')) listen(trigger, 'click', () => {
+    const key = trigger.dataset.openFilter;
+    if (opened?.key === key) { close({ focus: true }); return; }
+    close();
+    const panel = get(`[data-filter-panel="${key}"]`);
+    opened = { key, trigger, panel };
+    panel.hidden = false; trigger.setAttribute('aria-expanded', 'true');
+    if (pickers.has(key)) {
+      const search = get(`#${key}-search`);
+      search.value = ''; get(`[data-exact-scope="${key}"]`).hidden = true;
+      get(`[data-all-scope="${key}"]`).setAttribute('aria-pressed', String(session.applied[key] === null));
+      void pickers.get(key).search('', key === 'project' ? session.applied.folder : null);
+      search.focus();
+    } else if (key === 'created') { range.open(session.draft); get('#creation-window').focus(); }
+    else status.querySelector('input').focus();
+    position();
   });
-  listen(input.status, 'change', (event) => {
-    const all = input.status.querySelector('input[value=""]');
-    const codes = [...input.status.querySelectorAll('input')].filter((checkbox) => checkbox.value !== '');
+  for (const button of form.querySelectorAll('[data-close-filter]')) listen(button, 'click', () => close({ focus: true }));
+  listen(document, 'pointerdown', event => {
+    if (opened && !opened.panel.contains(event.target) && !opened.trigger.contains(event.target)) close();
+  });
+  listen(form, 'keydown', event => {
+    if (event.key === 'Escape' && opened) { event.preventDefault(); close({ focus: true }); }
+    else if (event.key === 'Enter' && opened && event.target.tagName === 'INPUT') event.preventDefault();
+  });
+  listen(document, 'focusin', event => {
+    if (opened && !opened.panel.contains(event.target) && !opened.trigger.contains(event.target)) close();
+  });
+  listen(window, 'resize', position);
+  listen(status, 'change', event => {
+    const all = status.querySelector('input[value=""]');
+    const codes = [...status.querySelectorAll('input')].filter(checkbox => checkbox.value !== '');
     if (event.target === all && all.checked) for (const checkbox of codes) checkbox.checked = false;
-    else if (event.target !== all && event.target.checked) all.checked = false;
-    if (!codes.some((checkbox) => checkbox.checked)) all.checked = true;
-    changed();
+    session.update({ status: codes.filter(checkbox => checkbox.checked).map(checkbox => Number(checkbox.value)).sort((a,b) => a-b) });
+    showDraft();
   });
-  listen(form, 'submit', (event) => {
+  listen(form, 'submit', event => {
     event.preventDefault();
-    readDraft();
+    if (opened || session.applied === null) return;
     try {
-      if (input['creation-window'].value === 'custom' && !session.draft.from && !session.draft.to) {
-        throw new SelectionError('Enter at least one time bound or choose Default window.');
-      }
       const selection = session.apply();
-      writeUrl(selection, false);
-      showApplied(selection);
-      notice.textContent = 'Filters applied.';
-      loadProjects();
+      writeUrl(selection); showDraft(); showApplied(selection);
     } catch (error) { notice.textContent = error instanceof SelectionError ? error.message : 'Filters could not be applied.'; }
   });
   listen(reset, 'click', () => {
-    window.history.replaceState(null, '', appBase);
-    restore({ reusePage: false });
+    close(); session.update({ status: [], from: null, to: null });
+    const selection = session.apply();
+    writeUrl(selection); showDraft(); showApplied(selection);
   });
   for (const [key, control] of Object.entries(order)) listen(control, 'change', () => {
     try {
       const selection = session.order({ [key]: key === 'limit' ? Number(control.value) : control.value });
-      writeUrl(selection, false);
-      showApplied(selection);
+      writeUrl(selection); showDraft(); showApplied(selection);
     } catch (error) {
       control.value = String(session.applied[key]);
       orderNotice.textContent = error instanceof SelectionError ? error.message : 'The table could not be updated.';
     }
   });
+  function restore({ reusePage = true } = {}) {
+    close();
+    try {
+      const selection = session.restore(window.location.search);
+      fieldset.disabled = false; reset.disabled = false; recover.hidden = true;
+      for (const control of Object.values(order)) control.disabled = false;
+      showDraft(); writeUrl(selection, true); showApplied(selection, { restore: reusePage });
+    } catch (error) {
+      fieldset.disabled = true; apply.disabled = true; recover.hidden = false;
+      for (const control of Object.values(order)) control.disabled = true;
+      orderNotice.textContent = '';
+      notice.textContent = `${error instanceof SelectionError ? error.message : 'Filters could not be restored.'} Reset invalid filters to start again.`;
+      onApplied(null);
+    }
+  }
+  listen(recover, 'click', () => { window.history.replaceState(null, '', appBase); restore({ reusePage: false }); });
   listen(window, 'popstate', restore);
   restore();
   return () => {
-    folders.dispose();
-    projects.dispose();
+    close(); clearTimeout(searchTimer); range.cancel();
+    for (const owner of pickers.values()) owner.dispose();
     for (const control of Object.values(order)) control.disabled = true;
-    for (const remove of removeListeners) remove();
+    for (const remove of removers) remove();
   };
 }

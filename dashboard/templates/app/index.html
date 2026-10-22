@@ -1,74 +1,98 @@
 {% extends "app/base.html" %}
 {% block screen %}overview{% endblock %}
 {% block content %}
-        <div class="page-heading">
-            <h1>Overview</h1>
-            <div class="section-actions">
-                <button type="button" data-overview-refresh disabled>Refresh</button>
-                <button type="button" data-poll-toggle disabled>Pause auto refresh</button>
-            </div>
-        </div>
-        <section class="panel filters" aria-labelledby="filters-heading">
-            <h2 id="filters-heading">Filters</h2>
+        <section class="overview-selection" aria-labelledby="filters-heading">
+            <h2 id="filters-heading" class="visually-hidden">Execution filters</h2>
             <form id="overview-filters" novalidate>
                 <fieldset class="filter-fields" disabled aria-describedby="app-status">
                     <legend class="visually-hidden">Execution filters</legend>
-                    <div class="filter-grid">
-                        <div class="navigation-field">
-                            <label for="folder">Folder
-                                <input id="folder" name="folder" type="text" maxlength="128" placeholder="All folders" autocomplete="off" aria-describedby="folder-navigation-status">
-                            </label>
-                            <select id="folder-options" aria-label="Folder choices" disabled><option value="">Choose from this page</option></select>
-                            <div class="navigation-controls" data-navigation="folders">
-                                <button type="button" data-previous aria-label="Previous folders" disabled>Previous</button>
-                                <button type="button" data-next aria-label="Next folders" disabled>Next</button>
-                                <button type="button" data-navigation-retry aria-label="Retry folders" hidden>Retry</button>
-                                <p id="folder-navigation-status" role="status"></p>
-                            </div>
+                    <div class="page-heading">
+                        <div class="scope-path" aria-label="Execution scope and current page">
+                            {% for kind in ['folder', 'project'] %}
+                            {% if kind == 'project' %}<span class="scope-separator" aria-hidden="true">/</span>{% endif %}
+                            <button type="button" class="scope-trigger" data-open-filter="{{ kind }}" aria-haspopup="dialog" aria-controls="{{ kind }}-picker" aria-expanded="false">
+                                <span data-filter-label="{{ kind }}">All {{ kind }}s</span><span class="chevron" aria-hidden="true">⌄</span>
+                            </button>
+                            {% endfor %}
+                            <span class="scope-current"><span class="scope-separator" aria-hidden="true">/</span><h1 aria-current="page">Overview</h1></span>
                         </div>
-                        <div class="navigation-field">
-                            <label for="project">Project
-                                <input id="project" name="project" type="text" maxlength="128" placeholder="All projects" autocomplete="off" aria-describedby="project-navigation-status">
-                            </label>
-                            <select id="project-options" aria-label="Project choices" disabled><option value="">Choose from this page</option></select>
-                            <div class="navigation-controls" data-navigation="projects">
-                                <button type="button" data-previous aria-label="Previous projects" disabled>Previous</button>
-                                <button type="button" data-next aria-label="Next projects" disabled>Next</button>
-                                <button type="button" data-navigation-retry aria-label="Retry projects" hidden>Retry</button>
-                                <p id="project-navigation-status" role="status"></p>
-                            </div>
+                        <div class="section-actions">
+                            <button type="button" data-overview-refresh disabled>Refresh</button>
+                            <button type="button" data-poll-toggle disabled>Pause auto refresh</button>
                         </div>
-                        <label for="creation-window">Created
-                            <select id="creation-window" name="window">
-                                <option value="default">Default window</option>
-                                <option value="custom">Custom window</option>
-                            </select>
-                        </label>
                     </div>
-                    <fieldset id="status" class="status-options">
-                        <legend>Status</legend>
-                        <div data-status-choices>
-                            <label><input type="checkbox" name="status" value="" checked>All statuses</label>
+                    <div class="filter-bar">
+                        <div class="filter-inline"><span id="status-label">Status</span>
+                            <button type="button" class="filter-trigger" data-open-filter="status" aria-haspopup="dialog" aria-controls="status-picker" aria-expanded="false">
+                                <span data-filter-label="status">All statuses</span><span class="chevron" aria-hidden="true">⌄</span>
+                            </button>
                         </div>
-                    </fieldset>
-                    <div class="custom-window" data-custom-window hidden>
-                        <label for="from">From (inclusive)
-                            <input id="from" name="from" type="text" maxlength="33" spellcheck="false" placeholder="2026-10-17T09:00:00+01:00" aria-describedby="time-input-help">
-                        </label>
-                        <label for="to">To (exclusive)
-                            <input id="to" name="to" type="text" maxlength="33" spellcheck="false" placeholder="2026-10-18T09:00:00+01:00" aria-describedby="time-input-help">
-                        </label>
-                        <p id="time-input-help">Use Z or an explicit offset, with up to 7 fractional digits. A blank bound uses the server default.</p>
+                        <div class="filter-inline filter-created"><span id="created-label">Created</span>
+                            <button type="button" class="filter-trigger" data-open-filter="created" aria-haspopup="dialog" aria-controls="created-picker" aria-expanded="false">
+                                <span data-filter-label="created">Default window</span><span class="chevron" aria-hidden="true">⌄</span>
+                            </button>
+                        </div>
+                        <button class="button-primary" type="submit" data-apply-filters disabled>Apply</button>
+                        <button class="button-quiet" type="button" data-reset-filters disabled>Reset filters</button>
+                    </div>
+                    {% for kind in ['folder', 'project'] %}
+                    <div id="{{ kind }}-picker" class="filter-popover" data-filter-panel="{{ kind }}" role="dialog" aria-labelledby="{{ kind }}-heading" hidden>
+                        <div class="popover-heading"><h2 id="{{ kind }}-heading">{{ kind|capitalize }}</h2><button type="button" class="button-quiet" data-close-filter aria-label="Close {{ kind }} picker">×</button></div>
+                        <label for="{{ kind }}-search" class="visually-hidden">Search {{ kind }}s</label>
+                        <input id="{{ kind }}-search" type="search" placeholder="Search {{ kind }}s" autocomplete="off" maxlength="128" aria-describedby="{{ kind }}-search-status">
+                        <button type="button" class="catalog-choice" data-all-scope="{{ kind }}">All {{ kind }}s</button>
+                        <div class="catalog-choices" data-catalog-choices="{{ kind }}"></div>
+                        <p id="{{ kind }}-search-status" class="resource-status" data-catalog-status="{{ kind }}" role="status"></p>
+                        <div class="popover-actions">
+                            <button type="button" data-catalog-more="{{ kind }}" hidden>Load more</button>
+                            <button type="button" data-catalog-retry="{{ kind }}" hidden>Retry</button>
+                            <button type="button" data-exact-scope="{{ kind }}" hidden>Use exact name</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    <div id="status-picker" class="filter-popover status-popover" data-filter-panel="status" role="dialog" aria-labelledby="status-heading" hidden>
+                        <div class="popover-heading"><h2 id="status-heading">Status</h2><button type="button" class="button-quiet" data-close-filter aria-label="Close status picker">×</button></div>
+                        <fieldset id="status" class="status-options"><legend class="visually-hidden">Execution statuses</legend>
+                            <div data-status-choices><label><input type="checkbox" name="status" value="" checked>All statuses</label></div>
+                        </fieldset>
+                        <div class="popover-actions"><button type="button" data-close-filter>Done</button></div>
+                    </div>
+                    <div id="created-picker" class="filter-popover created-popover" data-filter-panel="created" role="dialog" aria-labelledby="created-heading" hidden>
+                        <div class="popover-heading"><h2 id="created-heading">Created</h2><button type="button" class="button-quiet" data-close-filter aria-label="Close time picker">×</button></div>
+                        <label for="creation-window" class="visually-hidden">Creation window</label>
+                        <select id="creation-window">
+                            <option value="default">Default window</option><option value="today">Today</option>
+                            <option value="24h">Last 24 hours</option><option value="7d">Last 7 days</option>
+                            <option value="30d">Last 30 days</option><option value="custom">Custom range</option>
+                        </select>
+                        <div data-custom-window hidden>
+                            <div class="date-fields">
+                                {% for bound, label in [('from', 'Start date'), ('to', 'End date')] %}
+                                <label for="{{ bound }}-date">{{ label }}<input id="{{ bound }}-date" type="date" min="0001-01-01" max="9999-12-31"></label>
+                                {% endfor %}
+                            </div>
+                            <label class="check-label"><input id="include-time" type="checkbox">Include time</label>
+                            <div class="date-fields" data-time-fields hidden>
+                                <label for="from-time">Start time (inclusive)<input id="from-time" type="time" step="1"></label>
+                                <label for="to-time">End time (exclusive)<input id="to-time" type="time" step="1"></label>
+                            </div>
+                            <div class="date-fields">
+                                {% for bound, label in [('from', 'Start'), ('to', 'End')] %}
+                                <label data-occurrence-label="{{ bound }}" hidden>{{ label }} time occurs twice<select id="{{ bound }}-occurrence"><option value="">Choose occurrence</option><option value="0">First occurrence</option><option value="1">Second occurrence</option></select></label>
+                                {% endfor %}
+                            </div>
+                            <p class="resource-status" data-time-help>Start and end dates included. A blank date uses the server default.</p>
+                            <details class="exact-times"><summary>Exact timestamps</summary>
+                                <p class="resource-status">Optional: paste an exact timestamp with Z or an offset. Up to 7 fractional digits are preserved.</p>
+                                <div class="date-fields"><label for="from">From (inclusive)<input id="from" type="text" maxlength="33" spellcheck="false"></label><label for="to">To (exclusive)<input id="to" type="text" maxlength="33" spellcheck="false"></label></div>
+                            </details>
+                        </div>
+                        <p class="resource-status" data-time-notice role="status"></p>
+                        <div class="popover-actions"><button type="button" data-close-filter>Cancel</button><button type="button" class="button-primary" data-use-range>Use range</button></div>
                     </div>
                 </fieldset>
-                <div class="filter-actions">
-                    <p data-filter-notice role="status"></p>
-                    <div class="filter-buttons">
-                        <button class="button-primary" type="submit" data-apply-filters disabled>Apply</button>
-                        <button type="button" data-reset-filters disabled>Reset filters</button>
-                    </div>
-                </div>
-                <p class="applied-selection" data-applied-selection hidden></p>
+                <p class="resource-status filter-notice" data-filter-notice role="status"></p>
+                <button type="button" data-recover-filters hidden>Reset invalid filters</button>
             </form>
         </section>
 

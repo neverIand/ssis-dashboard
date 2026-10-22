@@ -1,5 +1,5 @@
 import { mountBootstrap } from './bootstrap.js';
-import { createDisplay, formatCode } from './display.js';
+import { formatCode } from './display.js';
 import { mountFilters } from './filters.js';
 import { mountOverview } from './render-overview.js';
 
@@ -22,9 +22,6 @@ export function mountOverviewScreen(root, saved = null) {
       label.append(checkbox, document.createTextNode(item.code === '' ? item.name : formatCode(item)));
       return label;
     }));
-    const display = createDisplay({ timeZone: metadata.display_timezone });
-    root.querySelector('#creation-window option').textContent =
-      `Default window (${display.count(metadata.limits.default_range_hours)} h)`;
     const overview = mountOverview(root, { metadata, api, appBase: config.app_base,
       retainedPaths: saved?.paths, restoreView: saved?.view });
     if (saved) { saved.paths.length = 0; saved.view = null; }

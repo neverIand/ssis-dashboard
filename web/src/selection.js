@@ -133,6 +133,14 @@ export function createSelectionSession(metadata) {
       draft = { ...applied };
       return applied;
     },
+    scope(changes) {
+      if (applied === null) invalid('Restore a valid selection before changing scope.');
+      const scope = { folder: applied.folder, project: applied.project, ...changes };
+      if ('folder' in changes && changes.folder !== applied.folder) scope.project = null;
+      applied = validateSelection({ ...applied, ...scope }, metadata);
+      draft = { ...draft, ...scope };
+      return applied;
+    },
     order(changes) {
       if (applied === null) invalid('Apply a valid selection before changing the table.');
       const order = Object.fromEntries(['sort', 'direction', 'limit'].map((key) => [key,

@@ -10,6 +10,26 @@ Updated 22 October 2026. Development base: `dev-next`; planning baseline: `ce8d0
 
 ## Task sizing and status
 
+### Overview filter UX — 22 October 2026
+
+Implemented the reviewed **Folder / Project / Overview** design as one frontend milestone. The global timezone, applied URL/history contract, all-status summary and refresh owner remain in place. No SQL/API contract or dependency change was required.
+
+| Step | Status | Exit check |
+| --- | --- | --- |
+| Compact scope and filters | Complete locally | Searchable title-row scope pickers and compact Status/Created popovers. Scope applies immediately, clears a changed folder's project and preserves pending status/time edits. Reset filters keeps scope. Search crosses bounded pages, reports partial scans and cancels obsolete work. |
+| Calendar and time selection | Complete locally | Server-anchored presets; native date/time inputs interpreted in the configured timezone; explicit DST occurrence selection, gap rejection, one-sided bounds and unchanged exact timestamps. Calendar/exact edits are tracked independently for each bound. |
+| Integration and validation | Complete locally with native-data gap | Automated/build/root/prefix checks and connected in-app fixture interaction/keyboard/responsive checks pass. The native SQL replay is unavailable as recorded below; existing environment gates stay open. Owned previews and tabs are closed. |
+
+**Validation:** 148 Node tests pass. The complete Python suite reports **368 tests: 365 PASS / three opt-in native SQL SKIP**; the final packaged build also passes all 10 shell and three asset checks. Documentation validation passes for 18 documents, 418 links/anchors, 16 Stage C IDs and 30 backend cases. Authored frontend JS+CSS is **113,354 bytes** (below 150 KiB); packaged JS/CSS is **53,619 / 11,145 bytes**, **64,764 total**. Build assets remain ignored delivery output.
+
+**Connected browser evidence:** the real Flask navigation routes and signed cursors, backed by an explicitly fictional catalog, find Folder 055 and Project 055 beyond the first 50 entries. Literal `all`, exact CR/LF names, prefix-aware URLs, folder/project dependency, preserved drafts, Reset, history restoration and invalid-URL recovery pass. Date field entry across London's 25-hour day produces exact bounds; repeated local time requires an occurrence. Clearing one bound and editing the other exact timestamp retains the clear and seven-digit fraction. Server-time presets produce explicit URL bounds. Fixture rows are fixed observations, so preset checks establish range selection rather than real SSISDB results. Root/prefix shells load packaged assets, and Escape returns focus to the opener. At 360/768/1280 px the document stays within the viewport; the wide selection area is **87 px** high and Created is **270 px** wide.
+
+Two mixed-bound regressions were reproduced before correction: an exact edit restored a cleared opposite bound or bypassed its unresolved repeated time. The range editor now validates each bound independently. A separate real-browser keyboard finding left focus on `BODY` after the final Load more; the corrected control stays focusable while busy and moves focus to the first added option on completion, without reclaiming deliberately moved focus. Focused regressions and the packaged browser replay pass.
+
+**Limits:** the configured local SSISDB attempt returned **503 / SQLSTATE 08001** for executions and folders. Native-data replay is **NOT RUN to completion**; synthetic browser checks do not establish catalog permissions, SQL performance, reader identity or production capacity. Browser-native calendar popup interaction, actual hidden-tab/cache return and corporate/cross-browser acceptance remain **NOT RUN**; date/time field entry and layout were observed in the in-app browser. Stage C, D3 and hosting gates are unchanged. The next code milestone remains P4.2a.
+
+Selected evidence is retained under `.local/reports/frontend/20261022-filter-ux/filter-ux-resume-20261022/`: regression/full-suite/build logs, browser cases and screenshots, private HTTP/server logs, source/build hashes and cleanup receipts. Both owned preview sessions exited with code 0, their PIDs and ports 5180/5181 were verified absent/released, both browser tabs were closed and the viewport override was reset. The earlier interrupted run's stale `.active` marker was removed after confirming no prior preview remained; its evidence was preserved.
+
 Deliver one coherent, independently verifiable task at a time. Record submilestones before expanding scope. **Complete locally** means the stated checks passed on the recorded setup; it does not imply all platforms, workloads or production hosting passed. **Deferred** means the user explicitly put the work on hold.
 
 Planning a task or writing a test procedure is not implementation or acceptance evidence. Record `NOT RUN` with the missing condition when an environment cannot exercise a case; do not substitute owner simulations, administrator impersonation or ordinary Back navigation for the missing real condition. Local workload/resource work remains planned even while environment-dependent checks wait.
