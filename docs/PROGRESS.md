@@ -1,6 +1,6 @@
 # Implementation progress
 
-Updated 18 October 2026. Development base: `dev-next`; planning baseline: `ce8d04e`. [Roadmap](roadmap.md) owns scope; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns status and next actions. Detailed results belong in [API validation](API_ACCEPTANCE.md) and the [backend checklist](BACKEND_CHECKLIST.md).
+Updated 22 October 2026. Development base: `dev-next`; planning baseline: `ce8d04e`. [Roadmap](roadmap.md) owns scope; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns status and next actions. Detailed results belong in [API validation](API_ACCEPTANCE.md) and the [backend checklist](BACKEND_CHECKLIST.md).
 
 **Stage C remains in progress.** All 14 GET operations and all 12 execution sorts are implemented; the three review remedies pass their [recorded local checks](API_ACCEPTANCE.md#sql-remedies-replay-17-october-2026). Representative workload, resource and independent API reader acceptance remain open. The first native overview's API prerequisites are available; frontend work is a separate milestone.
 
@@ -99,6 +99,21 @@ This checkpoint does not repeat the long workload samples, sustained/concurrent 
 Closed historical runs are archived with hashes; current C8 inputs, runtime/configuration and fixtures retain their paths. [Installation and local workflow](installation.md#local-artifacts) owns cleanup/recovery instructions. The earlier review and cleanup records remain in `.local/reviews/stage-c-20261017/` and `.local/reports/maintenance/20261017-stage-c-cleanup/`.
 
 Further consolidation reduces `docs/` from 14 files to 11 by combining API correctness/workload evidence, installation/local management and legacy references, and puts delivery phases/budgets in the roadmap. Existing case definitions, commands, result tables, dates and open gates are retained. Fourteen contract/shared-acceptance tests and 353 links/anchors pass. Preservation checks are recorded under `.local/reports/maintenance/20261017-docs-consolidation/`; no native SQL/HTTP rerun or application change is part of this documentation task.
+
+### Backend review fixes — 20 October 2026
+
+Four findings from a backend review of `72b774a`:
+
+| Finding | Change |
+| --- | --- |
+| DNS rebinding | Default `TRUSTED_HOSTS = ['localhost', '127.0.0.1']`, validated at startup as a non-empty list (Flask treats `None`/`[]` as allow-all). Foreign Host headers get 400 before routing on API, legacy, `/app/` and static routes. The legacy error page no longer calls `url_for` when the host was rejected, since no URL adapter exists then. |
+| Unguarded `sql_variant` conversion | `api-execution.sql` now converts `LOGGING_LEVEL` inside the same `CASE` guard as the other API queries, so a text parameter value cannot fail the detail lookup through evaluation order. A static test checks every `api-*.sql` integer conversion of `parameter_value`. |
+| Process-local cursor key | Optional `API_CURSOR_SECRET_KEY` (≥32 bytes) derives a shared HMAC key, so cursors work across workers and restarts. The default `None` keeps the random per-process key. Each app stores its derived key at startup, so creating another app, including one that fails startup, cannot change an existing app's cursors (review follow-up, 22 October). Binding, TTL and scope checks are unchanged. |
+| Unlisted HTTP statuses | API problems keep the error class: unlisted 4xx return 400 `invalid_input` and unlisted 5xx return 500 `internal_error`, instead of everything becoming 500. Status/code enums are unchanged. |
+
+**Validation:** the Python suite runs **366 tests: 360 PASS, six opt-in native SQL SKIP**, including nine new tests. Separately, each fix was reverted in a scratch copy and its matching test failed.
+
+A follow-up review (`.local/reports/reviews/20261022-claude-backend-patch/`) found that `configure()` replaced one process-wide key, so a second app with another secret broke the first app's cursors (HTTP 200 → 400 `invalid_cursor`), even when the second app then failed startup. After the per-app fix, the suite runs **368 tests: 365 PASS, three opt-in native SQL SKIP** (CPython 3.14.8, Flask 3.1.3). The new interleaved-app, failed-startup and derived-key tests fail against the process-wide `configure()`. The review probe `.local/tools/check-cursor-key-isolation.py` now reports every app accepting only its own cursors, with no database calls. **NOT RUN:** native SQL Server execution of the changed `api-execution.sql` (no SQL Server was available) and a real multi-worker host with a shared secret (hosting remains deferred). Rerun the native detail checks before relying on the SQL change in acceptance evidence.
 
 ## Later phase boundaries
 

@@ -12,6 +12,13 @@ from dashboard import config as defaults
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
+def validate_trusted_hosts(value):
+    """Require an explicit Host allowlist; Flask treats None or [] as allow-all."""
+    if (type(value) not in (list, tuple) or not value
+            or any(not isinstance(name, str) or not name.strip() for name in value)):
+        raise ValueError('TRUSTED_HOSTS must be a non-empty list of host names.')
+
+
 def create_app(config_overrides=None, *, config_path=None):
     """Create an independent app with retained HTML and versioned API routes.
 
@@ -45,6 +52,7 @@ def create_app(config_overrides=None, *, config_path=None):
     from dashboard.timezones import validate_display_timezone
     from dashboard.api import register_api, validate_config
 
+    validate_trusted_hosts(app.config['TRUSTED_HOSTS'])
     validate_timeouts(app.config['DB_LOGIN_TIMEOUT_SECONDS'], app.config['DB_QUERY_TIMEOUT_SECONDS'])
     validate_display_timezone(app.config['DISPLAY_TIMEZONE'])
     validate_config(app.config)

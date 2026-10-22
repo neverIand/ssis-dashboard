@@ -6,7 +6,11 @@ SELECT e.execution_id, e.folder_name, e.project_name, e.package_name, e.project_
        logging.logging_level, logging.logging_rows
 FROM catalog.executions AS e
 OUTER APPLY (
-    SELECT COUNT_BIG(*) AS logging_rows, MAX(CONVERT(int, v.parameter_value)) AS logging_level
+    -- The CASE keeps the conversion behind the filter: SQL Server may evaluate
+    -- SELECT expressions before WHERE, and other parameter values can be text.
+    SELECT COUNT_BIG(*) AS logging_rows,
+           MAX(CONVERT(int, CASE WHEN v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL'
+                                 THEN v.parameter_value END)) AS logging_level
     FROM catalog.execution_parameter_values AS v
     WHERE v.execution_id = e.execution_id AND v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL'
 ) AS logging

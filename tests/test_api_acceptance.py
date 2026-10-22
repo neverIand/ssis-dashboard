@@ -83,6 +83,18 @@ class APIAcceptanceTests(unittest.TestCase):
                 self.assertEqual(sql.count('?'), sum(statement.count('?') for statement in declared),
                                  'Explicit NULL binding requires SQL to declare every parameter type.')
 
+    def test_sql_variant_integer_conversions_stay_behind_their_parameter_filter(self):
+        from dashboard.db import load_query
+
+        # SQL Server may evaluate SELECT expressions before WHERE. Other parameter
+        # values can be text, so an integer conversion needs its own CASE guard.
+        unguarded = re.compile(r'CONVERT\(\s*(?:big|small|tiny)?int\s*,(?!\s*CASE\b)[^)]*parameter_value',
+                               re.IGNORECASE)
+        for resource in (Path(__file__).resolve().parents[1]/'dashboard/query').glob('api-*.sql'):
+            with self.subTest(resource=resource.name):
+                sql = re.sub(r'(?m)^[ \t]*--[^\n]*', '', load_query(resource.name))
+                self.assertIsNone(unguarded.search(sql))
+
     def test_all_production_gets_reject_invalid_queries_bodies_and_methods_before_sql(self):
         with self.assertLogs(self.app.logger, level='INFO') as logged:
             for template, (_, values) in OPERATIONS.items():

@@ -4,7 +4,7 @@ All 14 Stage C GET operations are implemented. [OpenAPI](openapi.yaml) is the fi
 
 ## Transport and local access
 
-The initial mode is a loopback-bound process under one configured SQL identity. All catalog reads obey that identity's current visibility; browser names/headers, IDs and cursors confer no rights. No login/delegation system, trusted proxy or shared/public deployment is introduced. OpenAPI's `security: []` describes this local mode. Keep one origin/base path; clients must support a later deployment prefix.
+The initial mode is a loopback-bound process under one configured SQL identity. All catalog reads obey that identity's current visibility; browser names/headers, IDs and cursors confer no rights. No login/delegation system, trusted proxy or shared/public deployment is introduced. A Host header outside `TRUSTED_HOSTS` (default `localhost`, `127.0.0.1`; ports ignored) gets 400 before routing on every route, which blocks DNS rebinding against the unauthenticated loopback service. OpenAPI's `security: []` describes this local mode. Keep one origin/base path; clients must support a later deployment prefix.
 
 Monitoring uses GET without a body. HEAD has the same policy/status/headers and no body; automatic OPTIONS may return method information but still checks capability. Other methods return 405 with `Allow`. Every API/health response has `Cache-Control: no-store` and a server-generated `X-Request-ID`. Successful resources have `data` and `meta` including that request ID and a UTC `generated_at`.
 
@@ -79,9 +79,9 @@ All sorts are global, with unique ID tie-breakers in the selected direction. NUL
 
 Ordinary execution keys select the bounded page before counts/logging enrichment. The four calculated sorts require global keys before paging; duration sorts by actual end−start, never elapsed time. Exact raw keys retain 100-ns ordering and avoid whole-duration nanosecond overflow. Materialized/output limits do not imply bounded source reads.
 
-Opaque cursor v2 tokens are HMAC-authenticated with a random process-local server key. Bind resource/version, canonical selection, limit/order, SQL/policy scope, first-page `as_of`, upper ID, last exact key/NULL flags and ID tie-breaker. Use keyed digests for search/filter/identity bindings; tokens never contain credentials, values or event text. Public name sort keys may appear. Tokens are at most 8192 characters and expire 30 minutes after creation, without renewal. Shared-worker signing coordination remains deferred hosting design.
+Opaque cursor v2 tokens are HMAC-authenticated with a server key: random per process by default, or derived from `API_CURSOR_SECRET_KEY` so workers and restarts share it. Each app keeps the key it derived at startup. Bind resource/version, canonical selection, limit/order, SQL/policy scope, first-page `as_of`, upper ID, last exact key/NULL flags and ID tie-breaker. Use keyed digests for search/filter/identity bindings; tokens never contain credentials, values or event text. Public name sort keys may appear. Tokens are at most 8192 characters and expire 30 minutes after creation, without renewal. Multi-worker hosts must configure one shared secret; other shared-worker coordination remains deferred hosting design.
 
-Continue by repeating the original selection and cursor; windowed collections must send the returned explicit `from`/`to`. Defaults are valid only when they equal the original effective selection. Changed selection/direction/policy/scope, altered/malformed tokens or old formats return 400 `invalid_cursor`; expiration returns `cursor_expired`. Restart may invalidate all cursors. Refresh from page one after these errors.
+Continue by repeating the original selection and cursor; windowed collections must send the returned explicit `from`/`to`. Defaults are valid only when they equal the original effective selection. Changed selection/direction/policy/scope, altered/malformed tokens or old formats return 400 `invalid_cursor`; expiration returns `cursor_expired`. With the default random key, restart invalidates all cursors. Refresh from page one after these errors.
 
 An initial visible maximum numeric ID fences later inserts; initially empty collections have NULL upper ID and no cursor. SQL visibility remains live. Retention/revocation, status changes or mutable sort keys can alter membership and cause duplicates/skips; no snapshot is promised. Consumers refresh/reset paging and deduplicate by identity when appropriate. A signature grants no access.
 
@@ -117,7 +117,7 @@ Otherwise return `mean_last_5_successful`, sample count, arithmetic mean duratio
 
 ## Errors and health
 
-Errors use RFC 9457 `application/problem+json`: `type: about:blank`, standard title, matching status, fixed safe detail, stable code and request ID. Omit rejected values, URL/instance and diagnostics. Unmatched API paths/methods are JSON; legacy errors remain HTML.
+Errors use RFC 9457 `application/problem+json`: `type: about:blank`, standard title, matching status, fixed safe detail, stable code and request ID. Omit rejected values, URL/instance and diagnostics. Unmatched API paths/methods are JSON; legacy errors remain HTML. Other HTTP errors keep their class within the fixed set: an unlisted 4xx returns 400 `invalid_input` and an unlisted 5xx returns 500 `internal_error`.
 
 | Status | Code / behavior |
 | --- | --- |

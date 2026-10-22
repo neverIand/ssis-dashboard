@@ -38,6 +38,7 @@ Set `CONNECTION_STRING['main']` to the approved SSISDB connection using an insta
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `DEBUG` | `False` | Local debugging only |
+| `TRUSTED_HOSTS` | `['localhost', '127.0.0.1']` | Non-empty list of accepted Host names (ports ignored; IPv6 literals unsupported). Other hosts get 400, blocking DNS rebinding. Add a name only for a reviewed proxy/host that serves it |
 | `DISPLAY_TIMEZONE` | `Europe/London` | Loadable IANA zone for API buckets and offset-free fixed dates; pinned `tzdata` supplies a fallback |
 | `AS_OF_DATE` | `NOW` | Default API upper creation bound; a fixed date/time must resolve to one instant |
 | `HOUR_SPAN` | `360` | Default elapsed-hour window; positive and no larger than `API_MAX_RANGE_HOURS` |
@@ -49,6 +50,7 @@ Set `CONNECTION_STRING['main']` to the approved SSISDB connection using an insta
 | `API_EVENTS_ENABLED` | `False` | Permit API event text/search for the configured SQL scope |
 | `API_VALUES_ENABLED` | `False` | Permit API nonsensitive parameters and override metadata |
 | `API_OVERRIDE_VALUES_ENABLED` | `False` | Permit nonsensitive override values; requires values enabled |
+| `API_CURSOR_SECRET_KEY` | `None` | Paging-cursor signing secret, at least 32 bytes; keep it private like the connection string. `None` uses a random key per process, so cursors fail across workers and after restart |
 | `LOG_LEVEL` | `INFO` | Safe request/query events; validated Python logger level |
 
 API capability settings require actual booleans. Sensitive values are always redacted. These API flags do not change legacy page access. All 14 Stage C GET operations are implemented; [the contract](API_CONTRACT.md) defines their selectors, paging and response semantics. Browser identity/proxy headers do not grant access or change SQL identity.

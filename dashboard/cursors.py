@@ -7,6 +7,8 @@ import json
 import re
 import secrets
 
+from flask import current_app, has_app_context
+
 from dashboard.timestamps import TICKS_PER_SECOND, parse_timestamp
 from dashboard.validation import InvalidInput
 
@@ -14,6 +16,40 @@ from dashboard.validation import InvalidInput
 _KEY = secrets.token_bytes(32)
 TTL_SECONDS = 1800
 MAX_CHARACTERS = 8192
+MIN_SECRET_BYTES = 32
+_EXTENSION = 'api_cursor_key'
+_SECRET_MESSAGE = 'API_CURSOR_SECRET_KEY must be None or a str/bytes secret of at least 32 bytes.'
+
+
+def signing_key(secret):
+    """Derive the HMAC key from a configured secret, validating it first."""
+    if isinstance(secret, str):
+        try:
+            secret = secret.encode('utf-8')
+        except UnicodeError:
+            raise ValueError(_SECRET_MESSAGE) from None
+    if type(secret) is not bytes or len(secret) < MIN_SECRET_BYTES:
+        raise ValueError(_SECRET_MESSAGE)
+    # Domain separation keeps tokens independent if the secret is reused elsewhere.
+    return hmac.new(secret, b'ssis-dashboard/api-cursor/v2', hashlib.sha256).digest()
+
+
+def configure(app):
+    """Bind the app's key at startup; a None secret keeps this process's random key.
+
+    Each app owns its derived key, so creating another app, even one that then
+    fails startup, never changes which cursors an existing app issues or accepts.
+    Workers sharing one secret accept each other's cursors and survive restarts;
+    TTL and scope binding still apply.
+    """
+    secret = app.config['API_CURSOR_SECRET_KEY']
+    app.extensions[_EXTENSION] = None if secret is None else signing_key(secret)
+
+
+def _key():
+    # No secret or no app context: the process key, read at call time.
+    key = current_app.extensions.get(_EXTENSION) if has_app_context() else None
+    return _KEY if key is None else key
 
 
 class InvalidCursor(InvalidInput):
@@ -38,7 +74,7 @@ def _decode(value):
 def digest(value):
     """Keyed binding hides low-entropy filters and connection identity strings."""
     encoded = json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(',', ':'), allow_nan=False)
-    return hmac.new(_KEY, encoded.encode('ascii'), hashlib.sha256).hexdigest()
+    return hmac.new(_key(), encoded.encode('ascii'), hashlib.sha256).hexdigest()
 
 
 def scope_digest(config):
@@ -50,7 +86,7 @@ def scope_digest(config):
 
 def seal(payload):
     body = _encode(json.dumps(payload, sort_keys=True, separators=(',', ':'), allow_nan=False).encode('ascii'))
-    signature = _encode(hmac.new(_KEY, body.encode('ascii'), hashlib.sha256).digest())
+    signature = _encode(hmac.new(_key(), body.encode('ascii'), hashlib.sha256).digest())
     token = body + '.' + signature
     if len(token) > MAX_CHARACTERS:
         raise ValueError('Paging state exceeds the token limit.')
@@ -62,7 +98,7 @@ def open_cursor(token, *, resource, selection, scope, now):
         if not isinstance(token, str) or len(token) > MAX_CHARACTERS:
             raise ValueError('Invalid token length.')
         body, signature = token.split('.')
-        expected = hmac.new(_KEY, body.encode('ascii'), hashlib.sha256).digest()
+        expected = hmac.new(_key(), body.encode('ascii'), hashlib.sha256).digest()
         if not hmac.compare_digest(_decode(signature), expected):
             raise ValueError('Invalid token signature.')
         payload = json.loads(_decode(body))

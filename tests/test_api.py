@@ -6,9 +6,10 @@ from unittest.mock import Mock, patch
 from flask import g
 import pyodbc
 from werkzeug.datastructures import WWWAuthenticate
-from werkzeug.exceptions import Forbidden, NotFound, Unauthorized
+from werkzeug.exceptions import (BadGateway, Forbidden, NotFound, NotImplemented as NotImplementedHTTP,
+                                 RequestEntityTooLarge, TooManyRequests, Unauthorized)
 
-from dashboard import create_app
+from dashboard import create_app, cursors
 from dashboard.api import query_parameters, requires_capability, resource_response
 from dashboard import api_validation as inputs
 from dashboard import serialization as wire
@@ -285,6 +286,36 @@ class APIHTTPTests(unittest.TestCase):
         self.assertNotIn('private-canary', '\n'.join(logged.output))
         self.connect.assert_not_called()
 
+    def test_unlisted_http_errors_keep_their_class_within_the_fixed_problem_set(self):
+        errors = {413: RequestEntityTooLarge, 429: TooManyRequests, 501: NotImplementedHTTP, 502: BadGateway}
+
+        def unlisted(code):
+            raise errors[code]('private-canary')
+
+        self.app.add_url_rule('/api/v1/_unlisted/<int:code>', view_func=unlisted)
+        expected = {413: ('invalid_input', 400), 429: ('invalid_input', 400),
+                    501: ('internal_error', 500), 502: ('internal_error', 500)}
+        for original, (code, status) in expected.items():
+            with self.subTest(original=original):
+                response = self.client.get(f'/api/v1/_unlisted/{original}')
+                self.assert_response(response, 'Problem', status)
+                self.assertEqual(response.json['code'], code)
+        self.connect.assert_not_called()
+
+    def test_foreign_host_headers_are_rejected_before_policy_views_or_sql(self):
+        for path in ('/api/v1/meta', '/healthz', '/readyz', '/api/v1/_values', '/api/v1/_inspect/42'):
+            for host in ('private-canary.example', 'private-canary.example:5555',
+                         '127.0.0.1.private-canary.example', 'localhost.private-canary.example'):
+                with self.subTest(path=path, host=host):
+                    response = self.client.get(path, headers={'Host': host})
+                    self.assert_response(response, 'Problem', 400)
+                    self.assertEqual(response.json['code'], 'invalid_input')
+        for host in ('localhost', 'localhost:5555', '127.0.0.1', '127.0.0.1:5000'):
+            with self.subTest(host=host):
+                self.assert_response(self.client.get('/api/v1/meta', headers={'Host': host}), 'MetaResponse')
+        self.visits.assert_not_called()
+        self.connect.assert_not_called()
+
 
 class APIConfigurationTests(unittest.TestCase):
     def test_bad_capability_and_limit_settings_fail_at_startup_without_sql(self):
@@ -314,3 +345,21 @@ class APIConfigurationTests(unittest.TestCase):
         self.assertEqual(data['limits']['max_range_hours'], 48)
         self.assertEqual(data['limits']['max_timeline_buckets'], 100)
         self.assertFalse(second.test_client().get('/api/v1/meta').json['data']['capabilities']['events'])
+
+    def test_host_allowlist_and_cursor_secret_fail_at_startup_without_sql(self):
+        cases = [
+            {'TRUSTED_HOSTS': None}, {'TRUSTED_HOSTS': []}, {'TRUSTED_HOSTS': ()},
+            {'TRUSTED_HOSTS': 'localhost'}, {'TRUSTED_HOSTS': ['']}, {'TRUSTED_HOSTS': [' ']},
+            {'TRUSTED_HOSTS': ['localhost', None]},
+            {'API_CURSOR_SECRET_KEY': ''}, {'API_CURSOR_SECRET_KEY': 'x' * 31},
+            {'API_CURSOR_SECRET_KEY': b'x' * 31}, {'API_CURSOR_SECRET_KEY': bytearray(32)},
+            {'API_CURSOR_SECRET_KEY': 2**300}, {'API_CURSOR_SECRET_KEY': True},
+            {'API_CURSOR_SECRET_KEY': '\ud800' * 32},
+        ]
+        with patch('pyodbc.connect') as connect, patch.object(cursors, '_KEY', cursors._KEY):
+            original = cursors._KEY
+            for config in cases:
+                with self.subTest(config=config), self.assertRaises(ValueError):
+                    create_app({'LOG_LEVEL': 'ERROR', **config})
+            self.assertIs(cursors._KEY, original)
+            connect.assert_not_called()

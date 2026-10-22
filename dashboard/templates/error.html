@@ -16,7 +16,7 @@
     <main>
         <h1>{{ status }} {{ title }}</h1>
         <p>{{ detail }}</p>
-        <p><a href="{{ url_for('packages') }}">Return to the dashboard</a></p>
+        <p><a href="{{ home_url or url_for('packages') }}">Return to the dashboard</a></p>
         <p>Request ID: <code>{{ request_id }}</code></p>
     </main>
 </body>

@@ -108,7 +108,7 @@ First-delivery and later-section acceptance use [the frontend procedures](FRONTE
 SSE is the initial server-to-browser transport; WebSockets require a concrete bidirectional need. The transport and SSISDB change detector are separate responsibilities.
 
 1. Use shared bounded/timed change detection per approved database/authorization scope. Detect new records **and updates to existing active executions**; a maximum execution ID alone misses transitions. Never keep an ODBC connection for the lifetime of a browser stream.
-2. Own detector startup/shutdown explicitly and avoid debug-reloader duplicates. Define coordination before adding multiple workers; process-local queues and cursor keys do not provide cross-worker continuity.
+2. Own detector startup/shutdown explicitly and avoid debug-reloader duplicates. Define coordination before adding multiple workers; process-local queues do not provide cross-worker continuity, and cursors need one shared `API_CURSOR_SECRET_KEY`.
 3. Send small authorized resource-change notifications, without raw messages, values or connection details. Coalesce client refetches and recheck subscription access on reconnect or identity expiry.
 4. Define ordered event IDs, bounded replay and idempotent handling. Snapshot/subscription handoff must not lose changes. Unknown/expired IDs, restart, retention gaps and queue overflow require explicit resync.
 5. Bound queues, subscribers, replay and message sizes. Disconnect or resync slow clients, send heartbeats, and release subscriptions on disconnect/navigation/shutdown.

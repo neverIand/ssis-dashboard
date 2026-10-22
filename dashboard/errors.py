@@ -6,9 +6,9 @@ from pathlib import Path
 import re
 import logging
 
-from flask import current_app, render_template
+from flask import current_app, render_template, request, url_for
 import pyodbc
-from werkzeug.exceptions import HTTPException
+from werkzeug.exceptions import HTTPException, SecurityError
 
 from dashboard.validation import InvalidInput
 from dashboard.cursors import InvalidCursor
@@ -68,6 +68,14 @@ _DETAILS = {
 }
 
 
+def _home_url():
+    # A rejected Host never gets a URL adapter, so url_for cannot build links.
+    # The script root still locates the dashboard, including under a prefix.
+    if isinstance(request.routing_exception, SecurityError):
+        return request.script_root + '/'
+    return url_for('packages')
+
+
 def _error_response(status, *, response=None):
     if is_api_request():
         return problem_response(status, response=response)
@@ -79,6 +87,7 @@ def _error_response(status, *, response=None):
         title=HTTPStatus(status).phrase,
         detail=_DETAILS.get(status, 'The request could not be completed.'),
         request_id=_request_id(),
+        home_url=_home_url(),
     ))
     response.content_type = 'text/html; charset=utf-8'
     response.headers['Cache-Control'] = 'no-store'

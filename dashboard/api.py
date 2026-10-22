@@ -59,6 +59,8 @@ def validate_config(config):
             raise ValueError(f'{name} must be a positive integer within its documented limit.')
     if config['HOUR_SPAN'] > config['API_MAX_RANGE_HOURS']:
         raise ValueError('HOUR_SPAN must fit API_MAX_RANGE_HOURS.')
+    if config['API_CURSOR_SECRET_KEY'] is not None:
+        cursors.signing_key(config['API_CURSOR_SECRET_KEY'])
 
 
 def capabilities():
@@ -102,7 +104,9 @@ def resource_response(data, *, meta=None):
 
 def problem_response(status, *, response=None, cursor_error=None):
     if status not in _PROBLEMS:
-        status = 500
+        # The contract fixes the status/code set. Keep an unlisted HTTP error in its
+        # class rather than reporting (and logging) a client error as a server fault.
+        status = 400 if type(status) is int and 400 <= status < 500 else 500
     code, detail = _PROBLEMS[status]
     if status == 400 and cursor_error in ('invalid_cursor', 'cursor_expired'):
         code = cursor_error
@@ -247,6 +251,7 @@ def readiness():
 
 
 def register_api(app):
+    cursors.configure(app)
     app.extensions['api_fixed_as_of'] = fixed_as_of(app.config['AS_OF_DATE'], app.config['DISPLAY_TIMEZONE'])
     app.register_blueprint(blueprint)
     app.add_url_rule('/healthz', 'healthz', liveness, methods=['GET'], merge_slashes=False)

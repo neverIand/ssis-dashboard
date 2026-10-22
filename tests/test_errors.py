@@ -166,6 +166,18 @@ class HttpErrorTests(unittest.TestCase):
             factory.assert_not_called()
         self.connect.assert_not_called()
 
+    def test_foreign_host_gets_a_safe_page_without_views_or_database(self):
+        with patch('dashboard.views.monitor') as factory:
+            for path in ('/', '/execution/42', '/app/', '/static/css/main.css', '/not-a-route'):
+                with self.subTest(path=path):
+                    response = self.client.get(path, headers={'Host': 'private-canary.example'})
+                    self.assertNotIn('private-canary', self.assert_safe_error(response, 400))
+            response = self.client.get('/', base_url='http://private-canary.example/dashboard')
+            self.assertEqual(response.status_code, 400)
+            self.assertIn('href="/dashboard/"', response.get_data(as_text=True))
+            factory.assert_not_called()
+        self.connect.assert_not_called()
+
     def test_wrong_method_preserves_allow_header_and_needs_no_database(self):
         response = self.client.post('/execution/42')
         self.assert_safe_error(response, 405)
