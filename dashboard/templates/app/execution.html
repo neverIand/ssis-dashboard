@@ -56,5 +56,34 @@
                 <p class="detail-note">Duplicate warnings are included in Warnings. Memory warnings are counted separately.</p>
             </section>
             <p class="resource-status detail-observed" data-detail-observed></p>
+            <section class="panel detail-panel executable-section" aria-labelledby="executables-heading">
+                <div class="section-heading">
+                    <h2 id="executables-heading">Executable observations</h2>
+                    <button type="button" data-executables-toggle aria-expanded="false" aria-controls="executable-observations" disabled>Show executable observations</button>
+                </div>
+                <div id="executable-observations" data-executables-panel hidden>
+                    <p class="detail-note">Observed invocations. Repeated executable IDs remain separate.</p>
+                    <div class="table-controls" aria-label="Executable order">
+                        <label>Sort <select data-executables-sort><option value="started_at">Started</option><option value="statistics_id">Statistics ID</option></select></label>
+                        <label>Direction <select data-executables-direction><option value="asc">Ascending</option><option value="desc">Descending</option></select></label>
+                        <label>Rows per page <input type="number" min="1" step="1" data-executables-limit></label>
+                    </div>
+                    <p class="resource-status" data-executables-notice role="status"></p>
+                    <p class="resource-status" data-executables-status role="status"></p>
+                    <button type="button" data-executables-retry hidden>Retry executable observations</button>
+                    <div class="table-scroll" data-executables-scroll role="region" aria-label="Executable observations table" tabindex="0">
+                        <table data-executables-table>
+                            <caption>Observed executable invocations</caption>
+                            <thead><tr><th scope="col">Statistics ID</th><th scope="col">Executable</th><th scope="col">Paths</th><th scope="col">Timing</th><th scope="col">Duration</th><th scope="col">Result</th></tr></thead>
+                            <tbody><tr><td colspan="6">Open this section to load observations.</td></tr></tbody>
+                        </table>
+                    </div>
+                    <nav class="pagination" aria-label="Executable pages">
+                        <button type="button" data-executables-previous aria-disabled="true">Previous</button>
+                        <button type="button" data-executables-next aria-disabled="true">Next</button>
+                        <button type="button" data-executables-latest>Show latest</button>
+                    </nav>
+                </div>
+            </section>
         </div>
 {% endblock %}

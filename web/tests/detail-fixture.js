@@ -1,4 +1,5 @@
 import { envelope, wireTime } from './fixtures.js';
+import { Node } from './overview-dom.js';
 
 export function detailResponse(executionId = '9223372036854775807') {
   return envelope({
@@ -13,44 +14,42 @@ export function detailResponse(executionId = '9223372036854775807') {
 
 // DOM double for mounted startup/render behavior; no browser/layout claims.
 export function detailDOM() {
-  let document;
-  class Node extends EventTarget {
-    constructor() { super(); this.textContent = ''; this.hidden = false; this.dataset = {}; this.attributes = new Map(); }
-    setAttribute(key, value) { this.attributes.set(key, String(value)); }
-    removeAttribute(key) { this.attributes.delete(key); }
-    focus() { if (!this.disabled) document.activeElement = this; }
-    contains(node) { return node === this; }
-  }
+  const window = Object.assign(new EventTarget(), { location: { origin: 'https://example.test', search: '' },
+    scrollX: 0, scrollY: 0, scrollTo(x, y) { this.scrollX = x; this.scrollY = y; } });
+  const document = Object.assign(new EventTarget(), { location: window.location, defaultView: window,
+    visibilityState: 'visible', activeElement: null });
+  document.createElement = tag => new Node(document, tag);
+  document.createTextNode = value => new Node(document, '#text', value);
+  const root = new Node(document, 'root'), main = new Node(document, 'main');
+  document.body = new Node(document, 'body');
+  document.activeElement = document.body;
   const nodes = new Map();
   for (const key of ['app-status', 'retry', 'request-id', 'display-timezone', 'execution-detail',
     'detail-status', 'detail-retry', 'detail-request-id', 'detail-observed', 'active-elapsed',
     'detail-refresh', 'detail-poll-toggle', 'detail-poll-status', 'overview-link', 'legacy-detail-link',
-    'overview-return-notice']) {
-    nodes.set(`[data-${key}]`, new Node());
+    'overview-return-notice', ...['toggle', 'panel', 'status', 'notice', 'retry', 'sort', 'direction',
+      'limit', 'previous', 'next', 'latest', 'scroll', 'table'].map(name => `executables-${name}`)]) {
+    const node = new Node(document, key.includes('retry') || /toggle|previous|next|latest|refresh$/.test(key) ? 'button' : 'div');
+    nodes.set(`[data-${key}]`, node);
+    root.append(node);
   }
+  const get = key => nodes.get(`[data-${key}]`);
   const fields = ['folder', 'project', 'package', 'lsn', 'environment-folder', 'environment', 'status', 'logging',
     'created', 'started', 'ended', 'duration', 'elapsed', 'all', 'warnings', 'errors', 'duplicate_warnings', 'memory_warnings']
-    .map(key => Object.assign(new Node(), { dataset: { detailField: key } }));
-  const window = Object.assign(new EventTarget(), { location: { origin: 'https://example.test', search: '' },
-    scrollX: 0, scrollY: 0, scrollTo(x, y) { this.scrollX = x; this.scrollY = y; } });
-  const main = new Node();
-  document = Object.assign(new EventTarget(), { location: window.location, defaultView: window,
-    visibilityState: 'visible', body: new Node(), getElementById(id) {
-    if (id === 'main-content') return main;
-    if (id !== 'app-config') throw new Error('Unexpected element');
-    return { textContent: JSON.stringify({ app_base: '/ops/app/', api_base: '/ops/api/v1/',
+    .map(key => Object.assign(new Node(document, 'dd'), { dataset: { detailField: key } }));
+  get('execution-detail').append(...fields, get('executables-toggle'), get('executables-panel'));
+  get('executables-panel').append(...['status', 'notice', 'retry', 'sort', 'direction', 'limit',
+    'previous', 'next', 'latest', 'scroll'].map(key => get(`executables-${key}`)));
+  get('executables-scroll').append(get('executables-table'));
+  const body = new Node(document, 'tbody');
+  get('executables-table').append(body);
+  get('executables-table').querySelector = selector => selector === 'tbody' ? body : null;
+  document.getElementById = id => id === 'main-content' ? main : {
+    textContent: JSON.stringify({ app_base: '/ops/app/', api_base: '/ops/api/v1/',
       execution_base: '/ops/execution/', execution_id: '9223372036854775807' }) };
-  } });
-  document.activeElement = document.body;
-  nodes.get('[data-execution-detail]').contains = node => fields.includes(node);
-  nodes.get('[data-detail-retry]').hidden = true;
-  const root = { ownerDocument: document, dataset: {}, querySelector(selector) {
-    if (!nodes.has(selector)) throw new Error(`No overview controls on detail: ${selector}`);
-    return nodes.get(selector);
-  }, querySelectorAll(selector) {
-    if (selector !== '[data-detail-field]') throw new Error(`Unexpected selector: ${selector}`);
-    return fields;
-  } };
-  return { root, document, window, main, get: key => nodes.get(`[data-${key}]`),
+  get('detail-retry').hidden = get('executables-retry').hidden = get('executables-panel').hidden = true;
+  root.querySelector = selector => { if (!nodes.has(selector)) throw new Error(`Missing detail fixture node: ${selector}`); return nodes.get(selector); };
+  root.querySelectorAll = selector => { if (selector !== '[data-detail-field]') throw new Error(`Unexpected selector: ${selector}`); return fields; };
+  return { root, document, window, main, body, get,
     field: key => fields.find(node => node.dataset.detailField === key) };
 }

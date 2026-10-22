@@ -1,6 +1,7 @@
 import { createDisplay } from './display.js';
 import { createDetailLoader, detailFields } from './detail.js';
 import { readOverviewReturn } from './detail-navigation.js';
+import { mountExecutableTable } from './render-executables.js';
 
 export function mountDetail(root, { api, metadata, executionId, appBase, restoreView = null }) {
   const document = root.ownerDocument;
@@ -31,11 +32,16 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   const restorePosition = value => {
     if (window.scrollX !== value.x || window.scrollY !== value.y) window.scrollTo(value.x, value.y);
   };
-  const focusTargets = { refresh, toggle, overview: returnLink, legacy: root.querySelector('[data-legacy-detail-link]'), retry, main };
+  const focusTargets = { refresh, toggle, overview: returnLink, legacy: root.querySelector('[data-legacy-detail-link]'),
+    executables: root.querySelector('[data-executables-toggle]'), retry, main };
   let returning = restoreView?.executionId === executionId ? restoreView : null;
   let autoPaused = returning?.autoPaused === true;
   const initialPosition = position(), initialFocus = document.activeElement;
   let rendered = null;
+  const executableView = mountExecutableTable(root, { metadata, restoreView: returning?.executableView,
+    actions: { toggle: () => { void loader.toggleExecutables(); }, retry: () => { void loader.retryExecutables(); },
+      order: query => { void loader.orderExecutables(query); }, previous: () => { void loader.previousExecutables(); },
+      next: () => { void loader.nextExecutables(); }, latest: () => { void loader.latestExecutables(); } } });
   const clear = () => {
     content.hidden = true;
     elapsed.hidden = true;
@@ -49,9 +55,11 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     }
   };
   const loader = createDetailLoader({ api, metadata, executionId, autoRefresh: !autoPaused,
+    restoreExecutables: returning?.executables,
     visible: document.visibilityState !== 'hidden', publish(state) {
     const currentPosition = rendered !== null ? position() : null;
     const focused = document.activeElement;
+    const protectedFocus = content.contains(focused);
     content.setAttribute('aria-busy', String(state.busy));
     refresh.disabled = toggle.disabled = false;
     refresh.setAttribute('aria-disabled', String(state.busy));
@@ -64,9 +72,10 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     retry.hidden = state.phase !== 'error' && !(state.busy && !retry.hidden);
     retry.disabled = false;
     retry.setAttribute('aria-disabled', String(state.busy));
-    status.textContent = state.busy ? (state.response ? 'Refreshing… Previous observation shown.' : 'Loading execution…')
+    status.textContent = state.busy && state.operation === 'section' ? '' : state.busy ? (state.response ? 'Refreshing… Previous observation shown.' : 'Loading execution…')
       : state.phase === 'ready' ? '' : `${state.error.message}${state.stale ? ' Previous observation shown.' : ''}`;
-    header.textContent = state.busy ? (state.response ? 'Refreshing…' : 'Loading execution…')
+    header.textContent = state.busy && state.operation === 'section' ? 'Loading executable observations…'
+      : state.busy ? (state.response ? 'Refreshing…' : 'Loading execution…')
       : state.phase === 'ready' ? 'Loaded' : state.stale ? 'Refresh failed' : 'Execution unavailable';
     correlation.hidden = !state.error?.requestId;
     correlation.textContent = state.error?.requestId ? `Request ID: ${state.error.requestId}` : '';
@@ -89,8 +98,9 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
       content.hidden = false;
     }
     rendered = state.response;
+    executableView.render(state.executables, state.busy, state.response !== null);
     if (focused === retry && retry.hidden) refresh.focus({ preventScroll: true });
-    else if (content.hidden && content.contains(focused)) main.focus({ preventScroll: true });
+    else if (content.hidden && protectedFocus) main.focus({ preventScroll: true });
     if (currentPosition) restorePosition(currentPosition);
     if (returning && !state.busy) {
       if (state.response) {
@@ -113,10 +123,12 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   document.addEventListener('visibilitychange', visibilityChanged);
   load();
   return { checkpoint() {
-    return { executionId, autoPaused, position: position(),
+    return { executionId, autoPaused, position: position(), executables: loader.checkpointExecutables(),
+      executableView: executableView.checkpoint(),
       focus: Object.keys(focusTargets).find(key => focusTargets[key] === document.activeElement) ?? null };
   }, dispose() {
     loader.dispose();
+    executableView.dispose();
     retry.removeEventListener('click', load);
     refresh.removeEventListener('click', load);
     toggle.removeEventListener('click', togglePolling);

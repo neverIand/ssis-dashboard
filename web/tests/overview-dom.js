@@ -1,5 +1,5 @@
 // A small DOM double for renderer ownership/identity tests, not browser or layout evidence.
-class Node extends EventTarget {
+export class Node extends EventTarget {
   constructor(document, tag, text = '') {
     super();
     Object.assign(this, { ownerDocument: document, tag, text, children: [], parentElement: null,
@@ -9,6 +9,7 @@ class Node extends EventTarget {
   set textContent(value) { this.replaceChildren(); this.text = String(value); }
   get firstChild() { return this.children[0] ?? null; }
   get href() { return this.getAttribute('href') ?? ''; }
+  set href(value) { this.setAttribute('href', value); }
   get disabled() { return this.isDisabled; }
   set disabled(value) {
     this.isDisabled = value;

@@ -25,6 +25,14 @@ export function readMetadata(data, requestId = null) {
   }
   if (data.execution_sorts.some((name) => typeof name !== 'string' || !name)
       || new Set(data.execution_sorts).size !== data.execution_sorts.length) invalid();
+  if (!Array.isArray(data.executable_results) || !data.executable_results.length) invalid();
+  const results = new Set();
+  for (const result of data.executable_results) {
+    if (!Number.isSafeInteger(result?.code) || result.code < -32768 || result.code > 32767
+        || !['success', 'failure', 'completion', 'cancelled', 'unknown'].includes(result.name)
+        || results.has(result.code)) invalid();
+    results.add(result.code);
+  }
   try {
     createDisplay({ timeZone: data.display_timezone });
   } catch {

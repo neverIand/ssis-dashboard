@@ -35,6 +35,11 @@ test('invalid metadata is a correlated failure instead of invented settings', ()
     (data) => { data.execution_statuses = [null]; },
     (data) => { data.execution_sorts = ['execution_id', 'execution_id']; },
     (data) => { data.execution_sorts = [null]; },
+    (data) => { delete data.executable_results; },
+    (data) => { data.executable_results = [null]; },
+    (data) => { data.executable_results.push(data.executable_results[0]); },
+    (data) => { data.executable_results[0] = { code: 0, name: 'running' }; },
+    (data) => { data.executable_results[0].code = 32768; },
   ];
   for (const mutate of mutations) {
     const data = metadata();

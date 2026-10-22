@@ -118,7 +118,9 @@ class FrontendShellTests(unittest.TestCase):
                                    'Actual duration', 'Active elapsed (observed)', 'Retry execution', '<noscript>']:
                         self.assertIn(markup, html)
                     for markup in ['data-detail-refresh disabled', 'data-detail-poll-toggle disabled',
-                                   'data-overview-link', 'data-legacy-detail-link', 'data-overview-return-notice hidden']:
+                                   'data-overview-link', 'data-legacy-detail-link', 'data-overview-return-notice hidden',
+                                   'data-executables-toggle aria-expanded="false"', 'data-executables-panel hidden',
+                                   'data-executables-table', 'aria-label="Executable pages"']:
                         self.assertIn(markup, html)
                     for markup in ['overview-filters', 'data-status-choices', 'data-execution-table']:
                         self.assertNotIn(markup, html)
