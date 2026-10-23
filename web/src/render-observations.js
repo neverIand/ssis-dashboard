@@ -1,8 +1,10 @@
 import { createDisplay, formatCode, formatId } from './display.js';
 
-export function mountExecutableTable(root, { metadata, actions, restoreView = null }) {
+export function mountObservationTable(root, { metadata, actions, restoreView = null, resource = 'executables' }) {
+  const child = resource === 'children', singular = child ? 'child' : 'executable';
+  const idKey = child ? 'observation_id' : 'statistics_id';
   const document = root.ownerDocument;
-  const get = name => root.querySelector(`[data-executables-${name}]`);
+  const get = name => root.querySelector(`[data-${resource}-${name}]`);
   const toggle = get('toggle'), panel = get('panel'), status = get('status'), notice = get('notice');
   const retry = get('retry'), sort = get('sort'), direction = get('direction'), limit = get('limit');
   const previous = get('previous'), next = get('next'), latest = get('latest');
@@ -31,25 +33,25 @@ export function mountExecutableTable(root, { metadata, actions, restoreView = nu
   function paint(page, pageNumber) {
     if (!page.data.length) {
       empty(pageNumber > 1 ? 'No observations remain on this page. Use Previous or Show latest.'
-        : page.meta.availability === 'not-recorded' ? 'No executable observations recorded. Logging was disabled.'
-          : page.meta.availability === 'unknown' ? 'No executable observations on this page. Recording coverage is unknown.'
-            : 'No executable observations on this page.');
+        : page.meta.availability === 'not-recorded' ? `No ${singular} observations recorded. Logging was disabled.`
+          : page.meta.availability === 'unknown' ? `No ${singular} observations on this page. Recording coverage is unknown.`
+            : `No ${singular} observations on this page.`);
       return;
     }
     if (!rows.size) body.replaceChildren();
     const wanted = new Set();
     let anchor = body.firstChild;
     for (const item of page.data) {
-      wanted.add(item.statistics_id);
-      let record = rows.get(item.statistics_id);
+      wanted.add(item[idKey]);
+      let record = rows.get(item[idKey]);
       if (!record) {
         const row = element('tr');
-        row.dataset.statisticsId = item.statistics_id;
+        row.dataset[child ? 'observationId' : 'statisticsId'] = item[idKey];
         const cells = Array.from({ length: 6 }, (_, i) => element('td', undefined,
-          i === 0 ? 'id-cell' : i === 3 ? 'time-cell executable-times' : i === 4 ? 'number-cell' : ''));
+          i === 0 ? 'id-cell' : i === 3 ? 'time-cell observation-times' : i === 4 ? 'number-cell' : ''));
         const name = element('span'), packageName = element('span', undefined, 'cell-detail');
         const id = element('span', undefined, 'cell-detail');
-        cells[1].className = 'executable-name';
+        cells[1].className = 'observation-name';
         cells[1].append(name, packageName, id);
         const paths = element('details'), summary = element('summary', 'Paths');
         const pathFields = element('dl', undefined, 'observation-paths');
@@ -64,15 +66,15 @@ export function mountExecutableTable(root, { metadata, actions, restoreView = nu
           line.append(element('span', label, 'cell-detail'), times[key]);
           cells[3].append(line);
         }
-        cells[5].append(element('span', undefined, 'result-badge'));
+        cells[5].append(element('span', undefined, child ? 'observation-state' : 'result-badge'));
         row.append(...cells);
         record = { row, cells, times, name, packageName, id, paths, summary, packagePath, executionPath, item: null };
-        rows.set(item.statistics_id, record);
+        rows.set(item[idKey], record);
       }
-      text(record.cells[0], formatId(item.statistics_id));
-      text(record.name, literal(item.name));
+      text(record.cells[0], formatId(item[idKey]));
+      text(record.name, literal(child ? item.source_name : item.name));
       text(record.packageName, `Package: ${literal(item.package_name)}`);
-      text(record.id, `Executable ID: ${formatId(item.executable_id)}`);
+      text(record.id, child ? `Source type: ${item.source_type === null ? '—' : item.source_type}` : `Executable ID: ${formatId(item.executable_id)}`);
       text(record.packagePath, literal(item.package_path));
       text(record.executionPath, literal(item.execution_path));
       for (const key of ['started_at', 'ended_at']) {
@@ -87,8 +89,8 @@ export function mountExecutableTable(root, { metadata, actions, restoreView = nu
         }
       }
       text(record.cells[4], display.duration(item.duration_seconds));
-      text(record.cells[5].firstChild, formatCode(item.result));
-      record.cells[5].firstChild.dataset.result = item.result?.name === 'unknown' ? 'unknown' : String(item.result?.code ?? '');
+      text(record.cells[5].firstChild, child ? item.state === 'complete' ? 'Observed pair' : 'Incomplete' : formatCode(item.result));
+      if (!child) record.cells[5].firstChild.dataset.result = item.result?.name === 'unknown' ? 'unknown' : String(item.result?.code ?? '');
       record.item = item;
       if (record.row !== anchor) body.insertBefore(record.row, anchor);
       anchor = record.row.nextSibling;
@@ -127,7 +129,7 @@ export function mountExecutableTable(root, { metadata, actions, restoreView = nu
       const focused = document.activeElement, rowFocused = body.contains(focused), panelFocused = panel.contains(focused);
       const position = { left: region.scrollLeft, top: region.scrollTop };
       toggle.disabled = !authorized;
-      toggle.textContent = state.open ? 'Hide executable observations' : 'Show executable observations';
+      toggle.textContent = `${state.open ? 'Hide' : 'Show'} ${singular} observations`;
       toggle.setAttribute('aria-expanded', String(state.open && authorized));
       panel.hidden = !state.open || !authorized;
       for (const node of [retry, sort, direction, limit, previous, next, latest]) {
@@ -143,14 +145,14 @@ export function mountExecutableTable(root, { metadata, actions, restoreView = nu
       const page = panel.hidden ? null : state.page;
       if (page !== rendered || page === null) {
         if (page) paint(page, state.pageNumber);
-        else empty(state.phase === 'loading' ? 'Loading executable observations…' : 'No observations loaded.');
+        else empty(state.phase === 'loading' ? `Loading ${singular} observations…` : 'No observations loaded.');
         rendered = page;
       }
       const pageInfo = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} rows · Observed ${display.timestamp(page.meta.generated_at)} · Live results · ${
-        { available: 'Recorded observations', 'not-recorded': 'Not recorded', unknown: 'Recording coverage unknown' }[page.meta.availability]}` : '';
+        { available: 'Recorded observations', 'not-recorded': 'Not recorded', unknown: 'Recording coverage unknown' }[page.meta.availability]}${child && page.meta.has_unidentified_starts ? ' · Some starts have no public numeric ID and cannot be paged. Coverage is unknown.' : ''}` : '';
       status.textContent = panel.hidden ? '' : state.error ? `${state.error.message}${state.error.requestId ? ` Request ID: ${state.error.requestId}` : ''}${state.stale ? ' Previous observation page shown. ' : ' '}${pageInfo}`
         : state.stale ? `Refreshing… Previous observation page shown. ${pageInfo}`
-          : state.phase === 'loading' ? 'Loading executable observations…' : pageInfo;
+          : state.phase === 'loading' ? `Loading ${singular} observations…` : pageInfo;
       if (panel.hidden && panelFocused && authorized) toggle.focus({ preventScroll: true });
       else if (focused === retry && retry.hidden) toggle.focus({ preventScroll: true });
       else if (authorized && rowFocused && document.activeElement !== focused) (focused.isConnected ? focused : region).focus({ preventScroll: true });

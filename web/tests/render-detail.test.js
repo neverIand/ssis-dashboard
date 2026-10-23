@@ -155,7 +155,7 @@ test('a retained detail checkpoint carries only pause/view state and re-fetches 
   dom.get('detail-refresh').focus();
   dom.window.scrollTo(0, 450);
   const checkpoint = first.checkpoint();
-  assert.deepEqual(Object.keys(checkpoint).sort(), ['autoPaused','executableView','executables','executionId','focus','position']);
+  assert.deepEqual(Object.keys(checkpoint).sort(), ['autoPaused','childView','children','executableView','executables','executionId','focus','position']);
   assert.equal(checkpoint.autoPaused, true);
   assert.doesNotMatch(JSON.stringify(checkpoint), /package|cursor|event_counts|Main/);
   first.dispose();

@@ -382,17 +382,18 @@ tbody tr:hover { background: var(--sd-subtle); }
 .detail-fields [data-level="error"] { color: var(--sd-error); font-weight: 600; }
 .detail-note { margin-top: 1.0667rem; }
 .detail-observed { grid-column: 1 / -1; }
-.executable-section { grid-column: 1 / -1; min-width: 0; }
-.executable-section .section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.8rem; }
-.executable-section .section-heading h2 { margin: 0; }
-.executable-section .table-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; margin-top: 1rem; }
-.executable-section .table-controls label { display: grid; gap: 0.4rem; }
-.executable-section input[type="number"] { width: 8rem; }
-.executable-name { min-width: 13rem; max-width: 26rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+.observation-section { grid-column: 1 / -1; min-width: 0; }
+.observation-section .section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.8rem; }
+.observation-section .section-heading h2 { margin: 0; }
+.observation-section .table-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; margin-top: 1rem; }
+.observation-section .table-controls label { display: grid; gap: 0.4rem; }
+.observation-section input[type="number"] { width: 8rem; }
+.observation-name { min-width: 13rem; max-width: 26rem; overflow-wrap: anywhere; white-space: pre-wrap; }
 .observation-paths { width: clamp(16rem, 38vw, 36rem); white-space: pre-wrap; overflow-wrap: anywhere; }
 .observation-paths dt { color: var(--sd-secondary); font-size: 0.8667rem; margin-top: 0.8rem; }
-.executable-section summary { cursor: pointer; white-space: nowrap; }
-.executable-times > div + div { margin-top: 0.55rem; }
+.observation-section summary { cursor: pointer; white-space: nowrap; }
+.observation-times > div + div { margin-top: 0.55rem; }
+.observation-state { white-space: nowrap; }
 .result-badge { display: inline-block; padding: 0.2rem 0.45rem; border-radius: 0.2rem; background: var(--sd-border); white-space: nowrap; }
 .result-badge[data-result="0"] { background: var(--sd-success-soft); color: var(--sd-success); }
 .result-badge[data-result="1"] { background: var(--sd-error-soft); color: var(--sd-error); }

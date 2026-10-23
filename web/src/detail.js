@@ -2,6 +2,7 @@ import { ApiError, safeRequestId } from './api.js';
 import { createDisplay, formatCode, formatId, formatText } from './display.js';
 import { createRefreshLoop } from './refresh-loop.js';
 import { executableQuery, readExecutablePage } from './executables.js';
+import { childQuery, readChildPage } from './children.js';
 
 export function readExecutionDetail(response, executionId, display) {
   try {
@@ -55,40 +56,47 @@ const transient = error => ['network', 'timeout'].includes(error.kind)
 
 export function createDetailLoader({ api, executionId, metadata, publish, timeoutMs = 30000, locale,
   autoRefresh = true, visible = true, pollIntervalMs = 30000, maxPollIntervalMs = 300000,
-  restoreExecutables = null }) {
+  restoreExecutables = null, restoreChildren = null }) {
   if (executionId === null) throw new TypeError('Missing execution ID.');
   formatId(executionId);
   const display = createDisplay({ timeZone: metadata.display_timezone, locale });
-  let active = null;
-  let disposed = false;
-  let generation = 0;
+  const definitions = {
+    executables: { query: executableQuery, read: readExecutablePage, label: 'executable' },
+    children: { query: childQuery, read: readChildPage, label: 'child' },
+  };
+  const keys = Object.keys(definitions);
   const emptyPath = () => ({ entries: [null], index: 0, cohort: null });
   const initialSection = () => ({ open: false, query: { sort: 'started_at', direction: 'asc', limit: metadata.limits.default_limit },
     phase: 'idle', page: null, error: null, stale: false, notice: '' });
-  let path = emptyPath();
-  let section = initialSection();
-  if (restoreExecutables?.open) {
-    try {
-      section = { ...section, open: true, query: executableQuery(restoreExecutables.query, metadata) };
-      if (restoreExecutables.path) path = { ...restoreExecutables.path, entries: [...restoreExecutables.path.entries] };
-    } catch { section = initialSection(); }
-  }
+  let paths = Object.fromEntries(keys.map(key => [key, emptyPath()]));
+  const sections = Object.fromEntries(keys.map(key => {
+    let section = initialSection();
+    const saved = { executables: restoreExecutables, children: restoreChildren }[key];
+    if (saved?.open) {
+      try {
+        section = { ...section, open: true, query: definitions[key].query(saved.query, metadata) };
+        if (saved.path) paths[key] = { ...saved.path, entries: [...saved.path.entries] };
+      } catch { section = initialSection(); paths[key] = emptyPath(); }
+    }
+    return [key, section];
+  }));
+  let active = null, disposed = false, generation = 0;
   let state = { phase: 'idle', executionId, response: null, error: null, stale: false,
-    operation: 'initial', executables: section };
+    operation: 'initial', sectionBusy: null, ...sections };
   const busy = () => state.phase === 'loading';
-  const show = poll => publish({ ...state, busy: busy(), poll, executables: { ...state.executables,
-    pageNumber: path.index + 1, hasPrevious: !busy() && path.index > 0,
-    hasNext: !busy() && Boolean(state.executables.page?.meta.has_more) } });
+  const show = poll => publish({ ...state, busy: busy(), poll, ...Object.fromEntries(keys.map(key => [key, {
+    ...state[key], pageNumber: paths[key].index + 1, hasPrevious: !busy() && paths[key].index > 0,
+    hasNext: !busy() && Boolean(state[key].page?.meta.has_more),
+  }])) });
   const loop = createRefreshLoop({ refresh: load, publish: show, paused: !autoRefresh, visible,
     intervalMs: pollIntervalMs, maxIntervalMs: maxPollIntervalMs });
   function emit(changes) {
     state = { ...state, ...changes };
-    const error = state.error ?? (state.executables.open ? state.executables.error : null);
-    show(loop.update({ busy: busy(), eligible: true, failed: error !== null,
-      retryable: error === null || transient(error),
-      coversReturn: state.operation === 'initial' || state.operation === 'select' }));
+    const errors = [state.error, ...keys.filter(key => state[key].open).map(key => state[key].error)].filter(Boolean);
+    show(loop.update({ busy: busy(), eligible: true, failed: errors.length > 0,
+      retryable: errors.every(transient), coversReturn: state.operation === 'initial' || state.operation === 'select' }));
   }
-  const updateSection = changes => { state = { ...state, executables: { ...state.executables, ...changes } }; };
+  const updateSection = (key, changes) => { state = { ...state, [key]: { ...state[key], ...changes } }; };
   function cancel() {
     generation += 1;
     if (active) { clearTimeout(active.timer); active.controller?.abort(); }
@@ -97,7 +105,6 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
   async function request(job, resource, params) {
     const controller = new AbortController();
     job.controller = controller;
-    job.resource = resource;
     let timedOut = false;
     job.timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
     try {
@@ -108,66 +115,77 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
       throw timedOut ? new ApiError('timeout') : error instanceof ApiError ? error : new ApiError('invalid_response');
     } finally { clearTimeout(job.timer); }
   }
-  async function readSection(job, current, index, notice) {
-    const query = state.executables.query;
-    const cursor = path.entries[index];
-    updateSection({ phase: 'loading', error: null, notice });
-    emit({});
+  async function readSection(job, current, key, index, notice) {
+    const query = state[key].query, path = paths[key], cursor = path.entries[index];
+    updateSection(key, { phase: 'loading', error: null, notice });
+    emit({ sectionBusy: key });
     try {
-      const response = await request(job, `executions/${state.executionId}/executables`,
+      const response = await request(job, `executions/${state.executionId}/${key}`,
         { ...query, ...(cursor === null ? {} : { cursor }) });
       if (disposed || current !== generation) return;
-      const page = readExecutablePage(response, state.executionId, query, metadata, display);
+      const page = definitions[key].read(response, state.executionId, query, metadata, display);
       if (cursor !== null && (page.meta.as_of !== path.cohort?.as_of || page.meta.upper_id !== path.cohort?.upper_id)) {
         throw new ApiError('invalid_response', { requestId: page.meta.request_id });
       }
-      path = { index, entries: path.entries.slice(0, index + 1),
+      paths[key] = { index, entries: path.entries.slice(0, index + 1),
         cohort: { as_of: page.meta.as_of, upper_id: page.meta.upper_id } };
-      if (page.meta.has_more) path.entries.push(page.meta.next_cursor);
-      updateSection({ page, phase: 'ready', error: null, stale: false, notice });
+      if (page.meta.has_more) paths[key].entries.push(page.meta.next_cursor);
+      updateSection(key, { page, phase: 'ready', error: null, stale: false, notice });
     } catch (error) {
       if (disposed || current !== generation) return;
       if (cursor !== null && ['invalid_cursor', 'cursor_expired'].includes(error.code)) {
-        job.sectionReset = true;
-        path = emptyPath();
-        updateSection({ page: null, stale: false });
-        return readSection(job, current, 0, 'The executable page link expired or is no longer valid. Reset to page one.');
+        job.reset.add(key);
+        paths[key] = emptyPath();
+        updateSection(key, { page: null, stale: false });
+        return readSection(job, current, key, 0, `The ${definitions[key].label} page link expired or is no longer valid. Reset to page one.`);
       }
       throw error;
     }
   }
-  async function run({ base = true, index = path.index, keep = true, notice = '' } = {}) {
+  async function run({ base = true, only = null, index, keep = true, pending = [] } = {}) {
     if (disposed || active) return;
-    const current = ++generation;
-    const previous = state.response;
-    const previousPage = keep ? state.executables.page : null;
-    const job = { controller: null, timer: null, resource: null };
+    const current = ++generation, previous = state.response;
+    const job = { controller: null, timer: null, section: null, reset: new Set(),
+      queue: new Set(only ? [only] : base ? keys.filter(key => state[key].open) : pending) };
     active = job;
-    updateSection({ page: previousPage, stale: previousPage !== null, error: null, notice });
-    emit({ phase: 'loading', response: previous, error: null, stale: base && previous !== null,
-      operation: base ? state.operation : 'section' });
+    emit({ phase: 'loading', error: null, stale: base && previous !== null,
+      operation: base ? state.operation : 'section', sectionBusy: only });
     try {
       if (base) {
         const response = await request(job, `executions/${state.executionId}`);
         if (disposed || current !== generation) return;
         emit({ response: readExecutionDetail(response, state.executionId, display), stale: false });
       }
-      if (state.executables.open && state.response) await readSection(job, current, index, notice);
-      if (!disposed && current === generation) emit({ phase: 'ready', operation: 'refresh' });
+      while (job.queue.size && state.response) {
+        const key = job.queue.values().next().value;
+        job.queue.delete(key);
+        if (!state[key].open) continue;
+        job.section = key;
+        const previousPage = key === only && !keep ? null : state[key].page;
+        updateSection(key, { page: previousPage, stale: previousPage !== null, error: null });
+        try { await readSection(job, current, key, key === only && index !== undefined ? index : paths[key].index, ''); }
+        catch (error) {
+          if (disposed || current !== generation) return;
+          const failure = error instanceof ApiError ? error : new ApiError('invalid_response');
+          if (failure.status === 404) throw failure;
+          const retained = transient(failure) && !job.reset.has(key) ? previousPage : null;
+          updateSection(key, { phase: 'error', error: failure, page: retained, stale: retained !== null });
+        }
+        if (disposed || current !== generation) return;
+        job.section = null;
+      }
+      if (!disposed && current === generation) emit({ phase: 'ready', operation: 'refresh', sectionBusy: null });
     } catch (error) {
       if (!disposed && current === generation) {
         const failure = error instanceof ApiError ? error : new ApiError('invalid_response');
-        if (job.resource?.endsWith('/executables') && failure.status !== 404) {
-          const retained = transient(failure) && !job.sectionReset ? previousPage : null;
-          updateSection({ phase: 'error', error: failure, page: retained, stale: retained !== null });
-          emit({ phase: 'ready', stale: false, operation: 'refresh' });
-        } else {
-          const retained = previous !== null && transient(failure);
-          if (!retained) path = emptyPath();
-          updateSection({ phase: retained && previousPage ? 'error' : 'idle', error: retained ? failure : null,
-            page: retained ? previousPage : null, stale: retained && previousPage !== null });
-          emit({ phase: 'error', response: retained ? previous : null, error: failure, stale: retained, operation: 'refresh' });
+        const retained = previous !== null && transient(failure);
+        for (const key of keys) {
+          const page = retained ? state[key].page : null;
+          if (!retained) paths[key] = emptyPath();
+          updateSection(key, { page, phase: page ? 'error' : 'idle', error: retained ? failure : null, stale: page !== null });
         }
+        emit({ phase: 'error', response: retained ? previous : null, error: failure, stale: retained,
+          operation: 'refresh', sectionBusy: null });
       }
     } finally {
       clearTimeout(job.timer);
@@ -175,64 +193,73 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     }
   }
   function load() { return run(); }
-  const sectionAction = options => state.response && state.executables.open
-    ? run({ ...options, base: options.base || state.phase === 'error' || state.stale }) : undefined;
-  return { load, refresh: load,
-    toggleExecutables() {
-      if (disposed || !state.response) return;
-      const open = !state.executables.open;
-      if (!open && active?.resource?.endsWith('/executables')) {
+  const sectionAction = (key, options = {}) => state.response && state[key].open
+    ? run({ ...options, only: key, base: state.phase === 'error' || state.stale }) : undefined;
+  function toggleSection(key) {
+    if (disposed || !state.response) return;
+    const open = !state[key].open;
+    let pending = [];
+    if (!open) {
+      active?.queue.delete(key);
+      if (active?.section === key) {
+        pending = [...active.queue];
         cancel();
-        state = { ...state, phase: 'ready' };
+        state = { ...state, phase: 'ready', sectionBusy: null };
       }
-      updateSection({ open, page: null, error: null, stale: false, phase: 'idle', notice: '' });
-      if (!open) loop.reset();
-      emit({});
-      if (open) return sectionAction({ base: false, keep: false });
-    },
-    orderExecutables(changes) {
-      if (disposed || active || !state.response || !state.executables.open) return;
-      const query = executableQuery({ ...state.executables.query, ...changes }, metadata);
-      path = emptyPath();
-      updateSection({ query });
-      return sectionAction({ base: false, index: 0, keep: false });
-    },
-    nextExecutables() {
-      if (!busy() && state.executables.page?.meta.has_more) return sectionAction({ base: false, index: path.index + 1, keep: false });
-    },
-    previousExecutables() {
-      if (!busy() && path.index > 0) return sectionAction({ base: false, index: path.index - 1, keep: false });
-    },
-    latestExecutables() {
-      if (busy()) return;
-      path = emptyPath();
-      return sectionAction({ base: false, index: 0, keep: false });
-    },
-    retryExecutables() { return state.phase === 'error' ? load() : sectionAction({ base: false }); },
-    checkpointExecutables() {
-      return { open: state.executables.open, query: { ...state.executables.query },
-        path: { ...path, entries: [...path.entries] } };
-    },
+    }
+    updateSection(key, { open, page: null, error: null, stale: false, phase: open ? 'loading' : 'idle', notice: '' });
+    if (!open) loop.reset();
+    emit({});
+    if (open) {
+      if (active) active.queue.add(key);
+      else return sectionAction(key, { keep: false });
+    } else if (pending.length) return run({ base: false, pending });
+  }
+  function orderSection(key, changes) {
+    if (disposed || active || !state.response || !state[key].open) return;
+    const query = definitions[key].query({ ...state[key].query, ...changes }, metadata);
+    paths[key] = emptyPath();
+    updateSection(key, { query });
+    return sectionAction(key, { index: 0, keep: false });
+  }
+  const next = key => !busy() && state[key].page?.meta.has_more
+    ? sectionAction(key, { index: paths[key].index + 1, keep: false }) : undefined;
+  const previous = key => !busy() && paths[key].index > 0
+    ? sectionAction(key, { index: paths[key].index - 1, keep: false }) : undefined;
+  function latest(key) {
+    if (busy()) return;
+    paths[key] = emptyPath();
+    return sectionAction(key, { index: 0, keep: false });
+  }
+  const checkpoint = key => ({ open: state[key].open, query: { ...state[key].query },
+    path: { ...paths[key], entries: [...paths[key].entries] } });
+  const retry = key => state.phase === 'error' ? load() : sectionAction(key);
+  return { load, refresh: load,
+    toggleExecutables: () => toggleSection('executables'), toggleChildren: () => toggleSection('children'),
+    orderExecutables: changes => orderSection('executables', changes), orderChildren: changes => orderSection('children', changes),
+    nextExecutables: () => next('executables'), nextChildren: () => next('children'),
+    previousExecutables: () => previous('executables'), previousChildren: () => previous('children'),
+    latestExecutables: () => latest('executables'), latestChildren: () => latest('children'),
+    retryExecutables: () => retry('executables'), retryChildren: () => retry('children'),
+    checkpointExecutables: () => checkpoint('executables'), checkpointChildren: () => checkpoint('children'),
     select(id) {
       if (id === null) throw new TypeError('Missing execution ID.');
       formatId(id);
       if (disposed) return;
       if (id === state.executionId) return load();
-      cancel();
-      loop.reset();
-      path = emptyPath();
-      state = { phase: 'idle', executionId: id, response: null, error: null, stale: false, operation: 'select',
-        executables: { ...initialSection(), open: state.executables.open } };
+      cancel(); loop.reset();
+      paths = Object.fromEntries(keys.map(key => [key, emptyPath()]));
+      state = { phase: 'idle', executionId: id, response: null, error: null, stale: false, operation: 'select', sectionBusy: null,
+        ...Object.fromEntries(keys.map(key => [key, { ...initialSection(), open: state[key].open }])) };
       return load();
     },
     setVisible: loop.setVisible,
     togglePolling: () => loop.togglePaused(),
     dispose() {
-      disposed = true;
-      loop.dispose();
-      cancel();
-      path = emptyPath();
-      state = { ...state, response: null, error: null, stale: false, executables: initialSection() };
+      disposed = true; loop.dispose(); cancel();
+      paths = Object.fromEntries(keys.map(key => [key, emptyPath()]));
+      state = { ...state, response: null, error: null, stale: false,
+        ...Object.fromEntries(keys.map(key => [key, initialSection()])) };
     },
   };
 }
