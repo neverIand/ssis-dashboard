@@ -143,7 +143,9 @@ All private tools, evidence and configuration stay ignored. Commit sanitized res
 
 | Material | Location and retention |
 | --- | --- |
-| Working configuration, Python environments/runtime, SSIS fixture and installer recovery sources | Keep their existing paths. They are not cleanup targets. |
+| Python runtime and environment | `.local/python-3.14.8/` (CPython 3.14.8 x64) and the single `.local/venv314/` built from it with `requirements-dev.txt`. Rebuild that environment instead of adding another. |
+| Working configuration, SSIS fixture and workstation recovery kits | `.local/backend-validation/dashboard.cfg`, `.local/ssis-fixture/` and `.local/recovery/<kit>/`. Keep their paths; they are not cleanup targets. |
+| Offline npm cache | `.local/npm-cache/`, used by the frontend build verifier's `npm ci --offline`. Repopulate it from the lockfile instead of letting it accumulate. |
 | Reusable helpers | `.local/tools/`; related native probes stay together in `.local/backend-validation/tools/` for shared imports. |
 | Disposable experiments, extracted copies and intermediate output | `.local/tmp/<task>-<run>/`; remove after selecting useful evidence. |
 | Selected native evidence | `.local/backend-validation/runs/<milestone>-<UTC>/`; retain inputs/source version, outcomes, raw measurements and limitations together. |
@@ -152,14 +154,14 @@ All private tools, evidence and configuration stay ignored. Commit sanitized res
 
 Create output directories in the probe's execution entry point, not during shared-module import. A running task puts `.active` in its temporary directory and removes it only after owned processes have exited. Check ownership before cleanup; markers do not discover unmarked legacy processes. Do not reuse another task's output directory or classify a run as failed merely because its filename says `fixtures`.
 
-Use an existing verified environment. Contract tools use the checked-in `requirements-dev.txt` / `constraints-dev.txt` and `python -m unittest tests.test_api_contract`; do not maintain another `pip --target` package tree or regenerate the current contract from an old draft-authoring script.
+Use `.local/venv314` or another verified environment. Contract tools use the checked-in `requirements-dev.txt` / `constraints-dev.txt` and `python -m unittest tests.test_api_contract`; do not maintain another `pip --target` package tree or regenerate the current contract from an old draft-authoring script.
 
 ### Cleanup and recovery
 
 The ignored helper below is available in this working copy. It needs only Python's standard library and is not a fresh-checkout prerequisite. From the repository root:
 
 ```powershell
-$pythonExe = '.local/contract-review-venv314/Scripts/python.exe'
+$pythonExe = '.local/venv314/Scripts/python.exe'
 & $pythonExe -B .local/tools/organize-local.py --preview
 & $pythonExe -B .local/tools/organize-local.py --apply PATH_TO_PRINTED_PLAN
 & $pythonExe -B .local/tools/organize-local.py --index

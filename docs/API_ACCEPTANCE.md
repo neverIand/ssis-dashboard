@@ -130,7 +130,7 @@ Reviewed application revision `9bd7a9c` / repository baseline `36b48f8`, with un
 
 The focused conversion probe did not reproduce a new correctness defect; it is not proof of every future SQL plan. The workload-bound check is an offline recheck of retained plans, not a fresh timing run. No catalog data, permissions or package execution changed. No production, real Scale Out/active workload, independent reader sign-in/HTTP or sustained-resource acceptance is claimed.
 
-Private evidence: `.local/backend-validation/runs/c8-acceptance-20261017T010821473592Z/acceptance.private.json` and its checked summary; focused review helper/results are in `.local/reviews/stage-c-20261017/`. Design/performance findings and next actions are in [progress](PROGRESS.md#review-of-stage-c--17-october-2026).
+Private evidence: `.local/backend-validation/runs/c8-acceptance-20261017T010821473592Z/acceptance.private.json` and its checked summary; focused review helper/results are in `.local/reports/reviews/20261017-stage-c/`. Design/performance findings and next actions are in [progress](PROGRESS.md#review-of-stage-c--17-october-2026).
 
 ### SQL remedies replay: 17 October 2026
 
@@ -138,7 +138,7 @@ After C8.2b.3, **341 database-free tests pass** (344 discovered, three opt-in na
 
 Fresh combined acceptance again passes **1,249 assertions / 118 schema responses / 171 queries** across all 14 operations and administrator/normal/restricted SQL contexts. The status split remains 82 successes, 12 capability denials, three policy-bound cursor failures, 20 hidden/absent results and one deliberate timeout; readiness recovers and every owned query cleanup succeeds. This is in-process WSGI and SQL impersonation, not independent reader sign-in/HTTP.
 
-Private replay: `.local/backend-validation/runs/c8-acceptance-20261017T103153811074Z/acceptance.private.json`. Native regression/unit logs, exact SQL comparisons and the [workload results](#c82b3-execution-query-remedies) are retained under `.local/sql-remedies-20261017/`. Existing production/resource/reader gates remain open.
+Private replay: `.local/backend-validation/runs/c8-acceptance-20261017T103153811074Z/acceptance.private.json`. Native regression/unit logs, exact SQL comparisons and the [workload results](#c82b3-execution-query-remedies) are retained under `.local/reports/backend/20261017-sql-remedies/`. Existing production/resource/reader gates remain open.
 
 ### Retained evidence
 
@@ -355,7 +355,7 @@ The same alternating protocol on the actual catalog used **30 repetitions per va
 
 Small administrator/global-reader calculated pages pay for the extra metadata read and compilation; this is an observed tradeoff, not a universal speedup. Tail timings also remain variable. Retain the substantial large-cohort and restricted-reader work reduction without adding a second small-cohort implementation. A further 32 diagnostic samples of cached calculated-page logging showed unchanged reads and inconsistent timing/compilation benefit, so that candidate was not retained. All timings, including regressions, remain in the raw evidence; these limited SQL samples do not establish a full-page/network p95 target.
 
-Reusable probes, rejected candidates, original SQL, raw plans/IO, warm samples and checks are ignored under `.local/sql-remedies-20261017/`. The checked-in [native regression suite](../tests/native/README.md) reproduces SQL correctness with temporary sources on an existing SQL Server connection; it does not substitute for public-view reader validation. No catalog writes, grants, package runs, cache flushes or TCP server were used.
+Reusable probes, rejected candidates, original SQL, raw plans/IO, warm samples and checks are ignored under `.local/reports/backend/20261017-sql-remedies/`. The checked-in [native regression suite](../tests/native/README.md) reproduces SQL correctness with temporary sources on an existing SQL Server connection; it does not substitute for public-view reader validation. No catalog writes, grants, package runs, cache flushes or TCP server were used.
 
 ### C8.2b.2b observation and text results
 

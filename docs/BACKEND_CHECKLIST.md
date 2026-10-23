@@ -18,7 +18,7 @@ Most repeatable SQL/HTTP/event checks can be run by the assistant when its runti
 
 ## Prepare the runtime and private config
 
-Use standard CPython 3.14 at the intended architecture, the pinned requirements and an installed SQL Server ODBC driver of matching architecture. Reuse `.local/validation-venv314` only after checking its interpreter; otherwise create a new environment. Follow [installation/configuration guidance](installation.md) for a fresh setup.
+Use standard CPython 3.14 at the intended architecture, the pinned requirements and an installed SQL Server ODBC driver of matching architecture. Reuse `.local/venv314` only after checking its interpreter; otherwise create a new environment. Follow [installation/configuration guidance](installation.md) for a fresh setup.
 
 Keep the real connection in `.local/backend-validation/dashboard.cfg`, selected by absolute `DASHBOARD_CONFIG`. Use `DEBUG=False`, `TESTING=False`, `PROPAGATE_EXCEPTIONS=False`, `LOG_LEVEL='INFO'`, positive login/query timeout settings, and a small overview window/list limit such as 24 hours/50 rows. Windows authentication uses the Python process account. The [reader reference](SSIS_FIXTURE_PROJECT_GUIDE.md#reader-permissions-and-sign-in-reference) explains the separate private reader configs.
 

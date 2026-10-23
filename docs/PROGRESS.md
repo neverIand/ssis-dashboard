@@ -116,9 +116,15 @@ This checkpoint does not repeat the long workload samples, sustained/concurrent 
 
 ### Documentation and local maintenance — 17 October 2026
 
-Closed historical runs are archived with hashes; current C8 inputs, runtime/configuration and fixtures retain their paths. [Installation and local workflow](installation.md#local-artifacts) owns cleanup/recovery instructions. The earlier review and cleanup records remain in `.local/reviews/stage-c-20261017/` and `.local/reports/maintenance/20261017-stage-c-cleanup/`.
+Closed historical runs are archived with hashes; current C8 inputs, runtime/configuration and fixtures retain their paths. [Installation and local workflow](installation.md#local-artifacts) owns cleanup/recovery instructions. The earlier review and cleanup records remain in `.local/reports/reviews/20261017-stage-c/` (moved 22 October) and `.local/reports/maintenance/20261017-stage-c-cleanup/`.
 
 Further consolidation reduces `docs/` from 14 files to 11 by combining API correctness/workload evidence, installation/local management and legacy references, and puts delivery phases/budgets in the roadmap. Existing case definitions, commands, result tables, dates and open gates are retained. Fourteen contract/shared-acceptance tests and 353 links/anchors pass. Preservation checks are recorded under `.local/reports/maintenance/20261017-docs-consolidation/`; no native SQL/HTTP rerun or application change is part of this documentation task.
+
+### Local workspace consolidation — 22 October 2026
+
+At the user's request, the ignored `.local/` folder was reduced from about 696 MB to about 270 MB. One environment, `.local/venv314`, is built from `requirements-dev.txt` on the local CPython 3.14.8 runtime. It replaces four overlapping environments, and its package set matches the former contract environment exactly. The npm offline cache was rebuilt from the lockfile. Review/remedy evidence moved under `.local/reports/`, and the four workstation repair kits moved under `.local/recovery/`. Twenty-nine closed Stage C runs were archived with hashes; the inputs of current tools stay unpacked. [Local artifacts](installation.md#local-artifacts) records the new layout. Codex reviewed the plan read-only before deletion.
+
+Afterwards, with `.local/venv314`: 427 document links/anchors pass; the suite runs **368 tests: 365 PASS, three opt-in native SKIP**; the three native SQL tests pass against the local `SSISDB`. The C8.2a offline verifier output is unchanged. The offline frontend install, the two reproducible builds and 163 Node tests pass. There were no application, SQL, contract or dependency changes. Receipts are in `.local/reports/maintenance/20261022-local-consolidation/`.
 
 ### Backend review fixes — 20 October 2026
 
