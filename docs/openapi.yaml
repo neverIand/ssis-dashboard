@@ -34,6 +34,7 @@ paths:
               examples:
                 synthetic: {$ref: '#/components/examples/MetaResponse'}
         '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
         '405': {$ref: '#/components/responses/MethodNotAllowed'}
         '500': {$ref: '#/components/responses/InternalError'}
   /api/v1/folders:
@@ -60,6 +61,7 @@ paths:
               examples:
                 synthetic: {$ref: '#/components/examples/FoldersResponse'}
         '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
         '405': {$ref: '#/components/responses/MethodNotAllowed'}
         '500': {$ref: '#/components/responses/InternalError'}
         '503': {$ref: '#/components/responses/DatabaseUnavailable'}
@@ -89,6 +91,7 @@ paths:
               examples:
                 synthetic: {$ref: '#/components/examples/ProjectsResponse'}
         '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
         '405': {$ref: '#/components/responses/MethodNotAllowed'}
         '500': {$ref: '#/components/responses/InternalError'}
         '503': {$ref: '#/components/responses/DatabaseUnavailable'}
@@ -121,6 +124,7 @@ paths:
               examples:
                 synthetic: {$ref: '#/components/examples/SummaryResponse'}
         '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
         '405': {$ref: '#/components/responses/MethodNotAllowed'}
         '500': {$ref: '#/components/responses/InternalError'}
         '503': {$ref: '#/components/responses/DatabaseUnavailable'}
@@ -155,6 +159,7 @@ paths:
               examples:
                 synthetic: {$ref: '#/components/examples/TimelineResponse'}
         '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
         '405': {$ref: '#/components/responses/MethodNotAllowed'}
         '500': {$ref: '#/components/responses/InternalError'}
         '503': {$ref: '#/components/responses/DatabaseUnavailable'}
@@ -191,6 +196,7 @@ paths:
               examples:
                 synthetic: {$ref: '#/components/examples/ExecutionsResponse'}
         '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
         '405': {$ref: '#/components/responses/MethodNotAllowed'}
         '500': {$ref: '#/components/responses/InternalError'}
         '503': {$ref: '#/components/responses/DatabaseUnavailable'}
@@ -217,6 +223,7 @@ paths:
               examples:
                 synthetic: {$ref: '#/components/examples/ExecutionResponse'}
         '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
         '405': {$ref: '#/components/responses/MethodNotAllowed'}
         '500': {$ref: '#/components/responses/InternalError'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -248,6 +255,7 @@ paths:
               examples:
                 synthetic: {$ref: '#/components/examples/ExecutablesResponse'}
         '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
         '405': {$ref: '#/components/responses/MethodNotAllowed'}
         '500': {$ref: '#/components/responses/InternalError'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -281,6 +289,7 @@ paths:
               examples:
                 synthetic: {$ref: '#/components/examples/ChildrenResponse'}
         '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
         '405': {$ref: '#/components/responses/MethodNotAllowed'}
         '500': {$ref: '#/components/responses/InternalError'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -386,6 +395,7 @@ paths:
               examples:
                 synthetic: {$ref: '#/components/examples/HistoryResponse'}
         '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
         '405': {$ref: '#/components/responses/MethodNotAllowed'}
         '500': {$ref: '#/components/responses/InternalError'}
         '503': {$ref: '#/components/responses/DatabaseUnavailable'}
@@ -410,6 +420,7 @@ paths:
               examples:
                 synthetic: {$ref: '#/components/examples/LivenessResponse'}
         '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
         '405': {$ref: '#/components/responses/MethodNotAllowed'}
         '500': {$ref: '#/components/responses/InternalError'}
   /readyz:
@@ -433,6 +444,7 @@ paths:
               examples:
                 synthetic: {$ref: '#/components/examples/ReadinessResponse'}
         '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
         '405': {$ref: '#/components/responses/MethodNotAllowed'}
         '500': {$ref: '#/components/responses/InternalError'}
         '503': {$ref: '#/components/responses/DatabaseUnavailable'}
@@ -2082,7 +2094,8 @@ components:
           example: {type: 'about:blank', title: Unauthorized, status: 401, detail: Authentication is required to
               access this resource., code: unauthenticated, request_id: 0123456789abcdef0123456789abcdef}
     Forbidden:
-      description: Forbidden. Fixed safe detail; no rejected values or diagnostics.
+      description: Forbidden. A disabled capability, or a cross-site browser request that is not a top-level
+        document navigation. Fixed safe detail; no rejected values or diagnostics.
       headers:
         X-Request-ID: {$ref: '#/components/headers/RequestId'}
         Cache-Control: {$ref: '#/components/headers/NoStore'}

@@ -58,6 +58,7 @@ def create_app(config_overrides=None, *, config_path=None):
     validate_config(app.config)
 
     from dashboard import filters, processors
+    from dashboard.browser_policy import register_browser_policy
     from dashboard.errors import register_error_handlers
     from dashboard.observability import register_observability
     from dashboard.views import register_views
@@ -66,6 +67,8 @@ def create_app(config_overrides=None, *, config_path=None):
     register_views(app)
     register_frontend(app)
     register_observability(app)
+    # Before API input checks and every route's SQL; after request timing starts.
+    register_browser_policy(app)
     register_api(app)
     register_error_handlers(app)
     app.context_processor(processors.utility_processor)

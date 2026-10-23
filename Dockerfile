@@ -40,5 +40,7 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 COPY . .
 ENV FLASK_APP=dashboard/__init__.py LC_ALL=C.UTF-8 LANG=C.UTF-8
 EXPOSE 5000
+# The container must listen on its own interface; publish it only on host
+# loopback (see docker-compose.yml), because the dashboard has no authentication.
 CMD [ "flask", "run", "--host=0.0.0.0" ]
 

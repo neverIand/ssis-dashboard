@@ -152,16 +152,18 @@ A local review of `0cb19d2` (`.local/reports/reviews/20261023-backend-security-p
 
 | Finding | Status |
 | --- | --- |
-| F1 — legacy overview `LOGGING_LEVEL` | Batch 1, in review. `package-list.sql` reads only the system parameter (`object_type = 50`) and converts it inside the `CASE` guard. A NULL or unlisted level renders `Unknown` instead of returning 500. The static conversion test now covers every SQL resource and also `CAST`. |
-| F2 — legacy history divide by zero | Batch 1, in review. `percent_complete` is computed only for running rows and divides by `NULLIF(mean, 0)`. The page omits an unavailable estimate. |
-| F3 — cross-site requests and browser headers | Planned |
-| F4 — Docker port binding | Planned |
+| F1 — legacy overview `LOGGING_LEVEL` | Batch 1 (`91dce8a`), approved by Codex with independent native verification. `package-list.sql` reads only the system parameter (`object_type = 50`) and converts it inside the `CASE` guard. A NULL or unlisted level renders `Unknown` instead of returning 500. The static conversion test now covers every SQL resource and also `CAST`. |
+| F2 — legacy history divide by zero | Batch 1 (`91dce8a`), approved by Codex. `percent_complete` is computed only for running rows and divides by `NULLIF(mean, 0)`. The page omits an unavailable estimate. |
+| F3 — cross-site requests and browser headers | Batch 2, in review. On every route, a request with `Sec-Fetch-Site: cross-site` gets 403 before SQL, unless it is a GET/HEAD top-level document navigation. Every response carries `nosniff`, `X-Frame-Options: DENY` and `frame-ancestors 'none'`. OpenAPI lists 403 on all operations. |
+| F4 — Docker port binding | Batch 2, in review. Both compose files publish `127.0.0.1:5000:5000`; the legacy `docker run` example uses the same binding. |
 | F5 — unbounded legacy overview aggregation | Planned |
 | F6 — third-party legacy stylesheet | Planned |
 
 **Batch 1 validation:** five new or extended tests fail before the fix (SQL `22018` and `22012`, HTTP 500, static guard) and pass after it. The suite runs **372 tests**. All pass with the native opt-in; without it, five native tests skip. On the local `SSISDB`, the checked-in legacy list returns the same 16 rows and levels as before. With a connection-local same-named text or integer parameter, it returns 16 rows / 16 IDs instead of `22018` or a duplicate row. Warm logical reads fall from 441 to 369 (parameter view 144 → 9). Legacy history returns identical displayed columns for all four identities, at 77 reads before and after. Legacy `/` and the four history pages return 200. Evidence is in `.local/reports/backend/20261023-review-fixes-r001/`.
 
 **NOT RUN:** independent-reader visibility and large-catalog timing of the legacy queries.
+
+**Batch 2 validation:** before the fix, four of the five new browser-policy tests fail (202 subtests: cross-site requests reached SQL or returned 200/500/503, and the headers were missing), and the compose test fails on both files. After the fix, the suite runs **378 tests**. All pass with the native opt-in; without it, five native tests skip. In the desktop app's Chromium browser, a page on `127.0.0.1` sent an image, script, iframe, no-cors fetch and CORS fetch to `localhost`; each got 403 with no query. A top-level link still opened the API page (200), and the native overview loaded same-origin with all three headers. Evidence is in `.local/reports/backend/20261023-review-fixes-r002/`. **NOT RUN:** other browser engines, and a Docker build (the legacy image cannot install current pins).
 
 ## Later phase boundaries
 

@@ -107,7 +107,7 @@ DRIVER={ODBC Driver 13 for SQL Server};SERVER=localhost;DATABASE=SSISDB;UID=;PWD
 You can now run it using the following options
 
 ```
-docker run -d -p 5000:5000 --name ssis-dashboard -e DASHBOARD_CONFIG=config.cfg -v <path-of-created-config.cfg>:/usr/src/app/dashboard/config.cfg yorek/ssis-dashboard
+docker run -d -p 127.0.0.1:5000:5000 --name ssis-dashboard -e DASHBOARD_CONFIG=config.cfg -v <path-of-created-config.cfg>:/usr/src/app/dashboard/config.cfg yorek/ssis-dashboard
 ```
 
 Once the container is running you can connect to the dashboard via the following url:

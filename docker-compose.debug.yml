@@ -6,5 +6,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    # Host loopback only: the dashboard has no authentication, and TRUSTED_HOSTS
+    # is not access control (any network client can send Host: localhost).
     ports:
-      - 5000:5000
+      - "127.0.0.1:5000:5000"

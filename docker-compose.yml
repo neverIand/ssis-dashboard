@@ -4,5 +4,7 @@ services:
   ssis-dashboard-next:
     image: ssis-dashboard-next
     build: .
+    # Host loopback only: the dashboard has no authentication, and TRUSTED_HOSTS
+    # is not access control (any network client can send Host: localhost).
     ports:
-      - 5000:5000
+      - "127.0.0.1:5000:5000"
