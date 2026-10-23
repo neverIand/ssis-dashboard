@@ -27,6 +27,17 @@ Vite HMR is a development feature. Data-only polling can deliver the first usabl
 
 Environment-dependent acceptance may wait while the user prepares the test environment. Actual hidden-tab/cache behavior, corporate-browser checks and unavailable reader/workload conditions remain explicitly unverified; they do not block local phase 4 development or count as passed. [Frontend acceptance](FRONTEND_ACCEPTANCE.md) explains the browser procedures. This sequencing does not close Stage C/D3, authorize shared deployment, or resume the deferred hosting work.
 
+## Plan Onwards
+1. Complete code review for both frontend and backend: security and performance
+2. UX and design improvement:
+	- manual test on real world project and improve UX
+	- design tweaks
+	- support dark mode
+3. Start adding features
+	- improve clarity for execution details
+	- tree view
+	- rerun packages from dashboard?
+
 ## Delivery phases
 
 | Phase | Deliverable and exit condition |
