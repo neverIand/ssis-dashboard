@@ -39,7 +39,8 @@ SELECT
 	end_time = format(CASE WHEN end_time IS NULL THEN dateadd(minute, cast(CEILING(avg_elapsed_time_min) AS int), start_time) ELSE end_time end, 'yyyy-MM-dd HH:mm:ss'),
 	elapsed_time_min = format(CASE WHEN end_time IS NULL THEN avg_elapsed_time_min ELSE elapsed_time_min end, '#,0.00'),
 	avg_elapsed_time_min = format(avg_elapsed_time_min, '#,0.00'),
-	percent_complete = format(100 * (DATEDIFF(ss, start_time, SYSDATETIMEOFFSET()) / 60.) / avg_elapsed_time_min, '#,0.00'),
+	-- Only running rows show an estimate. Runs inside one second give a zero mean.
+	percent_complete = format(CASE WHEN end_time IS NULL THEN 100 * (DATEDIFF(ss, start_time, SYSDATETIMEOFFSET()) / 60.) / NULLIF(avg_elapsed_time_min, 0) END, '#,0.00'),
 	has_expected_values = CASE WHEN end_time IS NULL THEN 1 ELSE 0 END
 FROM
 	cte

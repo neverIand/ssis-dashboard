@@ -48,7 +48,7 @@
                         <tr>
                             <td class="text-center">{{ p.execution_id }}</td>
                             <td>{{ p.project_name }} (v.{{ p.project_lsn }})</td>
-                            <td>{{ p.package_name }}{% if p.has_expected_values == True %} <span class="label label-info">Running</span> <span class="label label-warning">({{ p.percent_complete }}% Estimate)</span>{% endif %}</td>
+                            <td>{{ p.package_name }}{% if p.has_expected_values == True %} <span class="label label-info">Running</span>{% if p.percent_complete is not none %} <span class="label label-warning">({{ p.percent_complete }}% Estimate)</span>{% endif %}{% endif %}</td>
                             <td>{{ p.environment_name }}</td>
                             <td>{{ p.start_time }}</td>
                             <td>{{ p.end_time }}{% if p.has_expected_values == True %} <span class="label label-warning">Estimate</span>{% endif %}</td>

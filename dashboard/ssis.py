@@ -123,7 +123,8 @@ class monitor(object):
 
         for r in result:
             r["status_desc"] = self.package_status_codes[r["status"]].title()
-            r["logging_level_desc"] = self.logging_codes[r["logging_level"]].title()
+            # A missing system row or an unlisted code must not fail the whole page.
+            r["logging_level_desc"] = self.logging_codes.get(r["logging_level"], 'Unknown').title()
 
         return result
     

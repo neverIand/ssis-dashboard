@@ -146,6 +146,23 @@ Evidence and hashes are in `.local/reports/backend/20261022-native-recheck-96f63
 
 **NOT RUN:** independent-reader visibility, a workload measurement of the changed query, and a real multi-worker host with a shared secret (hosting remains deferred).
 
+### Backend review follow-up — 23 October 2026
+
+A local review of `0cb19d2` (`.local/reports/reviews/20261023-backend-security-performance/`) found six further issues. They are fixed in batches. Codex reviews each batch under the `collab-contract` task `ssis-backend-review-fixes-20261023`, and the next batch starts only after approval.
+
+| Finding | Status |
+| --- | --- |
+| F1 — legacy overview `LOGGING_LEVEL` | Batch 1, in review. `package-list.sql` reads only the system parameter (`object_type = 50`) and converts it inside the `CASE` guard. A NULL or unlisted level renders `Unknown` instead of returning 500. The static conversion test now covers every SQL resource and also `CAST`. |
+| F2 — legacy history divide by zero | Batch 1, in review. `percent_complete` is computed only for running rows and divides by `NULLIF(mean, 0)`. The page omits an unavailable estimate. |
+| F3 — cross-site requests and browser headers | Planned |
+| F4 — Docker port binding | Planned |
+| F5 — unbounded legacy overview aggregation | Planned |
+| F6 — third-party legacy stylesheet | Planned |
+
+**Batch 1 validation:** five new or extended tests fail before the fix (SQL `22018` and `22012`, HTTP 500, static guard) and pass after it. The suite runs **372 tests**. All pass with the native opt-in; without it, five native tests skip. On the local `SSISDB`, the checked-in legacy list returns the same 16 rows and levels as before. With a connection-local same-named text or integer parameter, it returns 16 rows / 16 IDs instead of `22018` or a duplicate row. Warm logical reads fall from 441 to 369 (parameter view 144 → 9). Legacy history returns identical displayed columns for all four identities, at 77 reads before and after. Legacy `/` and the four history pages return 200. Evidence is in `.local/reports/backend/20261023-review-fixes-r001/`.
+
+**NOT RUN:** independent-reader visibility and large-catalog timing of the legacy queries.
+
 ## Later phase boundaries
 
 Phase 3 implementation and the design system pass their recorded local checks; D3 still has deferred environment acceptance. Phase 4 has delivered P4.1a–P4.1c and P4.2a/P4.2b locally, with P4.3 next; phases 5–6 remain later work with production hosting/validation deferred. [The roadmap](roadmap.md#delivery-phases) defines their deliverables and exit conditions; [the plan](MODERNIZATION_PLAN.md#rollout-and-rollback) defines coexistence and rollback.

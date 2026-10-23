@@ -33,13 +33,18 @@ cteKPI as
 ),
 cteLoglevel as
 (
+	-- Only the system parameter: a project/package parameter can share the name
+	-- and hold text. The CASE keeps the conversion behind the filter, because
+	-- SQL Server may evaluate SELECT expressions before WHERE.
 	select
 		execution_id,
-		cast(parameter_value as int) as logging_level
+		convert(int, case when object_type = 50 and parameter_name = N'LOGGING_LEVEL' then parameter_value end) as logging_level
 	from
 		[catalog].[execution_parameter_values]
 	where
-		parameter_name = 'LOGGING_LEVEL'
+		object_type = 50
+	and
+		parameter_name = N'LOGGING_LEVEL'
 )
 select top (@executionCount)
 	e.execution_id, 

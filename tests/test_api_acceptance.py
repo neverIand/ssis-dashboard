@@ -88,9 +88,10 @@ class APIAcceptanceTests(unittest.TestCase):
 
         # SQL Server may evaluate SELECT expressions before WHERE. Other parameter
         # values can be text, so an integer conversion needs its own CASE guard.
-        unguarded = re.compile(r'CONVERT\(\s*(?:big|small|tiny)?int\s*,(?!\s*CASE\b)[^)]*parameter_value',
-                               re.IGNORECASE)
-        for resource in (Path(__file__).resolve().parents[1]/'dashboard/query').glob('api-*.sql'):
+        # Legacy pages read the same catalog view and need the same guard.
+        unguarded = re.compile(r'CONVERT\(\s*(?:big|small|tiny)?int\s*,(?!\s*CASE\b)[^)]*parameter_value'
+                               r'|CAST\(\s*parameter_value\s+AS\s+(?:big|small|tiny)?int\b', re.IGNORECASE)
+        for resource in (Path(__file__).resolve().parents[1]/'dashboard/query').glob('*.sql'):
             with self.subTest(resource=resource.name):
                 sql = re.sub(r'(?m)^[ \t]*--[^\n]*', '', load_query(resource.name))
                 self.assertIsNone(unguarded.search(sql))

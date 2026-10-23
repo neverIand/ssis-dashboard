@@ -91,6 +91,30 @@ class LegacyQueryUsageTests(unittest.TestCase):
                     ('package-list.sql', (*WINDOW, folder, project, status, 25), False),
                 ])
 
+    def test_overview_renders_missing_and_unlisted_logging_levels(self):
+        listed = self.rows.get_package_list()[0]
+        self.query.side_effect = lambda resource, parameters, **settings: (
+            [{**listed, 'execution_id': 42, 'logging_level': None},
+             {**listed, 'execution_id': 43, 'logging_level': 7}]
+            if resource == 'package-list.sql' else self.query_fixture(resource, parameters, **settings))
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('href="/execution/42"', html)
+        self.assertIn('href="/execution/43"', html)
+        self.assertEqual(html.count('<td>Unknown</td>'), 2)
+
+    def test_history_omits_an_unavailable_running_estimate(self):
+        history = self.rows.get_package_history()[0]
+        self.query.side_effect = lambda resource, parameters, **settings: (
+            [{**history, 'has_expected_values': 1, 'percent_complete': None}]
+            if resource == 'package-history.sql' else self.query_fixture(resource, parameters, **settings))
+        response = self.client.get('/history/F/project/P/status/all/package/Sample.dtsx')
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('Running', html)
+        self.assertNotIn('% Estimate', html)
+
     def test_execution_retains_navigation_kpi_children_and_executables_with_seven_queries(self):
         response = self.client.get('/execution/42')
         self.assertEqual(response.status_code, 200)
