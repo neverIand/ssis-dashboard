@@ -1,3 +1,4 @@
+import re
 import unittest
 from unittest.mock import patch
 
@@ -90,6 +91,13 @@ class LegacyQueryUsageTests(unittest.TestCase):
                     ('executions-statistics.sql', (*WINDOW, folder, project, status), False),
                     ('package-list.sql', (*WINDOW, folder, project, status, 25), False),
                 ])
+
+    def test_legacy_pages_request_no_third_party_stylesheet_or_font(self):
+        for path in ('/', '/execution/42', '/execution/42/values', '/history/F/project/P/status/all/package/A.dtsx'):
+            with self.subTest(path=path):
+                html = self.client.get(path).get_data(as_text=True)
+                self.assertNotIn('fonts.googleapis.com', html)
+                self.assertIsNone(re.search(r'<link\b[^>]*\bhref="(?:https?:)?//', html))
 
     def test_overview_renders_missing_and_unlisted_logging_levels(self):
         listed = self.rows.get_package_list()[0]

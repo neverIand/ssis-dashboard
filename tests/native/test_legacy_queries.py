@@ -3,6 +3,7 @@
 Catalog views are replaced by temporary tables with the same column names; no
 catalog objects, data or permissions change.
 """
+from datetime import date
 import os
 from pathlib import Path
 import unittest
@@ -47,7 +48,22 @@ INSERT #legacy_parameters VALUES
  (2, 20, N'LOGGING_LEVEL', CONVERT(sql_variant, 2)),
  (4, 50, N'LOGGING_LEVEL', CONVERT(sql_variant, 100)),
  (4, 30, N'DUMP_LEVEL', CONVERT(sql_variant, N'text'));
+INSERT #legacy_events VALUES (1, N'OnError'), (1, N'OnError'), (1, N'OnWarning'), (2, N'OnWarning'),
+ (2, N'OnWarning'), (2, N'OnWarning'), (4, N'OnInformation'), (10, N'OnError'), (99, N'OnError');
+-- Statistics: local created dates near midnight at extreme offsets (UTC-14..UTC+14).
+INSERT #legacy_executions VALUES
+ (30, N'S', N'P', N'A.dtsx', 1, NULL, NULL, 7, '2026-09-30T23:30:00-10:00', '2026-10-01T09:30:00Z', NULL),
+ (31, N'S', N'P', N'A.dtsx', 1, NULL, NULL, 7, '2026-10-01T00:30:00+14:00', '2026-09-30T10:30:00Z', NULL),
+ (32, N'S', N'P', N'A.dtsx', 1, NULL, NULL, 4, '2026-10-01T12:00:00Z', '2026-10-01T12:00:00Z', NULL),
+ (33, N'S', N'P', N'A.dtsx', 1, NULL, NULL, 7, '2026-10-02T08:00:00+05:45', '2026-10-02T02:15:00Z', NULL),
+ (34, N'S', N'P', N'A.dtsx', 1, NULL, NULL, 2, '2026-10-02T23:59:59.9999999-14:00', '2026-10-03T14:00:00Z', NULL),
+ (35, N'S', N'P', N'A.dtsx', 1, NULL, NULL, 4, '2026-10-03T23:30:00-14:00', '2026-10-04T13:30:00Z', NULL),
+ (36, N'S', N'P', N'A.dtsx', 1, NULL, NULL, 7, '2026-10-04T00:00:00+14:00', '2026-10-03T10:00:00Z', NULL),
+ (37, N'S', N'P', N'A.dtsx', 1, NULL, NULL, 1, '2026-10-02T10:00:00Z', NULL, NULL),
+ (38, N'X', N'P', N'A.dtsx', 1, NULL, NULL, 7, '2026-10-02T10:00:00Z', '2026-10-02T10:00:00Z', NULL);
 """
+# Per local created date: created, executed (started), succeeded (7), failed (4).
+STATISTICS = {date(2026, 10, 1): (2, 2, 1, 1), date(2026, 10, 2): (3, 2, 1, 0), date(2026, 10, 3): (1, 1, 0, 1)}
 
 
 @unittest.skipUnless(CONFIG, 'Set SSIS_DASHBOARD_NATIVE_TEST_CONFIG to run native SQL tests.')
@@ -64,6 +80,8 @@ class LegacySQLTests(unittest.TestCase):
             pass
 
     def rows(self, resource, parameters):
+        # Query-local tables live until the connection closes; the app opens one per query.
+        self.cursor.execute('DROP TABLE IF EXISTS #listed, #listed_events, #listed_levels, #created_dates;')
         sql = load_query(resource)
         for source, target in SOURCES:
             sql = sql.replace(source, target)
@@ -78,6 +96,27 @@ class LegacySQLTests(unittest.TestCase):
         levels = {row['execution_id']: row['logging_level'] for row in rows}
         self.assertEqual(len(rows), len(levels))
         self.assertEqual({key: levels[key] for key in (1, 2, 3, 4)}, {1: 1, 2: 3, 3: None, 4: 100})
+
+    def test_overview_counts_events_of_the_listed_page_with_null_for_none(self):
+        rows = self.rows('package-list.sql', (48, '2026-10-02 00:00:00', 'F', 'P', 7, 1000))
+        counts = {row['execution_id']: (row['errors'], row['warnings']) for row in rows}
+        self.assertEqual(sorted(counts), [1, 2, 3, 4, 10, 11, 20])
+        self.assertEqual({key: counts[key] for key in (1, 2, 3, 4, 10)},
+                         {1: (2, 1), 2: (None, 3), 3: (None, None), 4: (None, None), 10: (1, None)})
+        top = self.rows('package-list.sql', (48, '2026-10-02 00:00:00', 'F', 'P', 0, 2))
+        self.assertEqual([row['execution_id'] for row in top], [21, 20])
+
+    def test_statistics_count_whole_local_dates_at_every_offset(self):
+        rows = self.rows('executions-statistics.sql', (48, '2026-10-03 06:00:00', 'S', '%', 0))
+        actual = {row['calendar_date']: (row['created_packages'], row['executed_packages'],
+                                         row['succeeded_packages'], row['failed_packages']) for row in rows}
+        self.assertEqual(actual, STATISTICS)
+        succeeded = self.rows('executions-statistics.sql', (48, '2026-10-03 06:00:00', 'S', '%', 7))
+        self.assertEqual({row['calendar_date']: row['created_packages'] for row in succeeded},
+                         {date(2026, 10, 1): 1, date(2026, 10, 2): 1, date(2026, 10, 3): 0})
+        one_hour = self.rows('executions-statistics.sql', (1, '2026-10-02 12:00:00', 'S', '%', 0))
+        self.assertEqual([(row['calendar_date'], row['created_packages']) for row in one_hour],
+                         [(date(2026, 10, 2), 3)])
 
     def test_history_estimates_skip_zero_mean_and_completed_rows(self):
         quick = self.rows('package-history.sql', ('F', 'P', 'Quick.dtsx'))

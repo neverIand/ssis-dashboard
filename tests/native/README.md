@@ -5,8 +5,9 @@ connection-local synthetic sources. They check complete typed rows against an
 independent full-result query: all 12 sorts and both directions, cursor ties and
 NULL tails, selective/empty cohorts, retention, 100-ns timings, long durations,
 wide Unicode names and same-name user/system parameters. `test_legacy_queries.py`
-runs the legacy overview list and package history the same way, including
-same-name parameters and sub-second runs.
+runs the legacy overview list, daily statistics and package history the same
+way, including same-name parameters, NULL event counts, created dates at the
+extreme UTC offsets and sub-second runs.
 
 Use an existing private dashboard configuration with a SQL Server connection.
 No SSISDB objects, data or permissions are changed. The tests require only the

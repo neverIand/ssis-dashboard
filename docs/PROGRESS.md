@@ -160,16 +160,25 @@ A local review of `0cb19d2` (`.local/reports/reviews/20261023-backend-security-p
 | --- | --- |
 | F1 — legacy overview `LOGGING_LEVEL` | Batch 1 (`91dce8a`), approved by Codex with independent native verification. `package-list.sql` reads only the system parameter (`object_type = 50`) and converts it inside the `CASE` guard. A NULL or unlisted level renders `Unknown` instead of returning 500. The static conversion test now covers every SQL resource and also `CAST`. |
 | F2 — legacy history divide by zero | Batch 1 (`91dce8a`), approved by Codex. `percent_complete` is computed only for running rows and divides by `NULLIF(mean, 0)`. The page omits an unavailable estimate. |
-| F3 — cross-site requests and browser headers | Batch 2, in review. On every route, a request with `Sec-Fetch-Site: cross-site` gets 403 before SQL, unless it is a GET/HEAD top-level document navigation. Every response carries `nosniff`, `X-Frame-Options: DENY` and `frame-ancestors 'none'`. OpenAPI lists 403 on all operations. |
-| F4 — Docker port binding | Batch 2, in review. Both compose files publish `127.0.0.1:5000:5000`; the legacy `docker run` example uses the same binding. |
-| F5 — unbounded legacy overview aggregation | Planned |
-| F6 — third-party legacy stylesheet | Planned |
+| F3 — cross-site requests and browser headers | Batch 2 (`58311d2`), approved by Codex with independent native verification. On every route, a request with `Sec-Fetch-Site: cross-site` gets 403 before SQL, unless it is a GET/HEAD top-level document navigation. Every response carries `nosniff`, `X-Frame-Options: DENY` and `frame-ancestors 'none'`. OpenAPI lists 403 on all operations. |
+| F4 — Docker port binding | Batch 2 (`58311d2`), approved. Both compose files publish `127.0.0.1:5000:5000`; the legacy `docker run` example uses the same binding. |
+| F5 — unbounded legacy overview aggregation | Batch 3, in review. `package-list.sql` first selects the listed executions, then counts their events and reads their logging levels in separate listed-first statements; the whole event history is no longer aggregated per load. `executions-statistics.sql` aggregates each created date once over a sargable range that covers every stored offset, instead of rescanning executions for each calendar day. Results are unchanged. |
+| F6 — third-party legacy stylesheet | Batch 3, in review. The Google Fonts link is removed; `main.css` already falls back to `sans-serif`. |
 
 **Batch 1 validation:** five new or extended tests fail before the fix (SQL `22018` and `22012`, HTTP 500, static guard) and pass after it. The suite runs **372 tests**. All pass with the native opt-in; without it, five native tests skip. On the local `SSISDB`, the checked-in legacy list returns the same 16 rows and levels as before. With a connection-local same-named text or integer parameter, it returns 16 rows / 16 IDs instead of `22018` or a duplicate row. Warm logical reads fall from 441 to 369 (parameter view 144 → 9). Legacy history returns identical displayed columns for all four identities, at 77 reads before and after. Legacy `/` and the four history pages return 200. Evidence is in `.local/reports/backend/20261023-review-fixes-r001/`.
 
 **NOT RUN:** independent-reader visibility and large-catalog timing of the legacy queries.
 
 **Batch 2 validation:** before the fix, four of the five new browser-policy tests fail (202 subtests: cross-site requests reached SQL or returned 200/500/503, and the headers were missing), and the compose test fails on both files. After the fix, the suite runs **378 tests**. All pass with the native opt-in; without it, five native tests skip. In the desktop app's Chromium browser, a page on `127.0.0.1` sent an image, script, iframe, no-cors fetch and CORS fetch to `localhost`; each got 403 with no query. A top-level link still opened the API page (200), and the native overview loaded same-origin with all three headers. Evidence is in `.local/reports/backend/20261023-review-fixes-r002/`. **NOT RUN:** other browser engines, and a Docker build (the legacy image cannot install current pins).
+
+**Batch 3 validation:**
+
+- **Real catalog.** On the local `SSISDB`, the old and new legacy SQL return identical rows for 14 parameter sets: windows, as-of, status, folder, limit and empty. Daily statistics read `internal.operations` once instead of once per calendar day (744 h: 32 scans → 1).
+- **Connection-local sources at scale.** The sources mirror the internal index keys: 20,000 executions, 1,000,000 events and 300,000 parameters. Results are equal in every case; median timings use 15 interleaved samples. Statistics run 725 → 28 ms at 744 h, and 48 → 4 ms at 24 h. The overview list runs 291 → 62 ms for a 50-row page, 291 → 39 ms for an empty filtered page, 284 → 141 ms for 300 rows, and 291 → 249 / 363 → 259 ms for 1,000-row pages, with 36,082/66,673 → 39,762 reads.
+- **Remaining event scan.** At 300 or more listed executions, SQL Server still scans the events: the `operation_id` indexes do not cover `event_name`, so scanning is cheaper than per-execution lookups. Forced loop joins took 2.5-3.2 s; a single-statement shape and joining logging levels in the final select were slower.
+- **Tests.** New native tests check event counts with NULL for none, the page limit, and statistics for created dates at UTC−14/+14 around midnight. They also pass on the old SQL, confirming equal semantics. The new F6 test fails before the fix and passes after. The suite runs **381 tests**: all pass with the native opt-in; without it, seven native tests skip.
+
+Evidence is in `.local/reports/backend/20261023-review-fixes-r003/`. **NOT RUN:** a large real catalog with reader permission joins.
 
 ## Later phase boundaries
 
