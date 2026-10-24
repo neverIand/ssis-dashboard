@@ -154,7 +154,7 @@ Evidence and hashes are in `.local/reports/backend/20261022-native-recheck-96f63
 
 ### Backend review follow-up — 23 October 2026
 
-A local review of `0cb19d2` (`.local/reports/reviews/20261023-backend-security-performance/`) found six further issues. They are fixed in batches. Codex reviews each batch under the `collab-contract` task `ssis-backend-review-fixes-20261023`, and the next batch starts only after approval.
+A local review of `0cb19d2` (`.local/reports/reviews/20261023-backend-security-performance/`) found six further issues. They were fixed in three batches, and Codex reviewed each batch under the `collab-contract` task `ssis-backend-review-fixes-20261023`. **The task was accepted on 24 October 2026 on `5c6b024`.** All acceptance checks pass on that candidate, including independent native verification. The final record is `rounds/003/review-codex-final.md` in that task.
 
 | Finding | Status |
 | --- | --- |
@@ -162,8 +162,8 @@ A local review of `0cb19d2` (`.local/reports/reviews/20261023-backend-security-p
 | F2 — legacy history divide by zero | Batch 1 (`91dce8a`), approved by Codex. `percent_complete` is computed only for running rows and divides by `NULLIF(mean, 0)`. The page omits an unavailable estimate. |
 | F3 — cross-site requests and browser headers | Batch 2 (`58311d2`), approved by Codex with independent native verification. On every route, a request with `Sec-Fetch-Site: cross-site` gets 403 before SQL, unless it is a GET/HEAD top-level document navigation. Every response carries `nosniff`, `X-Frame-Options: DENY` and `frame-ancestors 'none'`. OpenAPI lists 403 on all operations. |
 | F4 — Docker port binding | Batch 2 (`58311d2`), approved. Both compose files publish `127.0.0.1:5000:5000`; the legacy `docker run` example uses the same binding. |
-| F5 — unbounded legacy overview aggregation | Batch 3, in review. `package-list.sql` first selects the listed executions, then counts their events and reads their logging levels in separate listed-first statements; the whole event history is no longer aggregated per load. `executions-statistics.sql` aggregates each created date once over a sargable range that covers every stored offset, instead of rescanning executions for each calendar day. Results are unchanged. |
-| F6 — third-party legacy stylesheet | Batch 3, in review. The Google Fonts link is removed; `main.css` already falls back to `sans-serif`. |
+| F5 — unbounded legacy overview aggregation | Batch 3 (`5c6b024`), approved by Codex with independent native equivalence and plan/IO checks. `package-list.sql` first selects the listed executions, then counts their events and reads their logging levels in separate listed-first statements; the whole event history is no longer aggregated per load. `executions-statistics.sql` aggregates each created date once over a sargable range that covers every stored offset, instead of rescanning executions for each calendar day. Results are unchanged. |
+| F6 — third-party legacy stylesheet | Batch 3 (`5c6b024`), approved. The Google Fonts link is removed; `main.css` already falls back to `sans-serif`. |
 
 **Batch 1 validation:** five new or extended tests fail before the fix (SQL `22018` and `22012`, HTTP 500, static guard) and pass after it. The suite runs **372 tests**. All pass with the native opt-in; without it, five native tests skip. On the local `SSISDB`, the checked-in legacy list returns the same 16 rows and levels as before. With a connection-local same-named text or integer parameter, it returns 16 rows / 16 IDs instead of `22018` or a duplicate row. Warm logical reads fall from 441 to 369 (parameter view 144 → 9). Legacy history returns identical displayed columns for all four identities, at 77 reads before and after. Legacy `/` and the four history pages return 200. Evidence is in `.local/reports/backend/20261023-review-fixes-r001/`.
 
@@ -179,6 +179,8 @@ A local review of `0cb19d2` (`.local/reports/reviews/20261023-backend-security-p
 - **Tests.** New native tests check event counts with NULL for none, the page limit, and statistics for created dates at UTC−14/+14 around midnight. They also pass on the old SQL, confirming equal semantics. The new F6 test fails before the fix and passes after. The suite runs **381 tests**: all pass with the native opt-in; without it, seven native tests skip.
 
 Evidence is in `.local/reports/backend/20261023-review-fixes-r003/`. **NOT RUN:** a large real catalog with reader permission joins.
+
+The acceptance does not close these separate gates: independent-reader permissions on a large real catalog, concurrent and sustained workloads, other browser engines, the Docker runtime and hosting. They stay with C8 above and with the deferred hosting work.
 
 ## Later phase boundaries
 
