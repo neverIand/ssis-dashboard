@@ -10,12 +10,12 @@ export function observationQuery(value, metadata, idSort, timeSort = 'started_at
   return query;
 }
 
-export function readObservationMeta({ data, meta }, query, metadata, display) {
+export function readObservationMeta({ data, meta }, query, metadata, display, { availability = true } = {}) {
   if (!Array.isArray(data) || data.length > query.limit || !safeRequestId(meta.request_id)
       || meta.limit !== query.limit || meta.sort !== query.sort || meta.direction !== query.direction
       || meta.from !== null || meta.to !== null || meta.consistency !== 'live'
-      || !['available', 'not-recorded', 'unknown'].includes(meta.availability)
-      || (data.length && meta.availability === 'not-recorded')
+      || (availability && (!['available', 'not-recorded', 'unknown'].includes(meta.availability)
+        || (data.length && meta.availability === 'not-recorded')))
       || typeof meta.has_more !== 'boolean' || (meta.has_more
         ? !data.length || typeof meta.next_cursor !== 'string' || !meta.next_cursor
           || meta.next_cursor.length > metadata.limits.max_cursor_characters

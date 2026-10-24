@@ -121,7 +121,8 @@ class FrontendShellTests(unittest.TestCase):
                                    'data-overview-link', 'data-legacy-detail-link', 'data-overview-return-notice hidden',
                                    'data-executables-toggle aria-expanded="false"', 'data-executables-panel hidden',
                                    'data-executables-table', 'data-children-table', 'data-children-toggle', 'data-events-toggle', 'data-events-filters', 'data-events-table',
-                                   'Event access is disabled for this application.',
+                                   'Event access is disabled for this application.', 'data-parameters-toggle', 'data-parameters-table',
+                                   'Parameter access is disabled for this application.', 'aria-label="Parameter pages"',
                                    'Start/end recording does not establish a package result.', 'aria-label="Executable pages"']:
                         self.assertIn(markup, html)
                     for markup in ['overview-filters', 'data-status-choices', 'data-execution-table']:

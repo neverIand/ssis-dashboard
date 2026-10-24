@@ -152,5 +152,33 @@
                     </nav>
                 </div>
             </section>
+            <section class="panel detail-panel observation-section" aria-labelledby="parameters-heading">
+                <div class="section-heading">
+                    <h2 id="parameters-heading">Parameters</h2>
+                    <button type="button" data-parameters-toggle aria-expanded="false" aria-controls="execution-parameters" disabled>Show parameters</button>
+                </div>
+                <p class="resource-status" data-parameters-unavailable hidden>Parameter access is disabled for this application.</p>
+                <div id="execution-parameters" data-parameters-panel hidden>
+                    <div class="table-controls" aria-label="Parameter order">
+                        <span class="cell-detail">Parameter ID, ascending</span>
+                        <label>Rows per page <input type="number" min="1" step="1" data-parameters-limit></label>
+                    </div>
+                    <p class="resource-status" data-parameters-notice role="status"></p>
+                    <p class="resource-status" data-parameters-status role="status"></p>
+                    <button type="button" data-parameters-retry hidden>Retry parameters</button>
+                    <div class="table-scroll" data-parameters-scroll role="region" aria-label="Parameters table" tabindex="0">
+                        <table data-parameters-table>
+                            <caption>Execution parameters</caption>
+                            <thead><tr><th scope="col">Parameter / ID</th><th scope="col">Scope</th><th scope="col">Type</th><th scope="col">Value</th><th scope="col">Flags</th></tr></thead>
+                            <tbody><tr><td colspan="5">Open this section to load parameters.</td></tr></tbody>
+                        </table>
+                    </div>
+                    <nav class="pagination" aria-label="Parameter pages">
+                        <button type="button" data-parameters-previous aria-disabled="true">Previous</button>
+                        <button type="button" data-parameters-next aria-disabled="true">Next</button>
+                        <button type="button" data-parameters-latest>Show latest</button>
+                    </nav>
+                </div>
+            </section>
         </div>
 {% endblock %}

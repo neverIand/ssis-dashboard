@@ -4,6 +4,7 @@ import { createRefreshLoop } from './refresh-loop.js';
 import { executableQuery, readExecutablePage } from './executables.js';
 import { childQuery, readChildPage } from './children.js';
 import { eventQuery, readEventPage } from './events.js';
+import { parameterQuery, readParameterPage } from './parameters.js';
 
 export function readExecutionDetail(response, executionId, display) {
   try {
@@ -57,7 +58,7 @@ const transient = error => ['network', 'timeout'].includes(error.kind)
 
 export function createDetailLoader({ api, executionId, metadata, publish, timeoutMs = 30000, locale,
   autoRefresh = true, visible = true, pollIntervalMs = 30000, maxPollIntervalMs = 300000,
-  restoreExecutables = null, restoreChildren = null, restoreEvents = null }) {
+  restoreExecutables = null, restoreChildren = null, restoreEvents = null, restoreParameters = null }) {
   if (executionId === null) throw new TypeError('Missing execution ID.');
   formatId(executionId);
   const display = createDisplay({ timeZone: metadata.display_timezone, locale });
@@ -65,17 +66,19 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     executables: { query: executableQuery, read: readExecutablePage, label: 'executable' },
     children: { query: childQuery, read: readChildPage, label: 'child' },
     events: { query: eventQuery, read: readEventPage, label: 'event' },
+    parameters: { query: parameterQuery, read: readParameterPage, label: 'parameter', resource: 'values' },
   };
   const keys = Object.keys(definitions);
   const emptyPath = () => ({ entries: [null], index: 0, cohort: null });
-  const allowed = key => key !== 'events' || metadata.capabilities.events;
-  const initialSection = key => ({ open: false, query: { sort: key === 'events' ? 'message_time' : 'started_at',
-    direction: 'asc', limit: metadata.limits.default_limit, ...(key === 'events' ? { kind: 'all', q: null } : {}) },
+  const allowed = key => key === 'parameters' ? metadata.capabilities.values : key !== 'events' || metadata.capabilities.events;
+  const initialSection = key => ({ open: false, query: key === 'parameters' ? { section: 'parameters', limit: metadata.limits.default_limit }
+    : { sort: key === 'events' ? 'message_time' : 'started_at', direction: 'asc',
+      limit: metadata.limits.default_limit, ...(key === 'events' ? { kind: 'all', q: null } : {}) },
     phase: 'idle', page: null, error: null, stale: false, notice: '' });
   let paths = Object.fromEntries(keys.map(key => [key, emptyPath()]));
   const sections = Object.fromEntries(keys.map(key => {
     let section = initialSection(key);
-    const saved = { executables: restoreExecutables, children: restoreChildren, events: restoreEvents }[key];
+    const saved = { executables: restoreExecutables, children: restoreChildren, events: restoreEvents, parameters: restoreParameters }[key];
     if (saved?.open && allowed(key)) {
       try {
         section = { ...section, open: true, query: definitions[key].query(saved.query, metadata) };
@@ -124,7 +127,7 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     updateSection(key, { phase: 'loading', error: null, notice });
     emit({ sectionBusy: key });
     try {
-      const response = await request(job, `executions/${state.executionId}/${key}`,
+      const response = await request(job, `executions/${state.executionId}/${definitions[key].resource ?? key}`,
         { ...query, ...(cursor === null ? {} : { cursor }) });
       if (disposed || current !== generation) return;
       const page = definitions[key].read(response, state.executionId, query, metadata, display);
@@ -256,6 +259,9 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     path: { ...paths[key], entries: [...paths[key].entries] } });
   const retry = key => state.phase === 'error' ? load() : sectionAction(key);
   return { load, refresh: load,
+    toggleParameters: () => toggleSection('parameters'), orderParameters: changes => orderSection('parameters', changes),
+    nextParameters: () => next('parameters'), previousParameters: () => previous('parameters'), latestParameters: () => latest('parameters'),
+    retryParameters: () => retry('parameters'), checkpointParameters: () => checkpoint('parameters'),
     toggleEvents: () => toggleSection('events'), applyEvents, orderEvents: changes => orderSection('events', changes),
     nextEvents: () => next('events'), previousEvents: () => previous('events'), latestEvents: () => latest('events'),
     retryEvents: () => retry('events'), checkpointEvents: () => checkpoint('events'),

@@ -406,6 +406,11 @@ tbody tr:hover { background: var(--sd-subtle); }
 [data-events-scope] { overflow-wrap: anywhere; }
 [data-events-q] { width: 24rem; max-width: 100%; resize: vertical; }
 [data-events-filters] > label { min-width: 0; max-width: 100%; grid-template-columns: minmax(0, 1fr); }
+.parameter-name, .parameter-type, .parameter-preview, .parameter-value { white-space: pre-wrap; overflow-wrap: anywhere; }
+.parameter-name, .parameter-type { min-width: 8rem; max-width: 16rem; }
+.parameter-preview, .parameter-value { margin: 0; }
+.parameter-flags { margin: 0.6rem 0 0; min-width: 10rem; }
+.parameter-flags dd { margin: 0 0 0.4rem; }
 .result-badge { display: inline-block; padding: 0.2rem 0.45rem; border-radius: 0.2rem; background: var(--sd-border); white-space: nowrap; }
 .result-badge[data-result="0"] { background: var(--sd-success-soft); color: var(--sd-success); }
 .result-badge[data-result="1"] { background: var(--sd-error-soft); color: var(--sd-error); }

@@ -27,8 +27,8 @@ export function detailDOM() {
   for (const key of ['app-status', 'retry', 'request-id', 'display-timezone', 'execution-detail',
     'detail-status', 'detail-retry', 'detail-request-id', 'detail-observed', 'active-elapsed',
     'detail-refresh', 'detail-poll-toggle', 'detail-poll-status', 'overview-link', 'legacy-detail-link',
-    'overview-return-notice', ...['unavailable','filters','apply','reset','kind','q','scope'].map(key => `events-${key}`), ...['toggle', 'panel', 'status', 'notice', 'retry', 'sort', 'direction',
-      'limit', 'previous', 'next', 'latest', 'scroll', 'table'].flatMap(name => ['executables', 'children', 'events'].map(section => `${section}-${name}`))]) {
+    'overview-return-notice', 'parameters-unavailable', ...['unavailable','filters','apply','reset','kind','q','scope'].map(key => `events-${key}`), ...['toggle', 'panel', 'status', 'notice', 'retry', 'sort', 'direction',
+      'limit', 'previous', 'next', 'latest', 'scroll', 'table'].flatMap(name => ['executables', 'children', 'events', 'parameters'].map(section => `${section}-${name}`))]) {
     const node = new Node(document, key.includes('retry') || /toggle|previous|next|latest|refresh$/.test(key) ? 'button' : 'div');
     nodes.set(`[data-${key}]`, node);
     root.append(node);
@@ -41,7 +41,7 @@ export function detailDOM() {
   root.append(...fields.filter(node => ['package', 'status'].includes(node.dataset.detailField)));
   get('execution-detail').append(...fields.filter(node => !['package', 'status'].includes(node.dataset.detailField)));
   const bodies = {};
-  for (const section of ['executables', 'children', 'events']) {
+  for (const section of ['executables', 'children', 'events', 'parameters']) {
     get('execution-detail').append(get(`${section}-toggle`), get(`${section}-panel`));
     get(`${section}-panel`).append(...['status', 'notice', 'retry', 'sort', 'direction', 'limit',
       'previous', 'next', 'latest', 'scroll'].map(key => get(`${section}-${key}`)));
@@ -61,6 +61,6 @@ export function detailDOM() {
   get('detail-retry').hidden = get('executables-retry').hidden = get('executables-panel').hidden = true;
   root.querySelector = selector => { if (!nodes.has(selector)) throw new Error(`Missing detail fixture node: ${selector}`); return nodes.get(selector); };
   root.querySelectorAll = selector => { if (selector !== '[data-detail-field]') throw new Error(`Unexpected selector: ${selector}`); return fields; };
-  return { root, document, window, main, body, childBody: bodies.children, eventBody: bodies.events, get,
+  return { root, document, window, main, body, childBody: bodies.children, eventBody: bodies.events, parameterBody: bodies.parameters, get,
     field: key => fields.find(node => node.dataset.detailField === key) };
 }

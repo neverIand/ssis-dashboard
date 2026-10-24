@@ -3,6 +3,7 @@ import { createDetailLoader, detailFields } from './detail.js';
 import { readOverviewReturn } from './detail-navigation.js';
 import { mountObservationTable } from './render-observations.js';
 import { mountEvents } from './render-events.js';
+import { mountParameters } from './render-parameters.js';
 
 export function mountDetail(root, { api, metadata, executionId, appBase, restoreView = null }) {
   const document = root.ownerDocument;
@@ -34,7 +35,8 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     if (window.scrollX !== value.x || window.scrollY !== value.y) window.scrollTo(value.x, value.y);
   };
   const focusTargets = { refresh, toggle, overview: returnLink, legacy: root.querySelector('[data-legacy-detail-link]'),
-    executables: root.querySelector('[data-executables-toggle]'), children: root.querySelector('[data-children-toggle]'), events: root.querySelector('[data-events-toggle]'), retry, main };
+    executables: root.querySelector('[data-executables-toggle]'), children: root.querySelector('[data-children-toggle]'),
+    events: root.querySelector('[data-events-toggle]'), parameters: root.querySelector('[data-parameters-toggle]'), retry, main };
   let returning = restoreView?.executionId === executionId ? restoreView : null;
   let autoPaused = returning?.autoPaused === true;
   const initialPosition = position(), initialFocus = document.activeElement;
@@ -52,6 +54,10 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
       apply: query => { void loader.applyEvents(query); }, order: query => { void loader.orderEvents(query); },
       previous: () => { void loader.previousEvents(); }, next: () => { void loader.nextEvents(); },
       latest: () => { void loader.latestEvents(); } } });
+  const parameterView = mountParameters(root, { metadata, restoreView: returning?.parameterView,
+    actions: { toggle: () => { void loader.toggleParameters(); }, retry: () => { void loader.retryParameters(); },
+      order: query => { void loader.orderParameters(query); }, previous: () => { void loader.previousParameters(); },
+      next: () => { void loader.nextParameters(); }, latest: () => { void loader.latestParameters(); } } });
   const clear = () => {
     content.hidden = true;
     elapsed.hidden = true;
@@ -66,6 +72,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   };
   const loader = createDetailLoader({ api, metadata, executionId, autoRefresh: !autoPaused,
     restoreExecutables: returning?.executables, restoreChildren: returning?.children, restoreEvents: returning?.events,
+    restoreParameters: returning?.parameters,
     visible: document.visibilityState !== 'hidden', publish(state) {
     const currentPosition = rendered !== null ? position() : null;
     const focused = document.activeElement;
@@ -84,7 +91,8 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     retry.setAttribute('aria-disabled', String(state.busy));
     status.textContent = state.busy && state.operation === 'section' ? '' : state.busy ? (state.response ? 'Refreshing… Previous observation shown.' : 'Loading execution…')
       : state.phase === 'ready' ? '' : `${state.error.message}${state.stale ? ' Previous observation shown.' : ''}`;
-    header.textContent = state.busy && state.operation === 'section' ? (state.sectionBusy === 'events' ? 'Loading events…' : state.sectionBusy === 'children' ? 'Loading package calls…' : 'Loading executable observations…')
+    header.textContent = state.busy && state.operation === 'section' ? (state.sectionBusy === 'parameters' ? 'Loading parameters…'
+      : state.sectionBusy === 'events' ? 'Loading events…' : state.sectionBusy === 'children' ? 'Loading package calls…' : 'Loading executable observations…')
       : state.busy ? (state.response ? 'Refreshing…' : 'Loading execution…')
       : state.phase === 'ready' ? 'Loaded' : state.stale ? 'Refresh failed' : 'Execution unavailable';
     correlation.hidden = !state.error?.requestId;
@@ -111,6 +119,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     executableView.render(state.executables, state.busy, state.response !== null);
     childView.render(state.children, state.busy, state.response !== null);
     eventView.render(state.events, state.busy, state.response !== null);
+    parameterView.render(state.parameters, state.busy, state.response !== null);
     if (focused === retry && retry.hidden) refresh.focus({ preventScroll: true });
     else if (content.hidden && protectedFocus) main.focus({ preventScroll: true });
     if (currentPosition) restorePosition(currentPosition);
@@ -137,12 +146,14 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   return { checkpoint() {
     return { executionId, autoPaused, position: position(), executables: loader.checkpointExecutables(),
       executableView: executableView.checkpoint(), children: loader.checkpointChildren(), childView: childView.checkpoint(), events: loader.checkpointEvents(), eventView: eventView.checkpoint(),
+      parameters: loader.checkpointParameters(), parameterView: parameterView.checkpoint(),
       focus: Object.keys(focusTargets).find(key => focusTargets[key] === document.activeElement) ?? null };
   }, dispose() {
     loader.dispose();
     executableView.dispose();
     childView.dispose();
     eventView.dispose();
+    parameterView.dispose();
     retry.removeEventListener('click', load);
     refresh.removeEventListener('click', load);
     toggle.removeEventListener('click', togglePolling);
