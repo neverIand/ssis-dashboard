@@ -2,6 +2,7 @@ import { ApiError } from './api.js';
 import { createDisplay, formatCode, formatId, formatText } from './display.js';
 import { selectionParams, timestampTicks } from './selection.js';
 import { createRefreshLoop } from './refresh-loop.js';
+import { readTimeline, timelineParams, timelineScope } from './timeline.js';
 
 const utc = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{7}Z$/;
 const badResponse = (response) => new ApiError('invalid_response', { requestId: response?.meta?.request_id });
@@ -101,10 +102,11 @@ export function readSummary(response, page, metadata, display) {
 }
 
 export function createOverview({ api, metadata, publish, timeoutMs = 30000, locale, retainedPaths = [],
-  autoRefresh = true, visible = true, pollIntervalMs = 30000, maxPollIntervalMs = 300000 }) {
+  autoRefresh = true, visible = true, pollIntervalMs = 30000, maxPollIntervalMs = 300000, restoreTimeline = null }) {
   const display = createDisplay({ timeZone: metadata.display_timezone, locale });
   let state = { phase: 'idle', selection: null, page: null, summary: null, error: null, notice: '',
-    operation: null, pageStale: false, summaryStale: false };
+    operation: null, pageStale: false, summaryStale: false, timeline: {open:restoreTimeline?.open === true,
+      bucket:['day','hour'].includes(restoreTimeline?.bucket) ? restoreTimeline.bucket : 'day', page:null, scope:null, error:null, stale:false} };
   // Keep request paths only, never rows or cursor tokens in history.state or storage.
   const contexts = new Map(retainedPaths.map(([id, path]) => [id, copyPath(path)]));
   const key = (selection) => JSON.stringify(selectionParams(selection));
@@ -112,7 +114,8 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
   let generation = 0;
   let active = null;
   let disposed = false;
-  const busy = () => ['loading-list', 'loading-summary'].includes(state.phase);
+  let timelineAfter = 'ready';
+  const busy = () => ['loading-list', 'loading-summary', 'loading-timeline'].includes(state.phase);
   const show = (poll) => {
     publish({ ...state, poll, busy: busy(), pageNumber: (context?.index ?? 0) + 1,
       hasPrevious: !busy() && Boolean(context?.index),
@@ -122,10 +125,12 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
     intervalMs: pollIntervalMs, maxIntervalMs: maxPollIntervalMs });
   const emit = (changes) => {
     state = { ...state, ...changes };
+    if (state.page === null) state = {...state, timeline:{...state.timeline, page:null, scope:null, error:null, stale:false}};
+    const errors = [state.error, state.timeline.open ? state.timeline.error : null].filter(Boolean);
     show(loop.update({ busy: busy(), eligible: state.selection !== null,
       coversReturn: state.operation === 'page',
-      failed: ['list-error', 'summary-error'].includes(state.phase),
-      retryable: state.error === null || transient(state.error) }));
+      failed: errors.length > 0,
+      retryable: errors.every(transient) }));
   };
 
   function remember() {
@@ -167,21 +172,45 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
   async function summary(current, selection, page) {
     const previous = state.summary?.meta.from === page.meta.from && state.summary.meta.to === page.meta.to
       ? state.summary : null;
+    if (state.timeline.scope !== timelineScope(selection,page)) state = {...state,
+      timeline:{...state.timeline, page:null, error:null, stale:false, scope:null}};
+    let afterPhase = 'ready';
     emit({ phase: 'loading-summary', page, pageStale: false, summary: previous, summaryStale: previous !== null, error: null });
     try {
       const response = await request('metrics/summary', { folder: selection.folder, project: selection.project,
         from: page.meta.from, to: page.meta.to });
       if (disposed || current !== generation) return;
-      emit({ phase: 'ready', summary: readSummary(response, page, metadata, display), summaryStale: false });
+      emit({ phase: state.timeline.open ? 'loading-summary' : 'ready', summary: readSummary(response, page, metadata, display), summaryStale: false });
     } catch (error) {
       if (!disposed && current === generation) {
         if ([401, 403].includes(error.status)) {
           denied();
           emit({ phase: 'list-error', page: null, summary: null, pageStale: false, summaryStale: false, error });
+          return;
         }
-        else emit({ phase: 'summary-error', summary: transient(error) ? previous : null,
+        else { afterPhase = 'summary-error'; emit({ phase: state.timeline.open ? 'loading-summary' : afterPhase, summary: transient(error) ? previous : null,
           summaryStale: transient(error) && previous !== null, error });
+        }
       }
+    }
+    if (!disposed && current === generation && state.timeline.open) await timeline(current,selection,page,afterPhase);
+  }
+
+  async function timeline(current,selection,page,afterPhase = state.phase === 'summary-error' ? 'summary-error' : 'ready') {
+    const {bucket} = state.timeline, scope = timelineScope(selection,page);
+    const previous = state.timeline.scope === scope && state.timeline.page?.meta.bucket === bucket ? state.timeline.page : null;
+    timelineAfter = afterPhase;
+    emit({phase:'loading-timeline', timeline:{...state.timeline, page:previous, scope, error:null, stale:previous !== null}});
+    try {
+      const response = await request('metrics/timeline',timelineParams(selection,page,bucket));
+      if (disposed || current !== generation) return;
+      const result = readTimeline(response,selection,page,bucket,metadata,display);
+      emit({phase:afterPhase,timeline:{...state.timeline,page:result,error:null,stale:false}});
+    } catch (error) {
+      if (disposed || current !== generation) return;
+      if ([401,403].includes(error.status)) {
+        denied(); emit({phase:'list-error',page:null,summary:null,pageStale:false,summaryStale:false,error});
+      } else emit({phase:afterPhase,timeline:{...state.timeline,error,page:transient(error) ? previous : null,stale:transient(error) && previous !== null}});
     }
   }
 
@@ -197,6 +226,8 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
     const params = { ...selectionParams(selection), ...(cohort ? { from: cohort.from, to: cohort.to } : {}),
       ...(cursor === null ? {} : { cursor }) };
     emit({ phase: 'loading-list', page: previousPage, summary: previousSummary,
+      timeline:{...state.timeline,page:operation === 'refresh' ? state.timeline.page : null,error:null,
+        stale:operation === 'refresh' && state.timeline.page !== null},
       pageStale: previousPage !== null, summaryStale: previousSummary !== null, operation, error: null, notice });
     try {
       const response = await request('executions', params);
@@ -251,9 +282,34 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
     if (!disposed && !busy() && state.selection !== null) return load(context.index, { operation: 'refresh' });
   }
 
+  function retryTimeline() {
+    if (disposed || busy() || !state.timeline.open || !state.page) return;
+    if (state.pageStale) return refresh();
+    state = {...state,operation:'timeline'};
+    return timeline(generation,state.selection,state.page);
+  }
+
+  function toggleTimeline() {
+    if (disposed || !state.page) return;
+    const open = !state.timeline.open;
+    if (!open && state.phase === 'loading-timeline') { cancel(); state = {...state,phase:timelineAfter}; }
+    state = {...state,timeline:{...state.timeline,open,page:null,scope:null,error:null,stale:false}};
+    if (!open && !state.error) loop.reset();
+    emit({});
+    if (open && !busy()) return retryTimeline();
+  }
+
   return {
     apply,
     refresh,
+    toggleTimeline, retryTimeline,
+    setTimelineBucket(bucket) {
+      if (!['day','hour'].includes(bucket)) throw new TypeError('Choose Day or Hour.');
+      if (disposed || busy() || !state.timeline.open || !state.page || state.timeline.bucket === bucket) return;
+      state = {...state,timeline:{...state.timeline,bucket,page:null,error:null,stale:false}};
+      return retryTimeline();
+    },
+    checkpointTimeline: () => ({open:state.timeline.open,bucket:state.timeline.bucket}),
     setVisible: loop.setVisible,
     togglePolling: () => loop.togglePaused(),
     checkpoint() {

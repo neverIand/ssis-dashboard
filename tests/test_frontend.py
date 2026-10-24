@@ -64,7 +64,10 @@ class FrontendShellTests(unittest.TestCase):
         for markup in ['href="#main-content"', 'id="main-content" tabindex="-1"',
                        'aria-labelledby="filters-heading"', 'aria-labelledby="summary-heading"',
                        'aria-labelledby="executions-heading"', 'role="status"', '<noscript>',
-                       'disabled aria-describedby="app-status"', 'scope="col"']:
+                       'disabled aria-describedby="app-status"', 'scope="col"',
+                       'Creation timeline', 'data-timeline-toggle disabled', 'data-timeline-panel hidden',
+                       'data-timeline-chart', 'data-timeline-table', 'Selected bucket', 'Data table',
+                       'Edge buckets count only the selected range.']:
             self.assertIn(markup, html)
         references = re.findall(r'(?:href|src)="([^"]+)"', html)
         self.assertEqual(set(references), {

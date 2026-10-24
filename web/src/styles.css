@@ -415,6 +415,15 @@ tbody tr:hover { background: var(--sd-subtle); }
 .parameter-flags dd { margin: 0 0 0.4rem; }
 .history-choices { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; margin: 0.4rem 0; }
 .history-scope { white-space: pre-wrap; overflow-wrap: anywhere; }
+.timeline-panel { padding: 1rem; margin: 1.5rem 0; }
+.timeline-scope { white-space: pre-wrap; overflow-wrap: anywhere; }
+.timeline-choice { width: 28rem; min-width: 0; max-width: 100%; }
+.timeline-choice select { width: 100%; }
+.timeline-chart { display: block; width: 100%; height: 11rem; border-bottom: 1px solid var(--sd-control-border); }
+.timeline-chart rect { fill: var(--sd-secondary); cursor: pointer; }
+.timeline-chart rect[data-selected="true"] { fill: var(--sd-action); }
+.timeline-scroll { max-height: 24rem; }
+.timeline-scroll tr[data-selected="true"] { background: var(--sd-action-soft); }
 [data-history-table] td { min-width: 11rem; }
 .result-badge { display: inline-block; padding: 0.2rem 0.45rem; border-radius: 0.2rem; background: var(--sd-border); white-space: nowrap; }
 .result-badge[data-result="0"] { background: var(--sd-success-soft); color: var(--sd-success); }

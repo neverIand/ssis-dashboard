@@ -56,10 +56,11 @@ export function overviewDOM() {
     scrollX: 0, scrollY: 0, scrollTo(x, y) { this.scrollX = x; this.scrollY = y; } };
   const document = Object.assign(new EventTarget(), { defaultView: window, activeElement: null, visibilityState: 'visible',
     createElement: tag => new Node(document, tag),
+    createElementNS: (_namespace,tag) => new Node(document,tag),
     createTextNode: text => new Node(document, '#text', text) });
   const root = new Node(document, 'root');
   const elements = new Map();
-  for (const key of ['executions-status', 'summary-status', 'list-retry', 'summary-retry', 'cohort-window',
+  for (const key of [...['toggle','panel','bucket','series','choice','retry','scroll','status','scope','chart','values','selected','scale','zero','table'].map(key=>`timeline-${key}`), 'executions-status', 'summary-status', 'list-retry', 'summary-retry', 'cohort-window',
     'app-status', 'executions-previous', 'executions-next', 'executions-latest', 'page-notice', 'overview-refresh', 'summary',
     'poll-toggle', 'poll-status']) {
     const node = new Node(document, key.includes('retry') || ['overview-refresh', 'poll-toggle',
@@ -78,6 +79,12 @@ export function overviewDOM() {
   table.append(body);
   table.querySelector = selector => selector === 'tbody' ? body : null;
   elements.set('[data-execution-table]', table);
+  const timelineBody=new Node(document,'tbody');
+  const timelineTable=elements.get('[data-timeline-table]');timelineTable.append(timelineBody);
+  timelineTable.querySelector=selector=>selector==='tbody'?timelineBody:null;
+  elements.get('[data-timeline-scroll]').append(timelineTable);
+  const timelinePanel=elements.get('[data-timeline-panel]');
+  timelinePanel.append(...['bucket','series','choice','retry','scroll','status','scope','chart','values','selected','scale','zero'].map(key=>elements.get(`[data-timeline-${key}]`)));
   root.querySelector = selector => elements.get(selector) ?? null;
-  return { root, document, window, scroll, body, get: key => elements.get(`[data-${key}]`) };
+  return { root, document, window, scroll, body, timelineBody, get: key => elements.get(`[data-${key}]`) };
 }

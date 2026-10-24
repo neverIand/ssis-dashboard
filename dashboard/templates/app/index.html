@@ -112,6 +112,30 @@
             </dl>
         </section>
 
+        <section class="panel timeline-panel" aria-labelledby="timeline-heading">
+            <div class="section-heading"><h2 id="timeline-heading">Creation timeline</h2><button type="button" data-timeline-toggle disabled aria-expanded="false" aria-controls="creation-timeline">Show timeline</button></div>
+            <div id="creation-timeline" data-timeline-panel hidden>
+                <p class="detail-note timeline-scope" data-timeline-scope></p>
+                <p class="detail-note">Buckets group executions by creation time. Start and success/failure counts describe those executions, regardless of when they started or ended. Edge buckets count only the selected range.</p>
+                <div class="table-controls">
+                    <label>Calendar interval<select data-timeline-bucket><option value="day">Day</option><option value="hour">Hour</option></select></label>
+                    <label>Series<select data-timeline-series></select></label>
+                    <label class="timeline-choice">Selected bucket<select data-timeline-choice></select></label>
+                </div>
+                <p class="resource-status" data-timeline-status role="status"></p><button type="button" data-timeline-retry hidden>Retry timeline</button>
+                <p class="cell-detail" data-timeline-scale></p>
+                <svg class="timeline-chart" data-timeline-chart viewBox="0 0 1000 170" preserveAspectRatio="none" aria-hidden="true" focusable="false"></svg>
+                <p class="resource-status" data-timeline-zero hidden>This series has zero executions in every bucket.</p>
+                <p class="resource-status" data-timeline-selected role="status"></p>
+                <details data-timeline-values><summary>Data table</summary>
+                    <div class="table-scroll timeline-scroll" data-timeline-scroll role="region" aria-label="Timeline values" tabindex="0">
+                        <table data-timeline-table><caption>Creation-cohort counts per calendar interval</caption>
+                            <thead><tr><th scope="col">Bucket start (inclusive)</th><th scope="col">Bucket end (exclusive)</th><th scope="col">Created</th><th scope="col">With an actual start</th><th scope="col">Currently succeeded</th><th scope="col">Currently failed</th></tr></thead><tbody></tbody>
+                        </table>
+                    </div>
+                </details>
+            </div>
+        </section>
         <section class="executions" aria-labelledby="executions-heading">
             <div class="section-heading">
                 <h2 id="executions-heading">Executions</h2>

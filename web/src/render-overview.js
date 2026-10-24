@@ -2,6 +2,7 @@ import { createDisplay, formatCode, formatId } from './display.js';
 import { executionHref } from './detail-navigation.js';
 import { createOverview } from './overview.js';
 import { selectionParams } from './selection.js';
+import { mountTimeline } from './render-timeline.js';
 
 export function mountOverview(root, { api, metadata, appBase, retainedPaths, restoreView = null }) {
   const document = root.ownerDocument;
@@ -32,6 +33,8 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   let returning = restoreView;
   let selectionKey = null;
   let autoPaused = restoreView?.autoPaused === true;
+  const timelineView=mountTimeline(root,{metadata,restoreView:restoreView?.timeline,
+    actions:{toggle:()=>{void owner.toggleTimeline();},retry:()=>{void owner.retryTimeline();},bucket:value=>{void owner.setTimelineBucket(value);}}});
 
   function position() {
     return { x: window.scrollX, y: window.scrollY, left: scroll.scrollLeft, top: scroll.scrollTop };
@@ -128,7 +131,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     return `${error.message}${error.requestId ? ` Request ID: ${error.requestId}` : ''}`;
   }
 
-  const owner = createOverview({ api, metadata, retainedPaths, autoRefresh: !autoPaused,
+  const owner = createOverview({ api, metadata, retainedPaths, autoRefresh: !autoPaused, restoreTimeline:restoreView?.timeline,
     visible: document.visibilityState !== 'hidden', publish(state) {
     const page = state.page;
     const refreshing = state.operation === 'refresh' || state.operation === 'summary-retry';
@@ -161,7 +164,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     header.textContent = refreshing && state.busy ? 'Refreshing…'
       : state.pageStale ? 'Refresh failed' : ({ idle: 'No selection', 'loading-list': 'Loading executions…',
       'loading-summary': 'Loading summary…', ready: 'Loaded', 'list-error': 'Executions unavailable',
-      'summary-error': 'Summary unavailable' })[state.phase];
+      'summary-error': 'Summary unavailable', 'loading-timeline':'Loading timeline…' })[state.phase];
     if (page !== renderedPage) {
       if (page) renderRows(page, state.pageNumber, state.selection);
       else empty(state.phase === 'loading-list' ? 'Loading executions…' : 'No data loaded.');
@@ -190,6 +193,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       if (values) node.removeAttribute('aria-label');
       else node.setAttribute('aria-label', 'Not loaded');
     }
+    timelineView.render(state.timeline,state.busy,state.selection,page);
     if (rowFocus && document.activeElement !== focused) {
       (focused.isConnected ? focused : scroll).focus({ preventScroll: true });
     }
@@ -229,10 +233,11 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     checkpoint() {
       const focusId = [...rows].find(([, record]) => record.row.contains(document.activeElement))?.[0] ?? null;
       return { paths: owner.checkpoint(), view: { position: position(), focusId, selectionKey, autoPaused,
-        tableFocused: document.activeElement === scroll } };
+        tableFocused: document.activeElement === scroll, timeline:{...owner.checkpointTimeline(),...timelineView.checkpoint()} } };
     },
     dispose() {
       owner.dispose();
+      timelineView.dispose();
       document.removeEventListener('visibilitychange', visibilityChanged);
       pollToggle.removeEventListener('click', togglePolling);
       listRetry.removeEventListener('click', retryList);

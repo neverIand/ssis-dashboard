@@ -19,6 +19,7 @@ export function readMetadata(data, requestId = null) {
     if (!Number.isSafeInteger(limits[name]) || limits[name] < 1) invalid();
   }
   if (limits.max_text_characters > 16384 || limits.max_search_characters > 512) invalid();
+  if (!Number.isSafeInteger(limits.max_timeline_buckets) || limits.max_timeline_buckets < 1 || limits.max_timeline_buckets > 1000) invalid();
   if (!Array.isArray(data.event_kinds) || !data.event_kinds.includes('all')
       || new Set(data.event_kinds).size !== data.event_kinds.length
       || data.event_kinds.some(kind => !['all', 'errors', 'warnings', 'duplicate-warnings', 'memory-warnings'].includes(kind))) invalid();
