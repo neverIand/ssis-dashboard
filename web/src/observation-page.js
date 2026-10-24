@@ -1,9 +1,9 @@
 import { formatId } from './display.js';
 import { safeRequestId } from './api.js';
 
-export function observationQuery(value, metadata, idSort) {
+export function observationQuery(value, metadata, idSort, timeSort = 'started_at') {
   const query = { sort: value.sort, direction: value.direction, limit: value.limit };
-  if (!['started_at', idSort].includes(query.sort) || !['asc', 'desc'].includes(query.direction)
+  if (![timeSort, idSort].includes(query.sort) || !['asc', 'desc'].includes(query.direction)
       || !Number.isSafeInteger(query.limit) || query.limit < 1 || query.limit > metadata.limits.max_limit) {
     throw new TypeError('Invalid observation order or page size.');
   }

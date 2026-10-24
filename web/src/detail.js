@@ -3,6 +3,7 @@ import { createDisplay, formatCode, formatId, formatText } from './display.js';
 import { createRefreshLoop } from './refresh-loop.js';
 import { executableQuery, readExecutablePage } from './executables.js';
 import { childQuery, readChildPage } from './children.js';
+import { eventQuery, readEventPage } from './events.js';
 
 export function readExecutionDetail(response, executionId, display) {
   try {
@@ -56,27 +57,30 @@ const transient = error => ['network', 'timeout'].includes(error.kind)
 
 export function createDetailLoader({ api, executionId, metadata, publish, timeoutMs = 30000, locale,
   autoRefresh = true, visible = true, pollIntervalMs = 30000, maxPollIntervalMs = 300000,
-  restoreExecutables = null, restoreChildren = null }) {
+  restoreExecutables = null, restoreChildren = null, restoreEvents = null }) {
   if (executionId === null) throw new TypeError('Missing execution ID.');
   formatId(executionId);
   const display = createDisplay({ timeZone: metadata.display_timezone, locale });
   const definitions = {
     executables: { query: executableQuery, read: readExecutablePage, label: 'executable' },
     children: { query: childQuery, read: readChildPage, label: 'child' },
+    events: { query: eventQuery, read: readEventPage, label: 'event' },
   };
   const keys = Object.keys(definitions);
   const emptyPath = () => ({ entries: [null], index: 0, cohort: null });
-  const initialSection = () => ({ open: false, query: { sort: 'started_at', direction: 'asc', limit: metadata.limits.default_limit },
+  const allowed = key => key !== 'events' || metadata.capabilities.events;
+  const initialSection = key => ({ open: false, query: { sort: key === 'events' ? 'message_time' : 'started_at',
+    direction: 'asc', limit: metadata.limits.default_limit, ...(key === 'events' ? { kind: 'all', q: null } : {}) },
     phase: 'idle', page: null, error: null, stale: false, notice: '' });
   let paths = Object.fromEntries(keys.map(key => [key, emptyPath()]));
   const sections = Object.fromEntries(keys.map(key => {
-    let section = initialSection();
-    const saved = { executables: restoreExecutables, children: restoreChildren }[key];
-    if (saved?.open) {
+    let section = initialSection(key);
+    const saved = { executables: restoreExecutables, children: restoreChildren, events: restoreEvents }[key];
+    if (saved?.open && allowed(key)) {
       try {
         section = { ...section, open: true, query: definitions[key].query(saved.query, metadata) };
         if (saved.path) paths[key] = { ...saved.path, entries: [...saved.path.entries] };
-      } catch { section = initialSection(); paths[key] = emptyPath(); }
+      } catch { section = initialSection(key); paths[key] = emptyPath(); }
     }
     return [key, section];
   }));
@@ -146,7 +150,7 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     if (disposed || active) return;
     const current = ++generation, previous = state.response;
     const job = { controller: null, timer: null, section: null, reset: new Set(),
-      queue: new Set(only ? [only] : base ? keys.filter(key => state[key].open) : pending) };
+      queue: new Set(only ? [only, ...pending] : base ? keys.filter(key => state[key].open) : pending) };
     active = job;
     emit({ phase: 'loading', error: null, stale: base && previous !== null,
       operation: base ? state.operation : 'section', sectionBusy: only });
@@ -196,7 +200,7 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
   const sectionAction = (key, options = {}) => state.response && state[key].open
     ? run({ ...options, only: key, base: state.phase === 'error' || state.stale }) : undefined;
   function toggleSection(key) {
-    if (disposed || !state.response) return;
+    if (disposed || !state.response || !allowed(key)) return;
     const open = !state[key].open;
     let pending = [];
     if (!open) {
@@ -231,10 +235,30 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     paths[key] = emptyPath();
     return sectionAction(key, { index: 0, keep: false });
   }
+  function applyEvents(changes) {
+    if (disposed || !allowed('events') || !state.response || !state.events.open) return;
+    const query = eventQuery({ ...state.events.query, ...changes }, metadata);
+    if (active && (active.section === 'events' || active.queue.has('events')) && paths.events.index === 0
+        && Object.keys(query).every(key => query[key] === state.events.query[key])) return;
+    const needsBase = state.phase === 'error' || state.stale;
+    let pending = [];
+    if (active?.section === 'events') {
+      pending = [...active.queue]; cancel();
+      state = { ...state, phase: 'ready', sectionBusy: null };
+    }
+    paths.events = emptyPath();
+    updateSection('events', { query, page: null, error: null, stale: false, notice: '', phase: 'loading' });
+    loop.reset(); emit({});
+    if (active) { active.queue.add('events'); return; }
+    return needsBase ? run() : run({ base: false, only: 'events', index: 0, keep: false, pending });
+  }
   const checkpoint = key => ({ open: state[key].open, query: { ...state[key].query },
     path: { ...paths[key], entries: [...paths[key].entries] } });
   const retry = key => state.phase === 'error' ? load() : sectionAction(key);
   return { load, refresh: load,
+    toggleEvents: () => toggleSection('events'), applyEvents, orderEvents: changes => orderSection('events', changes),
+    nextEvents: () => next('events'), previousEvents: () => previous('events'), latestEvents: () => latest('events'),
+    retryEvents: () => retry('events'), checkpointEvents: () => checkpoint('events'),
     toggleExecutables: () => toggleSection('executables'), toggleChildren: () => toggleSection('children'),
     orderExecutables: changes => orderSection('executables', changes), orderChildren: changes => orderSection('children', changes),
     nextExecutables: () => next('executables'), nextChildren: () => next('children'),
@@ -250,7 +274,7 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
       cancel(); loop.reset();
       paths = Object.fromEntries(keys.map(key => [key, emptyPath()]));
       state = { phase: 'idle', executionId: id, response: null, error: null, stale: false, operation: 'select', sectionBusy: null,
-        ...Object.fromEntries(keys.map(key => [key, { ...initialSection(), open: state[key].open }])) };
+        ...Object.fromEntries(keys.map(key => [key, { ...initialSection(key), open: state[key].open }])) };
       return load();
     },
     setVisible: loop.setVisible,
@@ -259,7 +283,7 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
       disposed = true; loop.dispose(); cancel();
       paths = Object.fromEntries(keys.map(key => [key, emptyPath()]));
       state = { ...state, response: null, error: null, stale: false,
-        ...Object.fromEntries(keys.map(key => [key, initialSection()])) };
+        ...Object.fromEntries(keys.map(key => [key, initialSection(key)])) };
     },
   };
 }

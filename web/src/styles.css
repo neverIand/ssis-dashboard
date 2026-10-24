@@ -243,7 +243,7 @@ label {
   font-weight: 500;
 }
 
-input, select, button {
+input, select, button, textarea {
   min-height: 2.4rem;
   max-width: 100%;
   min-width: 0;
@@ -401,6 +401,11 @@ tbody tr:hover { background: var(--sd-subtle); }
 .observation-section summary { cursor: pointer; white-space: nowrap; }
 .observation-times > div + div { margin-top: 0.55rem; }
 .observation-state { white-space: nowrap; }
+.event-name { min-width: 8rem; max-width: 14rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+.event-preview, .event-body { min-width: 16rem; max-width: 32rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+[data-events-scope] { overflow-wrap: anywhere; }
+[data-events-q] { width: 24rem; max-width: 100%; resize: vertical; }
+[data-events-filters] > label { min-width: 0; max-width: 100%; grid-template-columns: minmax(0, 1fr); }
 .result-badge { display: inline-block; padding: 0.2rem 0.45rem; border-radius: 0.2rem; background: var(--sd-border); white-space: nowrap; }
 .result-badge[data-result="0"] { background: var(--sd-success-soft); color: var(--sd-success); }
 .result-badge[data-result="1"] { background: var(--sd-error-soft); color: var(--sd-error); }

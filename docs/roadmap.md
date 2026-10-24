@@ -54,6 +54,8 @@ Environment-dependent acceptance may wait while the user prepares the test envir
 
 Proposed budgets remain **targets**: 50-row execution page test-network p95 below one second, maximum 200 rows per list page, authored frontend JS+CSS below 150 KiB uncompressed. Record the entire bundle including selected libraries. Measure calculated sorts separately and deliberately document any target revision. Set detector latency/load, queues/replay and concurrent stream/API budgets after the prototype. Keep local SQL, WSGI, TCP and production measurements distinct.
 
+At the user's request on 24 October 2026, enforcement of the authored-source size target is deferred to later code review/refactoring. Current feature tasks record actual source and packaged/gzip sizes in [progress](PROGRESS.md), with budget assessment and any justified simplification left to that review. The 150 KiB figure remains a reference target; this sequencing does not change API row limits or establish a network/performance result.
+
 ## Later
 
 - Improve duration forecasting after reliable historical data and basic estimates; advanced models are optional.

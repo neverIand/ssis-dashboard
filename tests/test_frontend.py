@@ -120,7 +120,8 @@ class FrontendShellTests(unittest.TestCase):
                     for markup in ['data-detail-refresh disabled', 'data-detail-poll-toggle disabled',
                                    'data-overview-link', 'data-legacy-detail-link', 'data-overview-return-notice hidden',
                                    'data-executables-toggle aria-expanded="false"', 'data-executables-panel hidden',
-                                   'data-executables-table', 'data-children-table', 'data-children-toggle',
+                                   'data-executables-table', 'data-children-table', 'data-children-toggle', 'data-events-toggle', 'data-events-filters', 'data-events-table',
+                                   'Event access is disabled for this application.',
                                    'Start/end recording does not establish a package result.', 'aria-label="Executable pages"']:
                         self.assertIn(markup, html)
                     for markup in ['overview-filters', 'data-status-choices', 'data-execution-table']:

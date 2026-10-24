@@ -15,6 +15,13 @@ export function readMetadata(data, requestId = null) {
     if (typeof data.capabilities[name] !== 'boolean') invalid();
   }
   if (data.capabilities.override_values && !data.capabilities.values) invalid();
+  for (const name of ['max_text_characters', 'max_search_characters']) {
+    if (!Number.isSafeInteger(limits[name]) || limits[name] < 1) invalid();
+  }
+  if (limits.max_text_characters > 16384 || limits.max_search_characters > 512) invalid();
+  if (!Array.isArray(data.event_kinds) || !data.event_kinds.includes('all')
+      || new Set(data.event_kinds).size !== data.event_kinds.length
+      || data.event_kinds.some(kind => !['all', 'errors', 'warnings', 'duplicate-warnings', 'memory-warnings'].includes(kind))) invalid();
   if (!Array.isArray(data.execution_statuses) || !data.execution_statuses.length
       || !Array.isArray(data.execution_sorts) || !data.execution_sorts.length) invalid();
   const codes = new Set();

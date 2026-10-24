@@ -116,5 +116,41 @@
                     </nav>
                 </div>
             </section>
+            <section class="panel detail-panel observation-section" aria-labelledby="event-log-heading">
+                <div class="section-heading">
+                    <h2 id="event-log-heading">Events</h2>
+                    <button type="button" data-events-toggle aria-expanded="false" aria-controls="execution-events" disabled>Show events</button>
+                </div>
+                <p class="resource-status" data-events-unavailable hidden>Event access is disabled for this application.</p>
+                <div id="execution-events" data-events-panel hidden>
+                    <form class="table-controls" data-events-filters aria-label="Event filters">
+                        <label>Category <select data-events-kind></select></label>
+                        <label>Search full messages <textarea rows="2" data-events-q autocomplete="off" spellcheck="false"></textarea></label>
+                        <button type="submit" data-events-apply>Apply filters</button>
+                        <button type="button" data-events-reset>Reset filters</button>
+                    </form>
+                    <p class="resource-status" data-events-scope></p>
+                    <div class="table-controls" aria-label="Event order">
+                        <label>Sort <select data-events-sort><option value="message_time">Message time</option><option value="event_id">Event ID</option></select></label>
+                        <label>Direction <select data-events-direction><option value="asc">Ascending</option><option value="desc">Descending</option></select></label>
+                        <label>Rows per page <input type="number" min="1" step="1" data-events-limit></label>
+                    </div>
+                    <p class="resource-status" data-events-notice role="status"></p>
+                    <p class="resource-status" data-events-status role="status"></p>
+                    <button type="button" data-events-retry hidden>Retry events</button>
+                    <div class="table-scroll" data-events-scroll role="region" aria-label="Events table" tabindex="0">
+                        <table data-events-table>
+                            <caption>Recorded events</caption>
+                            <thead><tr><th scope="col">Event ID</th><th scope="col">Time</th><th scope="col">Event</th><th scope="col">Message</th><th scope="col">Details</th></tr></thead>
+                            <tbody><tr><td colspan="5">Open this section to load events.</td></tr></tbody>
+                        </table>
+                    </div>
+                    <nav class="pagination" aria-label="Event pages">
+                        <button type="button" data-events-previous aria-disabled="true">Previous</button>
+                        <button type="button" data-events-next aria-disabled="true">Next</button>
+                        <button type="button" data-events-latest>Show latest</button>
+                    </nav>
+                </div>
+            </section>
         </div>
 {% endblock %}
