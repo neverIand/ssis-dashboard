@@ -4,7 +4,7 @@ import { createRefreshLoop } from './refresh-loop.js';
 import { executableQuery, readExecutablePage } from './executables.js';
 import { childQuery, readChildPage } from './children.js';
 import { eventQuery, readEventPage } from './events.js';
-import { parameterQuery, readParameterPage } from './parameters.js';
+import { parameterQuery, readParameterPage, overrideQuery, readOverridePage } from './values.js';
 
 export function readExecutionDetail(response, executionId, display) {
   try {
@@ -58,7 +58,7 @@ const transient = error => ['network', 'timeout'].includes(error.kind)
 
 export function createDetailLoader({ api, executionId, metadata, publish, timeoutMs = 30000, locale,
   autoRefresh = true, visible = true, pollIntervalMs = 30000, maxPollIntervalMs = 300000,
-  restoreExecutables = null, restoreChildren = null, restoreEvents = null, restoreParameters = null }) {
+  restoreExecutables = null, restoreChildren = null, restoreEvents = null, restoreParameters = null, restoreOverrides = null }) {
   if (executionId === null) throw new TypeError('Missing execution ID.');
   formatId(executionId);
   const display = createDisplay({ timeZone: metadata.display_timezone, locale });
@@ -67,18 +67,20 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     children: { query: childQuery, read: readChildPage, label: 'child' },
     events: { query: eventQuery, read: readEventPage, label: 'event' },
     parameters: { query: parameterQuery, read: readParameterPage, label: 'parameter', resource: 'values' },
+    overrides: { query: overrideQuery, read: readOverridePage, label: 'override', resource: 'values' },
   };
   const keys = Object.keys(definitions);
   const emptyPath = () => ({ entries: [null], index: 0, cohort: null });
-  const allowed = key => key === 'parameters' ? metadata.capabilities.values : key !== 'events' || metadata.capabilities.events;
-  const initialSection = key => ({ open: false, query: key === 'parameters' ? { section: 'parameters', limit: metadata.limits.default_limit }
+  const allowed = key => ['parameters', 'overrides'].includes(key) ? metadata.capabilities.values : key !== 'events' || metadata.capabilities.events;
+  const initialSection = key => ({ open: false, query: ['parameters', 'overrides'].includes(key) ? { section: key, limit: metadata.limits.default_limit }
     : { sort: key === 'events' ? 'message_time' : 'started_at', direction: 'asc',
       limit: metadata.limits.default_limit, ...(key === 'events' ? { kind: 'all', q: null } : {}) },
     phase: 'idle', page: null, error: null, stale: false, notice: '' });
   let paths = Object.fromEntries(keys.map(key => [key, emptyPath()]));
   const sections = Object.fromEntries(keys.map(key => {
     let section = initialSection(key);
-    const saved = { executables: restoreExecutables, children: restoreChildren, events: restoreEvents, parameters: restoreParameters }[key];
+    const saved = { executables: restoreExecutables, children: restoreChildren, events: restoreEvents,
+      parameters: restoreParameters, overrides: restoreOverrides }[key];
     if (saved?.open && allowed(key)) {
       try {
         section = { ...section, open: true, query: definitions[key].query(saved.query, metadata) };
@@ -259,6 +261,9 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     path: { ...paths[key], entries: [...paths[key].entries] } });
   const retry = key => state.phase === 'error' ? load() : sectionAction(key);
   return { load, refresh: load,
+    toggleOverrides: () => toggleSection('overrides'), orderOverrides: changes => orderSection('overrides', changes),
+    nextOverrides: () => next('overrides'), previousOverrides: () => previous('overrides'), latestOverrides: () => latest('overrides'),
+    retryOverrides: () => retry('overrides'), checkpointOverrides: () => checkpoint('overrides'),
     toggleParameters: () => toggleSection('parameters'), orderParameters: changes => orderSection('parameters', changes),
     nextParameters: () => next('parameters'), previousParameters: () => previous('parameters'), latestParameters: () => latest('parameters'),
     retryParameters: () => retry('parameters'), checkpointParameters: () => checkpoint('parameters'),

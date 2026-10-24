@@ -123,6 +123,9 @@ class FrontendShellTests(unittest.TestCase):
                                    'data-executables-table', 'data-children-table', 'data-children-toggle', 'data-events-toggle', 'data-events-filters', 'data-events-table',
                                    'Event access is disabled for this application.', 'data-parameters-toggle', 'data-parameters-table',
                                    'Parameter access is disabled for this application.', 'aria-label="Parameter pages"',
+                                   'data-overrides-toggle aria-expanded="false"', 'data-overrides-panel hidden', 'data-overrides-table',
+                                   'Override access is disabled for this application.', 'Override values are hidden by application policy.',
+                                   'aria-label="Override pages"', 'Property / ID',
                                    'Start/end recording does not establish a package result.', 'aria-label="Executable pages"']:
                         self.assertIn(markup, html)
                     for markup in ['overview-filters', 'data-status-choices', 'data-execution-table']:

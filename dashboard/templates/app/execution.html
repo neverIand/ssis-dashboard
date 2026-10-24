@@ -180,5 +180,34 @@
                     </nav>
                 </div>
             </section>
+            <section class="panel detail-panel observation-section" aria-labelledby="overrides-heading">
+                <div class="section-heading">
+                    <h2 id="overrides-heading">Overrides</h2>
+                    <button type="button" data-overrides-toggle aria-expanded="false" aria-controls="execution-overrides" disabled>Show overrides</button>
+                </div>
+                <p class="resource-status" data-overrides-unavailable hidden>Override access is disabled for this application.</p>
+                <div id="execution-overrides" data-overrides-panel hidden>
+                    <p class="detail-note" data-overrides-policy hidden>Override values are hidden by application policy.</p>
+                    <div class="table-controls" aria-label="Override order">
+                        <span class="cell-detail">Property ID, ascending</span>
+                        <label>Rows per page <input type="number" min="1" step="1" data-overrides-limit></label>
+                    </div>
+                    <p class="resource-status" data-overrides-notice role="status"></p>
+                    <p class="resource-status" data-overrides-status role="status"></p>
+                    <button type="button" data-overrides-retry hidden>Retry overrides</button>
+                    <div class="table-scroll" data-overrides-scroll role="region" aria-label="Overrides table" tabindex="0">
+                        <table data-overrides-table>
+                            <caption>Execution property overrides</caption>
+                            <thead><tr><th scope="col">Property / ID</th><th scope="col">Value</th><th scope="col">Sensitive</th></tr></thead>
+                            <tbody><tr><td colspan="3">Open this section to load overrides.</td></tr></tbody>
+                        </table>
+                    </div>
+                    <nav class="pagination" aria-label="Override pages">
+                        <button type="button" data-overrides-previous aria-disabled="true">Previous</button>
+                        <button type="button" data-overrides-next aria-disabled="true">Next</button>
+                        <button type="button" data-overrides-latest>Show latest</button>
+                    </nav>
+                </div>
+            </section>
         </div>
 {% endblock %}

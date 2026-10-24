@@ -3,7 +3,7 @@ import test from 'node:test';
 import { ApiError } from '../src/api.js';
 import { createDetailLoader } from '../src/detail.js';
 import { createDisplay } from '../src/display.js';
-import { parameterQuery, readParameterPage } from '../src/parameters.js';
+import { parameterQuery, readParameterPage } from '../src/values.js';
 import { mountDetail } from '../src/render-detail.js';
 import { deferred } from './fixtures.js';
 import { detailDOM, detailResponse } from './detail-fixture.js';
