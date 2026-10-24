@@ -78,7 +78,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     retry.setAttribute('aria-disabled', String(state.busy));
     status.textContent = state.busy && state.operation === 'section' ? '' : state.busy ? (state.response ? 'Refreshing… Previous observation shown.' : 'Loading execution…')
       : state.phase === 'ready' ? '' : `${state.error.message}${state.stale ? ' Previous observation shown.' : ''}`;
-    header.textContent = state.busy && state.operation === 'section' ? `Loading ${state.sectionBusy === 'children' ? 'child' : 'executable'} observations…`
+    header.textContent = state.busy && state.operation === 'section' ? (state.sectionBusy === 'children' ? 'Loading package calls…' : 'Loading executable observations…')
       : state.busy ? (state.response ? 'Refreshing…' : 'Loading execution…')
       : state.phase === 'ready' ? 'Loaded' : state.stale ? 'Refresh failed' : 'Execution unavailable';
     correlation.hidden = !state.error?.requestId;

@@ -138,6 +138,9 @@ test('transient refresh is labeled with its old observation time; denial clears 
   await settle();
   assert.equal(dom.get('execution-detail').hidden, true);
   assert.equal(dom.field('package').textContent, '—');
+  assert.equal(dom.field('status').textContent, '—');
+  assert.equal(dom.field('status').dataset.status, undefined);
+  assert.doesNotMatch(dom.root.textContent, /Main\.dtsx|succeeded/);
   assert.equal(dom.get('detail-observed').textContent, '');
   assert.match(dom.get('detail-poll-status').textContent, /stopped/);
   t.mock.timers.tick(60000);

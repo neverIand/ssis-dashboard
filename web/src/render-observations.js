@@ -1,8 +1,10 @@
 import { createDisplay, formatCode, formatId } from './display.js';
 
 export function mountObservationTable(root, { metadata, actions, restoreView = null, resource = 'executables' }) {
-  const child = resource === 'children', singular = child ? 'child' : 'executable';
+  const child = resource === 'children', singular = child ? 'package call' : 'executable';
   const idKey = child ? 'observation_id' : 'statistics_id';
+  const columns = child ? { count: 4, name: 0, timing: 1, duration: 2, state: 3 }
+    : { count: 6, name: 1, timing: 3, duration: 4, state: 5 };
   const document = root.ownerDocument;
   const get = name => root.querySelector(`[data-${resource}-${name}]`);
   const toggle = get('toggle'), panel = get('panel'), status = get('status'), notice = get('notice');
@@ -26,7 +28,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
   function empty(message) {
     rows.clear();
     const row = element('tr'), cell = element('td', message, 'empty-state');
-    cell.colSpan = 6;
+    cell.colSpan = columns.count;
     row.append(cell);
     body.replaceChildren(row);
   }
@@ -47,34 +49,49 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
       if (!record) {
         const row = element('tr');
         row.dataset[child ? 'observationId' : 'statisticsId'] = item[idKey];
-        const cells = Array.from({ length: 6 }, (_, i) => element('td', undefined,
-          i === 0 ? 'id-cell' : i === 3 ? 'time-cell observation-times' : i === 4 ? 'number-cell' : ''));
-        const name = element('span'), packageName = element('span', undefined, 'cell-detail');
-        const id = element('span', undefined, 'cell-detail');
-        cells[1].className = 'observation-name';
-        cells[1].append(name, packageName, id);
-        const paths = element('details'), summary = element('summary', 'Paths');
+        const cells = Array.from({ length: columns.count }, (_, i) => element('td', undefined,
+          i === columns.timing ? 'time-cell observation-times' : i === columns.duration ? 'number-cell' : !child && i === 0 ? 'id-cell' : ''));
+        const name = element('span', undefined, child ? 'package-call-name' : '');
+        const packageName = element('span', undefined, 'cell-detail');
+        const id = element(child ? 'dd' : 'span', undefined, child ? '' : 'cell-detail');
+        const source = element('dd'), sourceType = element('dd'), callPath = element('span', undefined, 'cell-detail call-path');
+        cells[columns.name].className = child ? 'observation-name package-call' : 'observation-name';
+        cells[columns.name].append(name);
+        const paths = element('details'), summary = element('summary', child ? 'Details' : 'Paths');
         const pathFields = element('dl', undefined, 'observation-paths');
         const packagePath = element('dd'), executionPath = element('dd');
+        if (child) pathFields.append(element('dt', 'Observation ID'), id, element('dt', 'Event source'), source,
+          element('dt', 'Source type'), sourceType);
         pathFields.append(element('dt', 'Package path'), packagePath, element('dt', 'Execution path'), executionPath);
         paths.append(summary, pathFields);
-        cells[2].append(paths);
+        if (child) cells[0].append(callPath, paths);
+        else { cells[1].append(packageName, id); cells[2].append(paths); }
         const times = {};
         for (const [key, label] of [['started_at', 'Started'], ['ended_at', 'Ended']]) {
           const line = element('div');
           times[key] = element('span');
           line.append(element('span', label, 'cell-detail'), times[key]);
-          cells[3].append(line);
+          cells[columns.timing].append(line);
         }
-        cells[5].append(element('span', undefined, child ? 'observation-state' : 'result-badge'));
+        cells[columns.state].append(element('span', undefined, child ? 'observation-state' : 'result-badge'));
         row.append(...cells);
-        record = { row, cells, times, name, packageName, id, paths, summary, packagePath, executionPath, item: null };
+        record = { row, cells, times, name, packageName, id, source, sourceType, callPath,
+          paths, summary, packagePath, executionPath, item: null };
         rows.set(item[idKey], record);
       }
-      text(record.cells[0], formatId(item[idKey]));
-      text(record.name, literal(child ? item.source_name : item.name));
-      text(record.packageName, `Package: ${literal(item.package_name)}`);
-      text(record.id, child ? `Source type: ${item.source_type === null ? '—' : item.source_type}` : `Executable ID: ${formatId(item.executable_id)}`);
+      text(record.name, literal(child ? item.package_name : item.name));
+      if (child) {
+        // A readable path projection, not a reconstructed package graph. Keep the raw path below.
+        const path = item.execution_path.startsWith('\\') ? item.execution_path.slice(1) : item.execution_path;
+        text(record.callPath, `Call path: ${path.replaceAll('\\', ' › ')}`);
+        text(record.id, formatId(item.observation_id));
+        text(record.source, literal(item.source_name));
+        text(record.sourceType, item.source_type === null ? '—' : String(item.source_type));
+      } else {
+        text(record.cells[0], formatId(item.statistics_id));
+        text(record.packageName, `Package: ${literal(item.package_name)}`);
+        text(record.id, `Executable ID: ${formatId(item.executable_id)}`);
+      }
       text(record.packagePath, literal(item.package_path));
       text(record.executionPath, literal(item.execution_path));
       for (const key of ['started_at', 'ended_at']) {
@@ -88,9 +105,9 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
           }
         }
       }
-      text(record.cells[4], display.duration(item.duration_seconds));
-      text(record.cells[5].firstChild, child ? item.state === 'complete' ? 'Observed pair' : 'Incomplete' : formatCode(item.result));
-      if (!child) record.cells[5].firstChild.dataset.result = item.result?.name === 'unknown' ? 'unknown' : String(item.result?.code ?? '');
+      text(record.cells[columns.duration], display.duration(item.duration_seconds));
+      text(record.cells[columns.state].firstChild, child ? item.state === 'complete' ? 'Start/end recorded' : 'End unconfirmed' : formatCode(item.result));
+      if (!child) record.cells[columns.state].firstChild.dataset.result = item.result?.name === 'unknown' ? 'unknown' : String(item.result?.code ?? '');
       record.item = item;
       if (record.row !== anchor) body.insertBefore(record.row, anchor);
       anchor = record.row.nextSibling;
@@ -129,7 +146,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
       const focused = document.activeElement, rowFocused = body.contains(focused), panelFocused = panel.contains(focused);
       const position = { left: region.scrollLeft, top: region.scrollTop };
       toggle.disabled = !authorized;
-      toggle.textContent = `${state.open ? 'Hide' : 'Show'} ${singular} observations`;
+      toggle.textContent = `${state.open ? 'Hide' : 'Show'} ${child ? 'package calls' : 'executable observations'}`;
       toggle.setAttribute('aria-expanded', String(state.open && authorized));
       panel.hidden = !state.open || !authorized;
       for (const node of [retry, sort, direction, limit, previous, next, latest]) {
@@ -148,7 +165,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
         else empty(state.phase === 'loading' ? `Loading ${singular} observations…` : 'No observations loaded.');
         rendered = page;
       }
-      const pageInfo = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} rows · Observed ${display.timestamp(page.meta.generated_at)} · Live results · ${
+      const pageInfo = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} ${child ? 'calls on this page' : 'rows'} · Observed ${display.timestamp(page.meta.generated_at)} · Live results · ${
         { available: 'Recorded observations', 'not-recorded': 'Not recorded', unknown: 'Recording coverage unknown' }[page.meta.availability]}${child && page.meta.has_unidentified_starts ? ' · Some starts have no public numeric ID and cannot be paged. Coverage is unknown.' : ''}` : '';
       status.textContent = panel.hidden ? '' : state.error ? `${state.error.message}${state.error.requestId ? ` Request ID: ${state.error.requestId}` : ''}${state.stale ? ' Previous observation page shown. ' : ' '}${pageInfo}`
         : state.stale ? `Refreshing… Previous observation page shown. ${pageInfo}`

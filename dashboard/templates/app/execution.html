@@ -7,7 +7,11 @@
 {% endblock %}
 {% block content %}
         <div class="page-heading">
-            <h1 class="detail-heading">Execution {{ app_config.execution_id }}</h1>
+            <div class="detail-heading">
+                <p class="detail-entry-label">Entry package</p>
+                <h1 data-detail-field="package">—</h1>
+                <p class="detail-context">Execution {{ app_config.execution_id }} <span class="status-badge" data-detail-field="status">—</span></p>
+            </div>
             <div class="section-actions">
                 <button type="button" data-detail-refresh disabled>Refresh</button>
                 <button type="button" data-detail-poll-toggle disabled>Pause auto refresh</button>
@@ -22,13 +26,11 @@
         </div>
         <div class="detail-grid" data-execution-detail hidden aria-busy="false">
             <section class="panel detail-panel" aria-labelledby="identity-heading">
-                <h2 id="identity-heading">Execution</h2>
+                <h2 id="identity-heading">Execution context</h2>
                 <dl class="detail-fields">
-                    <div><dt>Status</dt><dd><span class="status-badge" data-detail-field="status">—</span></dd></div>
                     <div><dt>Logging level</dt><dd data-detail-field="logging">—</dd></div>
                     <div><dt>Folder</dt><dd data-detail-field="folder">—</dd></div>
                     <div><dt>Project</dt><dd data-detail-field="project">—</dd></div>
-                    <div><dt>Package</dt><dd data-detail-field="package">—</dd></div>
                     <div><dt>Project version LSN</dt><dd data-detail-field="lsn">—</dd></div>
                     <div><dt>Environment folder</dt><dd data-detail-field="environment-folder">—</dd></div>
                     <div><dt>Environment</dt><dd data-detail-field="environment">—</dd></div>
@@ -87,27 +89,27 @@
             </section>
             <section class="panel detail-panel observation-section" aria-labelledby="children-heading">
                 <div class="section-heading">
-                    <h2 id="children-heading">Child observations</h2>
-                    <button type="button" data-children-toggle aria-expanded="false" aria-controls="child-observations" disabled>Show child observations</button>
+                    <h2 id="children-heading">Package calls</h2>
+                    <button type="button" data-children-toggle aria-expanded="false" aria-controls="child-observations" disabled>Show package calls</button>
                 </div>
                 <div id="child-observations" data-children-panel hidden>
-                    <p class="detail-note">Starts recorded under this parent execution. An observed pair is not a child result or a separate execution.</p>
-                    <div class="table-controls" aria-label="Child order">
+                    <p class="detail-note">Calls recorded within this execution. Start/end recording does not establish a package result.</p>
+                    <div class="table-controls" aria-label="Package call order">
                         <label>Sort <select data-children-sort><option value="started_at">Started</option><option value="observation_id">Observation ID</option></select></label>
                         <label>Direction <select data-children-direction><option value="asc">Ascending</option><option value="desc">Descending</option></select></label>
                         <label>Rows per page <input type="number" min="1" step="1" data-children-limit></label>
                     </div>
                     <p class="resource-status" data-children-notice role="status"></p>
                     <p class="resource-status" data-children-status role="status"></p>
-                    <button type="button" data-children-retry hidden>Retry child observations</button>
-                    <div class="table-scroll" data-children-scroll role="region" aria-label="Child observations table" tabindex="0">
+                    <button type="button" data-children-retry hidden>Retry package calls</button>
+                    <div class="table-scroll" data-children-scroll role="region" aria-label="Package calls table" tabindex="0">
                         <table data-children-table>
-                            <caption>Observed child starts</caption>
-                            <thead><tr><th scope="col">Observation ID</th><th scope="col">Source</th><th scope="col">Paths</th><th scope="col">Timing</th><th scope="col">Duration</th><th scope="col">Pairing</th></tr></thead>
-                            <tbody><tr><td colspan="6">Open this section to load observations.</td></tr></tbody>
+                            <caption>Recorded package calls</caption>
+                            <thead><tr><th scope="col">Package / call path</th><th scope="col">Timing</th><th scope="col">Duration</th><th scope="col">Recording</th></tr></thead>
+                            <tbody><tr><td colspan="4">Open this section to load observations.</td></tr></tbody>
                         </table>
                     </div>
-                    <nav class="pagination" aria-label="Child pages">
+                    <nav class="pagination" aria-label="Package call pages">
                         <button type="button" data-children-previous aria-disabled="true">Previous</button>
                         <button type="button" data-children-next aria-disabled="true">Next</button>
                         <button type="button" data-children-latest>Show latest</button>

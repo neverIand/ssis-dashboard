@@ -121,7 +121,7 @@ class FrontendShellTests(unittest.TestCase):
                                    'data-overview-link', 'data-legacy-detail-link', 'data-overview-return-notice hidden',
                                    'data-executables-toggle aria-expanded="false"', 'data-executables-panel hidden',
                                    'data-executables-table', 'data-children-table', 'data-children-toggle',
-                                   'An observed pair is not a child result or a separate execution.', 'aria-label="Executable pages"']:
+                                   'Start/end recording does not establish a package result.', 'aria-label="Executable pages"']:
                         self.assertIn(markup, html)
                     for markup in ['overview-filters', 'data-status-choices', 'data-execution-table']:
                         self.assertNotIn(markup, html)

@@ -1,14 +1,26 @@
 # Implementation progress
 
-Updated 23 October 2026. Development base: `dev-next`; planning baseline: `ce8d04e`. [Roadmap](roadmap.md) owns scope; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns status and next actions. Detailed results belong in [API validation](API_ACCEPTANCE.md) and the [backend checklist](BACKEND_CHECKLIST.md).
+Updated 24 October 2026. Development base: `dev-next`; planning baseline: `ce8d04e`. [Roadmap](roadmap.md) owns scope; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns status and next actions. Detailed results belong in [API validation](API_ACCEPTANCE.md) and the [backend checklist](BACKEND_CHECKLIST.md).
 
 **Stage C remains in progress.** All 14 GET operations and all 12 execution sorts are implemented; the three review remedies pass their [recorded local checks](API_ACCEPTANCE.md#sql-remedies-replay-17-october-2026). Representative workload, resource and independent API reader acceptance remain open. The first native overview's API prerequisites are available; frontend work is a separate milestone.
 
-**Next local code task: P4.3 — searchable events.** [P4.2b child observations](#p42b--child-observations--23-october-2026) are complete locally. Its three bounded parts covered DTO/shared-lifetime validation, lazy keyed rendering with explicit pairing/coverage, and automated/native/browser verification. No backend/API/SQL or dependency change was required. Existing uncommitted documentation maintenance stays outside this task's commit. Actual visibility/cache and Stage C acceptance stay open.
+**Next local code task: P4.3 — searchable events.** [P4.2b child observations](#p42b--child-observations--23-october-2026) and the approved [package-call presentation refinement](#package-call-presentation--24-october-2026) are complete locally. The refinement uses the existing detail/children DTOs and request lifetime. Actual visibility/cache and Stage C acceptance stay open.
 
 **Environment-dependent acceptance is parked at the user's request, 18 October 2026.** Actual hidden-tab transitions, browser-cache restoration and corporate-browser checks remain [NOT RUN](#remaining-browser-acceptance), with [manual procedures](FRONTEND_ACCEPTANCE.md) for the user to review. Other checks that need unavailable reader sessions, permissions or representative workloads retain their explicit gaps. These do not block local phase 4 work; Stage C/D3, shared deployment and cutover remain unaccepted where their gates are open. Hosting remains deferred under the separate 15 October instruction.
 
 ## Task sizing and status
+
+### Package-call presentation — 24 October 2026
+
+Complete locally. The detail heading now shows the **Entry package**, execution ID and overall status together; overview uses the same terminology, including its sort label. **Package calls** uses four columns: package/call path, stacked Started/Ended timing, actual Duration and Recording. Each call's readable path is visible without opening its details, retains loop indices and previews at most three lines. Expandable details retain the exact raw paths, observation ID, event source and source type. Repeated calls stay separate by observation ID, with **Start/end recorded** or **End unconfirmed** describing pairing independently of a package result. Counts explicitly describe calls on the current page.
+
+This bounded follow-up completed presentation, automated/build and browser validation, then evidence retention. API/SQL/pairing, dependencies, server ordering and request ownership did not change. Full trees, cross-page grouping and inferred child results remain outside this milestone.
+
+**Automated/build evidence:** all **177 Node tests PASS**, including the new repeated-call/path/current-page regression. Existing refresh, paging, focus, expiry, denial and exact-text/timestamp checks pass; the heading-clear regression now places package/status outside the hidden detail body. All **29 affected Python shell, packaging and child API tests PASS**. Clean offline installation and repeated builds are byte-identical; the lockfile and 41 legacy static files are unchanged. Authored frontend JS+CSS is **144,032 bytes**; packaged JS+CSS is **82,465 bytes**, **26,018 bytes gzip**, within the current authored-source budget. Documentation validation passes.
+
+**Connected browser evidence:** ten recorded observations cover the four-column packaged fixture page, visible paths and raw literal metadata, zero/NULL timings and missing package metadata, retained expanded details, second-page refresh, a late end updating the existing expanded call, unidentified coverage on nonempty/empty pages, and denied access clearing the package/status in the visible heading. Actual **1280/768/360 px** layouts have no document overflow; narrow horizontal scrolling stays within the table. A 3,920-character path preview is three lines high while its raw path remains in Details. The final browser console has no warnings/errors. These are controlled fixture UI observations, not native workload or production acceptance.
+
+**Limits and cleanup:** the attempted native detail read returned **503 / SQLSTATE 08001**; native-data replay did not complete. Existing visibility/cache/corporate-browser and Stage C reader/workload/hosting gates remain open. Selected test/build/browser/HTTP records, screenshots and cleanup evidence are hash-verified under `.local/reports/frontend/20261024-package-calls/`. The owned preview exited with code 0; its PID and ephemeral listener were verified absent, its tab was closed, the viewport override was reset, and inactive temporary runs were removed only after verified evidence copies. No push was performed.
 
 ### Overview filter UX — 22 October 2026
 

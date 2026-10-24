@@ -25,7 +25,7 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
     const option = document.createElement('option');
     option.value = key;
     option.textContent = ({ execution_id: 'ID', created_at: 'Created', started_at: 'Started', ended_at: 'Ended',
-      project_name: 'Project', package_name: 'Package', environment: 'Environment', status: 'Status',
+      project_name: 'Project', package_name: 'Entry package', environment: 'Environment', status: 'Status',
       logging_level: 'Logging level', duration_seconds: 'Duration', warning_count: 'Warnings', error_count: 'Errors' })[key] ?? key;
     return option;
   }));

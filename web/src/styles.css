@@ -370,6 +370,9 @@ tbody tr:hover { background: var(--sd-subtle); }
 
 .header-content nav { display: flex; flex-wrap: wrap; gap: 0.8rem; }
 .detail-heading { min-width: 0; overflow-wrap: anywhere; }
+.detail-heading h1 { white-space: pre-wrap; }
+.detail-entry-label { color: var(--sd-secondary); font-size: 0.8667rem; margin-bottom: 0.2667rem; }
+.detail-context { display: flex; align-items: center; flex-wrap: wrap; gap: 0.8rem; margin-top: 0.5333rem; }
 .detail-state:has([data-detail-status]:empty) { display: none; }
 .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.6rem; }
 .detail-panel { padding: 1.0667rem; }
@@ -389,6 +392,10 @@ tbody tr:hover { background: var(--sd-subtle); }
 .observation-section .table-controls label { display: grid; gap: 0.4rem; }
 .observation-section input[type="number"] { width: 8rem; }
 .observation-name { min-width: 13rem; max-width: 26rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+.package-call { min-width: 17rem; max-width: 36rem; }
+.package-call-name { display: block; font-weight: 600; }
+.call-path { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; margin: 0.4rem 0; }
+.package-call .observation-paths { width: auto; }
 .observation-paths { width: clamp(16rem, 38vw, 36rem); white-space: pre-wrap; overflow-wrap: anywhere; }
 .observation-paths dt { color: var(--sd-secondary); font-size: 0.8667rem; margin-top: 0.8rem; }
 .observation-section summary { cursor: pointer; white-space: nowrap; }

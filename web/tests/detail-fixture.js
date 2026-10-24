@@ -37,7 +37,9 @@ export function detailDOM() {
   const fields = ['folder', 'project', 'package', 'lsn', 'environment-folder', 'environment', 'status', 'logging',
     'created', 'started', 'ended', 'duration', 'elapsed', 'all', 'warnings', 'errors', 'duplicate_warnings', 'memory_warnings']
     .map(key => Object.assign(new Node(document, 'dd'), { dataset: { detailField: key } }));
-  get('execution-detail').append(...fields);
+  // Package/status live in the visible page heading, outside the hideable detail body.
+  root.append(...fields.filter(node => ['package', 'status'].includes(node.dataset.detailField)));
+  get('execution-detail').append(...fields.filter(node => !['package', 'status'].includes(node.dataset.detailField)));
   const bodies = {};
   for (const section of ['executables', 'children']) {
     get('execution-detail').append(get(`${section}-toggle`), get(`${section}-panel`));

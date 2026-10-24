@@ -158,19 +158,54 @@ test('keyed child rendering updates incomplete pairs without result links, retai
       ? childPage([child(), child('2')], { availability: 'unknown', has_unidentified_starts: true }) : pending.promise : detailResponse('17') } });
   t.after(() => screen.dispose()); await flush();
   dom.get('children-toggle').dispatchEvent(new Event('click')); await flush();
-  const row = dom.childBody.firstChild, paths = row.children[2].firstChild, summary = paths.firstChild;
-  assert.equal(dom.childBody.children.length, 2); assert.match(row.textContent, /Incomplete/);
+  const row = dom.childBody.firstChild, paths = row.children[0].children[2], summary = paths.firstChild;
+  assert.equal(dom.childBody.children.length, 2); assert.match(row.textContent, /End unconfirmed/);
+  assert.equal(row.children.length, 4);
+  assert.equal(row.children[0].firstChild.textContent, 'Child.dtsx');
+  assert.equal(row.children[0].children[1].textContent, 'Call path: Parent › Run[1] ');
+  assert.equal(paths.children[1].children.at(-1).textContent, '\\Parent\\Run[1] ');
+  assert.match(paths.textContent, /<b>Child 影狼<\/b>\r\nLine/);
+  assert.equal(row.children[0].children[1].children.length, 0);
   assert.match(dom.get('children-status').textContent, /no public numeric ID/);
-  assert.equal(row.children[3].children.length, 2);
-  assert.equal(row.children[3].children[1].children[1].textContent, '—');
+  assert.match(dom.get('children-status').textContent, /2 calls on this page/);
+  assert.equal(row.children[1].children.length, 2);
+  assert.equal(row.children[1].children[1].children[1].textContent, '—');
   paths.open = true; summary.focus(); dom.get('detail-refresh').dispatchEvent(new Event('click')); await flush();
   dom.get('legacy-detail-link').focus(); dom.get('children-scroll').scrollLeft = 180;
   pending.resolve(childPage([child('1', { ended_at: wireTime, duration_seconds: 0, state: 'complete' }), child('3')])); await flush();
   assert.equal(dom.childBody.firstChild, row); assert.equal(paths.open, true);
   assert.equal(dom.document.activeElement, dom.get('legacy-detail-link')); assert.equal(dom.get('children-scroll').scrollLeft, 180);
-  assert.match(row.textContent, /Observed pair/); assert.doesNotMatch(row.textContent, /Success|Succeeded|Executable ID/);
-  assert.equal(row.children[5].firstChild.dataset.result, undefined);
-  assert.equal(row.children[3].children[1].children[1].firstChild.getAttribute('datetime'), wireTime);
+  assert.match(row.textContent, /Start\/end recorded/); assert.doesNotMatch(row.textContent, /Success|Succeeded|Executable ID/);
+  assert.equal(row.children[3].firstChild.dataset.result, undefined);
+  assert.equal(row.children[2].textContent, display.duration(0));
+  assert.equal(row.children[1].children[1].children[1].firstChild.getAttribute('datetime'), wireTime);
+});
+
+test('visible call paths distinguish loops and tasks without merging repeated calls or claiming a total', async t => {
+  const dom = detailDOM(), calls = [];
+  const rows = [child('1', { execution_path: '\\Root\\Loop[1]\\Run\\Child' }),
+    child('2', { execution_path: '\\Root\\Loop[2]\\Run\\Child' }),
+    child('3', { execution_path: '\\Root\\ParallelB\\Child' }),
+    child('4', { execution_path: '\\Root\\ParallelB\\Child', package_name: null, source_name: '', source_type: 0 })];
+  const screen = mountDetail(dom.root, { executionId: '17', appBase: '/app/', metadata: metadata(),
+    api: { get: async resource => { calls.push(resource); return resource.endsWith('/children')
+      ? childPage(rows, { has_more: true, next_cursor: 'next' }) : detailResponse('17'); } } });
+  t.after(() => screen.dispose()); await flush();
+  assert.equal(calls.length, 1);
+  dom.get('children-toggle').dispatchEvent(new Event('click')); await flush();
+  assert.deepEqual(calls, ['executions/17', 'executions/17/children']);
+  assert.equal(dom.childBody.children.length, 4);
+  assert.deepEqual(dom.childBody.children.map(row => row.children[0].children[1].textContent), [
+    'Call path: Root › Loop[1] › Run › Child', 'Call path: Root › Loop[2] › Run › Child',
+    'Call path: Root › ParallelB › Child', 'Call path: Root › ParallelB › Child']);
+  const missing = dom.childBody.children[3].children[0];
+  assert.equal(missing.firstChild.textContent, '—');
+  const details = missing.children[2].children[1];
+  assert.equal(details.children[1].textContent, '4');
+  assert.equal(details.children[3].textContent, '(empty)');
+  assert.equal(details.children[5].textContent, '0');
+  assert.match(dom.get('children-status').textContent, /4 calls on this page/);
+  assert.equal(dom.get('children-next').getAttribute('aria-disabled'), 'false');
 });
 
 test('child view checkpoints restore anchors only after revalidation and clear coverage on disposal', async t => {
@@ -178,11 +213,11 @@ test('child view checkpoints restore anchors only after revalidation and clear c
   const options = { executionId: '17', appBase: '/app/', metadata: metadata(), api: { get } };
   const first = mountDetail(dom.root, options); await flush();
   dom.get('children-toggle').dispatchEvent(new Event('click')); await flush();
-  const paths = dom.childBody.firstChild.children[2].firstChild; paths.open = true; paths.firstChild.focus();
+  const paths = dom.childBody.firstChild.children[0].children[2]; paths.open = true; paths.firstChild.focus();
   const saved = first.checkpoint(); first.dispose();
   assert.doesNotMatch(JSON.stringify(saved), /Child.dtsx|source_name|duration_seconds|影狼/);
   const second = mountDetail(dom.root, { ...options, restoreView: saved }); t.after(() => second.dispose()); await flush();
-  assert.equal(dom.childBody.firstChild.children[2].firstChild.open, true);
+  assert.equal(dom.childBody.firstChild.children[0].children[2].open, true);
   second.dispose(); assert.equal(dom.childBody.children.length, 0); assert.equal(dom.get('children-status').textContent, '');
 });
 
