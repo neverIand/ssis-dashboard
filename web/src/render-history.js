@@ -30,8 +30,9 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
     cell.colSpan = 4; row.append(cell); body.replaceChildren(row);
   }
   function time(node,value) {
-    if (node.getAttribute('data-time') === String(value)) return;
-    node.setAttribute('data-time', String(value));
+    const key = value ?? '';
+    if (node.getAttribute('data-time') === key) return;
+    node.setAttribute('data-time', key);
     if (value === null) node.textContent = '—';
     else { const stamp = element('time',display.timestamp(value)); stamp.setAttribute('datetime',value); stamp.title = value; node.replaceChildren(stamp); }
   }
@@ -108,7 +109,8 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
         for (const [code,input] of choices) input.checked = chosen.includes(code);
         appliedStatus = state.query.status;
       }
-      scope.textContent = identity ? `Folder: ${identity.folder_name} · Project: ${identity.project_name} · Package: ${identity.package_name}\nAll creation dates · Applied statuses: ${state.query.status.split(',').map(code=>formatCode(metadata.execution_statuses.find(item=>String(item.code)===code) ?? {code:Number(code),name:'unknown'})).join(', ')}` : '';
+      scope.title = identity ? `Folder: ${identity.folder_name} · Project: ${identity.project_name} · Package: ${identity.package_name}` : '';
+      scope.textContent = identity ? `All creation dates · ${state.query.status.split(',').map(code=>formatCode(metadata.execution_statuses.find(item=>String(item.code)===code) ?? {code:Number(code),name:'unknown'})).join(', ')}` : '';
       notice.textContent = state.notice;
       const page = panel.hidden ? null : state.page;
       chart.render({page,pageNumber:state.pageNumber,busy:isBusy,visible:!panel.hidden,stale:state.stale});
@@ -116,7 +118,8 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
         if (page) paint(page,state.pageNumber); else empty(state.phase === 'loading' ? 'Loading package history…' : 'No history loaded.');
         rendered = page;
       }
-      const info = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} executions on this page · Observed ${display.timestamp(page.meta.generated_at)} · Live results` : '';
+      status.title = page ? `Observed ${display.timestamp(page.meta.generated_at)} · ${page.meta.generated_at}` : '';
+      const info = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} executions on this page` : '';
       status.textContent = panel.hidden ? '' : state.error ? `${state.error.message}${state.error.requestId ? ` Request ID: ${state.error.requestId}` : ''}${state.stale ? ' Previous history page shown. ' : ' '}${info}`
         : state.stale ? `Refreshing… Previous history page shown. ${info}` : state.phase === 'loading' ? 'Loading package history…' : info;
       if (panel.hidden && panelFocused && authorized) toggle.focus({preventScroll:true});
@@ -135,7 +138,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
     dispose() {
       chart.dispose();
       for (const [node,event,handler] of listeners) node.removeEventListener(event,handler);
-      rows.clear(); body.replaceChildren(); get('choices').replaceChildren(); scope.textContent = status.textContent = notice.textContent = '';
+      rows.clear(); body.replaceChildren(); get('choices').replaceChildren(); scope.textContent = status.textContent = notice.textContent = scope.title = status.title = '';
       for (const node of Object.values(controls)) node.disabled = true;
       panel.hidden = retry.hidden = true; toggle.setAttribute('aria-expanded','false'); current = returning = rendered = null;
     },

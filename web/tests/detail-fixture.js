@@ -26,7 +26,7 @@ export function detailDOM() {
   document.activeElement = document.body;
   const nodes = new Map();
   for (const key of ['app-status', 'retry', 'request-id', 'display-timezone', 'execution-detail',
-    'detail-status', 'detail-retry', 'detail-request-id', 'detail-observed', 'active-elapsed',
+    'detail-status', 'detail-retry', 'detail-request-id', 'active-elapsed',
     'detail-refresh', 'detail-poll-toggle', 'detail-poll-status', 'overview-link', 'legacy-detail-link',
     'overview-return-notice', 'parameters-unavailable', 'overrides-unavailable', 'overrides-policy', ...['toggle','panel','choice','plot','scope','selected','scale','empty'].map(key=>`history-chart-${key}`), ...['filters','choices','apply','scope'].map(key => `history-${key}`), ...['unavailable','filters','apply','reset','kind','q','scope'].map(key => `events-${key}`), ...['toggle', 'panel', 'status', 'notice', 'retry', 'sort', 'direction',
       'limit', 'previous', 'next', 'latest', 'scroll', 'table'].flatMap(name => ['executables', 'children', 'events', 'parameters', 'overrides', 'history'].map(section => `${section}-${name}`))]) {

@@ -3,6 +3,7 @@ import { SelectionError, timestampTicks } from './selection.js';
 const epochTicks = timestampTicks('1970-01-01T00:00:00Z');
 const pad = value => String(value).padStart(2, '0');
 const formatters = new Map();
+const repeatedDates = new Map();
 
 function parts(date, timeZone) {
   if (!formatters.has(timeZone)) formatters.set(timeZone, new Intl.DateTimeFormat('en-GB', {
@@ -30,6 +31,16 @@ export function nextDate(value) {
   return result;
 }
 
+function nearbyOffsets(wall, timeZone) {
+  const offsets = new Set();
+  for (const hours of [-36, -12, 0, 12, 36]) {
+    const sample = new Date(wall + hours * 3600000);
+    const local = parts(sample, timeZone);
+    offsets.add(Date.parse(`${local.date}T${local.time}Z`) - Math.floor(sample.valueOf() / 1000) * 1000);
+  }
+  return offsets;
+}
+
 // Enumerate the actual instants for a wall time. Zero = DST gap; two = repeated time.
 // Date is used to resolve a new user choice only, never to round restored bounds.
 export function localCandidates(date, time, timeZone) {
@@ -37,12 +48,7 @@ export function localCandidates(date, time, timeZone) {
   const clock = /^\d{2}:\d{2}$/.test(time) ? `${time}:00` : time;
   timestampTicks(`${date}T${clock}Z`);
   const wall = Date.parse(`${date}T${clock}Z`);
-  const offsets = new Set();
-  for (const hours of [-36, -12, 0, 12, 36]) {
-    const sample = new Date(wall + hours * 3600000);
-    const local = parts(sample, timeZone);
-    offsets.add(Date.parse(`${local.date}T${local.time}Z`) - Math.floor(sample.valueOf() / 1000) * 1000);
-  }
+  const offsets = nearbyOffsets(wall, timeZone);
   const matches = [];
   for (const offset of offsets) {
     const instant = new Date(wall - offset);
@@ -54,6 +60,20 @@ export function localCandidates(date, time, timeZone) {
     }
   }
   return matches.sort((a, b) => a.value.localeCompare(b.value));
+}
+
+export function repeatedTimeOffset(value, timeZone, local = projectTime(value, timeZone)) {
+  const key = `${timeZone}/${local.date}`;
+  if (!repeatedDates.has(key)) {
+    // Cache only a bounded date/zone flag, never execution timestamps or values.
+    if (repeatedDates.size >= 32) repeatedDates.delete(repeatedDates.keys().next().value);
+    repeatedDates.set(key, nearbyOffsets(Date.parse(`${local.date}T12:00:00Z`), timeZone).size > 1);
+  }
+  if (!repeatedDates.get(key)) return '';
+  const candidates = localCandidates(local.date, local.time, timeZone);
+  if (candidates.length < 2) return '';
+  const seconds = timestampTicks(value) / 10000000n;
+  return candidates.find(candidate => timestampTicks(candidate.value) / 10000000n === seconds).offset.replace('−', '-');
 }
 
 export function calendarBound(date, time, timeZone, { end = false, includeTime = false, occurrence = '' } = {}) {
@@ -92,7 +112,8 @@ export function rangeLabel(selection, timeZone) {
   const label = value => {
     if (value === null) return 'Default';
     const local = projectTime(value, timeZone);
-    return `${local.date} ${local.time.slice(0, 5)}`;
+    const offset = repeatedTimeOffset(value, timeZone, local);
+    return `${local.date} ${local.time}${offset ? ` (${offset})` : ''}`;
   };
   return `${label(selection.from)} → ${label(selection.to)}`;
 }

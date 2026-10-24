@@ -119,7 +119,13 @@ test('chart series, selected repeated hour, table/focus/scroll survive refresh a
   const rows=[timelineBucket(bounds.from,'2026-10-25T01:00:00.0000000Z'),timelineBucket('2026-10-25T01:00:00.0000000Z',bounds.to)];
   const get=async(resource,options)=>resource==='executions'?overviewPage(bounds):resource==='metrics/summary'?timelineSummary(bounds):timelinePage(rows,{...bounds,bucket:options.params.bucket});
   const dom=screen(t,get);await dom.view.apply(selection());click(dom,'timeline-toggle');await flush();
-  const first=dom.get('timeline-choice').children[0],second=dom.get('timeline-choice').children[1];assert.notEqual(first.textContent,second.textContent);assert.match(first.textContent,/GMT\+01:00/);
+  const first=dom.get('timeline-choice').children[0],second=dom.get('timeline-choice').children[1];assert.notEqual(first.textContent,second.textContent);
+  assert.equal(first.textContent,'2026-10-25 01:00:00 (UTC+01:00) → 2026-10-25 01:00:00 (UTC+00:00)');
+  assert.equal(second.textContent,'2026-10-25 01:00:00 (UTC+00:00) → 2026-10-25 02:00:00');
+  assert.equal(dom.timelineBody.children[0].children[0].firstChild.textContent,'2026-10-25 01:00:00 (UTC+01:00)');
+  assert.equal(dom.timelineBody.children[0].children[1].firstChild.textContent,'2026-10-25 01:00:00 (UTC+00:00)');
+  assert.equal(first.title,`${rows[0].start} → ${rows[0].end}`);
+  assert.equal(second.title,`${rows[1].start} → ${rows[1].end}`);
   dom.get('timeline-choice').value=rows[1].start;dom.get('timeline-choice').dispatchEvent(new Event('change'));
   dom.get('timeline-series').value='failed_count';dom.get('timeline-series').dispatchEvent(new Event('change'));dom.get('timeline-values').open=true;dom.get('timeline-scroll').scrollLeft=120;
   const option=dom.get('timeline-choice').children[1];const refreshing=dom.view.refresh();dom.get('timeline-choice').focus();await refreshing;

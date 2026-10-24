@@ -15,7 +15,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
   const rows = new Map(), controls = { toggle, retry, sort, direction, limit, previous, next, latest, region };
   const initialFocus = document.activeElement;
   const initialScroll = { left: region.scrollLeft, top: region.scrollTop };
-  let returning = restoreView, rendered = null, current = null, busy = true;
+  let returning = restoreView, rendered = null, renderedStart = null, current = null, busy = true;
   limit.max = String(metadata.limits.max_limit);
   const element = (tag, text, className) => {
     const node = document.createElement(tag);
@@ -32,7 +32,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
     row.append(cell);
     body.replaceChildren(row);
   }
-  function paint(page, pageNumber) {
+  function paint(page, pageNumber, executionStart) {
     if (!page.data.length) {
       empty(pageNumber > 1 ? 'No observations remain on this page. Use Previous or Show latest.'
         : page.meta.availability === 'not-recorded' ? `No ${singular} observations recorded. Logging was disabled.`
@@ -95,10 +95,10 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
       text(record.packagePath, literal(item.package_path));
       text(record.executionPath, literal(item.execution_path));
       for (const key of ['started_at', 'ended_at']) {
-        if (!record.item || record.item[key] !== item[key]) {
+        if (!record.item || record.item[key] !== item[key] || record.executionStart !== executionStart) {
           if (item[key] === null) record.times[key].textContent = '—';
           else {
-            const time = element('time', display.timestamp(item[key]));
+            const time = element('time', display.tableTimestamp(item[key], executionStart));
             time.setAttribute('datetime', item[key]);
             time.title = item[key];
             record.times[key].replaceChildren(time);
@@ -109,6 +109,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
       text(record.cells[columns.state].firstChild, child ? item.state === 'complete' ? 'Start/end recorded' : 'End unconfirmed' : formatCode(item.result));
       if (!child) record.cells[columns.state].firstChild.dataset.result = item.result?.name === 'unknown' ? 'unknown' : String(item.result?.code ?? '');
       record.item = item;
+      record.executionStart = executionStart;
       if (record.row !== anchor) body.insertBefore(record.row, anchor);
       anchor = record.row.nextSibling;
     }
@@ -140,7 +141,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
   listen(latest, 'click', actions.latest);
   for (const node of [sort, direction, limit]) listen(node, 'change', order);
   return {
-    render(state, isBusy, authorized) {
+    render(state, isBusy, authorized, executionStart = null) {
       current = state; busy = isBusy;
       if (!state.open) returning = null;
       const focused = document.activeElement, rowFocused = body.contains(focused), panelFocused = panel.contains(focused);
@@ -160,13 +161,15 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
       syncOrder(state.query);
       notice.textContent = state.notice;
       const page = panel.hidden ? null : state.page;
-      if (page !== rendered || page === null) {
-        if (page) paint(page, state.pageNumber);
+      if (page !== rendered || page === null || executionStart !== renderedStart) {
+        if (page) paint(page, state.pageNumber, executionStart);
         else empty(state.phase === 'loading' ? `Loading ${singular} observations…` : 'No observations loaded.');
         rendered = page;
+        renderedStart = executionStart;
       }
-      const pageInfo = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} ${child ? 'calls on this page' : 'rows'} · Observed ${display.timestamp(page.meta.generated_at)} · Live results · ${
-        { available: 'Recorded observations', 'not-recorded': 'Not recorded', unknown: 'Recording coverage unknown' }[page.meta.availability]}${child && page.meta.has_unidentified_starts ? ' · Some starts have no public numeric ID and cannot be paged. Coverage is unknown.' : ''}` : '';
+      status.title = page ? `Observed ${display.timestamp(page.meta.generated_at)} · ${page.meta.generated_at}` : '';
+      const coverage = page?.meta.availability === 'available' ? '' : page?.meta.availability === 'not-recorded' ? ' · Not recorded' : ' · Recording coverage unknown';
+      const pageInfo = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} ${child ? 'calls on this page' : 'rows'}${coverage}${child && page.meta.has_unidentified_starts ? ' · Some starts have no public numeric ID and cannot be paged. Coverage is unknown.' : ''}` : '';
       status.textContent = panel.hidden ? '' : state.error ? `${state.error.message}${state.error.requestId ? ` Request ID: ${state.error.requestId}` : ''}${state.stale ? ' Previous observation page shown. ' : ' '}${pageInfo}`
         : state.stale ? `Refreshing… Previous observation page shown. ${pageInfo}`
           : state.phase === 'loading' ? `Loading ${singular} observations…` : pageInfo;
@@ -194,7 +197,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
     },
     dispose() {
       for (const [node, event, action] of listeners) node.removeEventListener(event, action);
-      rows.clear(); body.replaceChildren(); status.textContent = notice.textContent = '';
+      rows.clear(); body.replaceChildren(); status.textContent = notice.textContent = status.title = '';
       for (const node of Object.values(controls)) node.disabled = true;
       panel.hidden = retry.hidden = true;
       toggle.setAttribute('aria-expanded', 'false');

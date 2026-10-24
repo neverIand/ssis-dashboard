@@ -120,7 +120,9 @@ test('keyed rendering reuses rows and links, patches values, removes/adds/reorde
   assert.equal(dom.window.scrollY, 250);
   assert.equal(dom.scroll.scrollLeft, 123);
   assert.equal(dom.scroll.scrollTop, 5);
-  assert.match(dom.get('executions-status').textContent, /Updated/);
+  assert.equal(dom.get('executions-status').textContent, 'Page 1 · 3 rows');
+  assert.equal(dom.get('poll-status').textContent, 'Updated 17:00:00 · auto refresh on');
+  assert.doesNotMatch(dom.get('executions-status').textContent, /Updated|Live results/);
   assert.equal(dom.get('overview-refresh').attributes.get('aria-disabled'), 'false');
   view.dispose();
 });
@@ -159,8 +161,10 @@ test('transient refresh errors retain and label existing DOM; denial removes it 
   assert.match(dom.get('summary-status').textContent, /^Refreshing/);
   await refreshing;
   assert.equal(dom.body.children[0], row);
-  assert.match(dom.get('executions-status').textContent, /Previous results shown.*Updated/);
-  assert.match(dom.get('summary-status').textContent, /Previous counts shown.*Updated/);
+  assert.match(dom.get('executions-status').textContent, /Previous results shown/);
+  assert.match(dom.get('summary-status').textContent, /Previous counts shown/);
+  assert.ok(dom.get('executions-status').title.includes(wireTime));
+  assert.ok(dom.get('summary-status').title.includes(wireTime));
   assert.doesNotMatch(dom.get('summary-status').textContent, /Refreshing/);
   assert.equal(dom.get('app-status').textContent, 'Refresh failed');
   await view.refresh();
@@ -224,7 +228,7 @@ test('pause/resume controls, manual refresh and a paused return checkpoint prese
   assert.equal(calls, 2);
   await view.refresh();
   assert.equal(calls, 4);
-  assert.equal(dom.get('poll-status').textContent, 'Auto refresh paused.');
+  assert.equal(dom.get('poll-status').textContent, 'Updated 17:00:00 · auto refresh paused');
   const saved = view.checkpoint();
   assert.equal(saved.view.autoPaused, true);
   view.dispose();
@@ -304,7 +308,8 @@ for (const appBase of ['/app/', '/ops/monitor/app/']) {
     assert.equal(detailCalls.length, 1);
     assert.equal(detailCalls[0].resource, `executions/${id}`);
     assert.equal(detailCalls[0].options.params, undefined, 'Overview filters must not constrain the detail read');
-    assert.match(detail.get('overview-return-notice').textContent, /page one/);
+    assert.equal(detail.get('overview-return-notice').hidden, true);
+    assert.match(detail.get('overview-link').title, /page one/);
     const destination = new URL(detail.get('overview-link').href, dom.window.location.origin);
     assert.equal(destination.pathname, appBase);
     assert.deepEqual(parseSelection(destination.search, settings), selection);

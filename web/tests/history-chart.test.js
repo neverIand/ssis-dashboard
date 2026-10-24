@@ -22,7 +22,7 @@ test('duration chart uses only the loaded history page; opening, selecting and c
   assert.equal(dom.get('history-chart-toggle').disabled,true);click(dom,'history-toggle');await flush();assert.equal(dom.calls.length,2);
   assert.equal(groups(dom).length,0);click(dom,'history-chart-toggle');assert.equal(groups(dom).length,2);
   choose(dom,'2');assert.match(dom.get('history-chart-selected').textContent,/Execution 2/);
-  assert.match(dom.get('history-chart-scope').textContent,/Loaded history page 1 · 2 executions.*rest of package history is not plotted/);
+  assert.equal(dom.get('history-chart-scope').textContent,'Loaded history page 1 only · 2 executions');
   dom.get('history-chart-choice').focus();click(dom,'history-chart-toggle');assert.equal(groups(dom).length,0);
   assert.equal(dom.document.activeElement,dom.get('history-chart-toggle'));assert.equal(dom.calls.length,2);
 });
@@ -33,7 +33,7 @@ test('missing actual duration never becomes observed elapsed or estimate, while 
   const dom=screen(t,async()=>historyPage(rows));await open(dom);
   assert.equal(groups(dom)[0].children[1].getAttribute('height'),'0');assert.equal(groups(dom)[0].children[3].getAttribute('display'),'inline');
   assert.equal(groups(dom)[1].children[1].getAttribute('display'),'none');assert.equal(groups(dom)[1].children[3].getAttribute('display'),'none');
-  choose(dom,'2');assert.match(dom.get('history-chart-selected').textContent,/Actual duration: Unavailable.*Elapsed \(observed\):.*123.*Estimated duration:.*10.*Mean of 1 prior successful run/);
+  choose(dom,'2');assert.match(dom.get('history-chart-selected').textContent,/Actual duration: Unavailable.*Elapsed \(observed\): 2 min 03 s.*Estimated duration: 10 s.*Mean of 1 prior successful run/);
   choose(dom,'1');assert.match(dom.get('history-chart-selected').textContent,/Actual duration: Unavailable · Estimated duration: Unavailable/);
   assert.doesNotMatch(dom.get('history-chart-selected').textContent,/Elapsed|Mean of/);
 });
@@ -43,7 +43,7 @@ test('finite huge and sub-millisecond durations keep finite plot geometry and se
     historyRow('2',{duration_seconds:0.0000001,estimate:estimate()}),historyRow('1',{duration_seconds:10})]));await open(dom);
   for(const group of groups(dom))for(const bar of group.children.slice(1,3))for(const key of ['x','y','height','width'])assert.ok(Number.isFinite(Number(bar.getAttribute(key))));
   assert.equal(groups(dom)[0].children[1].getAttribute('height'),'150');choose(dom,'2');
-  assert.match(dom.get('history-chart-selected').textContent,/Actual duration: <.*0\.001.*Estimated duration: <.*0\.001/);
+  assert.match(dom.get('history-chart-selected').textContent,/Actual duration: <1 ms.*Estimated duration: <1 ms/);
   assert.equal(groups(dom)[1].children[3].getAttribute('display'),'none');
 });
 
@@ -70,7 +70,7 @@ test('live estimate removal updates keyed chart values while current choice, tab
 test('paging plots only the returned bounded page and chooses a valid execution after a selected ID disappears',async t=>{
   const dom=screen(t,async({params})=>params.cursor?historyPage([historyRow('1')]):historyPage([historyRow('3'),historyRow('2')],{has_more:true,next_cursor:'next'}));await open(dom);
   choose(dom,'2');click(dom,'history-next');await flush();assert.equal(groups(dom).length,1);assert.equal(dom.get('history-chart-choice').value,'1');
-  assert.match(dom.get('history-chart-scope').textContent,/page 2 · 1 execution/);assert.equal(dom.calls.length,3);
+  assert.match(dom.get('history-chart-scope').textContent,/page 2 only · 1 execution/);assert.equal(dom.calls.length,3);
 });
 
 test('transient history errors label a retained chart; denial and malformed data remove plot values and selected anchors',async t=>{

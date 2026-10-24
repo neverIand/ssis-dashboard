@@ -8,8 +8,7 @@ export function mountTimeline(root,{metadata,actions,restoreView=null}) {
   const panel=get('panel'),status=get('status'),scope=get('scope'),svg=get('chart'),values=get('values');
   const body=get('table').querySelector('tbody'),rows=new Map(),listeners=[];
   const display=createDisplay({timeZone:metadata.display_timezone});
-  const clock=new Intl.DateTimeFormat(undefined,{timeZone:metadata.display_timezone,year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZoneName:'longOffset'});
-  const label=instant=>clock.format(new Date(instant.slice(0,23)+'Z'));
+  const label=instant=>display.timestamp(instant);
   const initialFocus=document.activeElement,initialPosition={left:scroll.scrollLeft,top:scroll.scrollTop};
   let current=null,rendered=null,busy=true,selected=typeof restoreView?.selected==='string'?restoreView.selected:null,returning=restoreView;
   const element=(tag,text)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;return node;};
@@ -51,6 +50,7 @@ export function mountTimeline(root,{metadata,actions,restoreView=null}) {
       }
       if(!row.item||row.item.end!==item.end){
         row.label=`${label(item.start)} → ${label(item.end)}`;text(row.option,row.label);
+        row.option.title=`${item.start} → ${item.end}`;
         for(const [index,key] of [[0,'start'],[1,'end']]){
           const time=element('time',label(item[key]));time.setAttribute('datetime',item[key]);time.title=item[key];row.cells[index].replaceChildren(time);
         }
@@ -80,10 +80,11 @@ export function mountTimeline(root,{metadata,actions,restoreView=null}) {
       const response=panel.hidden?null:state.page;
       series.disabled=choice.disabled=response===null;
       if(response!==rendered){if(response)paint(response);else clear();rendered=response;}
-      const previous=response?`Updated ${display.timestamp(response.meta.generated_at)}.`:'';
-      status.textContent=panel.hidden?'':state.error?`${state.error.message}${state.error.requestId?` Request ID: ${state.error.requestId}`:''}${state.error.status===400?' Choose Day or adjust the creation range.':''}${state.stale?' Previous timeline shown. ':''} ${previous}`
-        :state.stale?`${busy?'Refreshing… ':''}Previous timeline shown. ${previous}`:response?`${display.count(response.data.length)} calendar ${response.data.length===1?'bucket':'buckets'}. ${previous}`:'Loading timeline…';
-      scope.textContent=panel.hidden?'':`Created in ${display.timestamp(page.meta.from)} → ${display.timestamp(page.meta.to)} (exclusive) · ${metadata.display_timezone}\nStatuses: ${selection.status.length?selection.status.map(code=>formatCode(metadata.execution_statuses.find(item=>item.code===code))).join(', '):'All statuses'}. Counts cover the selected creation cohort, across every execution page.`;
+      status.title=response?`Observed ${display.timestamp(response.meta.generated_at)} · ${response.meta.generated_at}`:'';
+      status.textContent=panel.hidden?'':state.error?`${state.error.message}${state.error.requestId?` Request ID: ${state.error.requestId}`:''}${state.error.status===400?' Choose Day or adjust the creation range.':''}${state.stale?' Previous timeline shown.':''}`
+        :state.stale?`${busy?'Refreshing… ':''}Previous timeline shown.`:response?`${display.count(response.data.length)} calendar ${response.data.length===1?'bucket':'buckets'}`:'Loading timeline…';
+      scope.title=panel.hidden?'':`Created ${display.timestamp(page.meta.from)} → ${display.timestamp(page.meta.to)} (exclusive)`;
+      scope.textContent=panel.hidden?'':`Counts by creation time · ${selection.status.length?selection.status.map(code=>formatCode(metadata.execution_statuses.find(item=>item.code===code))).join(', '):'All statuses'} · All execution pages`;
       if((panel.hidden&&panelFocused)||(focused===retry&&retry.hidden)||(response===null&&[series,choice].includes(focused))){
         if(!toggle.disabled)toggle.focus({preventScroll:true});else document.getElementById?.('main-content')?.focus({preventScroll:true});
       }
@@ -96,6 +97,6 @@ export function mountTimeline(root,{metadata,actions,restoreView=null}) {
     },
     checkpoint:()=>({series:series.value,selected,tableOpen:values.open,left:scroll.scrollLeft,top:scroll.scrollTop,
       focus:Object.keys(controls).find(key=>controls[key]===document.activeElement)??null}),
-    dispose(){for(const [node,event,handler] of listeners)node.removeEventListener(event,handler);clear();for(const node of Object.values(controls))node.disabled=true;panel.hidden=true;values.open=false;scope.textContent=status.textContent='';current=rendered=returning=selected=null;},
+    dispose(){for(const [node,event,handler] of listeners)node.removeEventListener(event,handler);clear();for(const node of Object.values(controls))node.disabled=true;panel.hidden=true;values.open=false;scope.textContent=status.textContent=scope.title=status.title='';current=rendered=returning=selected=null;},
   };
 }

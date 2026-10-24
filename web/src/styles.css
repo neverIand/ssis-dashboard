@@ -126,6 +126,8 @@ main {
 
 .cohort-window, .resource-status:not(:empty) { margin-bottom: 0.8rem; }
 
+.section-actions .refresh-status { margin: 0; }
+
 .cell-detail {
   display: block;
   margin-top: 0.1333rem;
@@ -384,7 +386,6 @@ tbody tr:hover { background: var(--sd-subtle); }
 .detail-fields [data-level="warning"] { color: var(--sd-warning); font-weight: 600; }
 .detail-fields [data-level="error"] { color: var(--sd-error); font-weight: 600; }
 .detail-note { margin-top: 1.0667rem; }
-.detail-observed { grid-column: 1 / -1; }
 .observation-section { grid-column: 1 / -1; min-width: 0; }
 .observation-section .section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.8rem; }
 .observation-section .section-heading h2 { margin: 0; }

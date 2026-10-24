@@ -17,6 +17,7 @@
                             <span class="scope-current"><span class="scope-separator" aria-hidden="true">/</span><h1 aria-current="page">Overview</h1></span>
                         </div>
                         <div class="section-actions">
+                            <p class="resource-status refresh-status" data-poll-status role="status"></p>
                             <button type="button" data-overview-refresh disabled>Refresh</button>
                             <button type="button" data-poll-toggle disabled>Pause auto refresh</button>
                         </div>
@@ -116,7 +117,7 @@
             <div class="section-heading"><h2 id="timeline-heading">Creation timeline</h2><button type="button" data-timeline-toggle disabled aria-expanded="false" aria-controls="creation-timeline">Show timeline</button></div>
             <div id="creation-timeline" data-timeline-panel hidden>
                 <p class="detail-note timeline-scope" data-timeline-scope></p>
-                <p class="detail-note">Buckets group executions by creation time. Start and success/failure counts describe those executions, regardless of when they started or ended. Edge buckets count only the selected range.</p>
+                <details class="detail-note"><summary>About timeline counts</summary><p>Starts and current outcomes belong to each execution's creation bucket. Edge buckets include only the selected range.</p></details>
                 <div class="table-controls">
                     <label>Calendar interval<select data-timeline-bucket><option value="day">Day</option><option value="hour">Hour</option></select></label>
                     <label>Series<select data-timeline-series></select></label>
@@ -141,7 +142,6 @@
                 <h2 id="executions-heading">Executions</h2>
                 <button type="button" data-list-retry hidden>Retry executions</button>
             </div>
-            <p class="resource-status" data-poll-status role="status"></p>
             <div class="panel">
                 <div class="table-toolbar">
                     <div class="table-controls" aria-label="Execution order">

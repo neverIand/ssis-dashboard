@@ -168,10 +168,11 @@ function mounted(t, get, options = {}) {
 test('event UI separates draft filters from applied search, preserves invalid input and resets filters only', async t => {
   const run = mounted(t, async (resource, { params }) => response(resource, params)); await flush(); run.action('toggle'); await flush();
   const { dom } = run; dom.get('events-kind').value = 'warnings'; dom.get('events-q').value = ' %_\r\n ';
-  assert.match(dom.get('events-scope').textContent, /All events/); const count = run.calls.length;
+  assert.equal(dom.get('events-scope').textContent, ''); const count = run.calls.length;
   dom.get('detail-refresh').dispatchEvent(new Event('click')); await flush();
   assert.equal(run.calls.at(-1).params.q, null); assert.equal(dom.get('events-q').value, ' %_\r\n ');
   run.action('filters'); await flush(); assert.equal(run.calls.at(-1).params.q, ' %_\r\n '); assert.equal(run.calls.at(-1).params.kind, 'warnings');
+  assert.equal(dom.get('events-scope').textContent, 'Warnings · Search: " %_\\r\\n "');
   dom.get('events-q').value = 'x'.repeat(513); const current = run.calls.length; run.action('filters'); await flush();
   assert.equal(run.calls.length, current); assert.match(dom.get('events-notice').textContent, /512/);
   run.action('reset'); await flush(); assert.equal(run.calls.at(-1).params.q, null); assert.equal(run.calls.at(-1).params.kind, 'all');

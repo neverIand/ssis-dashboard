@@ -52,7 +52,7 @@ export function mountHistoryChart(root,{metadata,restoreView=null}) {
     toggle.disabled=!visible;toggle.textContent=`${open?'Hide':'Show'} duration chart`;attribute(toggle,'aria-expanded',active);panel.hidden=!active;
     choice.disabled=!active||!page?.data.length;attribute(svg,'aria-busy',busy);
     if(!active||!page)clear();else if(page!==rendered){paint(page);rendered=page;}
-    scope.textContent=!active?'':page?`Loaded history page ${display.count(pageNumber)} · ${display.count(page.data.length)} execution${page.data.length===1?'':'s'} · ${stale?'Previous observation shown.':'Live observation.'} The rest of package history is not plotted.`:'No history page loaded.';
+    scope.textContent=!active?'':page?`Loaded history page ${display.count(pageNumber)} only · ${display.count(page.data.length)} execution${page.data.length===1?'':'s'}${stale?' · Previous observation shown.':''}`:'No history page loaded.';
     if(focused===choice&&choice.disabled&&!toggle.disabled)toggle.focus({preventScroll:true});
     if(returning&&visible&&page&&!busy){
       if(document.activeElement===initialFocus)controls[returning.focus]?.focus({preventScroll:true});

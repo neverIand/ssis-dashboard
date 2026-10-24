@@ -67,7 +67,7 @@ class FrontendShellTests(unittest.TestCase):
                        'disabled aria-describedby="app-status"', 'scope="col"',
                        'Creation timeline', 'data-timeline-toggle disabled', 'data-timeline-panel hidden',
                        'data-timeline-chart', 'data-timeline-table', 'Selected bucket', 'Data table',
-                       'Edge buckets count only the selected range.']:
+                       'About timeline counts', 'Edge buckets include only the selected range.']:
             self.assertIn(markup, html)
         references = re.findall(r'(?:href|src)="([^"]+)"', html)
         self.assertEqual(set(references), {
@@ -131,9 +131,10 @@ class FrontendShellTests(unittest.TestCase):
                                    'aria-label="Override pages"', 'Property / ID',
                                    'data-history-toggle aria-expanded="false"', 'data-history-panel hidden', 'data-history-table',
                                    'Duration comparison', 'data-history-chart-panel hidden', 'data-history-chart-plot',
-                                   'Selected execution', 'A circle marks actual zero.',
+                                   'Selected execution', 'Chart key', 'Circle: actual zero.',
+                                   'Estimates are not actual timings.', 'How estimates work',
                                    'History statuses', 'Apply statuses', 'aria-label="History pages"', 'Actual duration', 'Estimate',
-                                   'Start/end recording does not establish a package result.', 'aria-label="Executable pages"']:
+                                   'Start/end recording is not a package result.', 'aria-label="Executable pages"']:
                         self.assertIn(markup, html)
                     for markup in ['overview-filters', 'data-status-choices', 'data-execution-table']:
                         self.assertNotIn(markup, html)

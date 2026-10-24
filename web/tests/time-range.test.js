@@ -1,7 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calendarBound, localCandidates, nextDate, presetRange, projectTime } from '../src/time-range.js';
+import { calendarBound, localCandidates, nextDate, presetRange, projectTime, rangeLabel } from '../src/time-range.js';
 import { timestampTicks } from '../src/selection.js';
+
+test('creation range labels retain seconds in the fixed display-zone format', () => {
+  assert.equal(rangeLabel({from:'2026-10-17T16:00:01.1234567Z',to:'2026-10-17T17:30:02Z'}, 'Europe/London'),
+    '2026-10-17 17:00:01 → 2026-10-17 18:30:02');
+  assert.equal(rangeLabel({from:null,to:null}, 'Europe/London'), 'Default window');
+});
+
+test('creation range labels distinguish repeated wall times from UTC or offset bounds', () => {
+  const expected = '2026-10-25 01:30:00 (UTC+01:00) → 2026-10-25 01:30:00 (UTC+00:00)';
+  assert.equal(rangeLabel({from:'2026-10-25T00:30:00.1234567Z',to:'2026-10-25T01:30:00.9876543Z'}, 'Europe/London'), expected);
+  assert.equal(rangeLabel({from:'2026-10-25T01:30:00+01:00',to:'2026-10-25T01:30:00+00:00'}, 'Europe/London'), expected);
+  assert.equal(rangeLabel({from:null,to:'2026-10-25T02:00:00Z'}, 'Europe/London'), 'Default → 2026-10-25 02:00:00');
+});
 
 test('calendar dates use London summer/winter time, including 23/25-hour days', () => {
   for (const [date, hours] of [['2026-03-29', 23], ['2026-10-25', 25]]) {

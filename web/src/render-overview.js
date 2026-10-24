@@ -1,4 +1,4 @@
-import { createDisplay, formatCode, formatId } from './display.js';
+import { createDisplay, formatCode, formatId, refreshStatus } from './display.js';
 import { executionHref } from './detail-navigation.js';
 import { createOverview } from './overview.js';
 import { selectionParams } from './selection.js';
@@ -23,8 +23,6 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   const refresh = root.querySelector('[data-overview-refresh]');
   const pollToggle = root.querySelector('[data-poll-toggle]');
   const pollStatus = root.querySelector('[data-poll-status]');
-  const pollTime = new Intl.DateTimeFormat(undefined, { timeZone: metadata.display_timezone,
-    hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' });
   const scroll = table.parentElement;
   const rows = new Map();
   const cards = Object.fromEntries(['total', 'running', 'succeeded', 'failed']
@@ -148,10 +146,8 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     autoPaused = state.poll.paused;
     pollToggle.disabled = state.selection === null;
     pollToggle.textContent = autoPaused ? 'Resume auto refresh' : 'Pause auto refresh';
-    pollStatus.textContent = state.poll.mode === 'scheduled'
-      ? `${state.poll.failures ? 'Retry' : 'Next refresh'}: ${pollTime.format(state.poll.nextAt)}.`
-      : ({ idle: '', paused: 'Auto refresh paused.', hidden: 'Auto refresh paused while this tab is hidden.',
-        updating: 'Auto refresh on.', blocked: 'Auto refresh stopped. Retry or change the selection.' })[state.poll.mode];
+    pollStatus.textContent = refreshStatus(display, page?.meta.generated_at, state.poll);
+    pollStatus.title = page ? `Observed ${display.timestamp(page.meta.generated_at)} · ${page.meta.generated_at}` : '';
     listRetry.hidden = state.phase !== 'list-error';
     summaryRetry.hidden = state.phase !== 'summary-error';
     // Native disabling blurs a focused button on every automatic refresh. Keep
@@ -163,7 +159,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     pageNotice.textContent = state.notice;
     header.textContent = refreshing && state.busy ? 'Refreshing…'
       : state.pageStale ? 'Refresh failed' : ({ idle: 'No selection', 'loading-list': 'Loading executions…',
-      'loading-summary': 'Loading summary…', ready: 'Loaded', 'list-error': 'Executions unavailable',
+      'loading-summary': 'Loading summary…', ready: '', 'list-error': 'Executions unavailable',
       'summary-error': 'Summary unavailable', 'loading-timeline':'Loading timeline…' })[state.phase];
     if (page !== renderedPage) {
       if (page) renderRows(page, state.pageNumber, state.selection);
@@ -173,11 +169,13 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       empty(state.phase === 'loading-list' ? 'Loading executions…'
         : state.phase === 'list-error' ? 'Executions could not be loaded.' : 'No data loaded.');
     }
-    const pageDetails = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} rows · Updated ${display.timestamp(page.meta.generated_at)} · Live results` : '';
+    const pageDetails = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} rows` : '';
+    listStatus.title = page ? `Observed ${display.timestamp(page.meta.generated_at)} · ${page.meta.generated_at}` : '';
     listStatus.textContent = state.phase === 'list-error'
       ? `${failure(state.error)}${state.pageStale ? ` Previous results shown. ${pageDetails}` : ''}`
       : state.pageStale ? `Refreshing… Previous results shown. ${pageDetails}` : pageDetails;
-    const summaryDetails = state.summaryStale ? ` Previous counts shown. Updated ${display.timestamp(state.summary.meta.generated_at)}.` : '';
+    const summaryDetails = state.summaryStale ? ' Previous counts shown.' : '';
+    summaryStatus.title = state.summary ? `Observed ${display.timestamp(state.summary.meta.generated_at)} · ${state.summary.meta.generated_at}` : '';
     summaryStatus.textContent = state.phase === 'summary-error' ? failure(state.error) + summaryDetails
       : state.summaryStale ? (state.busy ? 'Refreshing…' + summaryDetails : summaryDetails.trimStart())
       : state.phase === 'loading-summary' ? 'Loading summary…' : '';

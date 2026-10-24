@@ -11,7 +11,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
   const table = get('table'), body = table.querySelector('tbody'), form = get('filters');
   const display = createDisplay({ timeZone: metadata.display_timezone }), rows = new Map(), listeners = [];
   const initialFocus = document.activeElement, initialScroll = { left: scroll.scrollLeft, top: scroll.scrollTop };
-  let returning = enabled ? restoreView : null, current = null, rendered = null, applied = null, busy = true;
+  let returning = enabled ? restoreView : null, current = null, rendered = null, renderedStart = null, applied = null, busy = true;
   const element = (tag, text, className) => {
     const node = document.createElement(tag);
     if (text !== undefined) node.textContent = text;
@@ -32,7 +32,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
     rows.clear(); const row = element('tr'), cell = element('td', message, 'empty-state');
     cell.colSpan = 5; row.append(cell); body.replaceChildren(row);
   }
-  function paint(page, pageNumber) {
+  function paint(page, pageNumber, executionStart) {
     if (!page.data.length) {
       empty(pageNumber > 1 ? 'No events remain on this page. Use Previous or Show latest.'
         : page.meta.availability === 'not-recorded' ? 'No events recorded. Logging was disabled.'
@@ -60,7 +60,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
         row = { node, cells, time, name, code, preview, message, messageSummary, full, truncated, details, summary, values };
         rows.set(item.event_id, row);
       }
-      text(row.cells[0], formatId(item.event_id)); text(row.time, display.timestamp(item.message_time));
+      text(row.cells[0], formatId(item.event_id)); text(row.time, display.tableTimestamp(item.message_time, executionStart));
       row.time.setAttribute('datetime', item.message_time); row.time.title = item.message_time;
       text(row.name, literal(item.event_name)); text(row.code, `Message type: ${item.message_type}`);
       const characters = item.message === null ? [] : [...item.message];
@@ -90,7 +90,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
     catch { notice.textContent = `Rows per page must be between 1 and ${metadata.limits.max_limit}.`; }
   });
   return {
-    render(state, isBusy, authorized) {
+    render(state, isBusy, authorized, executionStart = null) {
       current = state; busy = isBusy;
       const focused = document.activeElement, rowFocused = body.contains(focused), panelFocused = panel.contains(focused);
       const position = { left: scroll.scrollLeft, top: scroll.scrollTop }, permitted = enabled && authorized;
@@ -110,15 +110,18 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
         kind.value = state.query.kind; q.value = state.query.q ?? '';
       }
       applied = state.query;
-      scope.textContent = panel.hidden ? '' : `Applied category: ${label(applied.kind)} · ${applied.q === null ? 'No search' : `Search: ${JSON.stringify(applied.q)}`}`;
+      scope.textContent = panel.hidden ? '' : [applied.kind === 'all' ? '' : label(applied.kind),
+        applied.q === null ? '' : `Search: ${JSON.stringify(applied.q)}`].filter(Boolean).join(' · ');
       notice.textContent = state.notice;
       const page = panel.hidden ? null : state.page;
-      if (page !== rendered || page === null) {
-        if (page) paint(page, state.pageNumber); else empty(state.phase === 'loading' ? 'Loading events…' : 'No events loaded.');
+      if (page !== rendered || page === null || executionStart !== renderedStart) {
+        if (page) paint(page, state.pageNumber, executionStart); else empty(state.phase === 'loading' ? 'Loading events…' : 'No events loaded.');
         rendered = page;
+        renderedStart = executionStart;
       }
-      const info = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} events · Observed ${display.timestamp(page.meta.generated_at)} · Live results · ${
-        { available: 'Recorded events', 'not-recorded': 'Not recorded', unknown: 'Recording coverage unknown' }[page.meta.availability]}${page.meta.has_unidentified_events ? ' · Some matching events have no public numeric ID and cannot be paged.' : ''}` : '';
+      status.title = page ? `Observed ${display.timestamp(page.meta.generated_at)} · ${page.meta.generated_at}` : '';
+      const coverage = page?.meta.availability === 'available' ? '' : page?.meta.availability === 'not-recorded' ? ' · Not recorded' : ' · Recording coverage unknown';
+      const info = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} events${coverage}${page.meta.has_unidentified_events ? ' · Some matching events have no public numeric ID and cannot be paged.' : ''}` : '';
       status.textContent = panel.hidden ? '' : state.error ? `${state.error.message}${state.error.requestId ? ` Request ID: ${state.error.requestId}` : ''}${state.stale ? ' Previous event page shown. ' : ' '}${info}`
         : state.stale ? `Refreshing… Previous event page shown. ${info}` : state.phase === 'loading' ? 'Loading events…' : info;
       if (panel.hidden && panelFocused && permitted) toggle.focus({ preventScroll: true });
@@ -152,7 +155,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
     },
     dispose() {
       for (const [node, event, handler] of listeners) node.removeEventListener(event, handler);
-      rows.clear(); body.replaceChildren(); status.textContent = notice.textContent = scope.textContent = q.value = '';
+      rows.clear(); body.replaceChildren(); status.textContent = notice.textContent = scope.textContent = q.value = status.title = '';
       for (const node of Object.values(controls)) node.disabled = true;
       panel.hidden = retry.hidden = true; toggle.setAttribute('aria-expanded', 'false');
       current = returning = rendered = applied = null;

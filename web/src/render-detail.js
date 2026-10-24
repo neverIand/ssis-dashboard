@@ -1,4 +1,4 @@
-import { createDisplay } from './display.js';
+import { createDisplay, refreshStatus } from './display.js';
 import { createDetailLoader, detailFields } from './detail.js';
 import { readOverviewReturn } from './detail-navigation.js';
 import { mountObservationTable } from './render-observations.js';
@@ -15,7 +15,6 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   const status = root.querySelector('[data-detail-status]');
   const retry = root.querySelector('[data-detail-retry]');
   const correlation = root.querySelector('[data-detail-request-id]');
-  const observed = root.querySelector('[data-detail-observed]');
   const elapsed = root.querySelector('[data-active-elapsed]');
   const refresh = root.querySelector('[data-detail-refresh]');
   const toggle = root.querySelector('[data-detail-poll-toggle]');
@@ -27,10 +26,9 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   const destination = readOverviewReturn(window.location.search,
     { appBase, origin: window.location.origin, metadata });
   returnLink.href = destination.href;
+  returnLink.title = 'Return to overview filters at page one.';
   returnNotice.textContent = destination.notice;
   returnNotice.hidden = !destination.notice;
-  const pollTime = new Intl.DateTimeFormat(undefined, { timeZone: metadata.display_timezone,
-    hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' });
   const fields = [...root.querySelectorAll('[data-detail-field]')];
   const position = () => ({ x: window.scrollX, y: window.scrollY });
   const restorePosition = value => {
@@ -73,7 +71,6 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   const clear = () => {
     content.hidden = true;
     elapsed.hidden = true;
-    observed.textContent = '';
     for (const field of fields) {
       field.textContent = '—';
       field.removeAttribute('datetime');
@@ -94,10 +91,8 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     refresh.setAttribute('aria-disabled', String(state.busy));
     autoPaused = state.poll.paused;
     toggle.textContent = autoPaused ? 'Resume auto refresh' : 'Pause auto refresh';
-    pollStatus.textContent = state.poll.mode === 'scheduled'
-      ? `${state.poll.failures ? 'Retry' : 'Next refresh'}: ${pollTime.format(state.poll.nextAt)}.`
-      : ({ idle: '', paused: 'Auto refresh paused.', hidden: 'Auto refresh paused while this tab is hidden.',
-        updating: 'Auto refresh on.', blocked: 'Auto refresh stopped. Retry when the cause is resolved.' })[state.poll.mode];
+    pollStatus.textContent = refreshStatus(display, state.response?.meta.generated_at, state.poll);
+    pollStatus.title = state.response ? `Observed ${display.timestamp(state.response.meta.generated_at)} · ${state.response.meta.generated_at}` : '';
     retry.hidden = state.phase !== 'error' && !(state.busy && !retry.hidden);
     retry.disabled = false;
     retry.setAttribute('aria-disabled', String(state.busy));
@@ -107,7 +102,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
       parameters: 'parameters', overrides: 'overrides', history: 'package history' }[state.sectionBusy] ?? 'sections';
     header.textContent = state.busy && state.operation === 'section' ? `Loading ${sectionName}…`
       : state.busy ? (state.response ? 'Refreshing…' : 'Loading execution…')
-      : state.phase === 'ready' ? 'Loaded' : state.stale ? 'Refresh failed' : 'Execution unavailable';
+      : state.phase === 'ready' ? '' : state.stale ? 'Refresh failed' : 'Execution unavailable';
     correlation.hidden = !state.error?.requestId;
     correlation.textContent = state.error?.requestId ? `Request ID: ${state.error.requestId}` : '';
     if (!state.response) clear();
@@ -125,13 +120,12 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
           data.event_counts[key] === 0 ? 'quiet' : key === 'warnings' ? 'warning' : 'error';
       }
       elapsed.hidden = data.started_at === null || data.ended_at !== null;
-      observed.textContent = `Observed ${display.timestamp(state.response.meta.generated_at)}`;
       content.hidden = false;
     }
     rendered = state.response;
-    executableView.render(state.executables, state.busy, state.response !== null);
-    childView.render(state.children, state.busy, state.response !== null);
-    eventView.render(state.events, state.busy, state.response !== null);
+    executableView.render(state.executables, state.busy, state.response !== null, state.response?.data.started_at);
+    childView.render(state.children, state.busy, state.response !== null, state.response?.data.started_at);
+    eventView.render(state.events, state.busy, state.response !== null, state.response?.data.started_at);
     parameterView.render(state.parameters, state.busy, state.response !== null);
     overrideView.render(state.overrides, state.busy, state.response !== null);
     historyView.render(state.history, state.busy, state.response !== null, state.response?.data);
@@ -180,6 +174,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     refresh.disabled = toggle.disabled = true;
     retry.hidden = retry.disabled = true;
     pollStatus.textContent = '';
+    pollStatus.title = '';
     status.textContent = 'Waiting for settings.';
     correlation.textContent = '';
     correlation.hidden = true;

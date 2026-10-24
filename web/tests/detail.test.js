@@ -19,7 +19,7 @@ test('detail retains exact BIGINT/LSN/timestamps, zero durations/counts and lite
   assert.equal(fields.folder, response.data.folder_name);
   assert.equal(fields.lsn, id);
   assert.equal(fields.environment, '—');
-  assert.equal(fields.duration, '0 secs');
+  assert.equal(fields.duration, '0 ms');
   assert.equal(fields.errors, '0');
   assert.equal(fields.logging, 'None');
   assert.equal(JSON.stringify(response), before);
@@ -40,7 +40,7 @@ test('created, active, incomplete and unknown observations have distinct project
   readExecutionDetail(response, id, display);
   fields = detailFields(response, display);
   assert.equal(fields.duration, '—');
-  assert.equal(fields.elapsed, '<0.001 secs');
+  assert.equal(fields.elapsed, '<1 ms');
   assert.equal(fields.logging, 'Unknown (-99)');
   assert.equal(fields.lsn, '0');
 });

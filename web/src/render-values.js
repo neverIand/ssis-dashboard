@@ -105,7 +105,8 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
         if (page) paint(page, state.pageNumber); else empty(state.phase === 'loading' ? `Loading ${resource}…` : `No ${resource} loaded.`);
         rendered = page;
       }
-      const info = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} ${resource} · Observed ${display.timestamp(page.meta.generated_at)} · Live results` : '';
+      status.title = page ? `Observed ${display.timestamp(page.meta.generated_at)} · ${page.meta.generated_at}` : '';
+      const info = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} ${resource}` : '';
       const previousPage = `Previous ${parameter ? 'parameter' : 'override'} page shown.`;
       status.textContent = panel.hidden ? '' : state.error ? `${state.error.message}${state.error.requestId ? ` Request ID: ${state.error.requestId}` : ''}${state.stale ? ` ${previousPage} ` : ' '}${info}`
         : state.stale ? `Refreshing… ${previousPage} ${info}` : state.phase === 'loading' ? `Loading ${resource}…` : info;
@@ -139,7 +140,7 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
     },
     dispose() {
       for (const [node, event, handler] of listeners) node.removeEventListener(event, handler);
-      rows.clear(); body.replaceChildren(); status.textContent = notice.textContent = '';
+      rows.clear(); body.replaceChildren(); status.textContent = notice.textContent = status.title = '';
       for (const node of Object.values(controls)) node.disabled = true;
       panel.hidden = retry.hidden = true; toggle.setAttribute('aria-expanded', 'false');
       current = returning = rendered = null;

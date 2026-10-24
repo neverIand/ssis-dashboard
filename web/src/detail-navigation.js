@@ -28,7 +28,7 @@ export function readOverviewReturn(search, { appBase, origin, metadata }) {
         || !params.get('overview').startsWith('?')) throw new TypeError();
     const selection = parseSelection(params.get('overview'), metadata);
     return { href: base.pathname + selectionSearch(selection, metadata), selection,
-      notice: 'Overview opens these filters at page one.' };
+      notice: '' };
   } catch {
     return { ...fallback, notice: 'Return filters are invalid. Overview opens at page one.' };
   }

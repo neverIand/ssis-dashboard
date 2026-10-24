@@ -29,7 +29,10 @@ test('detail bootstrap needs no overview controls and requests metadata then onl
   assert.equal(dom.field('status').dataset.status, '7');
   assert.equal(dom.field('errors').textContent, '0');
   assert.equal(dom.get('active-elapsed').hidden, true);
-  assert.match(dom.get('detail-observed').textContent, /^Observed /);
+  assert.equal(dom.field('created').textContent, '2026-10-17 17:00:00');
+  assert.equal(dom.field('created').getAttribute('title'), response.data.created_at);
+  assert.equal(dom.get('detail-poll-status').textContent, 'Updated 17:00:00 · auto refresh on');
+  assert.ok(dom.get('detail-poll-status').title.includes(response.meta.generated_at));
   dispose();
   assert.equal(dom.get('execution-detail').hidden, true);
   assert.equal(dom.field('package').textContent, '—');
@@ -126,13 +129,13 @@ test('transient refresh is labeled with its old observation time; denial clears 
     appBase: '/ops/app/', api: { async get() { attempts++; if (failure) throw failure; return detailResponse(); } } });
   t.after(screen.dispose);
   await settle();
-  const observed = dom.get('detail-observed').textContent;
+  const observed = dom.get('detail-poll-status').title;
   failure = new ApiError('http', { status: 503, requestId });
   dom.get('detail-refresh').dispatchEvent(new Event('click'));
   await settle();
   assert.equal(dom.get('execution-detail').hidden, false);
   assert.match(dom.get('detail-status').textContent, /Previous observation shown/);
-  assert.equal(dom.get('detail-observed').textContent, observed);
+  assert.equal(dom.get('detail-poll-status').title, observed);
   failure = new ApiError('http', { status: 403, requestId });
   dom.get('detail-retry').dispatchEvent(new Event('click'));
   await settle();
@@ -141,7 +144,7 @@ test('transient refresh is labeled with its old observation time; denial clears 
   assert.equal(dom.field('status').textContent, '—');
   assert.equal(dom.field('status').dataset.status, undefined);
   assert.doesNotMatch(dom.root.textContent, /Main\.dtsx|succeeded/);
-  assert.equal(dom.get('detail-observed').textContent, '');
+  assert.equal(dom.get('detail-poll-status').title, '');
   assert.match(dom.get('detail-poll-status').textContent, /stopped/);
   t.mock.timers.tick(60000);
   await settle();
@@ -190,7 +193,8 @@ test('detail return filters are validated after metadata and never sent to its A
     appBase: '/ops/app/', api: { async get(resource, options) { calls.push({ resource, options }); return detailResponse(); } } });
   await settle();
   assert.equal(dom.get('overview-link').href, '/ops/app/?folder=Fold%2B+%2F&limit=5');
-  assert.match(dom.get('overview-return-notice').textContent, /page one/);
+  assert.equal(dom.get('overview-return-notice').hidden, true);
+  assert.match(dom.get('overview-link').title, /page one/);
   assert.deepEqual(Object.keys(calls[0].options), ['signal']);
   screen.dispose();
   assert.equal(dom.get('detail-retry').hidden, true);

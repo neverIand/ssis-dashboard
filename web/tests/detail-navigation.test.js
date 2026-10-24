@@ -18,7 +18,7 @@ test('native detail URLs carry exact validated selection only and stay within th
   const returned = readOverviewReturn(new URL(href, options.origin).search, options);
   assert.deepEqual(returned.selection, selection);
   assert.deepEqual(parseSelection(new URL(returned.href, options.origin).search, settings), selection);
-  assert.match(returned.notice, /page one/);
+  assert.equal(returned.notice, '');
 });
 
 test('standalone or invalid return context has a safe default without accepting arbitrary destinations', () => {
