@@ -6,11 +6,11 @@ import { mountOverview } from './render-overview.js';
 export function mountOverviewScreen(root, saved = null) {
   const document = root.ownerDocument;
   root.querySelector('#overview-filters fieldset').disabled = true;
-  for (const selector of ['[data-apply-filters]', '[data-reset-filters]',
+  for (const selector of ['[data-reset-filters]',
     '[data-overview-refresh]', '[data-poll-toggle]']) root.querySelector(selector).disabled = true;
   for (const control of root.querySelectorAll('[data-order]')) control.disabled = true;
   let checkpoint = () => null;
-  const dispose = mountBootstrap(root, { ready(metadata, api, config) {
+  const dispose = mountBootstrap(root, { ready(metadata, api, config, serverTime) {
     const options = [{ code: '', name: 'All statuses' }, ...metadata.execution_statuses];
     root.querySelector('[data-status-choices]').replaceChildren(...options.map((item) => {
       const label = document.createElement('label');
@@ -22,13 +22,14 @@ export function mountOverviewScreen(root, saved = null) {
       label.append(checkbox, document.createTextNode(item.code === '' ? item.name : formatCode(item)));
       return label;
     }));
-    const overview = mountOverview(root, { metadata, api, appBase: config.app_base,
-      retainedPaths: saved?.paths, restoreView: saved?.view });
+    let filters;
+    const overview = mountOverview(root, { metadata, api, appBase: config.app_base, serverTime,
+      retainedPaths: saved?.paths, restoreView: saved?.view, onSelect: changes => filters.select(changes) });
     if (saved) { saved.paths.length = 0; saved.view = null; }
     checkpoint = overview.checkpoint;
-    const filters = mountFilters(root, { metadata, api, appBase: config.app_base,
+    filters = mountFilters(root, { metadata, api, appBase: config.app_base, effectiveWindow: overview.effectiveWindow,
       onApplied: (selection, options) => { void overview.apply(selection, options); } });
-    return () => { filters(); overview.dispose(); };
+    return () => { filters.dispose(); overview.dispose(); };
   } });
   return { dispose, checkpoint: () => checkpoint() };
 }

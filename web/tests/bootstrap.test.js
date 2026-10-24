@@ -74,6 +74,7 @@ test('one bootstrap request owns repeated starts and releases its deadline after
   pending.resolve(envelope());
   await first;
   assert.deepEqual(states.map((state) => state.phase), ['loading', 'ready']);
+  assert.equal(states.at(-1).serverTime, envelope().meta.generated_at);
   t.mock.timers.tick(60000);
   assert.equal(signal.aborted, false);
   assert.equal(calls, 1);

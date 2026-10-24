@@ -19,6 +19,12 @@ class Control extends EventTarget {
   }
   setAttribute(key, value) { this.attributes.set(key, String(value)); }
   getAttribute(key) { return this.attributes.get(key); }
+  closest(selector) {
+    return selector.split(', ').some(part => {
+      const key = { '[data-selection-link]':'selectionLink', '[data-sort]':'sort', '[data-execution-link]':'executionLink' }[part];
+      return key && key in this.dataset;
+    }) ? this : null;
+  }
   focus() { this.ownerDocument.activeElement = this; }
   contains(node) { return node === this || this.children.some(child => child.contains(node)); }
   getBoundingClientRect() { return { left: 0, top: 0, bottom: 36, width: 800 }; }
@@ -39,10 +45,14 @@ export function filtersDOM(metadata, search = '') {
   add('fieldset');
   for (const key of ['filter-notice', 'reset-filters', 'apply-filters', 'recover-filters', 'time-notice', 'use-range', 'custom-window', 'time-fields', 'time-help']) add(`[data-${key}]`);
   add('.exact-times'); add('#include-time', 'input');
-  const mode = add('#creation-window', 'select');
+  const presets = [];
   for (const value of ['default', 'today', '24h', '7d', '30d', 'custom']) {
-    const option = new Control(document, 'option'); option.value = value; mode.children.push(option);
+    const button = add(`[data-created-preset="${value}"]`, 'button'); button.dataset.createdPreset = value; presets.push(button);
   }
+  form.queries.set('[data-created-preset]', presets[0]);
+  // querySelectorAll uses a list while querySelector returns the first match.
+  const formAll = form.querySelectorAll.bind(form);
+  form.querySelectorAll = selector => selector === '[data-created-preset]' ? presets : formAll(selector);
   for (const key of ['from', 'to']) {
     for (const suffix of ['', '-date', '-time']) add(`#${key}${suffix}`, 'input');
     add(`[data-occurrence-label="${key}"]`);
@@ -69,6 +79,12 @@ export function filtersDOM(metadata, search = '') {
   }
   for (const key of ['sort', 'direction', 'limit']) add(`[data-order="${key}"]`, 'select', root);
   add('[data-order-notice]', 'p', root);
+  add('[data-order-label]', 'p', root);
+  const headers = ['execution_id', 'project_name', 'package_name', 'status', 'created_at', 'started_at', 'duration_seconds', 'warning_count', 'error_count'].map(key => {
+    const button = add(`[data-sort="${key}"]`, 'button', root); button.dataset.sort = key;
+    button.parentElement = new Control(document, 'th'); return button;
+  });
+  root.queries.set('[data-sort]', headers);
   return { root, form, document, window, get: selector => form.querySelector(selector),
     submit: () => form.dispatchEvent(new Event('submit', { cancelable: true })),
     click: selector => form.querySelector(selector).click(),

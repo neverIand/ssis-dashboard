@@ -1,8 +1,9 @@
 import { ApiError } from './api.js';
 import { createDisplay, formatCode, formatId, formatText } from './display.js';
-import { selectionParams, timestampTicks } from './selection.js';
+import { selectionParams, timestampTicks, validateSelection } from './selection.js';
 import { createRefreshLoop } from './refresh-loop.js';
 import { readTimeline, timelineParams, timelineScope } from './timeline.js';
+import { createServerClock, presetRange } from './time-range.js';
 
 const utc = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{7}Z$/;
 const badResponse = (response) => new ApiError('invalid_response', { requestId: response?.meta?.request_id });
@@ -102,14 +103,16 @@ export function readSummary(response, page, metadata, display) {
 }
 
 export function createOverview({ api, metadata, publish, timeoutMs = 30000, locale, retainedPaths = [],
-  autoRefresh = true, visible = true, pollIntervalMs = 30000, maxPollIntervalMs = 300000, restoreTimeline = null }) {
+  autoRefresh = true, visible = true, pollIntervalMs = 30000, maxPollIntervalMs = 300000, restoreTimeline = null,
+  serverTime = null, monotonicNow }) {
   const display = createDisplay({ timeZone: metadata.display_timezone, locale });
+  const clock = createServerClock(serverTime, monotonicNow);
   let state = { phase: 'idle', selection: null, page: null, summary: null, error: null, notice: '',
     operation: null, pageStale: false, summaryStale: false, timeline: {open:restoreTimeline?.open === true,
       bucket:['day','hour'].includes(restoreTimeline?.bucket) ? restoreTimeline.bucket : 'day', page:null, scope:null, error:null, stale:false} };
   // Keep request paths only, never rows or cursor tokens in history.state or storage.
   const contexts = new Map(retainedPaths.map(([id, path]) => [id, copyPath(path)]));
-  const key = (selection) => JSON.stringify(selectionParams(selection));
+  const key = (selection) => JSON.stringify({ ...selectionParams(selection), created: selection.created ?? null });
   let context = null;
   let generation = 0;
   let active = null;
@@ -222,17 +225,20 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
     const selection = state.selection;
     context = { ...context, entries: [...context.entries], index };
     const cursor = context.entries[index];
-    const cohort = operation === 'refresh' && index === 0 ? null : context.cohort;
-    const params = { ...selectionParams(selection), ...(cohort ? { from: cohort.from, to: cohort.to } : {}),
-      ...(cursor === null ? {} : { cursor }) };
+    const cohort = index === 0 && (operation === 'refresh' || selection.created) ? null : context.cohort;
     emit({ phase: 'loading-list', page: previousPage, summary: previousSummary,
       timeline:{...state.timeline,page:operation === 'refresh' ? state.timeline.page : null,error:null,
         stale:operation === 'refresh' && state.timeline.page !== null},
       pageStale: previousPage !== null, summaryStale: previousSummary !== null, operation, error: null, notice });
     try {
+      const bounds = cohort ? { from: cohort.from, to: cohort.to }
+        : selection.created ? presetRange(selection.created, clock.read(), metadata.display_timezone) : {};
+      if (selection.created) validateSelection({ ...selection, created: null, ...bounds }, metadata);
+      const params = { ...selectionParams(selection), ...bounds, ...(cursor === null ? {} : { cursor }) };
       const response = await request('executions', params);
       if (disposed || current !== generation) return;
-      const page = readExecutionPage(response, selection, metadata, display);
+      const page = readExecutionPage(response, { ...selection, ...bounds }, metadata, display);
+      clock.observe(page.meta.generated_at);
       if (cohort && (page.meta.from !== cohort.from || page.meta.to !== cohort.to
           || (cursor !== null && (page.meta.as_of !== cohort.as_of || page.meta.upper_id !== cohort.upper_id)))) {
         throw badResponse(response);
@@ -302,6 +308,7 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
   return {
     apply,
     refresh,
+    effectiveWindow: () => state.page ? { from: state.page.meta.from, to: state.page.meta.to } : null,
     toggleTimeline, retryTimeline,
     setTimelineBucket(bucket) {
       if (!['day','hour'].includes(bucket)) throw new TypeError('Choose Day or Hour.');

@@ -1,19 +1,25 @@
 import { formatCode } from './display.js';
 import { createCatalogSearch } from './catalog-search.js';
+import { executionHref } from './detail-navigation.js';
 import { mountRangeEditor } from './range-editor.js';
-import { catalogName, createSelectionSession, SelectionError, selectionSearch } from './selection.js';
+import { catalogName, createSelectionSession, SelectionError, selectionSearch, validateSelection } from './selection.js';
 import { rangeLabel } from './time-range.js';
 
-export function mountFilters(root, { metadata, api, appBase, onApplied = () => {} }) {
+export function mountFilters(root, { metadata, api, appBase, onApplied = () => {}, effectiveWindow = () => null }) {
   const document = root.ownerDocument, window = document.defaultView;
   const form = root.querySelector('#overview-filters');
   const get = selector => form.querySelector(selector);
   const fieldset = get('fieldset'), notice = get('[data-filter-notice]');
-  const apply = get('[data-apply-filters]'), reset = get('[data-reset-filters]');
+  const reset = get('[data-reset-filters]');
   const recover = get('[data-recover-filters]'), status = get('#status');
   const order = Object.fromEntries(['sort', 'direction', 'limit']
     .map(key => [key, root.querySelector(`[data-order="${key}"]`)]));
   const orderNotice = root.querySelector('[data-order-notice]');
+  const orderLabel = root.querySelector('[data-order-label]');
+  const headers = [...root.querySelectorAll('[data-sort]')];
+  const sortNames = { execution_id: 'ID', created_at: 'Created', started_at: 'Started', ended_at: 'Ended',
+    project_name: 'Project', package_name: 'Entry package', environment: 'Environment', status: 'Status',
+    logging_level: 'Logging level', duration_seconds: 'Duration', warning_count: 'Warnings', error_count: 'Errors' };
   const session = createSelectionSession(metadata), removers = [];
   const pickers = new Map();
   let opened = null, searchTimer = null;
@@ -24,14 +30,10 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
   order.sort.replaceChildren(...metadata.execution_sorts.map(key => {
     const option = document.createElement('option');
     option.value = key;
-    option.textContent = ({ execution_id: 'ID', created_at: 'Created', started_at: 'Started', ended_at: 'Ended',
-      project_name: 'Project', package_name: 'Entry package', environment: 'Environment', status: 'Status',
-      logging_level: 'Logging level', duration_seconds: 'Duration', warning_count: 'Warnings', error_count: 'Errors' })[key] ?? key;
+    option.textContent = sortNames[key] ?? key;
     return option;
   }));
-  order.limit.max = String(metadata.limits.max_limit);
-
-  function close({ focus = false } = {}) {
+  function close({ focus = false, commitStatus = true } = {}) {
     if (!opened) return;
     clearTimeout(searchTimer);
     const { panel, trigger, key } = opened;
@@ -40,6 +42,7 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
     pickers.get(key)?.cancel();
     if (key === 'created') range.cancel();
     opened = null;
+    if (key === 'status' && commitStatus) commit();
     if (focus) trigger.focus();
   }
   function position() {
@@ -66,13 +69,41 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
     label('status', names.length ? names.join(', ') : 'All statuses');
     label('created', rangeLabel(draft, metadata.display_timezone));
     const changed = JSON.stringify(draft) !== JSON.stringify(session.applied);
-    apply.disabled = !changed;
-    notice.textContent = changed ? 'Changes not applied.' : '';
+    notice.textContent = changed ? 'Close Status to apply; Escape cancels.' : '';
   }
   function showApplied(selection, options) {
+    const sizes = [...new Set([25, 50, 100, 200, metadata.limits.default_limit, selection.limit])]
+      .filter(value => value <= metadata.limits.max_limit).sort((a,b) => a-b);
+    order.limit.replaceChildren(...sizes.map(value => {
+      const option = document.createElement('option'); option.value = String(value); option.textContent = String(value); return option;
+    }));
     for (const [key, control] of Object.entries(order)) control.value = String(selection[key]);
+    orderLabel.textContent = `Sorted by ${sortNames[selection.sort] ?? selection.sort} · ${selection.direction === 'asc' ? 'Ascending' : 'Descending'}`;
+    for (const button of headers) {
+      const supported = metadata.execution_sorts.includes(button.dataset.sort);
+      button.disabled = !supported;
+      button.parentElement.setAttribute('aria-sort', !supported || button.dataset.sort !== selection.sort ? 'none'
+        : selection.direction === 'asc' ? 'ascending' : 'descending');
+    }
     orderNotice.textContent = '';
     onApplied(selection, options);
+  }
+  function commit() {
+    if (session.applied === null) return;
+    try {
+      const before = selectionSearch(session.applied, metadata);
+      const selection = session.apply();
+      writeUrl(selection); showDraft();
+      if (selectionSearch(selection, metadata) !== before) showApplied(selection);
+    } catch (error) { notice.textContent = error instanceof SelectionError ? error.message : 'Filters could not be applied.'; }
+  }
+  function select(changes) {
+    let value = { ...session.draft, ...changes };
+    if ('folder' in changes && changes.folder !== session.draft.folder && !('project' in changes)) value.project = null;
+    value = validateSelection(value, metadata);
+    close({ commitStatus: false });
+    session.update(value);
+    commit();
   }
   function writeUrl(selection, replace = false) {
     const url = appBase + selectionSearch(selection, metadata) + window.location.hash;
@@ -82,11 +113,9 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
   function chooseScope(key, name) {
     try {
       if (name !== null) catalogName(name);
-      const selection = session.scope({ [key]: name });
-      close({ focus: true });
-      writeUrl(selection);
-      showDraft();
-      showApplied(selection);
+      const trigger = opened?.trigger;
+      select({ [key]: name });
+      trigger?.focus();
     } catch (error) { notice.textContent = error instanceof SelectionError ? error.message : 'Scope could not be changed.'; }
   }
 
@@ -145,8 +174,9 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
     listen(get(`[data-all-scope="${key}"]`), 'click', () => chooseScope(key, null));
   }
 
-  const range = mountRangeEditor(form, { metadata, api, listen, onChoose(bounds) {
-    session.update(bounds); close({ focus: true }); showDraft();
+  const range = mountRangeEditor(form, { metadata, listen, onChoose(bounds) {
+    const trigger = opened?.trigger;
+    select(bounds); trigger?.focus();
   } });
   for (const trigger of form.querySelectorAll('[data-open-filter]')) listen(trigger, 'click', () => {
     const key = trigger.dataset.openFilter;
@@ -161,20 +191,44 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
       get(`[data-all-scope="${key}"]`).setAttribute('aria-pressed', String(session.applied[key] === null));
       void pickers.get(key).search('', key === 'project' ? session.applied.folder : null);
       search.focus();
-    } else if (key === 'created') { range.open(session.draft); get('#creation-window').focus(); }
+    } else if (key === 'created') { range.open(session.draft, effectiveWindow()); get('[data-created-preset]').focus(); }
     else status.querySelector('input').focus();
     position();
   });
   for (const button of form.querySelectorAll('[data-close-filter]')) listen(button, 'click', () => close({ focus: true }));
   listen(document, 'pointerdown', event => {
-    if (opened && !opened.panel.contains(event.target) && !opened.trigger.contains(event.target)) close();
+    if (opened && !opened.panel.contains(event.target) && !opened.trigger.contains(event.target)) {
+      // Let a selection action consume the Status draft once. Prevent mouse focus
+      // from committing and removing the clicked row before its click is delivered.
+      if (opened.key === 'status' && event.target.closest?.('[data-selection-link], [data-sort], [data-execution-link]')) event.preventDefault();
+      else close();
+    }
   });
+  function outsideClick(event) {
+    if (!opened || opened.panel.contains(event.target) || opened.trigger.contains(event.target)) return;
+    const link = event.target.closest?.('[data-execution-link]');
+    if (opened.key === 'status' && link) {
+      // The click has an activation target now. Update that exact anchor before
+      // the commit clears rows, so ordinary and modified navigation carry Status.
+      link.setAttribute('href', executionHref(link.dataset.executionId,
+        validateSelection(session.draft, metadata), { metadata, appBase, origin: window.location.origin }));
+    }
+    close();
+  }
+  listen(document, 'click', outsideClick);
+  listen(document, 'auxclick', outsideClick);
   listen(form, 'keydown', event => {
-    if (event.key === 'Escape' && opened) { event.preventDefault(); close({ focus: true }); }
+    if (event.key === 'Escape' && opened) {
+      event.preventDefault();
+      if (opened.key === 'status') { session.update({ status: session.applied.status }); showDraft(); }
+      close({ focus: true, commitStatus: false });
+    }
     else if (event.key === 'Enter' && opened && event.target.tagName === 'INPUT') event.preventDefault();
   });
   listen(document, 'focusin', event => {
-    if (opened && !opened.panel.contains(event.target) && !opened.trigger.contains(event.target)) close();
+    if (opened && !opened.panel.contains(event.target) && !opened.trigger.contains(event.target)) {
+      close();
+    }
   });
   listen(window, 'resize', position);
   listen(status, 'change', event => {
@@ -186,36 +240,38 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
   });
   listen(form, 'submit', event => {
     event.preventDefault();
-    if (opened || session.applied === null) return;
-    try {
-      const selection = session.apply();
-      writeUrl(selection); showDraft(); showApplied(selection);
-    } catch (error) { notice.textContent = error instanceof SelectionError ? error.message : 'Filters could not be applied.'; }
   });
   listen(reset, 'click', () => {
-    close(); session.update({ status: [], from: null, to: null });
-    const selection = session.apply();
-    writeUrl(selection); showDraft(); showApplied(selection);
+    select({ status: [], created: null, from: null, to: null });
   });
   for (const [key, control] of Object.entries(order)) listen(control, 'change', () => {
     try {
-      const selection = session.order({ [key]: key === 'limit' ? Number(control.value) : control.value });
-      writeUrl(selection); showDraft(); showApplied(selection);
+      select({ [key]: key === 'limit' ? Number(control.value) : control.value });
     } catch (error) {
       control.value = String(session.applied[key]);
       orderNotice.textContent = error instanceof SelectionError ? error.message : 'The table could not be updated.';
     }
   });
+  for (const button of headers) listen(button, 'click', () => {
+    const sort = button.dataset.sort;
+    const descendingFirst = ['execution_id', 'created_at', 'started_at', 'ended_at',
+      'duration_seconds', 'warning_count', 'error_count'].includes(sort);
+    if (session.applied && metadata.execution_sorts.includes(sort)) select({ sort,
+      direction: session.applied.sort === sort ? (session.applied.direction === 'asc' ? 'desc' : 'asc')
+        : descendingFirst ? 'desc' : 'asc' });
+  });
   function restore({ reusePage = true } = {}) {
-    close();
+    close({ commitStatus: false });
     try {
       const selection = session.restore(window.location.search);
       fieldset.disabled = false; reset.disabled = false; recover.hidden = true;
       for (const control of Object.values(order)) control.disabled = false;
       showDraft(); writeUrl(selection, true); showApplied(selection, { restore: reusePage });
     } catch (error) {
-      fieldset.disabled = true; apply.disabled = true; recover.hidden = false;
+      fieldset.disabled = true; recover.hidden = false;
       for (const control of Object.values(order)) control.disabled = true;
+      for (const button of headers) button.disabled = true;
+      orderLabel.textContent = '';
       orderNotice.textContent = '';
       notice.textContent = `${error instanceof SelectionError ? error.message : 'Filters could not be restored.'} Reset invalid filters to start again.`;
       onApplied(null);
@@ -224,10 +280,11 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
   listen(recover, 'click', () => { window.history.replaceState(null, '', appBase); restore({ reusePage: false }); });
   listen(window, 'popstate', restore);
   restore();
-  return () => {
-    close(); clearTimeout(searchTimer); range.cancel();
+  return { select, dispose() {
+    close({ commitStatus: false }); clearTimeout(searchTimer); range.cancel();
     for (const owner of pickers.values()) owner.dispose();
     for (const control of Object.values(order)) control.disabled = true;
+    for (const button of headers) button.disabled = true;
     for (const remove of removers) remove();
-  };
+  } };
 }

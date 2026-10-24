@@ -1,4 +1,6 @@
-const keys = new Set(['folder', 'project', 'status', 'from', 'to', 'sort', 'direction', 'limit']);
+const keys = new Set(['folder', 'project', 'status', 'created', 'from', 'to', 'sort', 'direction', 'limit']);
+export const createdPresets = Object.freeze({ today: 'Today', '24h': 'Last 24 hours',
+  '7d': 'Last 7 days', '30d': 'Last 30 days' });
 const ticksPerSecond = 10000000n;
 
 export class SelectionError extends Error {}
@@ -42,12 +44,12 @@ export function timestampTicks(value) {
 }
 
 export function defaultSelection(metadata) {
-  return { folder: null, project: null, status: [], from: null, to: null,
+  return { folder: null, project: null, status: [], created: null, from: null, to: null,
     sort: 'execution_id', direction: 'desc', limit: metadata.limits.default_limit };
 }
 
 export function validateSelection(value, metadata) {
-  const result = { ...value, status: [...value.status] };
+  const result = { ...value, created: value.created ?? null, status: [...value.status] };
   for (const key of ['folder', 'project']) if (result[key] !== null) catalogName(result[key]);
   const codes = new Set(metadata.execution_statuses.map((item) => item.code));
   if (result.status.some((code) => !codes.has(code)) || new Set(result.status).size !== result.status.length) {
@@ -59,6 +61,13 @@ export function validateSelection(value, metadata) {
   }
   if (!Number.isSafeInteger(result.limit) || result.limit < 1 || result.limit > metadata.limits.max_limit) {
     invalid(`Page size must be between 1 and ${metadata.limits.max_limit}.`);
+  }
+  if (result.created !== null) {
+    const hours = { today: 0, '24h': 24, '7d': 168, '30d': 720 }[result.created];
+    if (!Object.hasOwn(createdPresets, result.created) || hours > metadata.limits.max_range_hours
+        || result.from !== null || result.to !== null) {
+      invalid('Choose a supported relative creation window or explicit bounds, not both.');
+    }
   }
   const from = result.from === null ? null : timestampTicks(result.from);
   const to = result.to === null ? null : timestampTicks(result.to);
@@ -108,7 +117,8 @@ export function selectionParams(value) {
 
 export function selectionSearch(value, metadata) {
   const params = new URLSearchParams();
-  for (const [key, text] of Object.entries(selectionParams(value))) {
+  // Relative UI tokens never reach the API; each list cycle resolves their bounds.
+  for (const [key, text] of Object.entries({ ...selectionParams(value), created: value.created ?? null })) {
     if (text === null || (key === 'sort' && text === 'execution_id')
         || (key === 'direction' && text === 'desc')
         || (key === 'limit' && text === metadata.limits.default_limit)) continue;
@@ -125,7 +135,7 @@ export function createSelectionSession(metadata) {
     get applied() { return applied; },
     get draft() { return { ...draft, status: [...draft.status] }; },
     update(changes) {
-      if ('folder' in changes && changes.folder !== draft.folder) changes = { ...changes, project: null };
+      if ('folder' in changes && changes.folder !== draft.folder && !('project' in changes)) changes = { ...changes, project: null };
       draft = { ...draft, ...changes };
     },
     apply() {
@@ -136,7 +146,7 @@ export function createSelectionSession(metadata) {
     scope(changes) {
       if (applied === null) invalid('Restore a valid selection before changing scope.');
       const scope = { folder: applied.folder, project: applied.project, ...changes };
-      if ('folder' in changes && changes.folder !== applied.folder) scope.project = null;
+      if ('folder' in changes && changes.folder !== applied.folder && !('project' in changes)) scope.project = null;
       applied = validateSelection({ ...applied, ...scope }, metadata);
       draft = { ...draft, ...scope };
       return applied;

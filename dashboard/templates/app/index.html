@@ -33,7 +33,6 @@
                                 <span data-filter-label="created">Default window</span><span class="chevron" aria-hidden="true">⌄</span>
                             </button>
                         </div>
-                        <button class="button-primary" type="submit" data-apply-filters disabled>Apply</button>
                         <button class="button-quiet" type="button" data-reset-filters disabled>Reset filters</button>
                     </div>
                     {% for kind in ['folder', 'project'] %}
@@ -60,12 +59,11 @@
                     </div>
                     <div id="created-picker" class="filter-popover created-popover" data-filter-panel="created" role="dialog" aria-labelledby="created-heading" hidden>
                         <div class="popover-heading"><h2 id="created-heading">Created</h2><button type="button" class="button-quiet" data-close-filter aria-label="Close time picker">×</button></div>
-                        <label for="creation-window" class="visually-hidden">Creation window</label>
-                        <select id="creation-window">
-                            <option value="default">Default window</option><option value="today">Today</option>
-                            <option value="24h">Last 24 hours</option><option value="7d">Last 7 days</option>
-                            <option value="30d">Last 30 days</option><option value="custom">Custom range</option>
-                        </select>
+                        <div class="creation-presets" role="group" aria-label="Creation window">
+                            {% for value, label in [('default', 'Default window'), ('today', 'Today'), ('24h', 'Last 24 hours'), ('7d', 'Last 7 days'), ('30d', 'Last 30 days'), ('custom', 'Custom range')] %}
+                            <button type="button" class="catalog-choice" data-created-preset="{{ value }}" aria-pressed="false">{{ label }}</button>
+                            {% endfor %}
+                        </div>
                         <div data-custom-window hidden>
                             <div class="date-fields">
                                 {% for bound, label in [('from', 'Start date'), ('to', 'End date')] %}
@@ -105,12 +103,14 @@
             </div>
             <p class="cohort-window" data-cohort-window hidden></p>
             <p class="resource-status" data-summary-status role="status"></p>
-            <dl class="panel summary-grid">
-                <div><dt>Total executions</dt><dd data-count="total" aria-label="Not loaded">—</dd></div>
-                <div><dt class="metric-running">Running</dt><dd data-count="running" aria-label="Not loaded">—</dd></div>
-                <div><dt class="metric-succeeded">Succeeded</dt><dd data-count="succeeded" aria-label="Not loaded">—</dd></div>
-                <div><dt class="metric-failed">Failed</dt><dd data-count="failed" aria-label="Not loaded">—</dd></div>
-            </dl>
+            <div class="panel summary-grid">
+                {% for key, label in [('total', 'Total executions'), ('running', 'Running'), ('succeeded', 'Succeeded'), ('failed', 'Failed'), ('other', 'Other')] %}
+                <a class="summary-card" data-status-card="{{ key }}" data-selection-link aria-disabled="true"{% if key == 'other' %} hidden{% endif %}>
+                    <span class="metric-{{ key }}">{{ label }}</span><strong data-count="{{ key }}" aria-label="Not loaded">—</strong>
+                </a>
+                {% endfor %}
+            </div>
+            <p class="resource-status" data-summary-other-note hidden></p>
         </section>
 
         <section class="panel timeline-panel" aria-labelledby="timeline-heading">
@@ -144,11 +144,13 @@
             </div>
             <div class="panel">
                 <div class="table-toolbar">
-                    <div class="table-controls" aria-label="Execution order">
-                        <label>Sort <select data-order="sort" disabled><option value="execution_id">ID</option></select></label>
-                        <label>Direction <select data-order="direction" disabled><option value="desc">Descending</option><option value="asc">Ascending</option></select></label>
-                        <label>Rows per page <input data-order="limit" type="number" min="1" step="1" inputmode="numeric" disabled></label>
-                    </div>
+                    <p class="resource-status" data-order-label></p>
+                    <details class="table-sort-options"><summary>More sort options</summary>
+                        <div class="table-controls" aria-label="Execution order">
+                            <label>Sort <select data-order="sort" disabled><option value="execution_id">ID</option></select></label>
+                            <label>Direction <select data-order="direction" disabled><option value="desc">Descending</option><option value="asc">Ascending</option></select></label>
+                        </div>
+                    </details>
                     <p class="resource-status" data-order-notice role="status"></p>
                     <p class="resource-status" data-page-notice role="status"></p>
                 </div>
@@ -156,25 +158,26 @@
                     <table data-execution-table>
                         <caption class="visually-hidden">Executions in the selected creation window</caption>
                         <thead><tr>
-                            <th scope="col">ID</th>
-                            <th scope="col">Folder / project</th>
-                            <th scope="col">Entry package</th>
-                            <th scope="col">Status</th>
-                            <th scope="col">Created</th>
-                            <th scope="col">Started</th>
-                            <th class="number-cell" scope="col">Duration</th>
-                            <th class="number-cell" scope="col">Warnings</th>
-                            <th class="number-cell" scope="col">Errors</th>
+                            <th scope="col" aria-sort="none"><button type="button" data-sort="execution_id" disabled>ID</button></th>
+                            <th scope="col" aria-sort="none">Folder / <button type="button" data-sort="project_name" disabled>Project</button></th>
+                            <th scope="col" aria-sort="none"><button type="button" data-sort="package_name" disabled>Entry package</button></th>
+                            <th scope="col" aria-sort="none"><button type="button" data-sort="status" disabled>Status</button></th>
+                            <th scope="col" aria-sort="none"><button type="button" data-sort="created_at" disabled>Created</button></th>
+                            <th scope="col" aria-sort="none"><button type="button" data-sort="started_at" disabled>Started</button></th>
+                            <th class="number-cell" scope="col" aria-sort="none"><button type="button" data-sort="duration_seconds" disabled>Duration</button></th>
+                            <th class="number-cell" scope="col" aria-sort="none"><button type="button" data-sort="warning_count" disabled>Warnings</button></th>
+                            <th class="number-cell" scope="col" aria-sort="none"><button type="button" data-sort="error_count" disabled>Errors</button></th>
                         </tr></thead>
                         <tbody><tr><td class="empty-state" colspan="9">No data loaded.</td></tr></tbody>
                     </table>
                 </div>
                 <div class="table-footer">
                     <p class="resource-status" data-executions-status role="status"></p>
+                    <label class="page-size">Rows per page <select data-order="limit" disabled><option>50</option></select></label>
                     <nav class="execution-pages" aria-label="Execution pages">
                         <button type="button" data-executions-previous disabled>Previous</button>
                         <button type="button" data-executions-next disabled>Next</button>
-                        <button type="button" data-executions-latest disabled>Show latest</button>
+                        <button type="button" data-executions-latest disabled>First page</button>
                     </nav>
                 </div>
             </div>

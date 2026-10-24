@@ -15,6 +15,11 @@ export class Node extends EventTarget {
     this.isDisabled = value;
     if (value && this.ownerDocument.activeElement === this) this.ownerDocument.activeElement = null;
   }
+  get hidden() { return this.isHidden; }
+  set hidden(value) {
+    this.isHidden = value;
+    if (value && this.contains(this.ownerDocument.activeElement)) this.ownerDocument.activeElement = null;
+  }
   get nextSibling() {
     return this.parentElement?.children[this.parentElement.children.indexOf(this) + 1] ?? null;
   }
@@ -48,7 +53,12 @@ export class Node extends EventTarget {
   focus() { if (!this.disabled) this.ownerDocument.activeElement = this; }
   setAttribute(key, value) { this.attributes.set(key, String(value)); }
   getAttribute(key) { return this.attributes.get(key) ?? null; }
-  removeAttribute(key) { this.attributes.delete(key); }
+  removeAttribute(key) {
+    if (key === 'href' && this.tag === 'a' && this.attributes.has(key) && this.ownerDocument.activeElement === this) {
+      this.ownerDocument.activeElement = null;
+    }
+    this.attributes.delete(key);
+  }
 }
 
 export function overviewDOM() {
@@ -62,16 +72,19 @@ export function overviewDOM() {
   const elements = new Map();
   for (const key of [...['toggle','panel','bucket','series','choice','retry','scroll','status','scope','chart','values','selected','scale','zero','table'].map(key=>`timeline-${key}`), 'executions-status', 'summary-status', 'list-retry', 'summary-retry', 'cohort-window',
     'app-status', 'executions-previous', 'executions-next', 'executions-latest', 'page-notice', 'overview-refresh', 'summary',
-    'poll-toggle', 'poll-status']) {
+    'poll-toggle', 'poll-status', 'summary-other-note']) {
     const node = new Node(document, key.includes('retry') || ['overview-refresh', 'poll-toggle',
       'executions-previous', 'executions-next', 'executions-latest'].includes(key) ? 'button' : 'p');
     elements.set(`[data-${key}]`, node);
     root.append(node);
   }
-  for (const key of ['total', 'running', 'succeeded', 'failed']) {
+  for (const key of ['total', 'running', 'succeeded', 'failed', 'other']) {
     const node = new Node(document, 'dd');
     elements.set(`[data-count="${key}"]`, node);
     root.append(node);
+    const link = new Node(document, 'a');
+    elements.set(`[data-status-card="${key}"]`, link);
+    root.append(link); link.append(node);
   }
   const scroll = new Node(document, 'div'), table = new Node(document, 'table'), body = new Node(document, 'tbody');
   root.append(scroll);

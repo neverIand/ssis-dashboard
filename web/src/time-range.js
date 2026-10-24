@@ -1,4 +1,4 @@
-import { SelectionError, timestampTicks } from './selection.js';
+import { createdPresets, SelectionError, timestampTicks } from './selection.js';
 
 const epochTicks = timestampTicks('1970-01-01T00:00:00Z');
 const pad = value => String(value).padStart(2, '0');
@@ -107,7 +107,26 @@ export function presetRange(preset, serverTime, timeZone) {
   return { from: value, to: serverTime };
 }
 
+// Advance a server observation with elapsed monotonic time, never the wall clock.
+export function createServerClock(serverTime, now = () => performance.now()) {
+  let anchor = null, observed = 0;
+  const observe = value => { anchor = timestampTicks(value); observed = now(); };
+  if (serverTime) observe(serverTime);
+  return {
+    observe,
+    read() {
+      if (anchor === null) throw new SelectionError('Server time is unavailable. Reload settings to retry.');
+      const ticks = anchor + BigInt(Math.floor(Math.max(0, now() - observed) * 10000));
+      const fraction = ticks % 10000000n;
+      const seconds = (ticks - epochTicks - fraction) / 10000000n;
+      return new Date(Number(seconds) * 1000).toISOString().slice(0, 19)
+        + `.${String(fraction).padStart(7, '0')}Z`;
+    },
+  };
+}
+
 export function rangeLabel(selection, timeZone) {
+  if (selection.created) return createdPresets[selection.created];
   if (selection.from === null && selection.to === null) return 'Default window';
   const label = value => {
     if (value === null) return 'Default';

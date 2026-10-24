@@ -68,7 +68,7 @@ export function createMetadataLoader({ request, publish, timeoutMs = 10000 }) {
       if (disposed || current !== generation) return;
       if (controller.signal.aborted) throw new ApiError('timeout');
       const metadata = readMetadata(response.data, response.meta.request_id);
-      publish({ phase: 'ready', metadata });
+      publish({ phase: 'ready', metadata, serverTime: response.meta.generated_at });
     } catch (error) {
       if (disposed || current !== generation) return;
       const failure = timedOut ? new ApiError('timeout')
@@ -119,7 +119,7 @@ export function mountBootstrap(root, { ready = () => {} } = {}) {
         timezone.textContent = metadata.display_timezone;
         timezone.setAttribute('aria-label', `Display timezone: ${metadata.display_timezone}`);
         disposeScreen?.();
-        disposeScreen = ready(metadata, api, config);
+        disposeScreen = ready(metadata, api, config, state.serverTime);
       }
     },
   });
