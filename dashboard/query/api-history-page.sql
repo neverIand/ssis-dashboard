@@ -53,13 +53,29 @@ OUTER APPLY (
 -- Read the visible prior-success timestamps once rather than expanding the
 -- catalog's permission joins for every page row. No counts or durations are
 -- calculated over this source; only each target's TOP (5) is aggregated below.
-DECLARE @latest_start datetimeoffset(7) = (SELECT MAX(started_at) FROM #history_rows);
+DECLARE @latest_start datetimeoffset(7), @earliest_start datetimeoffset(7);
+SELECT @latest_start = MAX(started_at), @earliest_start = MIN(started_at) FROM #history_rows;
+-- Every page row starts no earlier than @earliest_start, so its candidates
+-- include the six latest successes ending by then; even after excluding the
+-- row itself, five of them end at or after the sixth's end time. Successes
+-- ending earlier can never be sampled, so only the page's own start span plus
+-- that floor is materialized (ties at the floor are kept). Fewer than six
+-- leaves no earlier success; none leaves no floor.
+DECLARE @floor datetimeoffset(7) = (
+    SELECT MIN(s.end_time) FROM (
+        SELECT TOP (6) e.end_time FROM catalog.executions AS e
+        WHERE e.folder_name = @folder AND e.project_name = @project AND e.package_name = @package
+          AND e.status = 7 AND e.start_time IS NOT NULL
+          AND e.end_time >= e.start_time AND e.end_time <= @earliest_start
+        ORDER BY e.end_time DESC
+    ) AS s);
 SELECT e.execution_id, e.start_time, e.end_time
 INTO #history_successes
 FROM catalog.executions AS e
 WHERE e.folder_name = @folder AND e.project_name = @project AND e.package_name = @package
   AND e.status = 7 AND e.start_time IS NOT NULL
-  AND e.end_time >= e.start_time AND e.end_time <= @latest_start;
+  AND e.end_time >= e.start_time AND e.end_time <= @latest_start
+  AND (@floor IS NULL OR e.end_time >= @floor);
 CREATE UNIQUE CLUSTERED INDEX IX_history_success_end ON #history_successes (end_time DESC, execution_id DESC);
 
 -- Sample only for the bounded page, independently of its status/ID fence.

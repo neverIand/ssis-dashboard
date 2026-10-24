@@ -113,6 +113,22 @@ Run three actual-plan/IO/TIME diagnostics for each selected page shape at both s
 
 Keep warm latency separate: two untimed warmups followed by 100 fixed round-robin samples per selected case, through unmodified checked-in SQL with source-name substitution. Time execute/fetch/native result collection/cursor close; exclude acquisition, fixture/reset, hashing, schema checks, API serialization and transport. Preserve every sample and report per-case median, nearest-rank p95 and maximum. Existing normal/restricted reader sessions supply separate read-only public-view SQL IO and independent ordered IDs; administrator-session impersonation does not pass independent Windows sign-in/HTTP. Missing reader SHOWPLAN stays NOT RUN; no permission changes, package runs, cache flushes or server/service changes are part of this protocol.
 
+### C8.2b.2b.R1 child-pairing protocol
+
+Reuse the retained C8.2b.2b children fixture unchanged (four repeated identities, missing/consecutive/time-reversed ends, an unidentified post, wide events and the maximal-path execution) at 2,000 and 20,000 starts, and add **50,000** starts as the larger growth point; its generated IDs stay disjoint. Run the base SQL from a hashed copy of the pre-change tree and the candidate SQL from the working tree through the same harness and application code. Correctness repeats the complete independent DTO and Python pairing comparison for all eight child cases plus four actual-next continuations at every size. Plans run three actual-plan/IO/TIME diagnostics per page shape and size for both SQL trees. Split event-source rows read into selection/enrichment (`#child_page`, `@child_starts`) and pairing. Pairing bounds are expected to stay constant with repeated starts, except where proving a missing end must read every later event. Warm samples follow the C8.2b.2b warm procedure.
+
+A native unittest (`tests.native.test_child_queries`) compares every cursor page of both orders/directions with an independent Python pairing over a fixture with neighbors beyond the search windows, scattered time orders, trailing-space/NULL-type identities, an unidentified post and start, ends above the fence and same-key events of another execution. Deliberately wrong SQL variants must fail it. On the real catalog, compare complete children DTOs from both SQL trees for every visible execution, both orders/directions and cursor chains at limits 2 and 200, and record existing-reader SQL IO.
+
+### C8.2b.2c aggregate and history protocol
+
+Use one connection-local synthetic catalog per size: **2,000, 20,000 and 100,000** executions over 1,000 UTC hours from 2026-09-26. One exact target package receives most rows, beside another package and folders; all statuses, NULL starts, running rows, zero, invalid (end before start), five-day and minute-tied end times are present. Run the base SQL from a hashed copy of the pre-change tree and the candidate SQL from the working tree, through the WSGI API with the same application code. The harness is `.local/backend-validation/tools/probe-aggregate-growth.py`.
+
+- **History:** pages in both directions at 50/200 rows, a server-issued next cursor and a direct deep cursor. Every row's estimate must equal an independent Python oracle: the five latest visible successes of the exact package ending by the row's start, excluding the row itself, ordered by end time then ID.
+- **Summaries:** broad, exact-folder selective and `*` pattern cohorts against Python status counts.
+- **Timelines:** **1,000 hour buckets** in Europe/London and America/New_York (fall back) and Pacific/Auckland (spring forward), a selective status/folder hour timeline, and day buckets with 23- and 25-hour days. Every bucket count must equal Python bisection over the response bounds, and the bounds must cover the window contiguously.
+
+Plans run three actual-plan/IO/TIME diagnostics per resource, case and size. Record source rows read, scans, logical reads, the rows materialized as prior successes, spills and compilation. Warm samples use 30 rounds after two warmups on one prepared session, with query-owned temporary tables reset between batches. Cohort scans that follow from the catalog having no creation-time or package index are reported as inherent, not hidden. A remedy may change only how much prior-success history is materialized, never which successes are sampled. A native unittest compares every history page of several status scopes and both directions with an independent estimate oracle, including ties on the sampling floor, a zero-duration self-success and fewer than six earlier successes. On the real catalog, compare base and candidate history, summary and timeline DTOs.
+
 ## Recorded results
 
 ### Review replay: 17 October 2026
@@ -442,3 +458,72 @@ These prepared SQL tails do not close any HTTP/network/browser budget. In partic
 These are actual visible small/empty pages, not populated/full-page reader workloads. Reader SHOWPLAN, independent Windows sign-in/API HTTP, real active/Scale Out data, network p95, C8.2b.2c aggregate/history growth, C8.2c sustained/concurrent resources, OBS-02 and deferred hosting retain their own open gates. Successful per-query closes do not pass sustained resource or native cleanup-failure acceptance.
 
 The independent offline verifier reconciles response bytes/data fingerprints, all 100-sample distributions, SQL/query counts, 192 actual insert cardinalities, reader scopes and unchanged catalog fingerprints. **131 focused database-free contract/observation/value/resource tests PASS**. Reusable probes/verifier/retention helpers remain in `.local/backend-validation/tools/`. Selected summaries, reconciliation, source snapshots and promotion/archive receipts are retained under `.local/reports/backend/20261018-c82b2b/`; complete raw phase evidence is recoverable from the hash-checked `.local/backend-validation/archive/c82b2b-20261018.zip` using the [local artifact workflow](installation.md#cleanup-and-recovery). Pilot/parser failures are excluded from acceptance counts and stay classified as disposable temporary output.
+
+### C8.2b.2b.R1 child-pairing results
+
+**24 October 2026, uncommitted candidate on base `b23d976`; independent review pending.** Only `api-children-page.sql` pairing changed (SQL SHA-256 `b2fccef6…b2ca`, base `b782c12a…c9ab`). The page now reads each start's adjacent keyed start/post instead of the whole keyed history: one seek between two page starts of a key, a 64-row window before a key's first and after its last page start, and, only for keys still unsettled, one shared doubling walk per direction that stops when every key is settled. No cache, history cap, hint or RECOMPILE was added; result columns, DTOs, cursors and the frontend are unchanged. The same environment as C8.2b.2b ran the [protocol](#c82b2br1-child-pairing-protocol).
+
+**Correctness:** both SQL trees pass all 12 child WSGI cases (8 initial and 4 actual-next) at 2,000, 20,000 and 50,000 starts with complete independent DTO equality. The new native test passes all three cases, and six deliberately wrong SQL variants fail it. On the real catalog, base and candidate DTOs are identical for all 16 visible executions × both orders/directions × limits 2/200 (128 cursor chains); both existing reader scopes pass their public-view SQL IO check.
+
+**Source work** (third diagnostic; event-source rows read split into selection/enrichment and pairing):
+
+| Page shape | Pairing rows, base 2k / 20k / 50k | Pairing rows, candidate 2k / 20k / 50k | Complete-batch regular reads at 20k / 50k, base → candidate |
+| --- | ---: | ---: | ---: |
+| ID ascending, first 200 | 6,884 / 60,705 / 150,408 | 2,788 / 2,788 / 2,788 | 89,824 → 8,126 / 221,088 → 12,137 |
+| ID descending, first 200 | 6,884 / 60,705 / 150,408 | 3,156 / 43,166 / 3,156 | 89,824 → 28,458 / 221,088 → 12,345 |
+| Time ascending, first 200 | 6,884 / 60,705 / 150,408 | 2,788 / 2,948 / 2,890 | 89,826 → 8,472 / 221,089 → 12,498 |
+| Time descending, first 200 | 6,884 / 60,705 / 150,408 | 3,140 / 42,998 / 3,166 | 89,823 → 28,348 / 221,087 → 12,634 |
+| ID first 50 | 6,884 / 60,705 / 150,408 | 976 / 976 / 976 | 88,281 → 4,381 / 219,545 → 8,392 |
+| Deep 200 | 6,884 / 60,705 / 150,408 | 3,156 / 3,156 / 3,156 | 89,824 → 8,334 / 221,090 → 12,345 |
+| Maximal path 200 | 6,882 / 60,703 / 150,406 | 930 / 930 / 930 | 7,258 → 5,638 / 11,270 → 5,639 (LOB 114,642 → 95,496) |
+
+Candidate pairing work no longer depends on how often a key repeated. The 20,000-start descending pages are the exception that proves the rule: the last start of one key has no post (start 19,998), and showing that no later end exists reads the execution's remaining **20,004** events once. Those are unrelated wide events, not repetitions of the key; at 50,000 the last four starts all have posts. Base diagnostics capture `SpillToTempDb`/`SortSpillDetails` at 2,000 and 50,000; no candidate diagnostic spills. Candidate per-execution compile messages stay at 0–11 ms CPU, without RECOMPILE.
+
+Selection/enrichment rows (`#child_page`, `@child_starts`) are identical in base and candidate: 13,764 / 61,105 / 150,808. The unchanged candidate selection scans the temporary heap at every size because these sources have no covering index. This is outside pairing and is not equivalent to SSISDB's clustered/operation indexes. It stays an open selection-plan observation for representative catalog/reader plans (reader SHOWPLAN remains NOT RUN). On the 16-execution real catalog, the busiest child page (4 starts) reads 993 event-message pages instead of 351. That fixed window/seek overhead does not grow with history, and is recorded as a small-catalog tradeoff.
+
+**Warm native SQL** (milliseconds; candidate 100 samples per case, base 20 at 20,000 run alone and 10 at 50,000; retained C8.2b.2b base for comparison):
+
+| Case | Base 20k median / p95 / max | Candidate 20k | Base 50k | Candidate 50k |
+| --- | ---: | ---: | ---: | ---: |
+| ID ascending, first 200 | 1,472.1 / 1,591.1 / 1,694.1 | 126.4 / 134.1 / 202.0 | 3,803.1 / 3,958.7 / 3,958.7 | 210.3 / 215.6 / 271.6 |
+| ID descending, first 200 | 1,606.4 / 1,847.8 / 1,857.9 | 357.9 / 405.4 / 442.1 | 3,921.2 / 4,098.6 / 4,098.6 | 322.6 / 432.9 / 615.8 |
+| Time ascending, first 200 | 1,626.3 / 1,858.3 / 1,897.3 | 309.9 / 344.6 / 516.2 | 3,949.1 / 4,291.9 / 4,291.9 | 309.2 / 432.3 / 468.1 |
+| Time descending, first 200 | 1,651.8 / 1,851.1 / 1,852.3 | 374.4 / 465.3 / 526.5 | 3,704.0 / 4,262.2 / 4,262.2 | 327.4 / 417.4 / 574.5 |
+| ID first 50 | 1,477.9 / 1,654.9 / 1,700.9 | 98.7 / 101.5 / 144.4 | 3,777.5 / 4,005.8 / 4,005.8 | 182.6 / 192.3 / 273.4 |
+| Deep 200 | 1,596.9 / 1,841.7 / 1,945.6 | 247.2 / 285.0 / 470.1 | 3,950.1 / 4,500.8 / 4,500.8 | 207.9 / 391.2 / 470.8 |
+| Maximal path 200 | 648.6 / 766.3 / 773.0 | 572.6 / 592.4 / 849.8 | 925.9 / 2,422.9 / 2,422.9 | 572.1 / 590.6 / 600.4 |
+
+The retained C8.2b.2b 20,000-start medians (1,391–1,556 ms) agree with today's base. The base 50,000 samples overlapped other local probe work, so they are indicative only. Every output stayed stable, all sampler connections closed and catalog fingerprints were unchanged. The remaining selection growth with the stream of unrelated events, reader SHOWPLAN, independent Windows-reader HTTP (C8.3), sustained/concurrent resources (C8.2c) and real active/Scale Out data keep their existing gates. Selected summaries are in `.local/reports/backend/20261024-c82b2b-r1/`; the reusable harnesses are `.local/backend-validation/tools/probe-child-pairing.py` and `compare-children-catalog.py`.
+
+### C8.2b.2c aggregate and history results
+
+**24 October 2026, uncommitted candidate on base `b23d976` plus the C8.2b.2b.R1 candidate; independent review pending.** Only `api-history-page.sql` changed (SHA-256 `33b7a415…`, base `bb9898d6…`). Before materializing prior successes, the page now reads the end time of the sixth latest visible success ending by its earliest row start, and materializes only successes ending at or after that floor. Each row still samples exactly its five latest prior successes; the floor only skips successes that no row could sample. The summary, timeline and fence SQL, the DTOs and the frontend are unchanged. The [protocol](#c82b2c-aggregate-and-history-protocol) ran on the C8.2b.2b environment.
+
+**Correctness:** both SQL trees pass all 14 cases at 2,000, 20,000 and 100,000 executions. Every history estimate equals the Python oracle, across both directions, 50/200 rows, the next and deep cursors (up to 198 estimates per page). Summary status totals match for broad (100,000), selective (2,000) and pattern (90,000) cohorts. All 1,000 hour buckets match in each of the London, New York and Auckland timelines, as do the selective timeline and the day timelines with 23- and 25-hour days. The new native history test passes, and four wrong floor variants fail it: TOP (5), a strict floor, a floor from the latest start, and a missing NULL guard. On the real catalog, base and candidate DTOs are identical for 44 history chains, summaries and timelines across 4 package identities (76 estimates); diagnose passes.
+
+**History source work** (third diagnostic; source rows read / logical reads / rows materialized as prior successes):
+
+| Page | 2,000 base → candidate | 20,000 base → candidate | 100,000 base → candidate |
+| --- | ---: | ---: | ---: |
+| Descending 200 | 4,084 / 881 / 1,240 → 6,084 / 907 / 1,240 | 24,202 / 1,624 / 12,525 → 44,202 / 1,770 / 2,516 | 104,202 / 3,212 / 62,674 → 204,202 / 3,841 / 2,509 |
+| Ascending 200 | 4,084 / 881 / 1,240 → 6,084 / 907 / 1,240 | 24,205 / 1,536 / 2,500 → 44,205 / 1,770 / 2,500 | 104,205 / 2,673 / 2,494 → 204,205 / 3,840 / 2,494 |
+| Descending 50 | 3,052 / 471 / 1,240 → 5,052 / 494 / 632 | 21,052 / 657 / 12,525 → 41,052 / 812 / 633 | 101,052 / 1,937 / 62,674 → 201,052 / 2,732 / 632 |
+| Deep 50 | 3,032 / 453 / 601 → 5,032 / 479 / 601 | 21,071 / 628 / 6,238 → 41,071 / 812 / 632 | 101,071 / 1,728 / 31,298 → 201,071 / 2,730 / 631 |
+
+Prior-success materialization no longer grows with package history: it stays at about 630 rows for a 50-row page and 2,500 for a 200-row page. The cost is one more pass over the cohort source, a TOP (6) whose sort keeps six rows, so source rows read roughly double and logical reads rise by up to 60%. Reading every candidate execution remains inherent, because the catalog has no package or end-time index and an exact sample cannot skip any success that might end later. No diagnostic spills; compile messages are 0 ms CPU.
+
+**Summaries and timelines** read exactly the cohort source once (2,000 / 20,000 / 100,000 rows), the same in both trees; this is inherent without a creation-time index. Summary logical reads are 26 / 234 / 1,167. Timeline reads are dominated by one bucket seek per execution: 8,067 / 44,275 / 205,208 for 1,000 hour buckets, against 4,240 / 40,448 / 201,381 for 42 day buckets, so bucket count adds almost nothing. The selective timeline reads 4,102 / 4,671 / 7,208.
+
+**Warm native SQL** (milliseconds, median / p95 / maximum, 30 samples per case at 100,000 executions; full per-size distributions in the retained summaries):
+
+| Case | Base | Candidate |
+| --- | ---: | ---: |
+| History descending 200 | 364.9 / 413.2 / 429.1 | 252.4 / 346.2 / 346.2 |
+| History ascending 200 | 65.4 / 101.7 / 107.6 | 66.1 / 163.5 / 192.8 |
+| History descending 50 | 329.9 / 425.8 / 458.0 | 191.0 / 348.4 / 350.8 |
+| History deep 50 | 157.3 / 174.8 / 175.0 | 139.0 / 174.8 / 330.5 |
+| Summary broad / selective / pattern | 101.9 / 53.8 / 113.1 (medians) | unchanged SQL |
+| Timeline 1,000 hours (London / New York / Auckland) | 738.1 / 718.9 / 672.5 (medians) | unchanged SQL |
+| Timeline selective / day / Auckland day | 104.3 / 656.6 / 643.6 (medians) | unchanged SQL |
+
+At 2,000 and 20,000 executions, history medians stay within 15 ms of the base or improve (20,000 deep: 55.9 → 35.6). Thirty-sample p95/maximum values vary by tens of milliseconds between runs; they are local observations, not a capacity claim. The 1,000-hour timeline at 100,000 executions (about 0.7 s of SQL) is the costliest case. It is linear in the cohort, not in history or bucket count, and stays an input to the P4.6a render/network budget. Reader SHOWPLAN, independent Windows-reader HTTP (C8.3), sustained/concurrent resources (C8.2c) and real active/Scale Out data keep their gates. Selected summaries are in `.local/reports/backend/20261024-c82b2c/`; the harnesses are `.local/backend-validation/tools/probe-aggregate-growth.py` and `compare-aggregates-catalog.py`.

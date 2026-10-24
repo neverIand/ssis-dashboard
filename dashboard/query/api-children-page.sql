@@ -30,11 +30,11 @@ DECLARE @child_starts TABLE (
     package_name nvarchar(260) COLLATE Latin1_General_100_BIN2 NULL,
     execution_path nvarchar(max) COLLATE Latin1_General_100_BIN2 NULL,
     source_id nvarchar(38) COLLATE Latin1_General_100_BIN2 NULL,
-    source_name nvarchar(4000) NULL, source_type smallint NULL
+    source_name nvarchar(4000) NULL, source_type smallint NULL, path_bytes bigint NULL
 );
 INSERT @child_starts
 SELECT p.observation_id, p.started_at, e.package_name, LEFT(e.execution_path, 32769),
-       e.message_source_id, e.message_source_name, e.message_source_type
+       e.message_source_id, e.message_source_name, e.message_source_type, DATALENGTH(e.execution_path)
 FROM #child_page AS p JOIN catalog.event_messages AS e
   ON e.operation_id = @execution_id AND e.event_message_id = p.observation_id;
 
@@ -48,40 +48,228 @@ WHERE NOT EXISTS (SELECT 1 FROM @child_starts AS s WHERE s.observation_id = p.ob
 DECLARE @child_keys TABLE (
     key_id bigint NOT NULL PRIMARY KEY, package_name nvarchar(260) COLLATE Latin1_General_100_BIN2 NOT NULL,
     execution_path nvarchar(max) COLLATE Latin1_General_100_BIN2 NOT NULL,
-    source_id nvarchar(38) COLLATE Latin1_General_100_BIN2 NOT NULL, source_type smallint NULL
+    source_id nvarchar(38) COLLATE Latin1_General_100_BIN2 NOT NULL, source_type smallint NULL,
+    first_id bigint NULL, last_id bigint NULL, before_id bigint NULL, after_id bigint NULL,
+    open_before bit NOT NULL, open_after bit NOT NULL
 );
-INSERT @child_keys
-SELECT MIN(observation_id), package_name, execution_path, source_id, source_type
+-- A start longer than the stored path prefix never matches its own key, so it
+-- bounds nothing and stays unpaired.
+INSERT @child_keys (key_id, package_name, execution_path, source_id, source_type, first_id, last_id, open_before, open_after)
+SELECT MIN(observation_id), package_name, execution_path, source_id, source_type,
+       MIN(CASE WHEN path_bytes = DATALENGTH(execution_path) THEN observation_id END),
+       MAX(CASE WHEN path_bytes = DATALENGTH(execution_path) THEN observation_id END), 0, 0
 FROM @child_starts
 WHERE package_name IS NOT NULL AND source_id IS NOT NULL
 GROUP BY package_name, DATALENGTH(package_name), execution_path, DATALENGTH(execution_path),
          source_id, DATALENGTH(source_id), source_type;
 
-DECLARE @child_ends TABLE (observation_id bigint NOT NULL PRIMARY KEY, ended_at datetimeoffset(7) NULL);
-WITH keyed_events AS (
-    SELECT k.key_id, e.event_message_id, e.event_name, e.message_time,
-           MAX(CASE WHEN e.event_message_id IS NULL THEN 1 ELSE 0 END) OVER (PARTITION BY k.key_id) AS unidentified
-    FROM catalog.event_messages AS e JOIN @child_keys AS k
-      ON e.package_name COLLATE Latin1_General_100_BIN2 = k.package_name AND DATALENGTH(e.package_name) = DATALENGTH(k.package_name)
-     AND e.execution_path COLLATE Latin1_General_100_BIN2 = k.execution_path AND DATALENGTH(e.execution_path) = DATALENGTH(k.execution_path)
-     AND e.message_source_id COLLATE Latin1_General_100_BIN2 = k.source_id AND DATALENGTH(e.message_source_id) = DATALENGTH(k.source_id)
-     AND (e.message_source_type = k.source_type OR (e.message_source_type IS NULL AND k.source_type IS NULL))
-    WHERE e.operation_id = @execution_id AND e.event_name IN (N'OnPreExecute', N'OnPostExecute')
+-- A key with an unidentified start/post anywhere in the execution cannot be
+-- ordered: none of its starts is paired, so it is never searched.
+UPDATE k SET open_before = 1, open_after = 1
+FROM @child_keys AS k
+WHERE k.first_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM catalog.event_messages AS e
+    WHERE e.operation_id = @execution_id AND e.event_message_id IS NULL AND e.event_name IN (N'OnPreExecute', N'OnPostExecute')
       AND e.package_path COLLATE Latin1_General_100_BIN2 = N'\Package' AND DATALENGTH(e.package_path) = 16
-), adjacent_events AS (
-    SELECT event_message_id, event_name, message_time, unidentified,
-           LAG(event_name) OVER (PARTITION BY key_id ORDER BY event_message_id) AS previous_name,
-           LEAD(event_name) OVER (PARTITION BY key_id ORDER BY event_message_id) AS next_name,
+      AND e.package_name COLLATE Latin1_General_100_BIN2 = k.package_name AND DATALENGTH(e.package_name) = DATALENGTH(k.package_name)
+      AND e.execution_path COLLATE Latin1_General_100_BIN2 = k.execution_path AND DATALENGTH(e.execution_path) = DATALENGTH(k.execution_path)
+      AND e.message_source_id COLLATE Latin1_General_100_BIN2 = k.source_id AND DATALENGTH(e.message_source_id) = DATALENGTH(k.source_id)
+      AND (e.message_source_type = k.source_type OR (e.message_source_type IS NULL AND k.source_type IS NULL)));
+
+-- Pairing needs only each start's adjacent keyed start/post, never a key's
+-- other repetitions. @key_events holds the page starts and exactly those
+-- neighbors, so LAG/LEAD over it equal LAG/LEAD over the whole keyed history.
+DECLARE @key_events TABLE (
+    key_id bigint NOT NULL, event_message_id bigint NOT NULL, is_start bit NOT NULL,
+    message_time datetimeoffset(7) NULL, PRIMARY KEY (key_id, event_message_id)
+);
+DECLARE @key_starts TABLE (observation_id bigint NOT NULL PRIMARY KEY, key_id bigint NOT NULL,
+                           previous_id bigint NULL, next_id bigint NULL);
+INSERT @key_starts
+SELECT s.observation_id, k.key_id,
+       LAG(s.observation_id) OVER (PARTITION BY k.key_id ORDER BY s.observation_id),
+       LEAD(s.observation_id) OVER (PARTITION BY k.key_id ORDER BY s.observation_id)
+FROM @child_starts AS s JOIN @child_keys AS k
+  ON k.open_before = 1 AND s.path_bytes = DATALENGTH(s.execution_path)
+ AND s.package_name = k.package_name AND DATALENGTH(s.package_name) = DATALENGTH(k.package_name)
+ AND s.execution_path = k.execution_path AND DATALENGTH(s.execution_path) = DATALENGTH(k.execution_path)
+ AND s.source_id = k.source_id AND DATALENGTH(s.source_id) = DATALENGTH(k.source_id)
+ AND (s.source_type = k.source_type OR (s.source_type IS NULL AND k.source_type IS NULL));
+INSERT @key_events
+SELECT k.key_id, k.observation_id, 1, s.started_at
+FROM @key_starts AS k JOIN @child_starts AS s ON s.observation_id = k.observation_id;
+
+-- Between two page starts of one key, the nearest keyed event on each side is
+-- found by one seek that stops at the first match before the other start.
+INSERT @key_events
+SELECT n.key_id, n.event_message_id, MAX(n.is_start), MAX(n.message_time)
+FROM (
+    SELECT s.key_id, f.event_message_id, f.is_start, f.message_time
+    FROM @key_starts AS s JOIN @child_keys AS k ON k.key_id = s.key_id
+    CROSS APPLY (
+        SELECT TOP (1) e.event_message_id, CASE WHEN e.event_name = N'OnPreExecute' THEN 1 ELSE 0 END AS is_start, e.message_time
+        FROM catalog.event_messages AS e
+        WHERE e.operation_id = @execution_id AND e.event_message_id > s.observation_id AND e.event_message_id < s.next_id
+          AND e.event_name IN (N'OnPreExecute', N'OnPostExecute')
+          AND e.package_path COLLATE Latin1_General_100_BIN2 = N'\Package' AND DATALENGTH(e.package_path) = 16
+          AND e.package_name COLLATE Latin1_General_100_BIN2 = k.package_name AND DATALENGTH(e.package_name) = DATALENGTH(k.package_name)
+          AND e.execution_path COLLATE Latin1_General_100_BIN2 = k.execution_path AND DATALENGTH(e.execution_path) = DATALENGTH(k.execution_path)
+          AND e.message_source_id COLLATE Latin1_General_100_BIN2 = k.source_id AND DATALENGTH(e.message_source_id) = DATALENGTH(k.source_id)
+          AND (e.message_source_type = k.source_type OR (e.message_source_type IS NULL AND k.source_type IS NULL))
+        ORDER BY e.event_message_id ASC
+    ) AS f
+    WHERE s.next_id IS NOT NULL
+    UNION ALL
+    SELECT s.key_id, b.event_message_id, b.is_start, b.message_time
+    FROM @key_starts AS s JOIN @child_keys AS k ON k.key_id = s.key_id
+    CROSS APPLY (
+        SELECT TOP (1) e.event_message_id, CASE WHEN e.event_name = N'OnPreExecute' THEN 1 ELSE 0 END AS is_start, e.message_time
+        FROM catalog.event_messages AS e
+        WHERE e.operation_id = @execution_id AND e.event_message_id < s.observation_id AND e.event_message_id > s.previous_id
+          AND e.event_name IN (N'OnPreExecute', N'OnPostExecute')
+          AND e.package_path COLLATE Latin1_General_100_BIN2 = N'\Package' AND DATALENGTH(e.package_path) = 16
+          AND e.package_name COLLATE Latin1_General_100_BIN2 = k.package_name AND DATALENGTH(e.package_name) = DATALENGTH(k.package_name)
+          AND e.execution_path COLLATE Latin1_General_100_BIN2 = k.execution_path AND DATALENGTH(e.execution_path) = DATALENGTH(k.execution_path)
+          AND e.message_source_id COLLATE Latin1_General_100_BIN2 = k.source_id AND DATALENGTH(e.message_source_id) = DATALENGTH(k.source_id)
+          AND (e.message_source_type = k.source_type OR (e.message_source_type IS NULL AND k.source_type IS NULL))
+        ORDER BY e.event_message_id DESC
+    ) AS b
+    WHERE s.previous_id IS NOT NULL
+) AS n
+GROUP BY n.key_id, n.event_message_id;
+
+-- Before each key's first and after its last page start the neighbor has no
+-- page bound. First look at the key's 64 nearest events of any kind, so each
+-- window reads at most 64 rows; a shorter window reached the execution's
+-- first/last event, so the key is settled.
+UPDATE k SET before_id = w.found_id, open_before = CASE WHEN w.found_id IS NULL AND w.window_rows = 64 THEN 1 ELSE 0 END
+FROM @child_keys AS k
+CROSS APPLY (
+    SELECT MAX(CASE WHEN c.matches = 1 THEN c.event_message_id END) AS found_id,
+           COUNT(*) AS window_rows
+    FROM (
+        SELECT TOP (64) event_message_id,
+               CASE WHEN event_name IN (N'OnPreExecute', N'OnPostExecute')
+                     AND package_path COLLATE Latin1_General_100_BIN2 = N'\Package' AND DATALENGTH(package_path) = 16
+                     AND package_name COLLATE Latin1_General_100_BIN2 = k.package_name AND DATALENGTH(package_name) = DATALENGTH(k.package_name)
+                     AND execution_path COLLATE Latin1_General_100_BIN2 = k.execution_path AND DATALENGTH(execution_path) = DATALENGTH(k.execution_path)
+                     AND message_source_id COLLATE Latin1_General_100_BIN2 = k.source_id AND DATALENGTH(message_source_id) = DATALENGTH(k.source_id)
+                     AND (message_source_type = k.source_type OR (message_source_type IS NULL AND k.source_type IS NULL))
+                    THEN 1 ELSE 0 END AS matches
+        FROM catalog.event_messages
+        WHERE operation_id = @execution_id AND event_message_id < k.first_id
+        ORDER BY event_message_id DESC
+    ) AS c
+) AS w
+WHERE k.open_before = 1;
+UPDATE k SET after_id = w.found_id, open_after = CASE WHEN w.found_id IS NULL AND w.window_rows = 64 THEN 1 ELSE 0 END
+FROM @child_keys AS k
+CROSS APPLY (
+    SELECT MIN(CASE WHEN c.matches = 1 THEN c.event_message_id END) AS found_id,
+           COUNT(*) AS window_rows
+    FROM (
+        SELECT TOP (64) event_message_id,
+               CASE WHEN event_name IN (N'OnPreExecute', N'OnPostExecute')
+                     AND package_path COLLATE Latin1_General_100_BIN2 = N'\Package' AND DATALENGTH(package_path) = 16
+                     AND package_name COLLATE Latin1_General_100_BIN2 = k.package_name AND DATALENGTH(package_name) = DATALENGTH(k.package_name)
+                     AND execution_path COLLATE Latin1_General_100_BIN2 = k.execution_path AND DATALENGTH(execution_path) = DATALENGTH(k.execution_path)
+                     AND message_source_id COLLATE Latin1_General_100_BIN2 = k.source_id AND DATALENGTH(message_source_id) = DATALENGTH(k.source_id)
+                     AND (message_source_type = k.source_type OR (message_source_type IS NULL AND k.source_type IS NULL))
+                    THEN 1 ELSE 0 END AS matches
+        FROM catalog.event_messages
+        WHERE operation_id = @execution_id AND event_message_id > k.last_id
+        ORDER BY event_message_id ASC
+    ) AS c
+) AS w
+WHERE k.open_after = 1;
+
+-- Keys still open have no keyed event nearby. One shared walk per direction,
+-- in doubling batches nearest first, reads each event at most once and stops
+-- as soon as every open key is settled. Batch size bounds one statement, not
+-- how far a walk may go; a short batch means the execution's first/last
+-- event. End events can arrive above the start fence, so the forward walk is
+-- bounded only by the execution's last event.
+DECLARE @scan TABLE (event_message_id bigint NOT NULL PRIMARY KEY, key_id bigint NULL);
+DECLARE @cursor bigint = (SELECT MAX(first_id) FROM @child_keys WHERE open_before = 1), @batch int = 128, @read int;
+WHILE @cursor IS NOT NULL AND EXISTS (SELECT 1 FROM @child_keys WHERE open_before = 1)
+BEGIN
+    INSERT @scan
+    SELECT c.event_message_id, k.key_id
+    FROM (
+        SELECT TOP (@batch) event_message_id, package_name, execution_path, message_source_id, message_source_type
+        FROM catalog.event_messages
+        WHERE operation_id = @execution_id AND event_message_id < @cursor AND event_name IN (N'OnPreExecute', N'OnPostExecute')
+          AND package_path COLLATE Latin1_General_100_BIN2 = N'\Package' AND DATALENGTH(package_path) = 16
+        ORDER BY event_message_id DESC
+    ) AS c
+    LEFT JOIN @child_keys AS k
+      ON k.open_before = 1 AND c.event_message_id < k.first_id
+     AND c.package_name COLLATE Latin1_General_100_BIN2 = k.package_name AND DATALENGTH(c.package_name) = DATALENGTH(k.package_name)
+     AND c.execution_path COLLATE Latin1_General_100_BIN2 = k.execution_path AND DATALENGTH(c.execution_path) = DATALENGTH(k.execution_path)
+     AND c.message_source_id COLLATE Latin1_General_100_BIN2 = k.source_id AND DATALENGTH(c.message_source_id) = DATALENGTH(k.source_id)
+     AND (c.message_source_type = k.source_type OR (c.message_source_type IS NULL AND k.source_type IS NULL));
+    SET @read = @@ROWCOUNT;
+    SET @cursor = CASE WHEN @read = @batch THEN (SELECT MIN(event_message_id) FROM @scan) END;
+    UPDATE k SET before_id = f.found_id, open_before = 0
+    FROM @child_keys AS k JOIN (SELECT key_id, MAX(event_message_id) AS found_id FROM @scan WHERE key_id IS NOT NULL GROUP BY key_id) AS f
+      ON f.key_id = k.key_id;
+    UPDATE @child_keys SET open_before = 0 WHERE open_before = 1 AND @cursor IS NULL;
+    DELETE @scan;
+    SET @batch = CASE WHEN @batch < 1048576 THEN @batch * 2 ELSE @batch END;
+END;
+
+SELECT @cursor = MIN(last_id), @batch = 128 FROM @child_keys WHERE open_after = 1;
+WHILE @cursor IS NOT NULL AND EXISTS (SELECT 1 FROM @child_keys WHERE open_after = 1)
+BEGIN
+    INSERT @scan
+    SELECT c.event_message_id, k.key_id
+    FROM (
+        SELECT TOP (@batch) event_message_id, package_name, execution_path, message_source_id, message_source_type
+        FROM catalog.event_messages
+        WHERE operation_id = @execution_id AND event_message_id > @cursor AND event_name IN (N'OnPreExecute', N'OnPostExecute')
+          AND package_path COLLATE Latin1_General_100_BIN2 = N'\Package' AND DATALENGTH(package_path) = 16
+        ORDER BY event_message_id ASC
+    ) AS c
+    LEFT JOIN @child_keys AS k
+      ON k.open_after = 1 AND c.event_message_id > k.last_id
+     AND c.package_name COLLATE Latin1_General_100_BIN2 = k.package_name AND DATALENGTH(c.package_name) = DATALENGTH(k.package_name)
+     AND c.execution_path COLLATE Latin1_General_100_BIN2 = k.execution_path AND DATALENGTH(c.execution_path) = DATALENGTH(k.execution_path)
+     AND c.message_source_id COLLATE Latin1_General_100_BIN2 = k.source_id AND DATALENGTH(c.message_source_id) = DATALENGTH(k.source_id)
+     AND (c.message_source_type = k.source_type OR (c.message_source_type IS NULL AND k.source_type IS NULL));
+    SET @read = @@ROWCOUNT;
+    SET @cursor = CASE WHEN @read = @batch THEN (SELECT MAX(event_message_id) FROM @scan) END;
+    UPDATE k SET after_id = f.found_id, open_after = 0
+    FROM @child_keys AS k JOIN (SELECT key_id, MIN(event_message_id) AS found_id FROM @scan WHERE key_id IS NOT NULL GROUP BY key_id) AS f
+      ON f.key_id = k.key_id;
+    UPDATE @child_keys SET open_after = 0 WHERE open_after = 1 AND @cursor IS NULL;
+    DELETE @scan;
+    SET @batch = CASE WHEN @batch < 1048576 THEN @batch * 2 ELSE @batch END;
+END;
+
+-- Read only the settled boundary neighbors' name/time, by ID.
+INSERT @key_events
+SELECT n.key_id, e.event_message_id, MAX(CASE WHEN e.event_name = N'OnPreExecute' THEN 1 ELSE 0 END), MAX(e.message_time)
+FROM (SELECT key_id, before_id AS event_message_id FROM @child_keys WHERE before_id IS NOT NULL
+      UNION SELECT key_id, after_id FROM @child_keys WHERE after_id IS NOT NULL) AS n
+JOIN catalog.event_messages AS e ON e.operation_id = @execution_id AND e.event_message_id = n.event_message_id
+WHERE NOT EXISTS (SELECT 1 FROM @key_events AS k WHERE k.key_id = n.key_id AND k.event_message_id = n.event_message_id)
+GROUP BY n.key_id, e.event_message_id;
+
+DECLARE @child_ends TABLE (observation_id bigint NOT NULL PRIMARY KEY, ended_at datetimeoffset(7) NULL);
+WITH adjacent_events AS (
+    SELECT event_message_id, message_time,
+           LAG(is_start) OVER (PARTITION BY key_id ORDER BY event_message_id) AS previous_start,
+           LEAD(is_start) OVER (PARTITION BY key_id ORDER BY event_message_id) AS next_start,
            LEAD(message_time) OVER (PARTITION BY key_id ORDER BY event_message_id) AS next_time
-    FROM keyed_events WHERE event_message_id IS NOT NULL
+    FROM @key_events
 )
 INSERT @child_ends
 SELECT e.event_message_id,
        -- Reject both starts in a consecutive-start ambiguity. Pairing starts
        -- and posts by independent row numbers would shift every later match
        -- after a missing end; choosing the next post could reuse another end.
-       CASE WHEN e.unidentified = 0 AND (e.previous_name IS NULL OR e.previous_name <> N'OnPreExecute')
-                  AND e.next_name = N'OnPostExecute' AND e.next_time >= e.message_time THEN e.next_time END
+       CASE WHEN (e.previous_start IS NULL OR e.previous_start = 0)
+                  AND e.next_start = 0 AND e.next_time >= e.message_time THEN e.next_time END
 FROM adjacent_events AS e JOIN #child_page AS p ON p.observation_id = e.event_message_id;
 
 DECLARE @unidentified bit = CASE WHEN EXISTS (
