@@ -4,6 +4,8 @@ import { readOverviewReturn } from './detail-navigation.js';
 import { mountObservationTable } from './render-observations.js';
 import { mountEvents } from './render-events.js';
 import { mountParameters, mountOverrides } from './render-values.js';
+import { mountHistory } from './render-history.js';
+import { defaultSelection } from './selection.js';
 
 export function mountDetail(root, { api, metadata, executionId, appBase, restoreView = null }) {
   const document = root.ownerDocument;
@@ -37,7 +39,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   const focusTargets = { refresh, toggle, overview: returnLink, legacy: root.querySelector('[data-legacy-detail-link]'),
     executables: root.querySelector('[data-executables-toggle]'), children: root.querySelector('[data-children-toggle]'),
     events: root.querySelector('[data-events-toggle]'), parameters: root.querySelector('[data-parameters-toggle]'),
-    overrides: root.querySelector('[data-overrides-toggle]'), retry, main };
+    overrides: root.querySelector('[data-overrides-toggle]'), history: root.querySelector('[data-history-toggle]'), retry, main };
   let returning = restoreView?.executionId === executionId ? restoreView : null;
   let autoPaused = returning?.autoPaused === true;
   const initialPosition = position(), initialFocus = document.activeElement;
@@ -63,6 +65,11 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     actions: { toggle: () => { void loader.toggleOverrides(); }, retry: () => { void loader.retryOverrides(); },
       order: query => { void loader.orderOverrides(query); }, previous: () => { void loader.previousOverrides(); },
       next: () => { void loader.nextOverrides(); }, latest: () => { void loader.latestOverrides(); } } });
+  const historyView = mountHistory(root, { metadata, executionId, restoreView: returning?.historyView,
+    navigation: {appBase, origin:window.location.origin, metadata, selection:destination.selection ?? defaultSelection(metadata)},
+    actions: { toggle: () => { void loader.toggleHistory(); }, retry: () => { void loader.retryHistory(); },
+      order: query => { void loader.orderHistory(query); }, previous: () => { void loader.previousHistory(); },
+      next: () => { void loader.nextHistory(); }, latest: () => { void loader.latestHistory(); } } });
   const clear = () => {
     content.hidden = true;
     elapsed.hidden = true;
@@ -77,7 +84,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   };
   const loader = createDetailLoader({ api, metadata, executionId, autoRefresh: !autoPaused,
     restoreExecutables: returning?.executables, restoreChildren: returning?.children, restoreEvents: returning?.events,
-    restoreParameters: returning?.parameters, restoreOverrides: returning?.overrides,
+    restoreParameters: returning?.parameters, restoreOverrides: returning?.overrides, restoreHistory: returning?.history,
     visible: document.visibilityState !== 'hidden', publish(state) {
     const currentPosition = rendered !== null ? position() : null;
     const focused = document.activeElement;
@@ -97,7 +104,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     status.textContent = state.busy && state.operation === 'section' ? '' : state.busy ? (state.response ? 'Refreshing… Previous observation shown.' : 'Loading execution…')
       : state.phase === 'ready' ? '' : `${state.error.message}${state.stale ? ' Previous observation shown.' : ''}`;
     const sectionName = { executables: 'executable observations', children: 'package calls', events: 'events',
-      parameters: 'parameters', overrides: 'overrides' }[state.sectionBusy] ?? 'sections';
+      parameters: 'parameters', overrides: 'overrides', history: 'package history' }[state.sectionBusy] ?? 'sections';
     header.textContent = state.busy && state.operation === 'section' ? `Loading ${sectionName}…`
       : state.busy ? (state.response ? 'Refreshing…' : 'Loading execution…')
       : state.phase === 'ready' ? 'Loaded' : state.stale ? 'Refresh failed' : 'Execution unavailable';
@@ -127,6 +134,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     eventView.render(state.events, state.busy, state.response !== null);
     parameterView.render(state.parameters, state.busy, state.response !== null);
     overrideView.render(state.overrides, state.busy, state.response !== null);
+    historyView.render(state.history, state.busy, state.response !== null, state.response?.data);
     if (focused === retry && retry.hidden) refresh.focus({ preventScroll: true });
     else if (content.hidden && protectedFocus) main.focus({ preventScroll: true });
     if (currentPosition) restorePosition(currentPosition);
@@ -155,6 +163,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
       executableView: executableView.checkpoint(), children: loader.checkpointChildren(), childView: childView.checkpoint(), events: loader.checkpointEvents(), eventView: eventView.checkpoint(),
       parameters: loader.checkpointParameters(), parameterView: parameterView.checkpoint(),
       overrides: loader.checkpointOverrides(), overrideView: overrideView.checkpoint(),
+      history: loader.checkpointHistory(), historyView: historyView.checkpoint(),
       focus: Object.keys(focusTargets).find(key => focusTargets[key] === document.activeElement) ?? null };
   }, dispose() {
     loader.dispose();
@@ -163,6 +172,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     eventView.dispose();
     parameterView.dispose();
     overrideView.dispose();
+    historyView.dispose();
     retry.removeEventListener('click', load);
     refresh.removeEventListener('click', load);
     toggle.removeEventListener('click', togglePolling);

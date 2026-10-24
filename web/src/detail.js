@@ -5,6 +5,7 @@ import { executableQuery, readExecutablePage } from './executables.js';
 import { childQuery, readChildPage } from './children.js';
 import { eventQuery, readEventPage } from './events.js';
 import { parameterQuery, readParameterPage, overrideQuery, readOverridePage } from './values.js';
+import { historyQuery, readHistoryPage, historyIdentity, sameHistoryIdentity } from './history.js';
 
 export function readExecutionDetail(response, executionId, display) {
   try {
@@ -58,7 +59,7 @@ const transient = error => ['network', 'timeout'].includes(error.kind)
 
 export function createDetailLoader({ api, executionId, metadata, publish, timeoutMs = 30000, locale,
   autoRefresh = true, visible = true, pollIntervalMs = 30000, maxPollIntervalMs = 300000,
-  restoreExecutables = null, restoreChildren = null, restoreEvents = null, restoreParameters = null, restoreOverrides = null }) {
+  restoreExecutables = null, restoreChildren = null, restoreEvents = null, restoreParameters = null, restoreOverrides = null, restoreHistory = null }) {
   if (executionId === null) throw new TypeError('Missing execution ID.');
   formatId(executionId);
   const display = createDisplay({ timeZone: metadata.display_timezone, locale });
@@ -68,11 +69,13 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     events: { query: eventQuery, read: readEventPage, label: 'event' },
     parameters: { query: parameterQuery, read: readParameterPage, label: 'parameter', resource: 'values' },
     overrides: { query: overrideQuery, read: readOverridePage, label: 'override', resource: 'values' },
+    history: { query: historyQuery, read: readHistoryPage, label: 'history', resource: 'history', global: true },
   };
   const keys = Object.keys(definitions);
   const emptyPath = () => ({ entries: [null], index: 0, cohort: null });
   const allowed = key => ['parameters', 'overrides'].includes(key) ? metadata.capabilities.values : key !== 'events' || metadata.capabilities.events;
   const initialSection = key => ({ open: false, query: ['parameters', 'overrides'].includes(key) ? { section: key, limit: metadata.limits.default_limit }
+    : key === 'history' ? { status: '2,7', sort: 'execution_id', direction: 'desc', limit: metadata.limits.default_limit }
     : { sort: key === 'events' ? 'message_time' : 'started_at', direction: 'asc',
       limit: metadata.limits.default_limit, ...(key === 'events' ? { kind: 'all', q: null } : {}) },
     phase: 'idle', page: null, error: null, stale: false, notice: '' });
@@ -80,7 +83,7 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
   const sections = Object.fromEntries(keys.map(key => {
     let section = initialSection(key);
     const saved = { executables: restoreExecutables, children: restoreChildren, events: restoreEvents,
-      parameters: restoreParameters, overrides: restoreOverrides }[key];
+      parameters: restoreParameters, overrides: restoreOverrides, history: restoreHistory }[key];
     if (saved?.open && allowed(key)) {
       try {
         section = { ...section, open: true, query: definitions[key].query(saved.query, metadata) };
@@ -129,10 +132,11 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     updateSection(key, { phase: 'loading', error: null, notice });
     emit({ sectionBusy: key });
     try {
-      const response = await request(job, `executions/${state.executionId}/${definitions[key].resource ?? key}`,
-        { ...query, ...(cursor === null ? {} : { cursor }) });
+      const definition = definitions[key];
+      const response = await request(job, definition.global ? definition.resource : `executions/${state.executionId}/${definition.resource ?? key}`,
+        { ...query, ...(definition.global ? historyIdentity(state.response.data) : {}), ...(cursor === null ? {} : { cursor }) });
       if (disposed || current !== generation) return;
-      const page = definitions[key].read(response, state.executionId, query, metadata, display);
+      const page = definition.read(response, state.executionId, query, metadata, display, state.response.data);
       if (cursor !== null && (page.meta.as_of !== path.cohort?.as_of || page.meta.upper_id !== path.cohort?.upper_id)) {
         throw new ApiError('invalid_response', { requestId: page.meta.request_id });
       }
@@ -163,7 +167,12 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
       if (base) {
         const response = await request(job, `executions/${state.executionId}`);
         if (disposed || current !== generation) return;
-        emit({ response: readExecutionDetail(response, state.executionId, display), stale: false });
+        const detail = readExecutionDetail(response, state.executionId, display);
+        if (previous && !sameHistoryIdentity(previous.data, detail.data)) {
+          paths.history = emptyPath();
+          updateSection('history', { page: null, error: null, stale: false });
+        }
+        emit({ response: detail, stale: false });
       }
       while (job.queue.size && state.response) {
         const key = job.queue.values().next().value;
@@ -176,7 +185,7 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
         catch (error) {
           if (disposed || current !== generation) return;
           const failure = error instanceof ApiError ? error : new ApiError('invalid_response');
-          if (failure.status === 404) throw failure;
+          if (failure.status === 404 && !definitions[key].global) throw failure;
           const retained = transient(failure) && !job.reset.has(key) ? previousPage : null;
           updateSection(key, { phase: 'error', error: failure, page: retained, stale: retained !== null });
         }
@@ -261,6 +270,9 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     path: { ...paths[key], entries: [...paths[key].entries] } });
   const retry = key => state.phase === 'error' ? load() : sectionAction(key);
   return { load, refresh: load,
+    toggleHistory: () => toggleSection('history'), orderHistory: changes => orderSection('history', changes),
+    nextHistory: () => next('history'), previousHistory: () => previous('history'), latestHistory: () => latest('history'),
+    retryHistory: () => retry('history'), checkpointHistory: () => checkpoint('history'),
     toggleOverrides: () => toggleSection('overrides'), orderOverrides: changes => orderSection('overrides', changes),
     nextOverrides: () => next('overrides'), previousOverrides: () => previous('overrides'), latestOverrides: () => latest('overrides'),
     retryOverrides: () => retry('overrides'), checkpointOverrides: () => checkpoint('overrides'),

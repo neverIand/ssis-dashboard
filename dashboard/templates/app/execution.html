@@ -209,5 +209,39 @@
                     </nav>
                 </div>
             </section>
+            <section class="panel detail-panel observation-section" aria-labelledby="history-heading">
+                <div class="section-heading">
+                    <h2 id="history-heading">Package history</h2>
+                    <button type="button" data-history-toggle aria-expanded="false" aria-controls="package-history" disabled>Show package history</button>
+                </div>
+                <div id="package-history" data-history-panel hidden>
+                    <p class="detail-note history-scope" data-history-scope></p>
+                    <form data-history-filters>
+                        <fieldset class="status-options"><legend>History statuses</legend><div class="history-choices" data-history-choices></div></fieldset>
+                        <button type="submit" data-history-apply>Apply statuses</button>
+                    </form>
+                    <div class="table-controls" aria-label="History order">
+                        <span class="cell-detail">Execution ID</span>
+                        <label>Direction <select data-history-direction><option value="desc">Descending</option><option value="asc">Ascending</option></select></label>
+                        <label>Rows per page <input type="number" min="1" step="1" data-history-limit></label>
+                    </div>
+                    <p class="detail-note">Estimates use the mean of up to five prior visible successful runs. They do not replace actual timings. An estimate is unavailable without a start or usable samples, for a zero mean, or when its end is out of range. Visibility and retention can change estimates.</p>
+                    <p class="resource-status" data-history-notice role="status"></p>
+                    <p class="resource-status" data-history-status role="status"></p>
+                    <button type="button" data-history-retry hidden>Retry history</button>
+                    <div class="table-scroll" data-history-scroll role="region" aria-label="Package history table" tabindex="0">
+                        <table data-history-table>
+                            <caption>Executions of the exact entry package</caption>
+                            <thead><tr><th scope="col">Execution / status</th><th scope="col">Timing</th><th scope="col">Actual duration</th><th scope="col">Estimate</th></tr></thead>
+                            <tbody><tr><td colspan="4">Open this section to load package history.</td></tr></tbody>
+                        </table>
+                    </div>
+                    <nav class="pagination" aria-label="History pages">
+                        <button type="button" data-history-previous aria-disabled="true">Previous</button>
+                        <button type="button" data-history-next aria-disabled="true">Next</button>
+                        <button type="button" data-history-latest>Show latest</button>
+                    </nav>
+                </div>
+            </section>
         </div>
 {% endblock %}
