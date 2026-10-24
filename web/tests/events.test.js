@@ -206,7 +206,7 @@ test('retained event state holds only user query/view anchors and revalidates; d
   const next = mounted(t, async (resource, { params }) => response(resource, params), { restoreView: saved }); await flush();
   assert.equal(next.dom.get('events-q').value, 'unapplied draft'); assert.equal(next.calls.at(-1).resource, 'executions/17/events');
   const off = mounted(t, async resource => response(resource), { restoreView: saved, metadata: eventMetadata(false) }); await flush();
-  assert.equal(off.calls.length, 1); assert.equal(off.dom.get('events-toggle').disabled, true); assert.equal(off.dom.eventBody.children.length, 1);
+  assert.equal(off.calls.length, 2); assert.equal(off.dom.get('events-toggle').disabled, true); assert.equal(off.dom.eventBody.children.length, 1);
   assert.equal(off.dom.get('events-q').value, '');
 });
 

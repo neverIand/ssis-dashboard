@@ -96,8 +96,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
       const focused = document.activeElement, rowFocused = body.contains(focused), panelFocused = panel.contains(focused);
       const position = {left:scroll.scrollLeft,top:scroll.scrollTop};
       if (!state.open) returning = null;
-      toggle.disabled = !authorized; toggle.textContent = `${state.open ? 'Hide' : 'Show'} package history`;
-      toggle.setAttribute('aria-expanded',String(state.open && authorized)); panel.hidden = !state.open || !authorized;
+      panel.hidden = !state.open || !authorized;
       for (const node of [retry,previous,next,latest,direction,limit,apply,...choices.values()]) node.disabled = panel.hidden;
       for (const node of [retry,latest,direction,limit,apply]) node.setAttribute('aria-disabled',String(busy));
       previous.setAttribute('aria-disabled',String(busy || !state.hasPrevious)); next.setAttribute('aria-disabled',String(busy || !state.hasNext));
@@ -140,7 +139,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
       for (const [node,event,handler] of listeners) node.removeEventListener(event,handler);
       rows.clear(); body.replaceChildren(); get('choices').replaceChildren(); scope.textContent = status.textContent = notice.textContent = scope.title = status.title = '';
       for (const node of Object.values(controls)) node.disabled = true;
-      panel.hidden = retry.hidden = true; toggle.setAttribute('aria-expanded','false'); current = returning = rendered = null;
+      panel.hidden = retry.hidden = true; current = returning = rendered = null;
     },
   };
 }

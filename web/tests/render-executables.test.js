@@ -17,11 +17,11 @@ function mount(t, get, restoreView) {
   return { dom, screen, calls, click };
 }
 
-test('closed observations send no request; keyed rows preserve literal paths, expansion and moved focus during refresh', async t => {
+test('default observations load once; keyed rows preserve literal paths, expansion and moved focus during refresh', async t => {
   const pending = deferred(); let sections = 0;
   const run = mount(t, async resource => !resource.endsWith('/executables') ? detailResponse('17')
     : ++sections === 1 ? executablePage([executable('1'), executable('2')]) : pending.promise);
-  await settle(); assert.equal(run.calls.length, 1);
+  await settle(); assert.equal(run.calls.length, 2);
   run.click('toggle'); await settle();
   const { dom } = run, row = dom.body.children[0], summary = paths(row).firstChild;
   assert.equal(dom.body.children.length, 2);

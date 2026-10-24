@@ -2,12 +2,15 @@
 {% block title %}Execution {{ app_config.execution_id }} · SSIS Dashboard{% endblock %}
 {% block screen %}execution{% endblock %}
 {% block navigation %}
-<a href="{{ app_config.app_base }}" data-overview-link>Overview</a>
 <a href="{{ app_config.execution_base }}{{ app_config.execution_id }}" data-legacy-detail-link>Legacy detail</a>
 {% endblock %}
 {% block content %}
         <div class="page-heading">
             <div class="detail-heading">
+                <a href="{{ app_config.app_base }}" data-overview-link>← Overview</a>
+                <nav class="detail-breadcrumb" aria-label="Execution context">
+                    <ol><li><a data-detail-breadcrumb="folder">—</a></li><li><a data-detail-breadcrumb="project">—</a></li><li><span data-detail-breadcrumb="package" aria-current="page">—</span></li></ol>
+                </nav>
                 <p class="detail-entry-label">Entry package</p>
                 <h1 data-detail-field="package">—</h1>
                 <p class="detail-context">Execution {{ app_config.execution_id }} <span class="status-badge" data-detail-field="status">—</span></p>
@@ -49,18 +52,30 @@
             <section class="panel detail-panel" aria-labelledby="events-heading">
                 <h2 id="events-heading">Recorded events</h2>
                 <dl class="detail-fields">
-                    <div><dt>All events</dt><dd data-detail-field="all">—</dd></div>
-                    <div><dt>Warnings</dt><dd data-detail-field="warnings">—</dd></div>
-                    <div><dt>Errors</dt><dd data-detail-field="errors">—</dd></div>
-                    <div><dt>Duplicate warnings</dt><dd data-detail-field="duplicate_warnings">—</dd></div>
-                    <div><dt>Memory warnings</dt><dd data-detail-field="memory_warnings">—</dd></div>
+                    <div><dt>All events</dt><dd><a data-detail-field="all" data-event-count-link="all">—</a></dd></div>
+                    <div><dt>Warnings</dt><dd><a data-detail-field="warnings" data-event-count-link="warnings">—</a></dd></div>
+                    <div><dt>Errors</dt><dd><a data-detail-field="errors" data-event-count-link="errors">—</a></dd></div>
+                    <div><dt>Duplicate warnings</dt><dd><a data-detail-field="duplicate_warnings" data-event-count-link="duplicate-warnings">—</a></dd></div>
+                    <div><dt>Memory warnings</dt><dd><a data-detail-field="memory_warnings" data-event-count-link="memory-warnings">—</a></dd></div>
                 </dl>
                 <details class="detail-note"><summary>Count definitions</summary><p>Warnings include duplicate warnings. Memory warnings are separate.</p></details>
             </section>
-            <section class="panel detail-panel observation-section" aria-labelledby="executables-heading">
+            <div class="detail-tabs">
+                <div class="detail-tab-list" role="tablist" aria-label="Execution sections">
+                    <button type="button" id="detail-tab-events" data-events-toggle role="tab" aria-selected="false" aria-controls="detail-panel-events" aria-describedby="events-unavailable" tabindex="-1" disabled>Events</button>
+                    <button type="button" id="detail-tab-executables" data-executables-toggle role="tab" aria-selected="false" aria-controls="detail-panel-executables" tabindex="-1" disabled>Executables</button>
+                    <button type="button" id="detail-tab-children" data-children-toggle role="tab" aria-selected="false" aria-controls="detail-panel-children" tabindex="-1" disabled>Package calls</button>
+                    <button type="button" id="detail-tab-parameters" data-parameters-toggle role="tab" aria-selected="false" aria-controls="detail-panel-parameters" aria-describedby="parameters-unavailable" tabindex="-1" disabled>Parameters</button>
+                    <button type="button" id="detail-tab-overrides" data-overrides-toggle role="tab" aria-selected="false" aria-controls="detail-panel-overrides" aria-describedby="overrides-unavailable" tabindex="-1" disabled>Overrides</button>
+                    <button type="button" id="detail-tab-history" data-history-toggle role="tab" aria-selected="false" aria-controls="detail-panel-history" tabindex="-1" disabled>History</button>
+                </div>
+                <p class="resource-status" id="events-unavailable" data-events-unavailable hidden>Event access is disabled for this application.</p>
+                <p class="resource-status" id="parameters-unavailable" data-parameters-unavailable hidden>Parameter access is disabled for this application.</p>
+                <p class="resource-status" id="overrides-unavailable" data-overrides-unavailable hidden>Override access is disabled for this application.</p>
+            </div>
+            <section class="panel detail-panel observation-section" id="detail-panel-executables" data-detail-tab-panel="executables" role="tabpanel" aria-labelledby="detail-tab-executables" tabindex="0" hidden>
                 <div class="section-heading">
                     <h2 id="executables-heading">Executable observations</h2>
-                    <button type="button" data-executables-toggle aria-expanded="false" aria-controls="executable-observations" disabled>Show executable observations</button>
                 </div>
                 <div id="executable-observations" data-executables-panel hidden>
                     <details class="detail-note"><summary>About observations</summary><p>Each row is a recorded invocation. Repeated executable IDs remain separate.</p></details>
@@ -86,10 +101,9 @@
                     </nav>
                 </div>
             </section>
-            <section class="panel detail-panel observation-section" aria-labelledby="children-heading">
+            <section class="panel detail-panel observation-section" id="detail-panel-children" data-detail-tab-panel="children" role="tabpanel" aria-labelledby="detail-tab-children" tabindex="0" hidden>
                 <div class="section-heading">
                     <h2 id="children-heading">Package calls</h2>
-                    <button type="button" data-children-toggle aria-expanded="false" aria-controls="child-observations" disabled>Show package calls</button>
                 </div>
                 <div id="child-observations" data-children-panel hidden>
                     <p class="detail-note">Start/end recording is not a package result.</p>
@@ -115,12 +129,10 @@
                     </nav>
                 </div>
             </section>
-            <section class="panel detail-panel observation-section" aria-labelledby="event-log-heading">
+            <section class="panel detail-panel observation-section" id="detail-panel-events" data-detail-tab-panel="events" role="tabpanel" aria-labelledby="detail-tab-events" tabindex="0" hidden>
                 <div class="section-heading">
                     <h2 id="event-log-heading">Events</h2>
-                    <button type="button" data-events-toggle aria-expanded="false" aria-controls="execution-events" disabled>Show events</button>
                 </div>
-                <p class="resource-status" data-events-unavailable hidden>Event access is disabled for this application.</p>
                 <div id="execution-events" data-events-panel hidden>
                     <form class="table-controls" data-events-filters aria-label="Event filters">
                         <label>Category <select data-events-kind></select></label>
@@ -151,12 +163,10 @@
                     </nav>
                 </div>
             </section>
-            <section class="panel detail-panel observation-section" aria-labelledby="parameters-heading">
+            <section class="panel detail-panel observation-section" id="detail-panel-parameters" data-detail-tab-panel="parameters" role="tabpanel" aria-labelledby="detail-tab-parameters" tabindex="0" hidden>
                 <div class="section-heading">
                     <h2 id="parameters-heading">Parameters</h2>
-                    <button type="button" data-parameters-toggle aria-expanded="false" aria-controls="execution-parameters" disabled>Show parameters</button>
                 </div>
-                <p class="resource-status" data-parameters-unavailable hidden>Parameter access is disabled for this application.</p>
                 <div id="execution-parameters" data-parameters-panel hidden>
                     <div class="table-controls" aria-label="Parameter order">
                         <span class="cell-detail">Parameter ID, ascending</span>
@@ -179,12 +189,10 @@
                     </nav>
                 </div>
             </section>
-            <section class="panel detail-panel observation-section" aria-labelledby="overrides-heading">
+            <section class="panel detail-panel observation-section" id="detail-panel-overrides" data-detail-tab-panel="overrides" role="tabpanel" aria-labelledby="detail-tab-overrides" tabindex="0" hidden>
                 <div class="section-heading">
                     <h2 id="overrides-heading">Overrides</h2>
-                    <button type="button" data-overrides-toggle aria-expanded="false" aria-controls="execution-overrides" disabled>Show overrides</button>
                 </div>
-                <p class="resource-status" data-overrides-unavailable hidden>Override access is disabled for this application.</p>
                 <div id="execution-overrides" data-overrides-panel hidden>
                     <p class="detail-note" data-overrides-policy hidden>Override values are hidden by application policy.</p>
                     <div class="table-controls" aria-label="Override order">
@@ -208,10 +216,9 @@
                     </nav>
                 </div>
             </section>
-            <section class="panel detail-panel observation-section" aria-labelledby="history-heading">
+            <section class="panel detail-panel observation-section" id="detail-panel-history" data-detail-tab-panel="history" role="tabpanel" aria-labelledby="detail-tab-history" tabindex="0" hidden>
                 <div class="section-heading">
                     <h2 id="history-heading">Package history</h2>
-                    <button type="button" data-history-toggle aria-expanded="false" aria-controls="package-history" disabled>Show package history</button>
                 </div>
                 <div id="package-history" data-history-panel hidden>
                     <p class="detail-note history-scope" data-history-scope></p>

@@ -301,17 +301,21 @@ test('clicking a card/header/scope with an open Status draft commits one merged 
 
 test('a detail link consumes closing Status into its URL before rows can be cleared', t => {
   for (const activation of ['click','auxclick']) {
+    for (const fragment of ['', '#events/errors', '#events/warnings']) {
     const dom = setup(t, '?created=24h'); dom.open('status');
     const status = dom.get('#status'); status.children[2].checked = true; status.dispatchEvent(new Event('change'));
     const link = dom.document.createElement('a'); link.dataset.executionLink = ''; link.dataset.executionId = '17';
+    link.href = '/dashboard/app/executions/17' + fragment;
     const pointer = eventAt('pointerdown', link); dom.document.dispatchEvent(pointer);
     assert.equal(pointer.defaultPrevented, true); assert.equal(dom.applied.length, 1);
     const click = eventAt(activation, link); dom.document.dispatchEvent(click);
     assert.equal(click.defaultPrevented, false, 'Native link activation remains available');
     assert.equal(dom.applied.length, 2); assert.deepEqual(dom.applied.at(-1).status, [2]);
     const url = new URL(link.getAttribute('href'), dom.window.location.origin);
+    assert.equal(url.hash, fragment, 'Status commit preserves the event category');
     const returned = readOverviewReturn(url.search, { metadata: settings, appBase: '/dashboard/app/', origin: dom.window.location.origin });
     assert.deepEqual(parseSelection(new URL(returned.href, dom.window.location.origin).search, settings).status, [2]);
     assert.equal(returned.selection.created, '24h');
+    }
   }
 });

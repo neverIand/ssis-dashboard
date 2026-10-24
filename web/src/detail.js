@@ -6,6 +6,7 @@ import { childQuery, readChildPage } from './children.js';
 import { eventQuery, readEventPage } from './events.js';
 import { parameterQuery, readParameterPage, overrideQuery, readOverridePage } from './values.js';
 import { historyQuery, readHistoryPage, historyIdentity, sameHistoryIdentity } from './history.js';
+import { defaultDetailTab, detailFragment, tabAllowed } from './detail-navigation.js';
 
 export function readExecutionDetail(response, executionId, display) {
   try {
@@ -59,7 +60,8 @@ const transient = error => ['network', 'timeout'].includes(error.kind)
 
 export function createDetailLoader({ api, executionId, metadata, publish, timeoutMs = 30000, locale,
   autoRefresh = true, visible = true, pollIntervalMs = 30000, maxPollIntervalMs = 300000,
-  restoreExecutables = null, restoreChildren = null, restoreEvents = null, restoreParameters = null, restoreOverrides = null, restoreHistory = null }) {
+  restoreExecutables = null, restoreChildren = null, restoreEvents = null, restoreParameters = null, restoreOverrides = null, restoreHistory = null,
+  initialTab = null }) {
   if (executionId === null) throw new TypeError('Missing execution ID.');
   formatId(executionId);
   const display = createDisplay({ timeZone: metadata.display_timezone, locale });
@@ -92,9 +94,9 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     }
     return [key, section];
   }));
-  let active = null, disposed = false, generation = 0;
+  let active = null, disposed = false, generation = 0, tabInitialized = false;
   let state = { phase: 'idle', executionId, response: null, error: null, stale: false,
-    operation: 'initial', sectionBusy: null, ...sections };
+    operation: 'initial', sectionBusy: null, activeTab: null, ...sections };
   const busy = () => state.phase === 'loading';
   const show = poll => publish({ ...state, busy: busy(), poll, ...Object.fromEntries(keys.map(key => [key, {
     ...state[key], pageNumber: paths[key].index + 1, hasPrevious: !busy() && paths[key].index > 0,
@@ -168,6 +170,17 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
         const response = await request(job, `executions/${state.executionId}`);
         if (disposed || current !== generation) return;
         const detail = readExecutionDetail(response, state.executionId, display);
+        if (initialTab !== null && !tabInitialized) {
+          const target = defaultDetailTab(initialTab, detail.data.status, metadata);
+          for (const key of keys) updateSection(key, { open: key === target.tab });
+          if (target.tab === 'events' && target.kind !== state.events.query.kind) {
+            paths.events = emptyPath();
+            updateSection('events', { query: eventQuery({ ...state.events.query, kind: target.kind, q: null }, metadata) });
+          }
+          state = { ...state, activeTab: target.tab };
+          tabInitialized = true;
+          job.queue = new Set([target.tab]);
+        }
         if (previous && !sameHistoryIdentity(previous.data, detail.data)) {
           paths.history = emptyPath();
           updateSection('history', { page: null, error: null, stale: false });
@@ -266,10 +279,39 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     if (active) { active.queue.add('events'); return; }
     return needsBase ? run() : run({ base: false, only: 'events', index: 0, keep: false, pending });
   }
+  function selectTab(target) {
+    if (disposed || !tabAllowed(target.tab, metadata)) return;
+    detailFragment(target, metadata);
+    if (target.tab === 'events' && target.kind !== undefined && !metadata.event_kinds.includes(target.kind)) return;
+    if (!state.response) { initialTab = target; return; }
+    const key = target.tab;
+    if (state[key].open && state.activeTab === key) {
+      return key === 'events' && target.kind !== undefined ? applyEvents({ kind: target.kind, q: null }) : undefined;
+    }
+    const needsBase = state.phase === 'error' || state.stale;
+    if (active?.section) {
+      cancel();
+      state = { ...state, phase: 'ready', sectionBusy: null };
+    }
+    // Switching owns the entire visible section set. In-flight base work may finish;
+    // obsolete section work is aborted and its generation can never publish again.
+    for (const other of keys) updateSection(other, { open: other === key, page: null, error: null,
+      stale: false, phase: other === key ? 'loading' : 'idle', notice: '' });
+    if (key === 'events' && target.kind !== undefined) {
+      paths.events = emptyPath();
+      updateSection('events', { query: eventQuery({ ...state.events.query, kind: target.kind, q: null }, metadata) });
+    }
+    tabInitialized = true;
+    state = { ...state, activeTab: key };
+    loop.reset();
+    if (active) { active.queue.clear(); active.queue.add(key); emit({}); return; }
+    emit({});
+    return needsBase ? run() : sectionAction(key, { keep: false });
+  }
   const checkpoint = key => ({ open: state[key].open, query: { ...state[key].query },
     path: { ...paths[key], entries: [...paths[key].entries] } });
   const retry = key => state.phase === 'error' ? load() : sectionAction(key);
-  return { load, refresh: load,
+  return { load, refresh: load, selectTab,
     toggleHistory: () => toggleSection('history'), orderHistory: changes => orderSection('history', changes),
     nextHistory: () => next('history'), previousHistory: () => previous('history'), latestHistory: () => latest('history'),
     retryHistory: () => retry('history'), checkpointHistory: () => checkpoint('history'),
@@ -294,7 +336,7 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
       formatId(id);
       if (disposed) return;
       if (id === state.executionId) return load();
-      cancel(); loop.reset();
+      cancel(); loop.reset(); tabInitialized = false;
       paths = Object.fromEntries(keys.map(key => [key, emptyPath()]));
       state = { phase: 'idle', executionId: id, response: null, error: null, stale: false, operation: 'select', sectionBusy: null,
         ...Object.fromEntries(keys.map(key => [key, { ...initialSection(key), open: state[key].open }])) };

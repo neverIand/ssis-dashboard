@@ -7,6 +7,7 @@ import { defaultSelection, parseSelection } from '../src/selection.js';
 import { deferred, envelope, metadata, wireTime } from './fixtures.js';
 import { detailDOM, detailResponse } from './detail-fixture.js';
 import { overviewDOM } from './overview-dom.js';
+import { executable, executablePage } from './executable-fixture.js';
 
 const settings = metadata();
 const from = '2026-10-17T00:00:00.0000001Z', to = '2026-10-17T18:00:00.1234567Z';
@@ -302,10 +303,11 @@ for (const appBase of ['/app/', '/ops/monitor/app/']) {
     const detail = detailDOM();
     detail.window.location.search = link.search;
     const screen = mountDetail(detail.root, { metadata: settings, executionId: id, appBase,
-      api: { async get(resource, options) { detailCalls.push({ resource, options }); return detailResponse(id); } } });
+      api: { async get(resource, options) { detailCalls.push({ resource, options });
+        return resource.endsWith('/executables') ? executablePage([executable('1', { execution_id: id })]) : detailResponse(id); } } });
     t.after(() => screen.dispose());
     await new Promise(resolve => setImmediate(resolve));
-    assert.equal(detailCalls.length, 1);
+    assert.equal(detailCalls.length, 2);
     assert.equal(detailCalls[0].resource, `executions/${id}`);
     assert.equal(detailCalls[0].options.params, undefined, 'Overview filters must not constrain the detail read');
     assert.equal(detail.get('overview-return-notice').hidden, true);

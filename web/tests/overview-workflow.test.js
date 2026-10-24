@@ -157,10 +157,28 @@ test('absolute bookmarked bounds retain exact wire values across refreshes', asy
   assert.equal(run.state.selection.created, null);
 });
 
+test('unavailable events keep overview count links on the execution without a category fragment', async t => {
+  const dom = overviewDOM(), result = overviewPage();
+  result.data[0].warning_count = 2; result.data[0].error_count = 3;
+  const view = mountOverview(dom.root, { metadata, appBase: '/ops/app/',
+    api: { get: async resource => resource === 'executions' ? result : timelineSummary() } });
+  t.after(view.dispose);
+  const applied = selection('?folder=Old&project=Old&status=2');
+  await view.apply(applied);
+  const cells = dom.body.firstChild.children;
+  for (const [index, count] of [[7, '2'], [8, '3']]) {
+    const link = cells[index].firstChild, url = new URL(link.href, navigation.origin);
+    assert.equal(link.textContent, count);
+    assert.equal(url.hash, ''); assert.equal(link.href, cells[0].firstChild.href);
+    assert.deepEqual(readOverviewReturn(url.search, navigation).selection, applied);
+  }
+});
+
 test('summary cards include Other, apply exact statuses and clear with Total; row links retain selection', async t => {
   const dom = overviewDOM(), changes = [];
+  const enabled = structuredClone(metadata); enabled.capabilities.events = true;
   const summary = timelineSummary(); summary.data.by_status[0].count = 2; summary.data.total += 2;
-  const view = mountOverview(dom.root, { metadata, appBase: '/ops/app/', onSelect: value => changes.push(value),
+  const view = mountOverview(dom.root, { metadata: enabled, appBase: '/ops/app/', onSelect: value => changes.push(value),
     api: { get: async resource => resource === 'executions' ? overviewPage() : summary } });
   t.after(view.dispose);
   await view.apply(selection('?folder=Old&project=Old&status=2'));
@@ -174,6 +192,12 @@ test('summary cards include Other, apply exact statuses and clear with Total; ro
   }
   const cells = dom.body.firstChild.children;
   assert.equal(cells[2].firstChild.href, cells[0].firstChild.href);
+  for (const [index, kind] of [[7,'warnings'],[8,'errors']]) {
+    const url = new URL(cells[index].firstChild.href, navigation.origin);
+    assert.equal(url.hash, `#events/${kind}`);
+    assert.deepEqual(readOverviewReturn(url.search, navigation).selection, selection('?folder=Old&project=Old&status=2'));
+    assert.match(cells[index].firstChild.getAttribute('aria-label'), new RegExp(kind));
+  }
   const folder = cells[1].children[0], project = cells[1].children[1];
   folder.dispatchEvent(new Event('click', { cancelable: true }));
   assert.deepEqual(changes.at(-1), { folder: 'Folder', project: null });

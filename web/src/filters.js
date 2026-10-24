@@ -1,6 +1,6 @@
 import { formatCode } from './display.js';
 import { createCatalogSearch } from './catalog-search.js';
-import { executionHref } from './detail-navigation.js';
+import { executionHref, readDetailFragment } from './detail-navigation.js';
 import { mountRangeEditor } from './range-editor.js';
 import { catalogName, createSelectionSession, SelectionError, selectionSearch, validateSelection } from './selection.js';
 import { rangeLabel } from './time-range.js';
@@ -211,7 +211,8 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
       // The click has an activation target now. Update that exact anchor before
       // the commit clears rows, so ordinary and modified navigation carry Status.
       link.setAttribute('href', executionHref(link.dataset.executionId,
-        validateSelection(session.draft, metadata), { metadata, appBase, origin: window.location.origin }));
+        validateSelection(session.draft, metadata), { metadata, appBase, origin: window.location.origin,
+          section: readDetailFragment(new URL(link.href, window.location.origin).hash, metadata) }));
     }
     close();
   }

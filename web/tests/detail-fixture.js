@@ -14,8 +14,13 @@ export function detailResponse(executionId = '9223372036854775807') {
 
 // DOM double for mounted startup/render behavior; no browser/layout claims.
 export function detailDOM() {
-  const window = Object.assign(new EventTarget(), { location: { origin: 'https://example.test', search: '' },
+  const window = Object.assign(new EventTarget(), { location: { origin: 'https://example.test', search: '', hash: '', pathname: '/ops/app/executions/17' },
     scrollX: 0, scrollY: 0, scrollTo(x, y) { this.scrollX = x; this.scrollY = y; } });
+  window.history = { state: null, replacements: [], replaceState(state, _title, href) {
+    this.state = state; this.replacements.push(href);
+    const url = new URL(href, window.location.origin);
+    Object.assign(window.location, { pathname: url.pathname, search: url.search, hash: url.hash });
+  } };
   const document = Object.assign(new EventTarget(), { location: window.location, defaultView: window,
     visibilityState: 'visible', activeElement: null });
   document.createElement = tag => new Node(document, tag);
@@ -41,9 +46,17 @@ export function detailDOM() {
   // Package/status live in the visible page heading, outside the hideable detail body.
   root.append(...fields.filter(node => ['package', 'status'].includes(node.dataset.detailField)));
   get('execution-detail').append(...fields.filter(node => !['package', 'status'].includes(node.dataset.detailField)));
+  for (const key of ['folder', 'project', 'package']) {
+    const node = new Node(document, key === 'package' ? 'span' : 'a');
+    nodes.set(`[data-detail-breadcrumb="${key}"]`, node); root.append(node);
+  }
+  const countLinks = fields.filter(node => ['all','warnings','errors','duplicate_warnings','memory_warnings'].includes(node.dataset.detailField));
+  for (const node of countLinks) { node.tag = 'a'; node.dataset.eventCountLink = node.dataset.detailField.replaceAll('_','-'); }
   const bodies = {};
   for (const section of ['executables', 'children', 'events', 'parameters', 'overrides', 'history']) {
-    get('execution-detail').append(get(`${section}-toggle`), get(`${section}-panel`));
+    const panel = new Node(document, 'section');
+    nodes.set(`[data-detail-tab-panel="${section}"]`, panel);
+    get('execution-detail').append(get(`${section}-toggle`), panel); panel.append(get(`${section}-panel`));
     get(`${section}-panel`).append(...['status', 'notice', 'retry', 'sort', 'direction', 'limit',
       'previous', 'next', 'latest', 'scroll'].map(key => get(`${section}-${key}`)));
     get(`${section}-scroll`).append(get(`${section}-table`));
@@ -65,7 +78,11 @@ export function detailDOM() {
       execution_base: '/ops/execution/', execution_id: '9223372036854775807' }) };
   get('detail-retry').hidden = get('executables-retry').hidden = get('executables-panel').hidden = true;
   root.querySelector = selector => { if (!nodes.has(selector)) throw new Error(`Missing detail fixture node: ${selector}`); return nodes.get(selector); };
-  root.querySelectorAll = selector => { if (selector !== '[data-detail-field]') throw new Error(`Unexpected selector: ${selector}`); return fields; };
+  root.querySelectorAll = selector => {
+    if (selector === '[data-detail-field]') return fields;
+    if (selector === '[data-event-count-link]') return countLinks;
+    throw new Error(`Unexpected selector: ${selector}`);
+  };
   return { root, document, window, main, body, childBody: bodies.children, eventBody: bodies.events, parameterBody: bodies.parameters, overrideBody: bodies.overrides, historyBody: bodies.history, get,
     field: key => fields.find(node => node.dataset.detailField === key) };
 }

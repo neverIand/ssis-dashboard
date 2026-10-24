@@ -191,9 +191,9 @@ test('visible call paths distinguish loops and tasks without merging repeated ca
     api: { get: async resource => { calls.push(resource); return resource.endsWith('/children')
       ? childPage(rows, { has_more: true, next_cursor: 'next' }) : detailResponse('17'); } } });
   t.after(() => screen.dispose()); await flush();
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
   dom.get('children-toggle').dispatchEvent(new Event('click')); await flush();
-  assert.deepEqual(calls, ['executions/17', 'executions/17/children']);
+  assert.deepEqual(calls, ['executions/17', 'executions/17/executables', 'executions/17/children']);
   assert.equal(dom.childBody.children.length, 4);
   assert.deepEqual(dom.childBody.children.map(row => row.children[0].children[1].textContent), [
     'Call path: Root › Loop[1] › Run › Child', 'Call path: Root › Loop[2] › Run › Child',

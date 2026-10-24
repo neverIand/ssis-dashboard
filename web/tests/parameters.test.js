@@ -205,7 +205,7 @@ test('parameter checkpoints keep only IDs/view state and disabled or changed met
   const checkpoint = dom.mounted.checkpoint(); assert.doesNotMatch(JSON.stringify(checkpoint), /private-name-canary|private-value-canary|sql_type|redaction_reason/);
   dom.mounted.dispose();
   const blocked = screen(t, async resource => response(resource), { metadata: parameterMetadata(false), restoreView: checkpoint }); await flush();
-  assert.equal(blocked.calls.length, 1); assert.equal(blocked.get('parameters-panel').hidden, true); assert.equal(blocked.get('parameters-toggle').disabled, true);
+  assert.equal(blocked.calls.length, 2); assert.equal(blocked.get('parameters-panel').hidden, true); assert.equal(blocked.get('parameters-toggle').disabled, true);
   const changed = screen(t, async resource => response(resource), { restoreView: checkpoint }); await flush();
   assert.equal(changed.calls.at(-1).resource, 'executions/17/values'); assert.ok(changed.parameterBody.textContent.includes('1.2300'));
   assert.doesNotMatch(changed.parameterBody.textContent, /private-value-canary/); assert.equal(changed.document.activeElement, changed.get('parameters-scroll'));

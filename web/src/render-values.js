@@ -92,8 +92,7 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
       if (!state.open) returning = null;
       get('unavailable').hidden = enabled;
       if (!parameter) get('policy').hidden = !enabled || metadata.capabilities.override_values;
-      toggle.disabled = !permitted; toggle.textContent = `${state.open ? 'Hide' : 'Show'} ${resource}`;
-      toggle.setAttribute('aria-expanded', String(state.open && permitted)); panel.hidden = !state.open || !permitted;
+      panel.hidden = !state.open || !permitted;
       for (const node of [retry, previous, next, latest, limit]) node.disabled = panel.hidden;
       for (const node of [retry, latest, limit]) node.setAttribute('aria-disabled', String(busy));
       previous.setAttribute('aria-disabled', String(busy || !state.hasPrevious)); next.setAttribute('aria-disabled', String(busy || !state.hasNext));
@@ -142,7 +141,7 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
       for (const [node, event, handler] of listeners) node.removeEventListener(event, handler);
       rows.clear(); body.replaceChildren(); status.textContent = notice.textContent = status.title = '';
       for (const node of Object.values(controls)) node.disabled = true;
-      panel.hidden = retry.hidden = true; toggle.setAttribute('aria-expanded', 'false');
+      panel.hidden = retry.hidden = true;
       current = returning = rendered = null;
     },
   };

@@ -120,6 +120,11 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
         packageLink.dataset.executionLink = ''; packageLink.dataset.executionId = item.execution_id;
         cells[2].append(packageLink);
         cells[3].append(element('span', undefined, 'status-badge'));
+        for (const index of [7, 8]) {
+          const count = element('a');
+          count.dataset.executionLink = ''; count.dataset.executionId = item.execution_id;
+          cells[index].append(count);
+        }
         row.append(...cells);
         record = { row, cells, item: null };
         folder.addEventListener('click', event => intercept(event, { folder: record.item.folder_name, project: null }));
@@ -147,8 +152,15 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
           cells[6].append(element('span', `Elapsed: ${display.duration(item.elapsed_seconds)}`, 'cell-detail'));
         }
       }
-      text(cells[7], display.count(item.warning_count));
-      text(cells[8], display.count(item.error_count));
+      for (const [index, kind, count] of [[7, 'warnings', item.warning_count], [8, 'errors', item.error_count]]) {
+        const link = cells[index].firstChild;
+        text(link, display.count(count));
+        const target = executionHref(item.execution_id, selection,
+          { appBase, origin: window.location.origin, metadata,
+            section: metadata.capabilities.events ? { tab: 'events', kind } : null });
+        if (link.getAttribute('href') !== target) link.setAttribute('href', target);
+        link.setAttribute('aria-label', `${display.count(count)} ${kind} for execution ${item.execution_id}`);
+      }
       cells[7].dataset.level = item.warning_count > 0 ? 'warning' : 'quiet';
       cells[8].dataset.level = item.error_count > 0 ? 'error' : 'quiet';
       record.item = item;

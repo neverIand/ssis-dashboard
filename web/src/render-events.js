@@ -63,6 +63,8 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
       text(row.cells[0], formatId(item.event_id)); text(row.time, display.tableTimestamp(item.message_time, executionStart));
       row.time.setAttribute('datetime', item.message_time); row.time.title = item.message_time;
       text(row.name, literal(item.event_name)); text(row.code, `Message type: ${item.message_type}`);
+      row.node.dataset.severity = ['OnError', 'OnTaskFailed'].includes(item.event_name) ? 'error'
+        : item.event_name === 'OnWarning' ? 'warning' : 'none';
       const characters = item.message === null ? [] : [...item.message];
       text(row.preview, characters.length > 160 ? characters.slice(0, 160).join('') + '…' : literal(item.message));
       text(row.full, literal(item.message)); row.message.hidden = characters.length <= 160 && !item.truncated;
@@ -96,8 +98,6 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
       const position = { left: scroll.scrollLeft, top: scroll.scrollTop }, permitted = enabled && authorized;
       if (!state.open) returning = null;
       get('unavailable').hidden = enabled;
-      toggle.disabled = !permitted; toggle.textContent = state.open ? 'Hide events' : 'Show events';
-      toggle.setAttribute('aria-expanded', String(state.open && permitted));
       panel.hidden = !state.open || !permitted;
       for (const node of [retry, previous, next, latest, sort, direction, limit, kind, q, apply, reset]) node.disabled = panel.hidden;
       for (const node of [retry, sort, direction, limit, latest]) node.setAttribute('aria-disabled', String(busy));
@@ -157,7 +157,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
       for (const [node, event, handler] of listeners) node.removeEventListener(event, handler);
       rows.clear(); body.replaceChildren(); status.textContent = notice.textContent = scope.textContent = q.value = status.title = '';
       for (const node of Object.values(controls)) node.disabled = true;
-      panel.hidden = retry.hidden = true; toggle.setAttribute('aria-expanded', 'false');
+      panel.hidden = retry.hidden = true;
       current = returning = rendered = applied = null;
     },
   };

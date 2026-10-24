@@ -1,11 +1,12 @@
 import { createDisplay, refreshStatus } from './display.js';
 import { createDetailLoader, detailFields } from './detail.js';
-import { readOverviewReturn } from './detail-navigation.js';
+import { readOverviewReturn, readDetailFragment, detailFragment } from './detail-navigation.js';
+import { mountDetailTabs } from './detail-tabs.js';
 import { mountObservationTable } from './render-observations.js';
 import { mountEvents } from './render-events.js';
 import { mountParameters, mountOverrides } from './render-values.js';
 import { mountHistory } from './render-history.js';
-import { defaultSelection } from './selection.js';
+import { defaultSelection, selectionSearch } from './selection.js';
 
 export function mountDetail(root, { api, metadata, executionId, appBase, restoreView = null }) {
   const document = root.ownerDocument;
@@ -41,36 +42,52 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   let returning = restoreView?.executionId === executionId ? restoreView : null;
   let autoPaused = returning?.autoPaused === true;
   const initialPosition = position(), initialFocus = document.activeElement;
-  let rendered = null;
+  let rendered = null, activeTab = null;
+  const tabView = mountDetailTabs(root, { metadata, revealInitial: !returning,
+    select: target => { void loader.selectTab(target); } });
+  const breadcrumb = Object.fromEntries(['folder', 'project', 'package'].map(key =>
+    [key, root.querySelector(`[data-detail-breadcrumb="${key}"]`)]));
+  const countLinks = [...root.querySelectorAll('[data-event-count-link]')];
+  const countActions = countLinks.map(link => {
+    const kind = link.dataset.eventCountLink;
+    const click = event => {
+      if ((event.button ?? 0) !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      if (link.getAttribute('href') !== null) tabView.follow({ tab: 'events', kind }, { focus: true });
+    };
+    link.addEventListener('click', click);
+    return [link, click];
+  });
   const executableView = mountObservationTable(root, { metadata, restoreView: returning?.executableView,
-    actions: { toggle: () => { void loader.toggleExecutables(); }, retry: () => { void loader.retryExecutables(); },
+    actions: { toggle: () => { void loader.selectTab({ tab: 'executables' }); }, retry: () => { void loader.retryExecutables(); },
       order: query => { void loader.orderExecutables(query); }, previous: () => { void loader.previousExecutables(); },
       next: () => { void loader.nextExecutables(); }, latest: () => { void loader.latestExecutables(); } } });
   const childView = mountObservationTable(root, { metadata, resource: 'children', restoreView: returning?.childView,
-    actions: { toggle: () => { void loader.toggleChildren(); }, retry: () => { void loader.retryChildren(); },
+    actions: { toggle: () => { void loader.selectTab({ tab: 'children' }); }, retry: () => { void loader.retryChildren(); },
       order: query => { void loader.orderChildren(query); }, previous: () => { void loader.previousChildren(); },
       next: () => { void loader.nextChildren(); }, latest: () => { void loader.latestChildren(); } } });
   const eventView = mountEvents(root, { metadata, restoreView: returning?.eventView,
-    actions: { toggle: () => { void loader.toggleEvents(); }, retry: () => { void loader.retryEvents(); },
+    actions: { toggle: () => { void loader.selectTab({ tab: 'events' }); }, retry: () => { void loader.retryEvents(); },
       apply: query => { void loader.applyEvents(query); }, order: query => { void loader.orderEvents(query); },
       previous: () => { void loader.previousEvents(); }, next: () => { void loader.nextEvents(); },
       latest: () => { void loader.latestEvents(); } } });
   const parameterView = mountParameters(root, { metadata, restoreView: returning?.parameterView,
-    actions: { toggle: () => { void loader.toggleParameters(); }, retry: () => { void loader.retryParameters(); },
+    actions: { toggle: () => { void loader.selectTab({ tab: 'parameters' }); }, retry: () => { void loader.retryParameters(); },
       order: query => { void loader.orderParameters(query); }, previous: () => { void loader.previousParameters(); },
       next: () => { void loader.nextParameters(); }, latest: () => { void loader.latestParameters(); } } });
   const overrideView = mountOverrides(root, { metadata, restoreView: returning?.overrideView,
-    actions: { toggle: () => { void loader.toggleOverrides(); }, retry: () => { void loader.retryOverrides(); },
+    actions: { toggle: () => { void loader.selectTab({ tab: 'overrides' }); }, retry: () => { void loader.retryOverrides(); },
       order: query => { void loader.orderOverrides(query); }, previous: () => { void loader.previousOverrides(); },
       next: () => { void loader.nextOverrides(); }, latest: () => { void loader.latestOverrides(); } } });
   const historyView = mountHistory(root, { metadata, executionId, restoreView: returning?.historyView,
     navigation: {appBase, origin:window.location.origin, metadata, selection:destination.selection ?? defaultSelection(metadata)},
-    actions: { toggle: () => { void loader.toggleHistory(); }, retry: () => { void loader.retryHistory(); },
+    actions: { toggle: () => { void loader.selectTab({ tab: 'history' }); }, retry: () => { void loader.retryHistory(); },
       order: query => { void loader.orderHistory(query); }, previous: () => { void loader.previousHistory(); },
       next: () => { void loader.nextHistory(); }, latest: () => { void loader.latestHistory(); } } });
   const clear = () => {
     content.hidden = true;
     elapsed.hidden = true;
+    for (const node of Object.values(breadcrumb)) { node.textContent = '—'; node.removeAttribute('href'); }
     for (const field of fields) {
       field.textContent = '—';
       field.removeAttribute('datetime');
@@ -80,6 +97,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     }
   };
   const loader = createDetailLoader({ api, metadata, executionId, autoRefresh: !autoPaused,
+    initialTab: readDetailFragment(window.location.hash, metadata) ?? returning?.activeTab ?? {},
     restoreExecutables: returning?.executables, restoreChildren: returning?.children, restoreEvents: returning?.events,
     restoreParameters: returning?.parameters, restoreOverrides: returning?.overrides, restoreHistory: returning?.history,
     visible: document.visibilityState !== 'hidden', publish(state) {
@@ -109,6 +127,12 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     else if (state.response !== rendered) {
       const values = detailFields(state.response, display);
       const data = state.response.data;
+      const selection = destination.selection ?? defaultSelection(metadata);
+      breadcrumb.folder.textContent = data.folder_name;
+      breadcrumb.project.textContent = data.project_name;
+      breadcrumb.package.textContent = data.package_name;
+      breadcrumb.folder.href = appBase + selectionSearch({ ...selection, folder: data.folder_name, project: null }, metadata);
+      breadcrumb.project.href = appBase + selectionSearch({ ...selection, folder: data.folder_name, project: data.project_name }, metadata);
       for (const field of fields) {
         const key = field.dataset.detailField;
         if (field.textContent !== values[key]) field.textContent = values[key];
@@ -129,6 +153,15 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     parameterView.render(state.parameters, state.busy, state.response !== null);
     overrideView.render(state.overrides, state.busy, state.response !== null);
     historyView.render(state.history, state.busy, state.response !== null, state.response?.data);
+    for (const link of countLinks) {
+      if (metadata.capabilities.events && state.response) link.href = detailFragment({ tab: 'events', kind: link.dataset.eventCountLink }, metadata);
+      else link.removeAttribute('href');
+      link.setAttribute('aria-label', `${link.textContent} ${link.dataset.eventCountLink === 'all'
+        ? 'events' : link.dataset.eventCountLink.replaceAll('-', ' ')} for this execution`);
+    }
+    tabView.render(state);
+    activeTab = state.activeTab ? { tab: state.activeTab,
+      ...(state.activeTab === 'events' ? { kind: state.events.query.kind } : {}) } : null;
     if (focused === retry && retry.hidden) refresh.focus({ preventScroll: true });
     else if (content.hidden && protectedFocus) main.focus({ preventScroll: true });
     if (currentPosition) restorePosition(currentPosition);
@@ -143,6 +176,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
       }
       returning = null;
     }
+    tabView.reveal();
   } });
   const load = () => { void loader.load(); };
   const togglePolling = () => loader.togglePolling();
@@ -153,7 +187,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   document.addEventListener('visibilitychange', visibilityChanged);
   load();
   return { checkpoint() {
-    return { executionId, autoPaused, position: position(), executables: loader.checkpointExecutables(),
+    return { executionId, autoPaused, activeTab, position: position(), executables: loader.checkpointExecutables(),
       executableView: executableView.checkpoint(), children: loader.checkpointChildren(), childView: childView.checkpoint(), events: loader.checkpointEvents(), eventView: eventView.checkpoint(),
       parameters: loader.checkpointParameters(), parameterView: parameterView.checkpoint(),
       overrides: loader.checkpointOverrides(), overrideView: overrideView.checkpoint(),
@@ -167,6 +201,8 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     parameterView.dispose();
     overrideView.dispose();
     historyView.dispose();
+    tabView.dispose();
+    for (const [link, click] of countActions) link.removeEventListener('click', click);
     retry.removeEventListener('click', load);
     refresh.removeEventListener('click', load);
     toggle.removeEventListener('click', togglePolling);

@@ -146,9 +146,6 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
       if (!state.open) returning = null;
       const focused = document.activeElement, rowFocused = body.contains(focused), panelFocused = panel.contains(focused);
       const position = { left: region.scrollLeft, top: region.scrollTop };
-      toggle.disabled = !authorized;
-      toggle.textContent = `${state.open ? 'Hide' : 'Show'} ${child ? 'package calls' : 'executable observations'}`;
-      toggle.setAttribute('aria-expanded', String(state.open && authorized));
       panel.hidden = !state.open || !authorized;
       for (const node of [retry, sort, direction, limit, previous, next, latest]) {
         node.disabled = !authorized || !state.open;
@@ -200,7 +197,6 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
       rows.clear(); body.replaceChildren(); status.textContent = notice.textContent = status.title = '';
       for (const node of Object.values(controls)) node.disabled = true;
       panel.hidden = retry.hidden = true;
-      toggle.setAttribute('aria-expanded', 'false');
       returning = rendered = current = null;
     },
   };

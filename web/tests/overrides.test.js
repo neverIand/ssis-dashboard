@@ -212,7 +212,7 @@ test('override checkpoints contain IDs and cursors only; metadata policy is reva
   row.children[0].children[2].open = row.children[1].children[2].open = true; row.children[1].children[2].children[0].focus();
   const checkpoint = dom.mounted.checkpoint(); assert.doesNotMatch(JSON.stringify(checkpoint), /private-path-canary|private-value-canary|property_path|redaction_reason/);
   dom.mounted.dispose(); const blocked = screen(t, undefined, { metadata: overrideMetadata(false), restoreView: checkpoint }); await flush();
-  assert.equal(blocked.calls.length, 1); assert.equal(blocked.get('overrides-toggle').disabled, true);
+  assert.equal(blocked.calls.length, 2); assert.equal(blocked.get('overrides-toggle').disabled, true);
   const policy = screen(t, async (resource, options) => options.params?.section === 'overrides' ? overridePage([overrideRow('1',
     { redacted: true, redaction_reason: 'policy', value: null })]) : response(resource, options), { metadata: overrideMetadata(true,false), restoreView: checkpoint });
   await flush(); assert.equal(policy.get('overrides-policy').hidden, false); assert.equal(policy.get('overrides-toggle').disabled, false);
