@@ -229,6 +229,18 @@
                     <p class="resource-status" data-history-notice role="status"></p>
                     <p class="resource-status" data-history-status role="status"></p>
                     <button type="button" data-history-retry hidden>Retry history</button>
+                    <section class="history-duration-chart" aria-labelledby="history-duration-heading">
+                        <div class="section-heading"><h3 id="history-duration-heading">Duration comparison</h3><button type="button" data-history-chart-toggle disabled aria-expanded="false" aria-controls="history-duration-chart">Show duration chart</button></div>
+                        <div id="history-duration-chart" data-history-chart-panel hidden>
+                            <p class="detail-note" data-history-chart-scope></p>
+                            <p class="detail-note duration-legend"><span data-duration-key="actual">Actual duration</span><span data-duration-key="estimate">Estimated duration</span><span>A circle marks actual zero. Missing durations have no mark. Full values and timestamps are in the history table below.</span></p>
+                            <label class="history-chart-choice">Selected execution<select data-history-chart-choice></select></label>
+                            <p class="cell-detail" data-history-chart-scale></p>
+                            <svg class="history-duration-plot" data-history-chart-plot viewBox="0 0 1000 170" preserveAspectRatio="none" aria-hidden="true" focusable="false"></svg>
+                            <p class="resource-status" data-history-chart-empty hidden></p>
+                            <p class="resource-status" data-history-chart-selected role="status"></p>
+                        </div>
+                    </section>
                     <div class="table-scroll" data-history-scroll role="region" aria-label="Package history table" tabindex="0">
                         <table data-history-table>
                             <caption>Executions of the exact entry package</caption>

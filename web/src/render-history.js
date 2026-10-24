@@ -1,5 +1,6 @@
 import { createDisplay, formatCode } from './display.js';
 import { executionHref } from './detail-navigation.js';
+import { mountHistoryChart } from './render-history-chart.js';
 
 export function mountHistory(root, { metadata, actions, navigation, executionId, restoreView = null }) {
   const document = root.ownerDocument, get = key => root.querySelector(`[data-history-${key}]`);
@@ -8,6 +9,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
   const panel = get('panel'), status = get('status'), notice = get('notice'), scope = get('scope'), form = get('filters');
   const table = get('table'), body = table.querySelector('tbody'), rows = new Map(), listeners = [], choices = new Map();
   const display = createDisplay({ timeZone: metadata.display_timezone });
+  const chart=mountHistoryChart(root,{metadata,restoreView:restoreView?.chart});
   const initialFocus = document.activeElement, initialScroll = { left: scroll.scrollLeft, top: scroll.scrollTop };
   let returning = restoreView, current = null, rendered = null, appliedStatus = null, busy = true;
   const element = (tag, value, className) => {
@@ -109,6 +111,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
       scope.textContent = identity ? `Folder: ${identity.folder_name} · Project: ${identity.project_name} · Package: ${identity.package_name}\nAll creation dates · Applied statuses: ${state.query.status.split(',').map(code=>formatCode(metadata.execution_statuses.find(item=>String(item.code)===code) ?? {code:Number(code),name:'unknown'})).join(', ')}` : '';
       notice.textContent = state.notice;
       const page = panel.hidden ? null : state.page;
+      chart.render({page,pageNumber:state.pageNumber,busy:isBusy,visible:!panel.hidden,stale:state.stale});
       if (page !== rendered || page === null) {
         if (page) paint(page,state.pageNumber); else empty(state.phase === 'loading' ? 'Loading package history…' : 'No history loaded.');
         rendered = page;
@@ -126,10 +129,11 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
         returning = null;
       }
     },
-    checkpoint() { return {left:scroll.scrollLeft,top:scroll.scrollTop,draft:[...choices].filter(([,input])=>input.checked).map(([code])=>code),
+    checkpoint() { return {left:scroll.scrollLeft,top:scroll.scrollTop,chart:chart.checkpoint(),draft:[...choices].filter(([,input])=>input.checked).map(([code])=>code),
       executionFocus:[...rows].find(([,row])=>row.link===document.activeElement)?.[0] ?? null,
       focus:Object.keys(controls).find(key=>controls[key]===document.activeElement) ?? null}; },
     dispose() {
+      chart.dispose();
       for (const [node,event,handler] of listeners) node.removeEventListener(event,handler);
       rows.clear(); body.replaceChildren(); get('choices').replaceChildren(); scope.textContent = status.textContent = notice.textContent = '';
       for (const node of Object.values(controls)) node.disabled = true;

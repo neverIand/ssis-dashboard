@@ -46,7 +46,7 @@ Environment-dependent acceptance may wait while the user prepares the test envir
 | 1 — backend | Factory/configuration, pinned runtime, owned resources, safe failures and legacy adapter validated |
 | 2 — Stage C API | Read-only operations, contract, typed SQL/JSON, bounded pages and access/redaction; workload/resource/reader acceptance |
 | 3 — first native screen | `/app/` shell, filters/list/cards, data-only in-place refresh; complete filter → list → detail-link path. [D1a–D3c](PROGRESS.md#phase-3--first-native-screen-preparation) define the nine bounded tasks and local acceptance. |
-| 4 — parity | First deliver native execution detail, in-place refresh and return to the overview; then observations/children/events/values/history/charts, keyboard/responsive behavior and legacy URL mapping. [P4.1a–P4.7](PROGRESS.md#phase-4--native-execution-workflows) define the independently verifiable tasks. |
+| 4 — parity | First deliver native execution detail, in-place refresh and return to the overview; then observations/children/events/values/history/charts, keyboard/responsive behavior and legacy URL mapping. [P4.1a–P4.7](PROGRESS.md#phase-4--native-execution-workflows) define the independently verifiable tasks, with [P4.7 inventory/mapping/integration](PROGRESS.md#p47-submilestones) separated before implementation. |
 | 5 — live updates | Shared detection, production stream and [recovery/capacity checks](MODERNIZATION_PLAN.md#production-live-updates) |
 | 6 — cutover | Prebuilt install, parity/load/host checks, rollback rehearsal, then obsolete UI/assets removal |
 

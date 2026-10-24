@@ -130,6 +130,8 @@ class FrontendShellTests(unittest.TestCase):
                                    'Override access is disabled for this application.', 'Override values are hidden by application policy.',
                                    'aria-label="Override pages"', 'Property / ID',
                                    'data-history-toggle aria-expanded="false"', 'data-history-panel hidden', 'data-history-table',
+                                   'Duration comparison', 'data-history-chart-panel hidden', 'data-history-chart-plot',
+                                   'Selected execution', 'A circle marks actual zero.',
                                    'History statuses', 'Apply statuses', 'aria-label="History pages"', 'Actual duration', 'Estimate',
                                    'Start/end recording does not establish a package result.', 'aria-label="Executable pages"']:
                         self.assertIn(markup, html)

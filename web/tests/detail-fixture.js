@@ -19,6 +19,7 @@ export function detailDOM() {
   const document = Object.assign(new EventTarget(), { location: window.location, defaultView: window,
     visibilityState: 'visible', activeElement: null });
   document.createElement = tag => new Node(document, tag);
+  document.createElementNS = (_namespace,tag) => new Node(document,tag);
   document.createTextNode = value => new Node(document, '#text', value);
   const root = new Node(document, 'root'), main = new Node(document, 'main');
   document.body = new Node(document, 'body');
@@ -27,7 +28,7 @@ export function detailDOM() {
   for (const key of ['app-status', 'retry', 'request-id', 'display-timezone', 'execution-detail',
     'detail-status', 'detail-retry', 'detail-request-id', 'detail-observed', 'active-elapsed',
     'detail-refresh', 'detail-poll-toggle', 'detail-poll-status', 'overview-link', 'legacy-detail-link',
-    'overview-return-notice', 'parameters-unavailable', 'overrides-unavailable', 'overrides-policy', ...['filters','choices','apply','scope'].map(key => `history-${key}`), ...['unavailable','filters','apply','reset','kind','q','scope'].map(key => `events-${key}`), ...['toggle', 'panel', 'status', 'notice', 'retry', 'sort', 'direction',
+    'overview-return-notice', 'parameters-unavailable', 'overrides-unavailable', 'overrides-policy', ...['toggle','panel','choice','plot','scope','selected','scale','empty'].map(key=>`history-chart-${key}`), ...['filters','choices','apply','scope'].map(key => `history-${key}`), ...['unavailable','filters','apply','reset','kind','q','scope'].map(key => `events-${key}`), ...['toggle', 'panel', 'status', 'notice', 'retry', 'sort', 'direction',
       'limit', 'previous', 'next', 'latest', 'scroll', 'table'].flatMap(name => ['executables', 'children', 'events', 'parameters', 'overrides', 'history'].map(section => `${section}-${name}`))]) {
     const node = new Node(document, key.includes('retry') || /toggle|previous|next|latest|refresh$/.test(key) ? 'button' : 'div');
     nodes.set(`[data-${key}]`, node);
@@ -56,6 +57,8 @@ export function detailDOM() {
   get('events-filters').append(...['kind','q','apply','reset'].map(key => get(`events-${key}`)));
   get('history-panel').append(get('history-filters'),get('history-scope'));
   get('history-filters').append(get('history-choices'),get('history-apply'));
+  get('history-panel').append(get('history-chart-toggle'),get('history-chart-panel'));
+  get('history-chart-panel').append(...['choice','plot','scope','selected','scale','empty'].map(key=>get(`history-chart-${key}`)));
   const body = bodies.executables;
   document.getElementById = id => id === 'main-content' ? main : {
     textContent: JSON.stringify({ app_base: '/ops/app/', api_base: '/ops/api/v1/',
