@@ -1,22 +1,81 @@
+/* Theme tokens. Light (Soft grey) is the default; dark applies by system preference unless
+   the user chose Light, or always when the user chose Dark. Keep the two dark blocks identical. */
 :root {
-  --sd-page: #f3f4f6;
-  --sd-surface: #fcfcfd;
-  --sd-subtle: #eaedf2;
-  --sd-text: #252d3a;
-  --sd-secondary: #566174;
-  --sd-border: #d6dbe3;
-  --sd-control-border: #b6bfcd;
-  --sd-action: #3c56a6;
-  --sd-action-hover: #30478d;
-  --sd-action-soft: #ebeef9;
-  --sd-success: #2c684a;
-  --sd-success-soft: #e8f1ea;
-  --sd-error: #9b4140;
-  --sd-error-soft: #f8eae8;
-  --sd-warning: #805716;
-  --sd-warning-soft: #f7f0de;
-  --sd-radius: 6px;
+  --sd-page: #e5e7ea;
+  --sd-surface: #f0f1f3;
+  --sd-subtle: #e3e6ea;
+  --sd-text: #262b33;
+  --sd-secondary: #575f6c;
+  --sd-border: #d1d6dd;
+  --sd-control-border: #b3bac6;
+  --sd-action: #3b56a0;
+  --sd-action-hover: #2f4687;
+  --sd-action-soft: #dfe4f2;
+  --sd-success: #2f6649;
+  --sd-success-soft: #dfe9e2;
+  --sd-error: #954240;
+  --sd-error-soft: #f0e0de;
+  --sd-warning: #7a5618;
+  --sd-warning-soft: #eee5d2;
+  --sd-shadow-color: rgb(38 43 51 / 14%);
   color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --sd-page: #16181c;
+    --sd-surface: #1e2127;
+    --sd-subtle: #272b32;
+    --sd-text: #d5d9df;
+    --sd-secondary: #9ba3ae;
+    --sd-border: #30353e;
+    --sd-control-border: #4a515c;
+    --sd-action: #8fa8e6;
+    --sd-action-hover: #aabdf0;
+    --sd-action-soft: #26304a;
+    --sd-success: #7dbf98;
+    --sd-success-soft: #1f3128;
+    --sd-error: #e09790;
+    --sd-error-soft: #3a2524;
+    --sd-warning: #d6b26e;
+    --sd-warning-soft: #352d1c;
+    --sd-shadow-color: rgb(0 0 0 / 45%);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --sd-page: #16181c;
+  --sd-surface: #1e2127;
+  --sd-subtle: #272b32;
+  --sd-text: #d5d9df;
+  --sd-secondary: #9ba3ae;
+  --sd-border: #30353e;
+  --sd-control-border: #4a515c;
+  --sd-action: #8fa8e6;
+  --sd-action-hover: #aabdf0;
+  --sd-action-soft: #26304a;
+  --sd-success: #7dbf98;
+  --sd-success-soft: #1f3128;
+  --sd-error: #e09790;
+  --sd-error-soft: #3a2524;
+  --sd-warning: #d6b26e;
+  --sd-warning-soft: #352d1c;
+  --sd-shadow-color: rgb(0 0 0 / 45%);
+  color-scheme: dark;
+}
+:root {
+  --sd-status-running: var(--sd-action);
+  --sd-status-running-soft: var(--sd-action-soft);
+  --sd-status-succeeded: var(--sd-success);
+  --sd-status-succeeded-soft: var(--sd-success-soft);
+  --sd-status-failed: var(--sd-error);
+  --sd-status-failed-soft: var(--sd-error-soft);
+  --sd-status-pending: var(--sd-warning);
+  --sd-status-pending-soft: var(--sd-warning-soft);
+  --sd-status-other: var(--sd-secondary);
+  --sd-status-other-soft: var(--sd-subtle);
+  --sd-shadow: 0 4px 16px var(--sd-shadow-color);
+  --sd-shadow-small: 0 2px 8px var(--sd-shadow-color);
+  --sd-radius: 6px;
   scrollbar-gutter: stable;
   font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
   font-size: 93.75%;
@@ -60,10 +119,11 @@ h2 {
   border-bottom: 1px solid var(--sd-border);
 }
 
+/* Up to 1800 px of content on wide screens, centred beyond that. */
 .header-content, main {
-  max-width: 88rem;
+  max-width: 120rem;
   margin: 0 auto;
-  padding: 1.0667rem 1.6rem;
+  padding: 1.0667rem clamp(1.6rem, 2vw, 2.4rem);
 }
 
 .header-content, .page-heading, .section-heading {
@@ -87,6 +147,8 @@ h2 {
   flex-shrink: 0;
   font-size: 0.9333rem;
 }
+.theme-choice { display: flex; align-items: center; gap: 0.4rem; color: var(--sd-secondary); font-size: 0.8667rem; }
+.theme-choice select { width: auto; min-height: 0; height: 1.9rem; padding-block: 0; font-size: 0.8667rem; }
 
 main {
   display: grid;
@@ -146,7 +208,7 @@ main {
 .icon-button svg, .info-trigger svg { display: block; flex-shrink: 0; }
 .info-tip { display: inline-flex; align-items: center; flex: 0 0 auto; vertical-align: middle; }
 .info-trigger { display: inline-flex; align-items: center; justify-content: center; width: 1.6rem; min-height: 1.6rem; padding: 0; border: 0; background: transparent; color: var(--sd-secondary); }
-.info-text { position: fixed; z-index: 50; width: min(24rem, calc(100vw - 1.0667rem)); padding: 0.6rem 0.8rem; border: 1px solid var(--sd-control-border); border-radius: 4px; background: var(--sd-surface); color: var(--sd-text); font-size: 0.8667rem; font-weight: 400; line-height: 1.5; white-space: normal; text-align: left; overflow-wrap: anywhere; box-shadow: 0 2px 8px #252d3a20; }
+.info-text { position: fixed; z-index: 50; width: min(24rem, calc(100vw - 1.0667rem)); padding: 0.6rem 0.8rem; border: 1px solid var(--sd-control-border); border-radius: 4px; background: var(--sd-surface); color: var(--sd-text); font-size: 0.8667rem; font-weight: 400; line-height: 1.5; white-space: normal; text-align: left; overflow-wrap: anywhere; box-shadow: var(--sd-shadow-small); }
 
 .cell-detail {
   display: block;
@@ -159,8 +221,9 @@ main {
 .id-cell, .time-cell, td.number-cell {
   font-variant-numeric: tabular-nums;
   font-size: 0.9333rem;
-  font-weight: 500;
+  font-weight: 400;
 }
+.id-cell { font-weight: 500; }
 
 .name-cell {
   min-width: 10rem;
@@ -225,7 +288,7 @@ main {
 .filter-trigger [data-filter-label] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .button-quiet { background: transparent; border-color: transparent; }
 .filter-notice:not(:empty) { margin: 0.6rem 0 0; }
-.filter-popover { position: absolute; z-index: 5; width: 28rem; max-width: 100%; max-height: min(70vh, 38rem); overflow-y: auto; padding: 1rem; border: 1px solid var(--sd-control-border); border-radius: var(--sd-radius); background: var(--sd-surface); box-shadow: 0 4px 16px #252d3a1f; }
+.filter-popover { position: absolute; z-index: 5; width: 28rem; max-width: 100%; max-height: min(70vh, 38rem); overflow-y: auto; padding: 1rem; border: 1px solid var(--sd-control-border); border-radius: var(--sd-radius); background: var(--sd-surface); box-shadow: var(--sd-shadow); }
 .created-popover { width: 36rem; }
 .status-popover { width: 23rem; }
 .popover-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; margin-bottom: 0.6rem; }
@@ -321,7 +384,7 @@ input:disabled, select:disabled, button:disabled, button[aria-disabled="true"] {
   font-weight: 500;
 }
 
-.metric-running::before, .metric-succeeded::before, .metric-failed::before {
+.metric-running::before, .metric-succeeded::before, .metric-failed::before, .metric-other::before {
   content: "";
   width: 6px;
   height: 6px;
@@ -329,9 +392,10 @@ input:disabled, select:disabled, button:disabled, button[aria-disabled="true"] {
   flex-shrink: 0;
 }
 
-.metric-running::before { background: var(--sd-action); }
-.metric-succeeded::before { background: var(--sd-success); }
-.metric-failed::before { background: var(--sd-error); }
+.metric-running::before { background: var(--sd-status-running); }
+.metric-succeeded::before { background: var(--sd-status-succeeded); }
+.metric-failed::before { background: var(--sd-status-failed); }
+.metric-other::before { background: var(--sd-status-other); }
 
 .summary-card strong {
   display: block;
@@ -381,14 +445,14 @@ tbody tr:hover { background: var(--sd-subtle); }
   font-size: 0.8667rem;
   font-weight: 600;
   white-space: nowrap;
-  background: var(--sd-subtle);
-  color: var(--sd-secondary);
+  background: var(--sd-status-other-soft);
+  color: var(--sd-status-other);
 }
 
-.status-badge[data-status="2"] { background: var(--sd-action-soft); color: var(--sd-action); }
-.status-badge[data-status="7"] { background: var(--sd-success-soft); color: var(--sd-success); }
-.status-badge[data-status="4"], .status-badge[data-status="6"] { background: var(--sd-error-soft); color: var(--sd-error); }
-.status-badge[data-status="5"], .status-badge[data-status="8"] { background: var(--sd-warning-soft); color: var(--sd-warning); }
+.status-badge[data-status="2"] { background: var(--sd-status-running-soft); color: var(--sd-status-running); }
+.status-badge[data-status="7"] { background: var(--sd-status-succeeded-soft); color: var(--sd-status-succeeded); }
+.status-badge[data-status="4"], .status-badge[data-status="6"] { background: var(--sd-status-failed-soft); color: var(--sd-status-failed); }
+.status-badge[data-status="5"], .status-badge[data-status="8"] { background: var(--sd-status-pending-soft); color: var(--sd-status-pending); }
 
 .header-content nav { display: flex; flex-wrap: wrap; gap: 0.8rem; }
 .detail-heading { min-width: 0; overflow-wrap: anywhere; }
@@ -416,7 +480,7 @@ tbody tr:hover { background: var(--sd-subtle); }
 .detail-title > span { white-space: nowrap; }
 .detail-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.8rem; }
 .detail-strip { padding: 0.6rem 1.0667rem; }
-.detail-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.4rem 1rem; }
+.detail-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.4rem 1rem; }
 .detail-fields dt, .detail-note { color: var(--sd-secondary); font-size: 0.8667rem; }
 .detail-fields dd { min-width: 0; overflow-wrap: anywhere; font-size: 0.9333rem; font-variant-numeric: tabular-nums; }
 .event-counts { display: flex; align-items: center; flex-wrap: wrap; gap: 0.3rem 0.8rem; margin-top: 0.5rem; font-size: 0.8667rem; }
@@ -517,11 +581,11 @@ tbody tr:hover { background: var(--sd-subtle); }
 .chart-frame:has(svg[data-empty="true"]) { display: none; }
 .chart-frame svg { justify-self: center; }
 .chart-empty { margin: 0.6rem; }
-.chart-frame g { --chart-color: var(--sd-secondary); cursor: pointer; }
-.chart-frame g[data-status="2"] { --chart-color: var(--sd-action); }
-.chart-frame g[data-status="7"] { --chart-color: var(--sd-success); }
-.chart-frame g[data-status="4"], .chart-frame g[data-status="6"] { --chart-color: var(--sd-error); }
-.chart-frame g[data-status="5"], .chart-frame g[data-status="8"] { --chart-color: var(--sd-warning); }
+.chart-frame g { --chart-color: var(--sd-status-other); cursor: pointer; }
+.chart-frame g[data-status="2"] { --chart-color: var(--sd-status-running); }
+.chart-frame g[data-status="7"] { --chart-color: var(--sd-status-succeeded); }
+.chart-frame g[data-status="4"], .chart-frame g[data-status="6"] { --chart-color: var(--sd-status-failed); }
+.chart-frame g[data-status="5"], .chart-frame g[data-status="8"] { --chart-color: var(--sd-status-pending); }
 .history-duration-plot [data-series="actual"] { fill: var(--chart-color); }
 .history-duration-plot [data-series="estimate"] { stroke: var(--sd-text); stroke-width: 2; stroke-dasharray: 4 2; vector-effect: non-scaling-stroke; }
 .chart-frame [data-zero] { fill: var(--sd-surface); stroke: var(--chart-color); stroke-width: 1; vector-effect: non-scaling-stroke; }
@@ -531,14 +595,14 @@ tbody tr:hover { background: var(--sd-subtle); }
 [data-duration-key]::before { content: ''; display: inline-block; width: 0.7rem; height: 0.7rem; margin-right: 0.4rem; }
 [data-duration-key="actual"]::before { background: var(--sd-secondary); }
 [data-duration-key="estimate"]::before { height: 0; border-top: 2px dashed var(--sd-text); vertical-align: middle; }
-[data-chart-status]::before { content: ''; display: inline-block; width: 0.7rem; height: 0.7rem; margin-right: 0.4rem; background: var(--sd-secondary); }
-[data-chart-status="7"] { fill: var(--sd-success); }
-[data-chart-status="4"] { fill: var(--sd-error); }
-[data-chart-status="other"] { fill: var(--sd-secondary); }
-[data-chart-status="7"]::before { background: var(--sd-success); }
-[data-chart-status="4"]::before { background: var(--sd-error); }
-[data-chart-status="2"]::before { background: var(--sd-action); }
-[data-chart-status="5"]::before { background: var(--sd-warning); }
+[data-chart-status]::before { content: ''; display: inline-block; width: 0.7rem; height: 0.7rem; margin-right: 0.4rem; background: var(--sd-status-other); }
+[data-chart-status="7"] { fill: var(--sd-status-succeeded); }
+[data-chart-status="4"] { fill: var(--sd-status-failed); }
+[data-chart-status="other"] { fill: var(--sd-status-other); }
+[data-chart-status="7"]::before { background: var(--sd-status-succeeded); }
+[data-chart-status="4"]::before { background: var(--sd-status-failed); }
+[data-chart-status="2"]::before { background: var(--sd-status-running); }
+[data-chart-status="5"]::before { background: var(--sd-status-pending); }
 .timeline-panel { padding: 0.6rem; border-bottom: 1px solid var(--sd-border); }
 .timeline-panel .table-toolbar { padding: 0 0 0.5rem; border: 0; }
 .timeline-choice { min-width: 5rem; max-width: 28rem; flex: 1 1 auto; }

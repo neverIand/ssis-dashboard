@@ -17,6 +17,12 @@ export default defineConfig({
         fileName: 'LICENSES.txt',
         source: readFileSync(new URL('LICENSES.txt', import.meta.url), 'utf8'),
       });
+      // A classic, render-blocking script: it must run before the stylesheet paints.
+      this.emitFile({
+        type: 'asset',
+        fileName: 'theme-init.js',
+        source: readFileSync(new URL('src/theme-init.js', import.meta.url), 'utf8'),
+      });
     },
   }],
   server: {

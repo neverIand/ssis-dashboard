@@ -166,6 +166,15 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
     });
     listen(search, 'keydown', event => {
       if (event.key === 'Enter') { event.preventDefault(); clearTimeout(searchTimer); searchNow(); }
+      else if (event.key === 'ArrowDown' && choices.children.length) { event.preventDefault(); choices.children[0].focus(); }
+    });
+    // ArrowDown/ArrowUp move through the choices; ArrowUp from the first returns to the search box.
+    listen(choices, 'keydown', event => {
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      const items = [...choices.children], index = items.indexOf(event.target);
+      if (index < 0) return;
+      event.preventDefault();
+      (event.key === 'ArrowDown' ? items[index + 1] : items[index - 1] ?? search)?.focus();
     });
     listen(more, 'click', () => { void owner.more(); });
     listen(retry, 'click', () => { void owner.retry(); });

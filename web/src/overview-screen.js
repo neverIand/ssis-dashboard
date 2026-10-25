@@ -3,6 +3,12 @@ import { formatCode } from './display.js';
 import { mountFilters } from './filters.js';
 import { mountOverview } from './render-overview.js';
 
+// Running, Succeeded and Failed first; the other statuses keep their code order.
+export function statusChoiceOrder(statuses) {
+  const common = [2, 7, 4], rank = item => common.includes(item.code) ? common.indexOf(item.code) : common.length;
+  return [...statuses].sort((a, b) => rank(a) - rank(b));
+}
+
 export function mountOverviewScreen(root, saved = null) {
   const document = root.ownerDocument;
   root.querySelector('#overview-filters fieldset').disabled = true;
@@ -11,7 +17,7 @@ export function mountOverviewScreen(root, saved = null) {
   for (const control of root.querySelectorAll('[data-order]')) control.disabled = true;
   let checkpoint = () => null;
   const dispose = mountBootstrap(root, { ready(metadata, api, config, serverTime) {
-    const options = [{ code: '', name: 'All statuses' }, ...metadata.execution_statuses];
+    const options = [{ code: '', name: 'All statuses' }, ...statusChoiceOrder(metadata.execution_statuses)];
     root.querySelector('[data-status-choices]').replaceChildren(...options.map((item) => {
       const label = document.createElement('label');
       const checkbox = document.createElement('input');

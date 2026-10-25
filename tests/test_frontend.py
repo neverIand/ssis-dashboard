@@ -45,6 +45,7 @@ class FrontendShellTests(unittest.TestCase):
         self.write_manifest(self.manifest)
         (self.output / 'assets/main.js').write_text('// packaged entry', encoding='utf-8')
         (self.output / 'assets/main.css').write_text('body { margin: 0; }', encoding='utf-8')
+        (self.output / 'theme-init.js').write_text('// theme', encoding='utf-8')
         self.app = create_app({'TESTING': True})
         self.app.static_folder = str(self.static)
         self.client = self.app.test_client()
@@ -73,10 +74,20 @@ class FrontendShellTests(unittest.TestCase):
         references = re.findall(r'(?:href|src)="([^"]+)"', html)
         self.assertEqual(set(references), {
             '#main-content', '/', '/static/app/assets/main.js', '/static/app/assets/main.css',
+            '/static/app/theme-init.js',
         })
+        # The theme script is classic and render-blocking, ahead of the stylesheet it configures.
+        self.assertLess(html.index('/static/app/theme-init.js'), html.index('/static/app/assets/main.css'))
+        self.assertRegex(html, r'<script src="/static/app/theme-init.js"></script>')
+        self.assertIn('<select data-theme-choice><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select>', html)
         for legacy_dependency in ['jquery', 'bootstrap', 'morris', 'raphael', 'smartmenus',
                                   'http-equiv="refresh"', 'google-analytics']:
             self.assertNotIn(legacy_dependency, html.lower())
+        self.connect.assert_not_called()
+
+    def test_missing_theme_script_makes_the_shell_unavailable_like_other_assets(self):
+        (self.output / 'theme-init.js').unlink()
+        self.assertEqual(self.client.get('/app/').status_code, 503)
         self.connect.assert_not_called()
 
     def test_mounted_shell_asset_and_route_bases_keep_the_deployment_prefix(self):

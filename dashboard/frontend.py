@@ -56,7 +56,7 @@ def _entry_assets():
     entry = manifest['src/main.js']
     if not isinstance(entry, dict) or entry.get('isEntry') is not True:
         raise ValueError('Missing build entry')
-    return {'script': visit('src/main.js'), 'styles': styles, 'preloads': preloads}
+    return {'script': visit('src/main.js'), 'styles': styles, 'preloads': preloads, 'theme': asset('theme-init.js')}
 
 
 def _shell(template, **config):

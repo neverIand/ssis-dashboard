@@ -44,6 +44,8 @@ class PackagedFrontendTests(unittest.TestCase):
         self.assertFalse((ASSET_ROOT / 'index.html').exists())
         self.assertEqual((ASSET_ROOT / 'LICENSES.txt').read_bytes(),
                          (ASSET_ROOT.parents[2] / 'web/LICENSES.txt').read_bytes())
+        self.assertEqual((ASSET_ROOT / 'theme-init.js').read_bytes(),
+                         (ASSET_ROOT.parents[2] / 'web/src/theme-init.js').read_bytes())
         self.connect.assert_not_called()
 
     def test_packaged_detail_uses_the_current_entry_at_root_and_prefix(self):
@@ -57,7 +59,7 @@ class PackagedFrontendTests(unittest.TestCase):
         self.connect.assert_not_called()
 
     def test_manifest_assets_load_at_root_and_mounted_prefix_without_sql(self):
-        files = {chunk['file'] for chunk in self.manifest.values()} | {'LICENSES.txt'}
+        files = {chunk['file'] for chunk in self.manifest.values()} | {'LICENSES.txt', 'theme-init.js'}
         files.update(filename for chunk in self.manifest.values() for filename in chunk.get('css', []))
         files.update(filename for chunk in self.manifest.values() for filename in chunk.get('assets', []))
         for prefix in ['', '/dashboard']:

@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}SSIS Dashboard{% endblock %}</title>
+    <script src="{{ assets.theme }}"></script>
     {% for stylesheet in assets.styles %}
     <link rel="stylesheet" href="{{ stylesheet }}">
     {% endfor %}
@@ -26,6 +27,7 @@
             </section>
             <nav aria-label="Dashboard navigation">
                 <p data-display-timezone hidden></p>
+                <label class="theme-choice">Theme<select data-theme-choice><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
                 {% block navigation %}<a href="{{ url_for('packages') }}" aria-label="Legacy dashboard">Legacy</a>{% endblock %}
             </nav>
         </div>

@@ -3,10 +3,12 @@ import './styles.css';
 import { mountBootstrap } from './bootstrap.js';
 import { mountDetail } from './render-detail.js';
 import { mountOverviewScreen } from './overview-screen.js';
-import { mountInfoTips } from './ui.js';
+import { mountInfoTips, mountThemeChoice } from './ui.js';
 
 const root = document.querySelector('[data-dashboard-app]');
 if (root) {
+  // Presentation only and independent of settings: mounted once, kept across cache restores.
+  mountThemeChoice(root);
   let dispose;
   let disposeTips;
   let checkpoint = () => null;

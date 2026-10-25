@@ -18,6 +18,37 @@ export function pollingButton(button, paused) {
   path.setAttribute('d', paths[name]); svg.append(path); button.replaceChildren(svg); button.dataset.icon = name;
 }
 
+const themeKey = 'sd-theme';
+const themes = ['light', 'dark'];
+
+// System is the absence of a stored choice; theme-init.js applies a stored one before paint.
+export function mountThemeChoice(root) {
+  const select = root.querySelector('[data-theme-choice]');
+  if (!select) return () => {};
+  const document = root.ownerDocument, window = document.defaultView, html = document.documentElement;
+  const storage = () => { try { return window.localStorage; } catch { return null; } };
+  const apply = value => {
+    if (themes.includes(value)) html.setAttribute('data-theme', value);
+    else html.removeAttribute('data-theme');
+    select.value = themes.includes(value) ? value : 'system';
+  };
+  let saved = null;
+  try { saved = storage()?.getItem(themeKey) ?? null; } catch { saved = null; }
+  apply(saved);
+  const change = () => {
+    apply(select.value);
+    try {
+      if (themes.includes(select.value)) storage()?.setItem(themeKey, select.value);
+      else storage()?.removeItem(themeKey);
+    } catch { /* The choice applies to this page only. */ }
+  };
+  // Another tab changed the choice: follow it.
+  const synced = event => { if (event.key === themeKey) apply(event.newValue); };
+  select.addEventListener('change', change);
+  window.addEventListener('storage', synced);
+  return () => { select.removeEventListener('change', change); window.removeEventListener('storage', synced); };
+}
+
 export function inlineStatus(node, text, detail = '') {
   node.textContent = text;
   node.title = [text, detail].filter(Boolean).join(' · ');

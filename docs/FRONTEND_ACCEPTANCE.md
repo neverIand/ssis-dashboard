@@ -128,7 +128,7 @@ Repeat about 1280/800/375 px layouts with long local bucket labels; all controls
 
 ## Layout stability (UX batch F part 1)
 
-Use the actual native build and the existing read-only `.local/tools/layout-shift-probe.js`; no measurement dependency is required. Keep its input hash with the run. The baseline addendum measured F-03-F-07 at commit `1a1d4f9`: overview refresh 31-77 px, detail refresh 55-56 px, selection/reload collapse up to 1,389 px, header controls 15-16 px and painted overview initial-load CLS 0.176. These are baseline observations, not acceptance results for the new build. The reviewer owns the candidate's native geometry results; F1 was accepted at `b7148e8`; G replaces its scrollable slots and must repeat this native sweep. F2 polish/dark mode remains on hold at the user's request.
+Use the actual native build and the existing read-only `.local/tools/layout-shift-probe.js`; no measurement dependency is required. Keep its input hash with the run. The baseline addendum measured F-03-F-07 at commit `1a1d4f9`: overview refresh 31-77 px, detail refresh 55-56 px, selection/reload collapse up to 1,389 px, header controls 15-16 px and painted overview initial-load CLS 0.176. These are baseline observations, not acceptance results for the new build. The reviewer owns the candidate's native geometry results; F1 was accepted at `b7148e8`; G replaces its scrollable slots and must repeat this native sweep. F2 (design system and dark mode) repeats these probe actions with theme switches in its own procedure below.
 
 1. Start or attribute the normal native Flask build against the approved local SSISDB configuration. Record candidate/build, viewport, capabilities, execution/range and whether the browser pane is actually painting. Repeat at **1280×900/1000/800/375 px** for G. Use execution 17 and a non-empty Last 30 days/custom range for the dated local cohort. Reuse the probe without editing it or the findings.
 2. Inject **400 ms delay into same-origin API fetches only**, retaining the original fetch function for restoration at the end. Delayed requests must otherwise retain their options, responses, abort/generation behavior and request count. Paste the probe into the console. It samples document-relative anchor coordinates after every DOM mutation batch, including in a non-painting pane. Its transient result is maximum movement minus final movement, with a 2 px reporting threshold; a final change from genuinely different data is recorded separately.
@@ -168,6 +168,16 @@ Claude implements this round with the in-app browser against native SSISDB and r
 4. Stop the server, refresh a detail page, then open another tab: the section shows its error with Retry directly after the message, and Retry reloads the base detail first.
 5. Overview: open Timeline. The panel appears below the Executions toolbar, and the toggle keeps its position. Repeat the F1/G probe actions with a 400 ms delay (refresh, header sort, Day/Hour, status cards) with the timeline open. History charts with fewer than seven executions label groups by ID; seven or more keep dates.
 6. Restore a detail page from the back/forward cache, or remount it with a persisted `pageshow`: the Events category list keeps one option per kind.
+
+## Design system and dark mode (F part 2)
+
+Claude implements this round with the in-app browser and records the native evidence; Codex reviews the code and that evidence.
+
+1. With no stored choice, the theme follows the operating system and changes live when the OS setting changes. Choose Light and Dark in the header: each applies at once, survives a reload without a flash of the other theme, and another open tab follows. System clears the stored choice. With storage blocked, the choice still applies to the current page.
+2. In both themes, measure the computed contrast of every visible text element on the overview (timeline open) and every detail tab: body text at least 7:1 where it is the main text, and nothing below 4.5:1. Charts, badges and legends use the same status colours.
+3. At 1920 and 2560 px the content is about 1800 px wide and centred; repeat the 1280/1000/800/375 px checks from batches G and H, with no document overflow or empty boxes.
+4. Repeat the F1/G layout probe with a 400 ms delay, including Light/Dark switches: nothing moves.
+5. Folder/project pickers: ArrowDown from the search reaches the choices, ArrowUp from the first returns to the search. Status choices start with Running, Succeeded and Failed.
 
 ## Native detail refresh and return
 
