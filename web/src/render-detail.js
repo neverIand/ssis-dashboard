@@ -60,32 +60,27 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     link.addEventListener('click', click);
     return [link, click];
   });
+  const actionsFor = key => ({
+    toggle: () => { void loader.selectTab({ tab: key }); },
+    retry: () => { void loader.section(key).retry(); },
+    order: query => { void loader.section(key).order(query); },
+    previous: () => { void loader.section(key).previous(); },
+    next: () => { void loader.section(key).next(); },
+    latest: () => { void loader.section(key).latest(); },
+  });
   const executableView = mountObservationTable(root, { metadata, restoreView: returning?.executableView,
-    actions: { toggle: () => { void loader.selectTab({ tab: 'executables' }); }, retry: () => { void loader.retryExecutables(); },
-      order: query => { void loader.orderExecutables(query); }, previous: () => { void loader.previousExecutables(); },
-      next: () => { void loader.nextExecutables(); }, latest: () => { void loader.latestExecutables(); } } });
+    actions: actionsFor('executables') });
   const childView = mountObservationTable(root, { metadata, resource: 'children', restoreView: returning?.childView,
-    actions: { toggle: () => { void loader.selectTab({ tab: 'children' }); }, retry: () => { void loader.retryChildren(); },
-      order: query => { void loader.orderChildren(query); }, previous: () => { void loader.previousChildren(); },
-      next: () => { void loader.nextChildren(); }, latest: () => { void loader.latestChildren(); } } });
+    actions: actionsFor('children') });
   const eventView = mountEvents(root, { metadata, restoreView: returning?.eventView,
-    actions: { toggle: () => { void loader.selectTab({ tab: 'events' }); }, retry: () => { void loader.retryEvents(); },
-      apply: query => { void loader.applyEvents(query); }, order: query => { void loader.orderEvents(query); },
-      previous: () => { void loader.previousEvents(); }, next: () => { void loader.nextEvents(); },
-      latest: () => { void loader.latestEvents(); } } });
+    actions: { ...actionsFor('events'), apply: query => { void loader.section('events').applyEvents(query); } } });
   const parameterView = mountParameters(root, { metadata, restoreView: returning?.parameterView,
-    actions: { toggle: () => { void loader.selectTab({ tab: 'parameters' }); }, retry: () => { void loader.retryParameters(); },
-      order: query => { void loader.orderParameters(query); }, previous: () => { void loader.previousParameters(); },
-      next: () => { void loader.nextParameters(); }, latest: () => { void loader.latestParameters(); } } });
+    actions: actionsFor('parameters') });
   const overrideView = mountOverrides(root, { metadata, restoreView: returning?.overrideView,
-    actions: { toggle: () => { void loader.selectTab({ tab: 'overrides' }); }, retry: () => { void loader.retryOverrides(); },
-      order: query => { void loader.orderOverrides(query); }, previous: () => { void loader.previousOverrides(); },
-      next: () => { void loader.nextOverrides(); }, latest: () => { void loader.latestOverrides(); } } });
+    actions: actionsFor('overrides') });
   const historyView = mountHistory(root, { metadata, executionId, restoreView: returning?.historyView,
-    navigation: {appBase, origin:window.location.origin, metadata, selection:destination.selection ?? defaultSelection(metadata)},
-    actions: { toggle: () => { void loader.selectTab({ tab: 'history' }); }, retry: () => { void loader.retryHistory(); },
-      order: query => { void loader.orderHistory(query); }, previous: () => { void loader.previousHistory(); },
-      next: () => { void loader.nextHistory(); }, latest: () => { void loader.latestHistory(); } } });
+    navigation: { appBase, origin: window.location.origin, metadata, selection: destination.selection ?? defaultSelection(metadata) },
+    actions: actionsFor('history') });
   const clear = () => {
     content.hidden = true;
     elapsed.hidden = true;
@@ -119,13 +114,15 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     refresh.setAttribute('aria-disabled', String(state.busy));
     autoPaused = state.poll.paused;
     pollingButton(toggle, autoPaused, state.terminal);
-    const observed = state.response ? `Observed ${display.timestamp(state.response.meta.generated_at)} · ${state.response.meta.generated_at}` : '';
+    const observed = state.response
+      ? `Observed ${display.timestamp(state.response.meta.generated_at)} · ${state.response.meta.generated_at}` : '';
     const error = state.error ? `${state.error.message}${state.error.requestId ? ` · Request ID: ${state.error.requestId}` : ''}` : '';
     const refreshText = refreshStatus(display, state.response?.meta.generated_at, state.poll, state.terminal);
     const pageStatus = state.busy && state.operation !== 'section'
       ? (state.response ? 'Refreshing… Previous observation shown.' : 'Loading execution…')
       : state.phase === 'error' ? (state.stale
-        ? `⚠ Refresh failed · showing data from ${display.clock(state.response.meta.generated_at)}` : `⚠ Execution unavailable · ${state.error.message}`)
+        ? `⚠ Refresh failed · showing data from ${display.clock(state.response.meta.generated_at)}`
+          : `⚠ Execution unavailable · ${state.error.message}`)
         : refreshText;
     inlineStatus(pollStatus, pageStatus, [observed, error,
       pageStatus !== refreshText ? refreshText : ''].filter(Boolean).join(' · '));
@@ -165,7 +162,8 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     overrideView.render(state.overrides, state.busy, state.response !== null);
     historyView.render(state.history, state.busy, state.response !== null, state.response?.data);
     for (const link of countLinks) {
-      if (metadata.capabilities.events && state.response) link.href = detailFragment({ tab: 'events', kind: link.dataset.eventCountLink }, metadata);
+      if (metadata.capabilities.events && state.response) link.href = detailFragment({ tab: 'events',
+        kind: link.dataset.eventCountLink }, metadata);
       else link.removeAttribute('href');
       const kind = link.dataset.eventCountLink === 'all' ? 'events' : link.dataset.eventCountLink.replaceAll('-', ' ');
       const label = state.response?.data.event_counts[link.dataset.detailField] === 1 ? kind.slice(0, -1) : kind;
@@ -197,11 +195,13 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   document.addEventListener('visibilitychange', visibilityChanged);
   load();
   return { checkpoint() {
-    return { executionId, autoPaused, activeTab, position: position(), executables: loader.checkpointExecutables(),
-      executableView: executableView.checkpoint(), children: loader.checkpointChildren(), childView: childView.checkpoint(), events: loader.checkpointEvents(), eventView: eventView.checkpoint(),
-      parameters: loader.checkpointParameters(), parameterView: parameterView.checkpoint(),
-      overrides: loader.checkpointOverrides(), overrideView: overrideView.checkpoint(),
-      history: loader.checkpointHistory(), historyView: historyView.checkpoint(),
+    return { executionId, autoPaused, activeTab, position: position(), executables: loader.section('executables').checkpoint(),
+      executableView: executableView.checkpoint(),
+      children: loader.section('children').checkpoint(), childView: childView.checkpoint(),
+      events: loader.section('events').checkpoint(), eventView: eventView.checkpoint(),
+      parameters: loader.section('parameters').checkpoint(), parameterView: parameterView.checkpoint(),
+      overrides: loader.section('overrides').checkpoint(), overrideView: overrideView.checkpoint(),
+      history: loader.section('history').checkpoint(), historyView: historyView.checkpoint(),
       focus: Object.keys(focusTargets).find(key => focusTargets[key] === document.activeElement) ?? null };
   }, dispose() {
     loader.dispose();

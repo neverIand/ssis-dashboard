@@ -14,7 +14,8 @@ export function tabAllowed(tab, metadata) {
 // Only public section/category tokens may enter a fragment. Search and cursors stay in memory.
 export function detailFragment({ tab, kind }, metadata) {
   if (!detailTabs.some(([key]) => key === tab) || (kind !== undefined
-      && (tab !== 'events' || !['all', 'errors', 'warnings', 'duplicate-warnings', 'memory-warnings'].includes(kind)))) throw new TypeError('Invalid detail fragment.');
+      && (tab !== 'events' || !['all', 'errors', 'warnings', 'duplicate-warnings',
+        'memory-warnings'].includes(kind)))) throw new TypeError('Invalid detail fragment.');
   return `#${tab}${tab === 'events' && kind && kind !== 'all' ? `/${kind}` : ''}`;
 }
 

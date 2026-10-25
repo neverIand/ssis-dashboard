@@ -16,7 +16,7 @@ from dashboard import create_app
 
 ASSET_ROOT = Path(__file__).resolve().parents[1] / 'dashboard/static/app'
 SOURCE_ROOT = ASSET_ROOT.parents[2] / 'web/src'
-AUTHORED_BUDGET = 300 * 1024
+AUTHORED_BUDGET = 280 * 1024
 PACKAGED_GZIP_BUDGET = 64 * 1024
 
 

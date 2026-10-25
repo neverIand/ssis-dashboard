@@ -109,7 +109,8 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
   const clock = createServerClock(serverTime, monotonicNow);
   let state = { phase: 'idle', selection: null, page: null, summary: null, error: null, notice: '',
     operation: null, pageStale: false, summaryStale: false, timeline: {open:restoreTimeline?.open === true,
-      bucket:['day','hour'].includes(restoreTimeline?.bucket) ? restoreTimeline.bucket : 'day', page:null, scope:null, error:null, stale:false} };
+      bucket:['day','hour'].includes(restoreTimeline?.bucket) ? restoreTimeline.bucket : 'day', page:null, scope:null, error:null,
+        stale:false} };
   // Keep request paths only, never rows or cursor tokens in history.state or storage.
   const contexts = new Map(retainedPaths.map(([id, path]) => [id, copyPath(path)]));
   const key = (selection) => JSON.stringify({ ...selectionParams(selection), created: selection.created ?? null });
@@ -183,7 +184,8 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
       const response = await request('metrics/summary', { folder: selection.folder, project: selection.project,
         from: page.meta.from, to: page.meta.to });
       if (disposed || current !== generation) return;
-      emit({ phase: state.timeline.open ? 'loading-summary' : 'ready', summary: readSummary(response, page, metadata, display), summaryStale: false });
+      emit({ phase: state.timeline.open ? 'loading-summary' : 'ready', summary: readSummary(response, page, metadata, display),
+        summaryStale: false });
     } catch (error) {
       if (!disposed && current === generation) {
         if ([401, 403].includes(error.status)) {
@@ -191,7 +193,8 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
           emit({ phase: 'list-error', page: null, summary: null, pageStale: false, summaryStale: false, error });
           return;
         }
-        else { afterPhase = 'summary-error'; emit({ phase: state.timeline.open ? 'loading-summary' : afterPhase, summary: transient(error) ? previous : null,
+        else { afterPhase = 'summary-error'; emit({ phase: state.timeline.open ? 'loading-summary' : afterPhase,
+          summary: transient(error) ? previous : null,
           summaryStale: transient(error) && previous !== null, error });
         }
       }
@@ -213,7 +216,8 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
       if (disposed || current !== generation) return;
       if ([401,403].includes(error.status)) {
         denied(); emit({phase:'list-error',page:null,summary:null,pageStale:false,summaryStale:false,error});
-      } else emit({phase:afterPhase,timeline:{...state.timeline,error,page:transient(error) ? previous : null,stale:transient(error) && previous !== null}});
+      } else emit({phase:afterPhase,timeline:{...state.timeline,error,page:transient(error) ? previous : null,
+        stale:transient(error) && previous !== null}});
     }
   }
 

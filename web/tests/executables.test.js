@@ -47,19 +47,19 @@ test('section loads only when opened; paging and refresh retain query/path while
       next_cursor: params.cursor ? null : 'entry-A' }) : detailResponse('17'));
   await run.owner.load();
   assert.equal(run.calls.length, 1);
-  await run.owner.toggleExecutables();
+  await run.owner.section('executables').select();
   assert.equal(run.calls.length, 2);
-  await run.owner.nextExecutables();
+  await run.owner.section('executables').next();
   assert.equal(run.state.executables.pageNumber, 2);
   assert.equal(run.calls.at(-1).params.cursor, 'entry-A');
   await run.owner.refresh();
   assert.deepEqual(run.calls.slice(-2).map(call => call.resource), ['executions/17', 'executions/17/executables']);
   assert.equal(run.calls.at(-1).params.cursor, 'entry-A');
-  await run.owner.orderExecutables({ sort: 'statistics_id', direction: 'desc', limit: 1 });
+  await run.owner.section('executables').order({ sort: 'statistics_id', direction: 'desc', limit: 1 });
   assert.equal(run.calls.at(-1).params.cursor, undefined);
   assert.equal(run.state.executables.pageNumber, 1);
   assert.equal(run.state.executables.query.limit, 1);
-  await run.owner.toggleExecutables();
+  await run.owner.section('executables').select();
   await run.owner.refresh();
   assert.equal(run.calls.at(-1).resource, 'executions/17');
   assert.equal(run.state.executables.page, null);
@@ -71,11 +71,11 @@ test('one scheduler waits for base plus section and coalesces manual/paging/visi
   const run = setup(t, async resource => !resource.endsWith('/executables') ? runningDetailResponse('17')
     : ++sections === 2 ? pending.promise : executablePage(),
   { autoRefresh: true, pollIntervalMs: 1000, maxPollIntervalMs: 10000 });
-  await run.owner.load(); await run.owner.toggleExecutables();
+  await run.owner.load(); await run.owner.section('executables').select();
   t.mock.timers.tick(1000); await flush();
   assert.equal(run.state.busy, true);
   const count = run.calls.length;
-  await run.owner.refresh(); await run.owner.nextExecutables();
+  await run.owner.refresh(); await run.owner.section('executables').next();
   run.owner.setVisible(false); run.owner.setVisible(true);
   t.mock.timers.tick(1000); await flush();
   assert.equal(run.calls.length, count);
@@ -90,12 +90,12 @@ test('closing a pending section aborts it, removes data and rejects late denial 
   const late = deferred(); let attempts = 0;
   const run = setup(t, resource => resource.endsWith('/executables')
     ? ++attempts === 1 ? late.promise : executablePage() : Promise.resolve(detailResponse('17')));
-  await run.owner.load(); const old = run.owner.toggleExecutables();
+  await run.owner.load(); const old = run.owner.section('executables').select();
   const signal = run.calls.at(-1).signal;
-  await run.owner.toggleExecutables();
+  await run.owner.section('executables').select();
   assert.equal(signal.aborted, true);
   assert.equal(run.state.executables.open, false);
-  await run.owner.toggleExecutables();
+  await run.owner.section('executables').select();
   const page = run.state.executables.page;
   late.reject(new ApiError('http', { status: 404 })); await old;
   assert.equal(run.state.executables.page, page);
@@ -110,7 +110,7 @@ test('an expired deep refresh resets once and never relabels its old page after 
     if (fallbackFails && !params.cursor) throw new ApiError('http', { status: 503 });
     return executablePage([executable(params.cursor ? '2' : '1')], { has_more: !params.cursor, next_cursor: params.cursor ? null : 'entry-A' });
   });
-  await run.owner.load(); await run.owner.toggleExecutables(); await run.owner.nextExecutables();
+  await run.owner.load(); await run.owner.section('executables').select(); await run.owner.section('executables').next();
   expired = fallbackFails = true;
   const before = run.calls.length;
   await run.owner.refresh();
@@ -118,7 +118,7 @@ test('an expired deep refresh resets once and never relabels its old page after 
   assert.equal(run.state.executables.pageNumber, 1);
   assert.equal(run.state.executables.page, null);
   assert.match(run.state.executables.notice, /Reset to page one/);
-  fallbackFails = false; await run.owner.retryExecutables();
+  fallbackFails = false; await run.owner.section('executables').retry();
   assert.equal(run.state.executables.page.data[0].statistics_id, '1');
 });
 
@@ -132,7 +132,7 @@ test('section denial/malformed data clears that section; execution-scoped 404 cl
       if (failed) throw failure;
       return executablePage();
     }, { autoRefresh: true });
-    await run.owner.load(); await run.owner.toggleExecutables();
+    await run.owner.load(); await run.owner.section('executables').select();
     failed = true; await run.owner.refresh();
     assert.equal(run.state.executables.page, null);
     assert.equal(run.state.response === null, failure.status === 404);
@@ -152,12 +152,12 @@ test('a section deadline retains same-page data and disposal aborts its next req
     signal = options.signal;
     return new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError'))));
   }, { timeoutMs: 1000 });
-  await run.owner.load(); await run.owner.toggleExecutables();
+  await run.owner.load(); await run.owner.section('executables').select();
   const work = run.owner.refresh(); await flush();
   t.mock.timers.tick(1000); await work;
   assert.equal(run.state.executables.error.kind, 'timeout');
   assert.equal(run.state.executables.stale, true);
-  const next = run.owner.retryExecutables(); run.owner.dispose(); await next;
+  const next = run.owner.section('executables').retry(); run.owner.dispose(); await next;
   assert.equal(signal.aborted, true);
 });
 
@@ -168,7 +168,7 @@ test('base refresh failures gate sections and retain only transient same-executi
     if (failure) throw failure;
     return detailResponse('17');
   });
-  await run.owner.load(); await run.owner.toggleExecutables();
+  await run.owner.load(); await run.owner.section('executables').select();
   failure = new ApiError('http', { status: 503 });
   const count = run.calls.length; await run.owner.refresh();
   assert.equal(run.calls.length, count + 1);
@@ -187,10 +187,10 @@ test('closing a denied section restores the base-only polling schedule', async t
     if (denied) throw new ApiError('http', { status: 403 });
     return executablePage();
   }, { autoRefresh: true, pollIntervalMs: 1000 });
-  await run.owner.load(); await run.owner.toggleExecutables();
+  await run.owner.load(); await run.owner.section('executables').select();
   denied = true; await run.owner.refresh();
   assert.equal(run.state.poll.mode, 'blocked');
-  await run.owner.toggleExecutables();
+  await run.owner.section('executables').select();
   assert.equal(run.state.poll.mode, 'scheduled');
   const before = run.calls.length;
   t.mock.timers.tick(1000); await flush();
@@ -205,7 +205,7 @@ test('switching execution IDs rejects a previous section response, including an 
     return Promise.resolve(resource.endsWith('/executables') ? ++sections === 1 ? late.promise
       : executablePage([executable('1', { execution_id: id })]) : detailResponse(id));
   });
-  await run.owner.load(); const old = run.owner.toggleExecutables();
+  await run.owner.load(); const old = run.owner.section('executables').select();
   await run.owner.select('18'); await run.owner.select('17');
   const page = run.state.executables.page;
   late.resolve(executablePage([executable('9')])); await old;
@@ -217,8 +217,8 @@ test('retained section checkpoints contain paths/query only and revalidate base 
   const api = async (resource, { params }) => resource.endsWith('/executables')
     ? executablePage([executable(params.cursor ? '2' : '1')], { has_more: !params.cursor, next_cursor: params.cursor ? null : 'entry-A' })
     : detailResponse('17');
-  const first = setup(t, api); await first.owner.load(); await first.owner.toggleExecutables(); await first.owner.nextExecutables();
-  const saved = first.owner.checkpointExecutables();
+  const first = setup(t, api); await first.owner.load(); await first.owner.section('executables').select(); await first.owner.section('executables').next();
+  const saved = first.owner.section('executables').checkpoint();
   assert.doesNotMatch(JSON.stringify(saved), /execution_path|Task|statistics_id"\s*:/);
   first.owner.dispose();
   const returned = setup(t, api, { restoreExecutables: saved }); await returned.owner.load();

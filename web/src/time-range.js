@@ -56,7 +56,9 @@ export function localCandidates(date, time, timeZone) {
     if (local.date === date && local.time === clock.slice(0, 8)) {
       const value = instant.toISOString().slice(0, 19) + (clock.includes('.') ? `.${clock.split('.')[1]}` : '') + 'Z';
       timestampTicks(value);
-      matches.push({ value, offset: `UTC${offset < 0 ? '−' : '+'}${pad(Math.floor(Math.abs(offset) / 3600000))}:${pad(Math.floor(Math.abs(offset) / 60000) % 60)}` });
+      matches.push({ value,
+        offset: `UTC${offset < 0 ? '−'
+          : '+'}${pad(Math.floor(Math.abs(offset) / 3600000))}:${pad(Math.floor(Math.abs(offset) / 60000) % 60)}` });
     }
   }
   return matches.sort((a, b) => a.value.localeCompare(b.value));

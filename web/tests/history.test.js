@@ -69,12 +69,12 @@ test('lazy history requests exact detail identity without overview scope and sha
   const run=setup(t,async(resource,options)=>{peak=Math.max(peak,++active);await flush();active--;
     return resource==='history' ? historyPage([historyRow(options.params.cursor?'1':'2')],{has_more:!options.params.cursor,next_cursor:options.params.cursor?null:'history-next',limit:options.params.limit,direction:options.params.direction}) : response(resource,options);
   },{metadata:all});
-  await run.owner.load();assert.equal(run.calls.length,1);await run.owner.toggleHistory();await run.owner.nextHistory();
+  await run.owner.load();assert.equal(run.calls.length,1);await run.owner.section('history').select();await run.owner.section('history').next();
   assert.equal(run.state.history.pageNumber,2);assert.deepEqual(run.calls.at(-1).params,{...allQuery,...historyIdentity(identity),cursor:'history-next'});
-  await run.owner.toggleExecutables();await run.owner.toggleChildren();await run.owner.toggleEvents();await run.owner.toggleParameters();await run.owner.toggleOverrides();
+  await run.owner.section('executables').select();await run.owner.section('children').select();await run.owner.section('events').select();await run.owner.section('parameters').select();await run.owner.section('overrides').select();
   const start=run.calls.length;await run.owner.refresh();assert.equal(run.calls.length-start,7);assert.equal(peak,1);
   assert.deepEqual(run.calls.slice(start).map(c=>c.params?.section??c.resource.split('/').at(-1)),['17','executables','children','events','parameters','overrides','history']);
-  await run.owner.orderHistory({status:'7',direction:'asc',limit:8});assert.equal(run.state.history.pageNumber,1);
+  await run.owner.section('history').order({status:'7',direction:'asc',limit:8});assert.equal(run.state.history.pageNumber,1);
   assert.deepEqual(run.calls.at(-1).params,{...query,status:'7',direction:'asc',limit:8,...historyIdentity(identity)});
 });
 
@@ -84,14 +84,14 @@ test('a changed exact package identity discards old history paths and rows even 
     if(resource==='history'){if(changed)throw new ApiError('http',{status:503});return historyPage([historyRow('2')],{has_more:true,next_cursor:'old-identity'});}
     const page=response(resource,options);if(changed)page.data.package_name='Renamed.dtsx';return page;
   });
-  await run.owner.load();await run.owner.toggleHistory();changed=true;await run.owner.refresh();
+  await run.owner.load();await run.owner.section('history').select();changed=true;await run.owner.refresh();
   assert.equal(run.calls.at(-1).params.package,'Renamed.dtsx');assert.equal(run.calls.at(-1).params.cursor,undefined);
   assert.equal(run.state.history.page,null);assert.equal(run.state.history.stale,false);assert.equal(run.state.response.data.package_name,'Renamed.dtsx');
 });
 
 test('history errors remain scoped including global 404, while invalid cursor fallback clears old results',async t=>{
   for(const status of [503,403,404]){let fail=false;const run=setup(t,async(resource,options)=>{if(fail&&resource==='history')throw new ApiError('http',{status});return response(resource,options);});
-    await run.owner.load();await run.owner.toggleHistory();fail=true;await run.owner.refresh();
+    await run.owner.load();await run.owner.section('history').select();fail=true;await run.owner.refresh();
     assert.ok(run.state.response);assert.equal(run.state.history.page!==null,status===503);
   }
   const run=setup(t,async(resource,options)=>{if(resource!=='history')return response(resource,options);if(options.params.cursor)throw new ApiError('http',{status:400,code:'cursor_expired'});throw new ApiError('http',{status:503});},
@@ -102,7 +102,7 @@ test('history errors remain scoped including global 404, while invalid cursor fa
 test('closing pending history preserves queued value reads and late history cannot invalidate the execution',async t=>{
   const wait=deferred(),all=historyMetadata();all.capabilities.values=true;
   const run=setup(t,(resource,options)=>resource==='history'?wait.promise:Promise.resolve(response(resource,options)),{metadata:all});
-  await run.owner.load();const opening=run.owner.toggleHistory();await run.owner.toggleParameters();await run.owner.toggleHistory();await flush();
+  await run.owner.load();const opening=run.owner.section('history').select();await run.owner.section('parameters').select();await run.owner.section('history').select();await flush();
   assert.ok(run.state.parameters.page);wait.reject(new ApiError('http',{status:404}));await opening;
   assert.equal(run.state.history.open,false);assert.ok(run.state.response);
 });
@@ -110,11 +110,11 @@ test('closing pending history preserves queued value reads and late history cann
 test('history generation, deadlines and disposal reject late responses after A to B to A',async t=>{
   t.mock.timers.enable({apis:['setTimeout','Date'],now:0});const pending=[];
   const run=setup(t,(resource,options)=>{if(resource!=='history')return Promise.resolve(response(resource,options));const wait=deferred();pending.push({...wait,signal:options.signal});return wait.promise;},{timeoutMs:20});
-  await run.owner.load();const a=run.owner.toggleHistory();await flush();const b=run.owner.select('18');await flush();const again=run.owner.select('17');await flush();
+  await run.owner.load();const a=run.owner.section('history').select();await flush();const b=run.owner.select('18');await flush();const again=run.owner.select('17');await flush();
   pending[0].reject(new ApiError('http',{status:403}));pending[1].resolve(historyPage([historyRow('2')]));pending[2].resolve(historyPage([historyRow('3')]));await Promise.all([a,b,again]);
   assert.equal(run.state.history.page.data[0].execution_id,'3');const refreshing=run.owner.refresh();await flush();t.mock.timers.tick(20);assert.ok(pending[3].signal.aborted);
   pending[3].reject(new Error('abort'));await refreshing;assert.equal(run.state.history.error.kind,'timeout');
-  const retry=run.owner.retryHistory();await flush();const state=run.state;run.owner.dispose();pending[4].resolve(historyPage());await retry;assert.equal(run.state,state);
+  const retry=run.owner.section('history').retry();await flush();const state=run.state;run.owner.dispose();pending[4].resolve(historyPage());await retry;assert.equal(run.state,state);
 });
 
 test('history UI keeps actual and estimated timing separate, preserves lexical identity and links only valid selection',async t=>{

@@ -31,7 +31,8 @@ export function readTimeline(response, selection, page, bucket, metadata, displa
       if (start >= end || start >= to || end <= from || (previous !== null && previous !== row.start)) throw new TypeError();
       previous = row.end;
       for (const key of Object.keys(timelineSeries)) { if (row[key] === null) throw new TypeError(); display.count(row[key]); }
-      if (row.started_count > row.created_count || BigInt(row.succeeded_count) + BigInt(row.failed_count) > BigInt(row.created_count)) throw new TypeError();
+      if (row.started_count > row.created_count ||
+        BigInt(row.succeeded_count) + BigInt(row.failed_count) > BigInt(row.created_count)) throw new TypeError();
     }
     if (timestampTicks(data[0].start) > from || timestampTicks(data.at(-1).end) < to) throw new TypeError();
     return response;

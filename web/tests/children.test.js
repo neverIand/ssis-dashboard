@@ -56,15 +56,15 @@ test('two lazy sections retain independent page paths, orders and request budget
       next_cursor: params.cursor ? null : 'child-next' })
     : resource.endsWith('/executables') ? executablePage() : detailResponse('17'));
   await run.owner.load(); assert.equal(run.calls.length, 1);
-  await run.owner.toggleExecutables(); await run.owner.toggleChildren(); await run.owner.nextChildren();
+  await run.owner.section('executables').select(); await run.owner.section('children').select(); await run.owner.section('children').next();
   assert.equal(run.state.children.pageNumber, 2); assert.equal(run.state.executables.pageNumber, 1);
   await run.owner.refresh();
   assert.deepEqual(run.calls.slice(-3).map(call => call.resource), ['executions/17', 'executions/17/executables', 'executions/17/children']);
   assert.equal(run.calls.at(-1).params.cursor, 'child-next');
-  await run.owner.orderChildren({ sort: 'observation_id', direction: 'desc', limit: 1 });
+  await run.owner.section('children').order({ sort: 'observation_id', direction: 'desc', limit: 1 });
   assert.equal(run.state.children.pageNumber, 1); assert.equal(run.calls.at(-1).params.cursor, undefined);
   assert.equal(run.state.executables.page.data.length, 1);
-  await run.owner.toggleChildren(); await run.owner.refresh();
+  await run.owner.section('children').select(); await run.owner.refresh();
   assert.deepEqual(run.calls.slice(-2).map(call => call.resource), ['executions/17', 'executions/17/executables']);
 });
 
@@ -72,8 +72,8 @@ test('opening a second section while busy queues it in the same serial cycle', a
   const pending = deferred();
   const run = setup(t, resource => resource.endsWith('/executables') ? pending.promise
     : Promise.resolve(resource.endsWith('/children') ? childPage() : detailResponse('17')));
-  await run.owner.load(); const opening = run.owner.toggleExecutables();
-  await run.owner.toggleChildren(); assert.equal(run.calls.length, 2);
+  await run.owner.load(); const opening = run.owner.section('executables').select();
+  await run.owner.section('children').select(); assert.equal(run.calls.length, 2);
   pending.resolve(executablePage()); await opening;
   assert.equal(run.calls.length, 3); assert.equal(run.state.children.phase, 'ready');
 });
@@ -82,10 +82,10 @@ test('closing an in-flight section preserves queued work and rejects its late ex
   const pending = deferred(); let sections = 0;
   const current = setup(t, resource => resource === 'executions/17' ? Promise.resolve(detailResponse('17'))
     : resource.endsWith('/executables') && ++sections === 2 ? pending.promise : Promise.resolve(resourcePage(resource)));
-  await current.owner.load(); await current.owner.toggleExecutables(); await current.owner.toggleChildren();
+  await current.owner.load(); await current.owner.section('executables').select(); await current.owner.section('children').select();
   const refresh = current.owner.refresh(); await flush();
   const signal = current.calls.at(-1).signal;
-  await current.owner.toggleExecutables();
+  await current.owner.section('executables').select();
   assert.equal(signal.aborted, true); assert.equal(current.state.children.phase, 'ready');
   const page = current.state.children.page;
   pending.reject(new ApiError('http', { status: 404 })); await refresh;
@@ -96,12 +96,12 @@ test('section denial does not prevent other reads; closing it restores polling; 
   let failure = null;
   const run = setup(t, async resource => resource === 'executions/17' ? runningDetailResponse('17')
     : resource.endsWith('/children') && failure ? Promise.reject(failure) : resourcePage(resource), { autoRefresh: true });
-  await run.owner.load(); await run.owner.toggleExecutables(); await run.owner.toggleChildren();
+  await run.owner.load(); await run.owner.section('executables').select(); await run.owner.section('children').select();
   failure = new ApiError('http', { status: 403 }); await run.owner.refresh();
   assert.equal(run.state.children.page, null); assert.notEqual(run.state.executables.page, null);
   assert.equal(run.state.poll.mode, 'blocked');
-  await run.owner.toggleChildren(); assert.equal(run.state.poll.mode, 'scheduled');
-  failure = null; await run.owner.toggleChildren();
+  await run.owner.section('children').select(); assert.equal(run.state.poll.mode, 'scheduled');
+  failure = null; await run.owner.section('children').select();
   failure = new ApiError('http', { status: 404 }); await run.owner.refresh();
   assert.equal(run.state.response, null); assert.equal(run.state.children.page, null); assert.equal(run.state.executables.page, null);
 });
@@ -115,12 +115,12 @@ test('transient child error retains its page; expired child reset failure cannot
     if (failure) throw failure;
     return childPage([child(params.cursor ? '2' : '1')], { ...params, has_more: !params.cursor, next_cursor: params.cursor ? null : 'next' });
   });
-  await run.owner.load(); await run.owner.toggleExecutables(); await run.owner.toggleChildren(); await run.owner.nextChildren();
+  await run.owner.load(); await run.owner.section('executables').select(); await run.owner.section('children').select(); await run.owner.section('children').next();
   const old = run.state.children.page, executable = run.state.executables.page;
-  failure = new ApiError('http', { status: 503 }); await run.owner.retryChildren();
+  failure = new ApiError('http', { status: 503 }); await run.owner.section('children').retry();
   assert.equal(run.state.children.page, old); assert.equal(run.state.children.stale, true);
   const count = childCalls;
-  failure = new ApiError('http', { status: 400, code: 'cursor_expired' }); await run.owner.retryChildren();
+  failure = new ApiError('http', { status: 400, code: 'cursor_expired' }); await run.owner.section('children').retry();
   assert.equal(childCalls, count + 2); assert.equal(run.state.children.page, null);
   assert.equal(run.state.children.pageNumber, 1); assert.match(run.state.children.notice, /Reset to page one/);
   assert.equal(run.state.executables.page, executable);
@@ -132,9 +132,9 @@ test('polling waits for both pages and coalesces manual and visible-return activ
   const run = setup(t, resource => resource === 'executions/17' ? Promise.resolve(runningDetailResponse('17'))
     : resource.endsWith('/children') && ++childCalls === 2 ? pending.promise : Promise.resolve(resourcePage(resource)),
   { autoRefresh: true, pollIntervalMs: 1000 });
-  await run.owner.load(); await run.owner.toggleExecutables(); await run.owner.toggleChildren();
+  await run.owner.load(); await run.owner.section('executables').select(); await run.owner.section('children').select();
   t.mock.timers.tick(1000); await flush(); const count = run.calls.length;
-  run.owner.refresh(); run.owner.nextChildren(); run.owner.setVisible(false); run.owner.setVisible(true);
+  run.owner.refresh(); run.owner.section('children').next(); run.owner.setVisible(false); run.owner.setVisible(true);
   t.mock.timers.tick(1000); await flush(); assert.equal(run.calls.length, count);
   pending.resolve(childPage()); await flush(); t.mock.timers.tick(0); await flush();
   assert.equal(run.calls.length, count + 3); assert.equal(run.state.busy, false);
@@ -144,7 +144,7 @@ test('child generations reject A to B to A late responses and disposal aborts th
   const pending = deferred(); let calls = 0;
   const run = setup(t, resource => !resource.endsWith('/children') ? Promise.resolve(detailResponse(resource.split('/')[1]))
     : ++calls === 1 ? pending.promise : Promise.resolve(childPage([child('1', { execution_id: resource.split('/')[1] })])));
-  await run.owner.load(); const old = run.owner.toggleChildren();
+  await run.owner.load(); const old = run.owner.section('children').select();
   await run.owner.select('18'); await run.owner.select('17');
   const current = run.state.children.page;
   pending.reject(new ApiError('http', { status: 404 })); await old;
@@ -228,13 +228,13 @@ test('a child deadline retains only its prior page and releases the shared owner
   const run = setup(t, (resource, { signal }) => resource === 'executions/17' ? Promise.resolve(detailResponse('17'))
     : delayed && resource.endsWith('/children') ? new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(new ApiError('network'))))
       : Promise.resolve(resourcePage(resource)), { timeoutMs: 20 });
-  await run.owner.load(); await run.owner.toggleExecutables(); await run.owner.toggleChildren();
+  await run.owner.load(); await run.owner.section('executables').select(); await run.owner.section('children').select();
   const old = run.state.children.page;
   delayed = true; const refreshing = run.owner.refresh(); await flush();
   t.mock.timers.tick(20); await refreshing;
   assert.equal(run.state.children.page, old); assert.equal(run.state.children.error.kind, 'timeout');
   assert.equal(run.state.busy, false); assert.notEqual(run.state.executables.page, null);
-  delayed = false; await run.owner.retryChildren(); assert.equal(run.state.children.error, null);
+  delayed = false; await run.owner.section('children').retry(); assert.equal(run.state.children.error, null);
 });
 
 test('failure in one section does not skip the next, but a base denial gates and clears both', async t => {
@@ -247,7 +247,7 @@ test('failure in one section does not skip the next, but a base denial gates and
     if (resource.endsWith('/executables') && failed) throw new ApiError('http', { status: 403 });
     return resourcePage(resource);
   });
-  await run.owner.load(); await run.owner.toggleExecutables(); await run.owner.toggleChildren();
+  await run.owner.load(); await run.owner.section('executables').select(); await run.owner.section('children').select();
   failed = true; await run.owner.refresh();
   assert.equal(run.state.executables.page, null); assert.equal(run.state.children.phase, 'ready');
   const count = run.calls.length; baseFailed = true; await run.owner.refresh();

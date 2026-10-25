@@ -55,5 +55,7 @@ function readValuePage(response, query, metadata, display, section) {
     return response;
   } catch { throw new ApiError('invalid_response', { requestId: response?.meta?.request_id }); }
 }
-export const readParameterPage = (response, _executionId, query, metadata, display) => readValuePage(response, query, metadata, display, 'parameters');
-export const readOverridePage = (response, _executionId, query, metadata, display) => readValuePage(response, query, metadata, display, 'overrides');
+export const readParameterPage = (response, _executionId, query, metadata, display) => readValuePage(response, query, metadata, display,
+  'parameters');
+export const readOverridePage = (response, _executionId, query, metadata, display) => readValuePage(response, query, metadata, display,
+  'overrides');

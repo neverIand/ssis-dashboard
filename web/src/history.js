@@ -26,7 +26,8 @@ export function readHistoryPage(response, _executionId, query, metadata, display
       if (row.execution_id === null) throw new TypeError();
       formatId(row.execution_id);
       const id = BigInt(row.execution_id);
-      if (id > BigInt(response.meta.upper_id) || (previous !== null && (query.direction === 'asc' ? id <= previous : id >= previous))) throw new TypeError();
+      if (id > BigInt(response.meta.upper_id) || (previous !== null && (query.direction === 'asc' ? id <= previous
+        : id >= previous))) throw new TypeError();
       previous = id;
       for (const [key, width] of [['folder_name',128], ['project_name',128], ['package_name',260]]) {
         observationText(row[key], width, true);

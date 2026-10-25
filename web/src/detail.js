@@ -60,7 +60,8 @@ const transient = error => ['network', 'timeout'].includes(error.kind)
 
 export function createDetailLoader({ api, executionId, metadata, publish, timeoutMs = 30000, locale,
   autoRefresh = true, visible = true, pollIntervalMs = 30000, maxPollIntervalMs = 300000,
-  restoreExecutables = null, restoreChildren = null, restoreEvents = null, restoreParameters = null, restoreOverrides = null, restoreHistory = null,
+  restoreExecutables = null, restoreChildren = null, restoreEvents = null,
+  restoreParameters = null, restoreOverrides = null, restoreHistory = null,
   initialTab = null }) {
   if (executionId === null) throw new TypeError('Missing execution ID.');
   formatId(executionId);
@@ -75,9 +76,12 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
   };
   const keys = Object.keys(definitions);
   const emptyPath = () => ({ entries: [null], index: 0, cohort: null });
-  const allowed = key => ['parameters', 'overrides'].includes(key) ? metadata.capabilities.values : key !== 'events' || metadata.capabilities.events;
-  const initialSection = key => ({ open: false, query: ['parameters', 'overrides'].includes(key) ? { section: key, limit: metadata.limits.default_limit }
-    : key === 'history' ? { status: allHistoryStatuses(metadata), sort: 'execution_id', direction: 'desc', limit: metadata.limits.default_limit }
+  const allowed = key => ['parameters', 'overrides'].includes(key)
+    ? metadata.capabilities.values : key !== 'events' || metadata.capabilities.events;
+  const initialSection = key => ({ open: false, query: ['parameters', 'overrides'].includes(key)
+    ? { section: key, limit: metadata.limits.default_limit }
+    : key === 'history' ? { status: allHistoryStatuses(metadata), sort: 'execution_id', direction: 'desc',
+      limit: metadata.limits.default_limit }
     : { sort: key === 'events' ? 'message_time' : 'started_at', direction: 'asc',
       limit: metadata.limits.default_limit, ...(key === 'events' ? { kind: 'all', q: null } : {}) },
     phase: 'idle', page: null, error: null, stale: false, notice: '' });
@@ -135,7 +139,8 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     emit({ sectionBusy: key });
     try {
       const definition = definitions[key];
-      const response = await request(job, definition.global ? definition.resource : `executions/${state.executionId}/${definition.resource ?? key}`,
+      const response = await request(job,
+        definition.global ? definition.resource : `executions/${state.executionId}/${definition.resource ?? key}`,
         { ...query, ...(definition.global ? historyIdentity(state.response.data) : {}), ...(cursor === null ? {} : { cursor }) });
       if (disposed || current !== generation) return;
       const page = definition.read(response, state.executionId, query, metadata, display, state.response.data);
@@ -152,7 +157,8 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
         job.reset.add(key);
         paths[key] = emptyPath();
         updateSection(key, { page: null, stale: false });
-        return readSection(job, current, key, 0, `The ${definitions[key].label} page link expired or is no longer valid. Reset to page one.`);
+        return readSection(job, current, key, 0,
+          `The ${definitions[key].label} page link expired or is no longer valid. Reset to page one.`);
       }
       throw error;
     }
@@ -312,26 +318,17 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
   const checkpoint = key => ({ open: state[key].open, query: { ...state[key].query },
     path: { ...paths[key], entries: [...paths[key].entries] } });
   const retry = key => state.phase === 'error' ? load() : sectionAction(key);
+  const sectionActions = Object.fromEntries(keys.map(key => [key, {
+    select: () => toggleSection(key), order: changes => orderSection(key, changes),
+    next: () => next(key), previous: () => previous(key), latest: () => latest(key),
+    retry: () => retry(key), checkpoint: () => checkpoint(key),
+    ...(key === 'events' ? { applyEvents } : {}),
+  }]));
   return { load, refresh: load, selectTab,
-    toggleHistory: () => toggleSection('history'), orderHistory: changes => orderSection('history', changes),
-    nextHistory: () => next('history'), previousHistory: () => previous('history'), latestHistory: () => latest('history'),
-    retryHistory: () => retry('history'), checkpointHistory: () => checkpoint('history'),
-    toggleOverrides: () => toggleSection('overrides'), orderOverrides: changes => orderSection('overrides', changes),
-    nextOverrides: () => next('overrides'), previousOverrides: () => previous('overrides'), latestOverrides: () => latest('overrides'),
-    retryOverrides: () => retry('overrides'), checkpointOverrides: () => checkpoint('overrides'),
-    toggleParameters: () => toggleSection('parameters'), orderParameters: changes => orderSection('parameters', changes),
-    nextParameters: () => next('parameters'), previousParameters: () => previous('parameters'), latestParameters: () => latest('parameters'),
-    retryParameters: () => retry('parameters'), checkpointParameters: () => checkpoint('parameters'),
-    toggleEvents: () => toggleSection('events'), applyEvents, orderEvents: changes => orderSection('events', changes),
-    nextEvents: () => next('events'), previousEvents: () => previous('events'), latestEvents: () => latest('events'),
-    retryEvents: () => retry('events'), checkpointEvents: () => checkpoint('events'),
-    toggleExecutables: () => toggleSection('executables'), toggleChildren: () => toggleSection('children'),
-    orderExecutables: changes => orderSection('executables', changes), orderChildren: changes => orderSection('children', changes),
-    nextExecutables: () => next('executables'), nextChildren: () => next('children'),
-    previousExecutables: () => previous('executables'), previousChildren: () => previous('children'),
-    latestExecutables: () => latest('executables'), latestChildren: () => latest('children'),
-    retryExecutables: () => retry('executables'), retryChildren: () => retry('children'),
-    checkpointExecutables: () => checkpoint('executables'), checkpointChildren: () => checkpoint('children'),
+    section(key) {
+      if (!keys.includes(key)) throw new TypeError('Unknown detail section.');
+      return sectionActions[key];
+    },
     select(id) {
       if (id === null) throw new TypeError('Missing execution ID.');
       formatId(id);
@@ -339,7 +336,8 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
       if (id === state.executionId) return load();
       cancel(); loop.reset(); tabInitialized = false;
       paths = Object.fromEntries(keys.map(key => [key, emptyPath()]));
-      state = { phase: 'idle', executionId: id, response: null, terminal: false, error: null, stale: false, operation: 'select', sectionBusy: null,
+      state = { phase: 'idle', executionId: id, response: null, terminal: false, error: null, stale: false, operation: 'select',
+        sectionBusy: null,
         ...Object.fromEntries(keys.map(key => [key, { ...initialSection(key), open: state[key].open }])) };
       return load();
     },

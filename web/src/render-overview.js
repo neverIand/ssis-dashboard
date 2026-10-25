@@ -39,7 +39,8 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   let autoPaused = restoreView?.autoPaused === true;
   let phase = 'idle';
   const timelineView=mountTimeline(root,{metadata,restoreView:restoreView?.timeline,
-    actions:{toggle:()=>{void owner.toggleTimeline();},retry:()=>{void owner.retryTimeline();},bucket:value=>{void owner.setTimelineBucket(value);}}});
+    actions:{toggle:()=>{void owner.toggleTimeline();},retry:()=>{void owner.retryTimeline();},
+      bucket:value=>{void owner.setTimelineBucket(value);}}});
 
   function position() {
     return { x: window.scrollX, y: window.scrollY, left: scroll.scrollLeft, top: scroll.scrollTop };
@@ -129,7 +130,8 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
         row.append(...cells);
         record = { row, cells, item: null };
         folder.addEventListener('click', event => intercept(event, { folder: record.item.folder_name, project: null }));
-        project.addEventListener('click', event => intercept(event, { folder: record.item.folder_name, project: record.item.project_name }));
+        project.addEventListener('click', event => intercept(event, { folder: record.item.folder_name,
+          project: record.item.project_name }));
         rows.set(item.execution_id, record);
       }
       const { row, cells, item: previous } = record;
@@ -184,7 +186,8 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     reserveSpace(state.phase === 'loading-list' && page === null, renderedPage !== null);
     const refreshing = state.operation === 'refresh' || state.operation === 'summary-retry';
     appliedSelection = state.selection;
-    selectionKey = state.selection === null ? null : JSON.stringify({ ...selectionParams(state.selection), created: state.selection.created ?? null });
+    selectionKey = state.selection === null ? null : JSON.stringify({ ...selectionParams(state.selection),
+      created: state.selection.created ?? null });
     if (returning && returning.selectionKey !== selectionKey) returning = null;
     const currentPosition = refreshing && page !== null ? position() : null;
     const focused = document.activeElement;
@@ -236,7 +239,8 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       : state.phase === 'loading-summary' ? 'Loading summary…' : refreshText;
     inlineStatus(pollStatus, message, [errorDetails,
       page ? `Observed ${display.timestamp(page.meta.generated_at)} · ${page.meta.generated_at}` : '',
-      state.summaryStale && state.summary ? `Counts observed ${display.timestamp(state.summary.meta.generated_at)} · ${state.summary.meta.generated_at}` : '',
+      state.summaryStale && state.summary
+        ? `Counts observed ${display.timestamp(state.summary.meta.generated_at)} · ${state.summary.meta.generated_at}` : '',
       message !== refreshText ? refreshText : ''].filter(Boolean).join(' · '));
     bounds.hidden = false;
     if (page) {
@@ -246,7 +250,8 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     bounds.title = page ? `${bounds.textContent} (exclusive)` : '';
     const counts = state.summary ? Object.fromEntries(state.summary.data.by_status.map((item) => [item.code, item.count])) : null;
     const values = state.summary ? { total: state.summary.data.total, running: counts[2], succeeded: counts[7], failed: counts[4],
-      other: state.summary.data.by_status.filter(item => ![2,4,7].includes(item.code)).reduce((total,item) => total + item.count, 0) } : null;
+      other: state.summary.data.by_status.filter(item => ![2,4,7].includes(item.code)).reduce((total,item) => total + item.count,
+        0) } : null;
     summaryAvailable = values !== null;
     for (const [key, node] of Object.entries(cards)) {
       node.textContent = values ? display.count(values[key]) : '—';
@@ -259,17 +264,21 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       // guard above prevents activation until fresh counts are available.
       if (state.selection && (key === 'total' || statusSets[key].length)) linkSelection(link, state.selection, { status: statusSets[key] });
       else link.removeAttribute('href');
-      if (state.selection && JSON.stringify(state.selection.status) === JSON.stringify(statusSets[key])) link.setAttribute('aria-current', 'true');
+      if (state.selection &&
+        JSON.stringify(state.selection.status) === JSON.stringify(statusSets[key])) link.setAttribute('aria-current', 'true');
       else link.removeAttribute('aria-current');
     }
     if (values) cardLinks.other.hidden = values.other === 0;
     else if (!state.busy) cardLinks.other.hidden = true;
     if (cardLinks.other.hidden && focused === cardLinks.other && state.selection) cardLinks.total.focus({ preventScroll: true });
-    const unknownCount = state.summary?.data.by_status.filter(item => !metadata.execution_statuses.some(status => status.code === item.code))
+    const unknownCount = state.summary?.data.by_status.filter(item => !metadata.execution_statuses.some(status =>
+      status.code === item.code))
       .reduce((total,item) => total + item.count, 0) ?? 0;
     otherNote.hidden = unknownCount === 0;
-    otherNote.textContent = unknownCount ? `Other includes ${display.count(unknownCount)} executions with unknown status codes; its filter selects supported statuses.` : '';
-    cardLinks.other.title = 'Other supported statuses: ' + metadata.execution_statuses.filter(item => statusSets.other.includes(item.code)).map(formatCode).join(', ')
+    otherNote.textContent = unknownCount
+      ? `Other includes ${display.count(unknownCount)} executions with unknown status codes; its filter selects supported statuses.` : '';
+    cardLinks.other.title = 'Other supported statuses: ' + metadata.execution_statuses.filter(item =>
+      statusSets.other.includes(item.code)).map(formatCode).join(', ')
       + (unknownCount ? `. Counts include ${display.count(unknownCount)} unknown codes, which the API cannot filter.` : '');
     timelineView.render(state.timeline,state.busy,state.selection,page);
     if (focused === listRetry && listRetry.hidden) refresh.focus({ preventScroll: true });

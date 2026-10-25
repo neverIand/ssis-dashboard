@@ -141,7 +141,8 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
         more.setAttribute('aria-disabled', String(state.phase === 'loading'));
         more.textContent = search.value ? 'Search more' : 'Load more';
         retry.hidden = state.phase !== 'error';
-        message.textContent = state.phase === 'idle' ? 'Choose a folder to browse projects, or enter an exact project name across all folders.'
+        message.textContent = state.phase === 'idle'
+          ? 'Choose a folder to browse projects, or enter an exact project name across all folders.'
           : state.phase === 'loading' ? (search.value ? 'Searching the catalog…' : 'Loading…')
           : state.phase === 'error' ? `${state.error.message}${state.error.requestId ? ` Request ID: ${state.error.requestId}` : ''}`
           : state.complete ? (state.rows.length ? `${state.rows.length} ${search.value ? 'matches' : `${key}s`}` : 'No matches.')
@@ -209,7 +210,8 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
     if (opened && !opened.panel.contains(event.target) && !opened.trigger.contains(event.target)) {
       // Let a selection action consume the Status draft once. Prevent mouse focus
       // from committing and removing the clicked row before its click is delivered.
-      if (opened.key === 'status' && event.target.closest?.('[data-selection-link], [data-sort], [data-execution-link]')) event.preventDefault();
+      if (opened.key === 'status' &&
+        event.target.closest?.('[data-selection-link], [data-sort], [data-execution-link]')) event.preventDefault();
       else close();
     }
   });
@@ -285,7 +287,8 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
       for (const control of Object.values(order)) control.disabled = true;
       for (const button of headers) button.disabled = true;
       orderNotice.textContent = '';
-      notice.textContent = `${error instanceof SelectionError ? error.message : 'Filters could not be restored.'} Reset invalid filters to start again.`;
+      notice.textContent = `${error instanceof SelectionError ? error.message
+        : 'Filters could not be restored.'} Reset invalid filters to start again.`;
       onApplied(null);
     }
   }

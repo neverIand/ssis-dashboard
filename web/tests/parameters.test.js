@@ -73,8 +73,8 @@ test('malformed flags, identities, section/order/fence and leaked redacted text 
 
 test('disabled capability discards restored parameters and all programmatic reads while other detail work continues', async t => {
   const run = setup(t, undefined, { metadata: parameterMetadata(false), restoreParameters: { open: true, query, path: { entries: ['private-old'], index: 0 } } });
-  await run.owner.load(); await run.owner.toggleParameters(); await run.owner.retryParameters(); await run.owner.latestParameters();
-  await run.owner.orderParameters({ limit: 8 }); await run.owner.refresh();
+  await run.owner.load(); await run.owner.section('parameters').select(); await run.owner.section('parameters').retry(); await run.owner.section('parameters').latest();
+  await run.owner.section('parameters').order({ limit: 8 }); await run.owner.refresh();
   assert.equal(run.calls.length, 2); assert.equal(run.state.parameters.open, false); assert.equal(run.state.parameters.page, null);
 });
 
@@ -83,24 +83,24 @@ test('parameters page independently and share a five-read serial refresh with ex
   const run = setup(t, async (resource, { params }) => resource.endsWith('/values') ? parameterPage([parameterRow(params.cursor ? '2' : '1')],
     { limit: params.limit, has_more: !params.cursor, next_cursor: params.cursor ? null : 'parameter-next' }) : response(resource), { metadata: allMetadata });
   await run.owner.load(); assert.equal(run.calls.length, 1);
-  await run.owner.toggleExecutables(); await run.owner.toggleChildren(); await run.owner.toggleEvents(); await run.owner.toggleParameters();
-  await run.owner.nextParameters(); assert.equal(run.state.parameters.pageNumber, 2); assert.equal(run.state.events.pageNumber, 1);
+  await run.owner.section('executables').select(); await run.owner.section('children').select(); await run.owner.section('events').select(); await run.owner.section('parameters').select();
+  await run.owner.section('parameters').next(); assert.equal(run.state.parameters.pageNumber, 2); assert.equal(run.state.events.pageNumber, 1);
   const start = run.calls.length; await run.owner.refresh();
   assert.deepEqual(run.calls.slice(start).map(call => call.resource), ['executions/17','executions/17/executables','executions/17/children','executions/17/events','executions/17/values']);
   assert.deepEqual(run.calls.at(-1).params, { section: 'parameters', limit: 50, cursor: 'parameter-next' });
-  await run.owner.orderParameters({ limit: 8 }); assert.deepEqual(run.calls.at(-1).params, { section: 'parameters', limit: 8 });
-  assert.equal(run.state.parameters.pageNumber, 1); await run.owner.nextParameters(); await run.owner.previousParameters();
-  assert.equal(run.state.parameters.pageNumber, 1); await run.owner.latestParameters(); assert.equal(run.state.parameters.pageNumber, 1);
+  await run.owner.section('parameters').order({ limit: 8 }); assert.deepEqual(run.calls.at(-1).params, { section: 'parameters', limit: 8 });
+  assert.equal(run.state.parameters.pageNumber, 1); await run.owner.section('parameters').next(); await run.owner.section('parameters').previous();
+  assert.equal(run.state.parameters.pageNumber, 1); await run.owner.section('parameters').latest(); assert.equal(run.state.parameters.pageNumber, 1);
 });
 
 test('queued parameters survive event-search cancellation and closing in-flight values preserves queued sibling work', async t => {
   const old = deferred(), value = deferred(), allMetadata = eventMetadata(); allMetadata.capabilities.values = true;
   const run = setup(t, (resource, { params }) => resource.endsWith('/events') && params.q === 'old' ? old.promise
     : resource.endsWith('/values') ? value.promise : Promise.resolve(response(resource)), { metadata: allMetadata });
-  await run.owner.load(); await run.owner.toggleEvents(); const searching = run.owner.applyEvents({ q: 'old' });
-  await run.owner.toggleParameters(); const replacing = run.owner.applyEvents({ q: 'new' }); await flush();
+  await run.owner.load(); await run.owner.section('events').select(); const searching = run.owner.section('events').applyEvents({ q: 'old' });
+  await run.owner.section('parameters').select(); const replacing = run.owner.section('events').applyEvents({ q: 'new' }); await flush();
   assert.equal(run.calls.at(-1).resource, 'executions/17/values');
-  await run.owner.toggleChildren(); await run.owner.toggleParameters(); await flush();
+  await run.owner.section('children').select(); await run.owner.section('parameters').select(); await flush();
   assert.equal(run.calls.at(-1).resource, 'executions/17/children');
   value.reject(new ApiError('http', { status: 404 })); old.reject(new ApiError('http', { status: 403 })); await Promise.all([searching, replacing]);
   assert.equal(run.state.phase, 'ready'); assert.equal(run.state.parameters.open, false); assert.ok(run.state.children.page);
@@ -110,10 +110,10 @@ test('parameter transient failures retain only their current page; denial/malfor
   for (const failure of [new ApiError('http', { status: 503 }), new ApiError('http', { status: 403 }), new ApiError('invalid_response'), new ApiError('http', { status: 404 })]) {
     let failed = false;
     const run = setup(t, async resource => { if (failed && resource.endsWith('/values')) throw failure; return response(resource); });
-    await run.owner.load(); await run.owner.toggleParameters(); failed = true; await run.owner.refresh();
+    await run.owner.load(); await run.owner.section('parameters').select(); failed = true; await run.owner.refresh();
     assert.equal(run.state.parameters.page !== null, failure.status === 503);
     assert.equal(run.state.response === null, failure.status === 404);
-    if (failure.status === 503) { failed = false; await run.owner.retryParameters(); assert.equal(run.state.parameters.error, null); }
+    if (failure.status === 503) { failed = false; await run.owner.section('parameters').retry(); assert.equal(run.state.parameters.error, null); }
   }
 });
 
@@ -135,23 +135,23 @@ test('parameter deadlines, A to B to A generations and disposal reject late read
     if (!resource.endsWith('/values')) return Promise.resolve(response(resource));
     const wait = deferred(); pending.push({ ...wait, signal: options.signal }); return wait.promise;
   }, { timeoutMs: 20 });
-  await run.owner.load(); const first = run.owner.toggleParameters(); await flush();
+  await run.owner.load(); const first = run.owner.section('parameters').select(); await flush();
   const b = run.owner.select('18'); await flush(); const a = run.owner.select('17'); await flush();
   pending[0].reject(new ApiError('http', { status: 404 })); pending[1].resolve(parameterPage([parameterRow('2')]));
   pending[2].resolve(parameterPage([parameterRow('3')])); await Promise.all([first,b,a]);
   assert.equal(run.state.executionId, '17'); assert.equal(run.state.parameters.page.data[0].execution_parameter_id, '3');
   const late = run.owner.refresh(); await flush(); t.mock.timers.tick(20); assert.equal(pending[3].signal.aborted, true);
   pending[3].reject(new Error('aborted')); await late; assert.equal(run.state.parameters.error.kind, 'timeout');
-  const disposed = run.owner.retryParameters(); await flush(); const lastPublished = run.state;
+  const disposed = run.owner.section('parameters').retry(); await flush(); const lastPublished = run.state;
   run.owner.dispose(); pending[4].resolve(parameterPage()); await disposed;
-  assert.equal(run.state, lastPublished); assert.equal(run.owner.checkpointParameters().open, false);
+  assert.equal(run.state, lastPublished); assert.equal(run.owner.section('parameters').checkpoint().open, false);
 });
 
 test('the completion-based scheduler coalesces refresh and visibility recovery behind pending parameter work', async t => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
   const wait = deferred(); let delay = true;
   const run = setup(t, resource => resource === 'executions/17' ? runningDetailResponse('17') : resource.endsWith('/values') && delay ? wait.promise : Promise.resolve(response(resource)), { autoRefresh: true, pollIntervalMs: 100 });
-  await run.owner.load(); const opening = run.owner.toggleParameters(); await flush(); t.mock.timers.tick(1000);
+  await run.owner.load(); const opening = run.owner.section('parameters').select(); await flush(); t.mock.timers.tick(1000);
   await run.owner.refresh(); run.owner.setVisible(false); run.owner.setVisible(true); await flush(); assert.equal(run.calls.length, 2);
   delay = false; wait.resolve(parameterPage()); await opening; await flush();
   const beforeResync = run.calls.length; t.mock.timers.tick(0); await flush(); assert.equal(run.calls.length, beforeResync + 2);

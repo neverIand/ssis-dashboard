@@ -57,7 +57,7 @@ test('event DTO preserves precise IDs/time, literal NULL/empty text, unknown cod
 test('disabled events never request data, including restored or programmatic opening, filtering and refresh', async t => {
   const run = setup(t, async resource => detailResponse(resource.split('/')[1]), { metadata: eventMetadata(false),
     restoreEvents: { open: true, query, path: { entries: [null], index: 0 } } });
-  await run.owner.load(); await run.owner.toggleEvents(); await run.owner.applyEvents({ kind: 'errors' });
+  await run.owner.load(); await run.owner.section('events').select(); await run.owner.section('events').applyEvents({ kind: 'errors' });
   await run.owner.refresh(); assert.equal(run.calls.length, 2); assert.equal(run.state.events.open, false);
   assert.equal(run.state.events.page, null);
 });
@@ -66,23 +66,23 @@ test('events load lazily and keep their independent query, page path and fence d
   const run = setup(t, async (resource, { params }) => resource.endsWith('/events')
     ? eventPage([eventRow(params.cursor ? '2' : '1')], { ...params, has_more: !params.cursor, next_cursor: params.cursor ? null : 'event-next' }) : response(resource));
   await run.owner.load(); assert.equal(run.calls.length, 1);
-  await run.owner.toggleExecutables(); await run.owner.toggleChildren(); await run.owner.toggleEvents();
-  await run.owner.nextEvents(); assert.equal(run.state.events.pageNumber, 2);
+  await run.owner.section('executables').select(); await run.owner.section('children').select(); await run.owner.section('events').select();
+  await run.owner.section('events').next(); assert.equal(run.state.events.pageNumber, 2);
   await run.owner.refresh(); assert.deepEqual(run.calls.slice(-4).map(call => call.resource),
     ['executions/17', 'executions/17/executables', 'executions/17/children', 'executions/17/events']);
   assert.equal(run.calls.at(-1).params.cursor, 'event-next');
-  await run.owner.applyEvents({ kind: 'warnings', q: '  %_ +  ' });
+  await run.owner.section('events').applyEvents({ kind: 'warnings', q: '  %_ +  ' });
   assert.equal(run.state.events.pageNumber, 1); assert.equal(run.calls.at(-1).params.q, '  %_ +  ');
   assert.equal(run.calls.at(-1).params.cursor, undefined); assert.equal(run.state.executables.pageNumber, 1);
-  await run.owner.toggleEvents(); await run.owner.refresh(); assert.equal(run.calls.at(-1).resource, 'executions/17/children');
+  await run.owner.section('events').select(); await run.owner.refresh(); assert.equal(run.calls.at(-1).resource, 'executions/17/children');
 });
 
 test('applying a new search aborts obsolete event work and rejects late denial and stale old-query data', async t => {
   const pending = deferred(); let count = 0;
   const run = setup(t, resource => !resource.endsWith('/events') ? Promise.resolve(response(resource))
     : ++count === 1 ? pending.promise : Promise.resolve(eventPage([eventRow('2', { message: 'new search' })])));
-  await run.owner.load(); const old = run.owner.toggleEvents(); const signal = run.calls.at(-1).signal;
-  await run.owner.applyEvents({ q: 'new search', kind: 'errors' });
+  await run.owner.load(); const old = run.owner.section('events').select(); const signal = run.calls.at(-1).signal;
+  await run.owner.section('events').applyEvents({ q: 'new search', kind: 'errors' });
   assert.equal(signal.aborted, true); const page = run.state.events.page;
   pending.reject(new ApiError('http', { status: 404 })); await old;
   assert.equal(run.state.events.page, page); assert.notEqual(run.state.response, null);
@@ -92,9 +92,9 @@ test('applying a new search aborts obsolete event work and rejects late denial a
 test('a same-query Apply queues behind unrelated section work; multiple drafts coalesce to the last query', async t => {
   let slow = false; const pending = deferred();
   const run = setup(t, resource => resource.endsWith('/executables') && slow ? pending.promise : Promise.resolve(response(resource)));
-  await run.owner.load(); await run.owner.toggleEvents(); slow = true;
-  const other = run.owner.toggleExecutables(); await run.owner.applyEvents({ q: null });
-  await run.owner.applyEvents({ q: 'first' }); await run.owner.applyEvents({ q: 'last' });
+  await run.owner.load(); await run.owner.section('events').select(); slow = true;
+  const other = run.owner.section('executables').select(); await run.owner.section('events').applyEvents({ q: null });
+  await run.owner.section('events').applyEvents({ q: 'first' }); await run.owner.section('events').applyEvents({ q: 'last' });
   const count = run.calls.length; pending.resolve(executablePage()); await other;
   assert.equal(run.calls.length, count + 1); assert.equal(run.calls.at(-1).params.q, 'last');
   assert.equal(run.state.events.phase, 'ready');
@@ -104,11 +104,11 @@ test('search supersession preserves another queued section and a failed new sele
   const pending = deferred(); let slow = false, fail = false;
   const run = setup(t, resource => resource.endsWith('/events') && fail ? Promise.reject(new ApiError('http', { status: 503 }))
     : resource.endsWith('/events') && slow ? pending.promise : Promise.resolve(response(resource)));
-  await run.owner.load(); await run.owner.toggleEvents(); slow = true;
-  const old = run.owner.retryEvents(); await run.owner.toggleChildren(); slow = false;
-  await run.owner.applyEvents({ q: 'current' }); assert.equal(run.state.children.phase, 'ready');
+  await run.owner.load(); await run.owner.section('events').select(); slow = true;
+  const old = run.owner.section('events').retry(); await run.owner.section('children').select(); slow = false;
+  await run.owner.section('events').applyEvents({ q: 'current' }); assert.equal(run.state.children.phase, 'ready');
   pending.resolve(eventPage([eventRow('2')])); await old;
-  fail = true; await run.owner.applyEvents({ q: 'unavailable' });
+  fail = true; await run.owner.section('events').applyEvents({ q: 'unavailable' });
   assert.equal(run.state.events.page, null); assert.equal(run.state.events.stale, false);
   assert.equal(run.state.children.page.data.length, 1);
 });
@@ -120,14 +120,14 @@ test('event errors remain scoped, expiry resets once, and a section 404 clears a
     if (failure) throw failure;
     return eventPage([eventRow(params.cursor ? '2' : '1')], { ...params, has_more: !params.cursor, next_cursor: params.cursor ? null : 'event-next' });
   });
-  await run.owner.load(); await run.owner.toggleExecutables(); await run.owner.toggleEvents(); await run.owner.nextEvents();
+  await run.owner.load(); await run.owner.section('executables').select(); await run.owner.section('events').select(); await run.owner.section('events').next();
   const previous = run.state.events.page;
-  failure = new ApiError('http', { status: 503 }); await run.owner.retryEvents(); assert.equal(run.state.events.page, previous);
+  failure = new ApiError('http', { status: 503 }); await run.owner.section('events').retry(); assert.equal(run.state.events.page, previous);
   failure = new ApiError('http', { status: 400, code: 'cursor_expired' }); const count = run.calls.length;
-  await run.owner.retryEvents(); assert.equal(run.calls.length, count + 2); assert.equal(run.state.events.page, null);
+  await run.owner.section('events').retry(); assert.equal(run.calls.length, count + 2); assert.equal(run.state.events.page, null);
   assert.match(run.state.events.notice, /Reset to page one/);
-  failure = new ApiError('http', { status: 403 }); await run.owner.retryEvents(); assert.notEqual(run.state.executables.page, null);
-  failure = new ApiError('http', { status: 404 }); await run.owner.retryEvents();
+  failure = new ApiError('http', { status: 403 }); await run.owner.section('events').retry(); assert.notEqual(run.state.executables.page, null);
+  failure = new ApiError('http', { status: 404 }); await run.owner.section('events').retry();
   assert.equal(run.state.response, null); assert.equal(run.state.executables.page, null);
 });
 
@@ -137,8 +137,8 @@ test('one completion-based scheduler waits for event work and coalesces manual a
   const run = setup(t, resource => resource === 'executions/17' ? runningDetailResponse('17')
     : resource.endsWith('/events') && ++count === 2 ? pending.promise : Promise.resolve(response(resource)),
     { autoRefresh: true, pollIntervalMs: 1000 });
-  await run.owner.load(); await run.owner.toggleEvents(); t.mock.timers.tick(1000); await flush();
-  const requests = run.calls.length; run.owner.refresh(); run.owner.nextEvents(); run.owner.setVisible(false); run.owner.setVisible(true);
+  await run.owner.load(); await run.owner.section('events').select(); t.mock.timers.tick(1000); await flush();
+  const requests = run.calls.length; run.owner.refresh(); run.owner.section('events').next(); run.owner.setVisible(false); run.owner.setVisible(true);
   t.mock.timers.tick(1000); await flush(); assert.equal(run.calls.length, requests);
   pending.resolve(eventPage()); await flush(); t.mock.timers.tick(0); await flush(); assert.equal(run.calls.length, requests + 2);
 });
@@ -148,12 +148,12 @@ test('event generations and deadlines guard query switches, A to B to A, close a
   const run = setup(t, (resource, { signal }) => slow && resource.endsWith('/events')
     ? new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(new ApiError('network'))))
     : Promise.resolve(resource.endsWith('/events') ? eventPage([eventRow('1', { execution_id: resource.split('/')[1] })]) : response(resource)), { timeoutMs: 20 });
-  await run.owner.load(); await run.owner.toggleEvents(); slow = true; const old = run.owner.retryEvents();
+  await run.owner.load(); await run.owner.section('events').select(); slow = true; const old = run.owner.section('events').retry();
   t.mock.timers.tick(20); await old; assert.equal(run.state.events.error.kind, 'timeout');
   slow = false; await run.owner.select('18'); await run.owner.select('17'); assert.equal(run.state.events.page.data[0].execution_id, '17');
-  slow = true; const closing = run.owner.retryEvents(); const signal = run.calls.at(-1).signal;
-  await run.owner.toggleEvents(); assert.equal(signal.aborted, true); await closing; assert.equal(run.state.events.page, null);
-  const opening = run.owner.toggleEvents(); const last = run.calls.at(-1).signal; run.owner.dispose(); await opening;
+  slow = true; const closing = run.owner.section('events').retry(); const signal = run.calls.at(-1).signal;
+  await run.owner.section('events').select(); assert.equal(signal.aborted, true); await closing; assert.equal(run.state.events.page, null);
+  const opening = run.owner.section('events').select(); const last = run.calls.at(-1).signal; run.owner.dispose(); await opening;
   assert.equal(last.aborted, true);
 });
 

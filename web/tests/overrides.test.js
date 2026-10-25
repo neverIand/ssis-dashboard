@@ -78,13 +78,13 @@ test('wrong section, path, identity, redaction or policy fails closed without st
 test('values capability blocks both value sections while override display policy permits redacted metadata', async t => {
   const restore = { open: true, query, path: { entries: [null, 'old-policy'], index: 1 } };
   const blocked = setup(t, undefined, { metadata: overrideMetadata(false), restoreOverrides: restore });
-  await blocked.owner.load(); await blocked.owner.toggleOverrides(); await blocked.owner.toggleParameters();
-  await blocked.owner.orderOverrides({ limit: 8 }); await blocked.owner.nextOverrides(); await blocked.owner.previousOverrides();
-  await blocked.owner.retryOverrides(); await blocked.owner.latestOverrides(); await blocked.owner.refresh();
+  await blocked.owner.load(); await blocked.owner.section('overrides').select(); await blocked.owner.section('parameters').select();
+  await blocked.owner.section('overrides').order({ limit: 8 }); await blocked.owner.section('overrides').next(); await blocked.owner.section('overrides').previous();
+  await blocked.owner.section('overrides').retry(); await blocked.owner.section('overrides').latest(); await blocked.owner.refresh();
   assert.equal(blocked.calls.length, 2); assert.equal(blocked.state.overrides.open, false);
   const allowed = setup(t, async (resource, options) => resource.endsWith('/values') ? overridePage([overrideRow('1',
     { redacted: true, redaction_reason: 'policy', value: null })]) : response(resource, options), { metadata: overrideMetadata(true, false) });
-  await allowed.owner.load(); await allowed.owner.toggleOverrides();
+  await allowed.owner.load(); await allowed.owner.section('overrides').select();
   assert.equal(allowed.state.overrides.page.data[0].redaction_reason, 'policy');
   assert.deepEqual(allowed.calls.at(-1).params, query);
 });
@@ -99,16 +99,16 @@ test('parameters and overrides page independently within one six-read serial ref
     const page = params.section === 'overrides' ? overridePage : parameterPage, row = params.section === 'overrides' ? overrideRow : parameterRow;
     return page([row(params.cursor ? '2' : '1')], { limit: params.limit, has_more: !params.cursor, next_cursor: params.cursor ? null : `${params.section}-next` });
   }, { metadata: all });
-  await run.owner.load(); await run.owner.toggleExecutables(); await run.owner.toggleChildren(); await run.owner.toggleEvents();
-  await run.owner.toggleParameters(); await run.owner.toggleOverrides(); await run.owner.nextOverrides();
+  await run.owner.load(); await run.owner.section('executables').select(); await run.owner.section('children').select(); await run.owner.section('events').select();
+  await run.owner.section('parameters').select(); await run.owner.section('overrides').select(); await run.owner.section('overrides').next();
   assert.equal(run.state.overrides.pageNumber, 2); assert.equal(run.state.parameters.pageNumber, 1);
-  await run.owner.nextParameters(); const start = run.calls.length; await run.owner.refresh();
+  await run.owner.section('parameters').next(); const start = run.calls.length; await run.owner.refresh();
   assert.deepEqual(run.calls.slice(start).map(call => call.params?.section ?? call.resource.split('/').at(-1)),
     ['17','executables','children','events','parameters','overrides']);
   assert.deepEqual(run.calls.at(-1).params, { ...query, cursor: 'overrides-next' }); assert.equal(peak, 1);
-  await run.owner.orderOverrides({ limit: 8 }); assert.deepEqual(run.calls.at(-1).params, { section: 'overrides', limit: 8 });
-  assert.equal(run.state.parameters.pageNumber, 2); await run.owner.nextOverrides(); await run.owner.previousOverrides();
-  await run.owner.latestOverrides(); assert.equal(run.state.overrides.pageNumber, 1);
+  await run.owner.section('overrides').order({ limit: 8 }); assert.deepEqual(run.calls.at(-1).params, { section: 'overrides', limit: 8 });
+  assert.equal(run.state.parameters.pageNumber, 2); await run.owner.section('overrides').next(); await run.owner.section('overrides').previous();
+  await run.owner.section('overrides').latest(); assert.equal(run.state.overrides.pageNumber, 1);
 });
 
 test('invalid policy cursors reset once to redacted metadata and cannot retain values after failed fallback', async t => {
@@ -121,7 +121,7 @@ test('invalid policy cursors reset once to redacted metadata and cannot retain v
       return overridePage([overrideRow(options.params.cursor ? '2' : '1', changed ? { redacted: true, redaction_reason: 'policy', value: null } : {})],
         { has_more: !changed && !options.params.cursor, next_cursor: !changed && !options.params.cursor ? 'old-policy' : null });
     });
-    await run.owner.load(); await run.owner.toggleOverrides(); await run.owner.nextOverrides();
+    await run.owner.load(); await run.owner.section('overrides').select(); await run.owner.section('overrides').next();
     changed = true; const start = run.calls.length; await run.owner.refresh();
     assert.equal(run.calls.length - start, 3); assert.equal(run.state.overrides.pageNumber, 1);
     assert.equal(run.state.overrides.page?.data[0].redaction_reason ?? null, fail ? null : 'policy');
@@ -137,10 +137,10 @@ test('override failures isolate siblings, correlate errors and clear the whole d
     const run = setup(t, async (resource, options) => {
       if (failed && options.params?.section === 'overrides') throw failure; return response(resource, options);
     });
-    await run.owner.load(); await run.owner.toggleParameters(); await run.owner.toggleOverrides(); failed = true; await run.owner.refresh();
+    await run.owner.load(); await run.owner.section('parameters').select(); await run.owner.section('overrides').select(); failed = true; await run.owner.refresh();
     assert.equal(run.state.overrides.page !== null, failure.status === 503);
     assert.equal(run.state.parameters.page !== null, failure.status !== 404); assert.equal(run.state.response === null, failure.status === 404);
-    if (failure.status === 503) { failed = false; await run.owner.retryOverrides(); assert.equal(run.state.overrides.error, null); }
+    if (failure.status === 503) { failed = false; await run.owner.section('overrides').retry(); assert.equal(run.state.overrides.error, null); }
   }
 });
 
@@ -148,10 +148,10 @@ test('event-search replacement preserves queued overrides and closing their requ
   const old = deferred(), value = deferred(), all = overrideMetadata(); all.capabilities.events = true;
   const run = setup(t, (resource, options) => resource.endsWith('/events') && options.params.q === 'old' ? old.promise
     : options.params?.section === 'overrides' ? value.promise : Promise.resolve(response(resource, options)), { metadata: all });
-  await run.owner.load(); await run.owner.toggleEvents(); const searching = run.owner.applyEvents({ q: 'old' });
-  await run.owner.toggleOverrides(); const replacing = run.owner.applyEvents({ q: 'new' }); await flush();
-  assert.equal(run.calls.at(-1).params.section, 'overrides'); await run.owner.toggleParameters(); await run.owner.toggleChildren();
-  await run.owner.toggleOverrides(); await flush();
+  await run.owner.load(); await run.owner.section('events').select(); const searching = run.owner.section('events').applyEvents({ q: 'old' });
+  await run.owner.section('overrides').select(); const replacing = run.owner.section('events').applyEvents({ q: 'new' }); await flush();
+  assert.equal(run.calls.at(-1).params.section, 'overrides'); await run.owner.section('parameters').select(); await run.owner.section('children').select();
+  await run.owner.section('overrides').select(); await flush();
   value.reject(new ApiError('http', { status: 404 })); old.reject(new ApiError('http', { status: 403 })); await Promise.all([searching,replacing]);
   assert.equal(run.state.overrides.open, false); assert.ok(run.state.parameters.page); assert.ok(run.state.children.page);
   assert.equal(run.state.phase, 'ready');
@@ -163,16 +163,16 @@ test('override deadline, A-to-B-to-A generations and disposal suppress late valu
     if (options.params?.section !== 'overrides') return Promise.resolve(response(resource, options));
     const wait = deferred(); pending.push({ ...wait, signal: options.signal }); return wait.promise;
   }, { timeoutMs: 20, autoRefresh: true, pollIntervalMs: 100 });
-  await run.owner.load(); const first = run.owner.toggleOverrides(); await flush();
+  await run.owner.load(); const first = run.owner.section('overrides').select(); await flush();
   const b = run.owner.select('18'); await flush(); const a = run.owner.select('17'); await flush();
   pending[0].reject(new ApiError('http', { status: 404 })); pending[1].resolve(overridePage([overrideRow('2')])); pending[2].resolve(overridePage([overrideRow('3')]));
   await Promise.all([first,b,a]); assert.equal(run.state.overrides.page.data[0].property_id, '3');
   const late = run.owner.refresh(); await flush(); const count = run.calls.length; t.mock.timers.tick(1000); await run.owner.refresh();
   assert.equal(run.calls.length, count); assert.equal(pending[3].signal.aborted, true);
   pending[3].reject(new Error('aborted')); await late; assert.equal(run.state.overrides.error.kind, 'timeout');
-  const disposed = run.owner.retryOverrides(); await flush(); const published = run.state;
+  const disposed = run.owner.section('overrides').retry(); await flush(); const published = run.state;
   run.owner.dispose(); pending[4].resolve(overridePage()); await disposed; assert.equal(run.state, published);
-  assert.equal(run.owner.checkpointOverrides().open, false);
+  assert.equal(run.owner.section('overrides').checkpoint().open, false);
 });
 
 test('override UI shows only property, value and sensitivity with exact path expansion and distinct value states', async t => {
