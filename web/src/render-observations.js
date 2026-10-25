@@ -1,5 +1,6 @@
 import { createDisplay, formatCode, formatId } from './display.js';
 import { mountTableOrder } from './table-order.js';
+import { reserveLoadingSpace } from './loading-space.js';
 
 export function mountObservationTable(root, { metadata, actions, restoreView = null, resource = 'executables' }) {
   const child = resource === 'children', singular = child ? 'package call' : 'executable';
@@ -12,6 +13,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
   const retry = get('retry'), sort = get('sort'), direction = get('direction'), limit = get('limit');
   const previous = get('previous'), next = get('next'), latest = get('latest');
   const region = get('scroll'), table = get('table'), body = table.querySelector('tbody');
+  const reserveSpace = reserveLoadingSpace(region);
   const display = createDisplay({ timeZone: metadata.display_timezone });
   const rows = new Map(), controls = { toggle, retry, sort, direction, limit, previous, next, latest, region };
   const order = mountTableOrder(root, { resource, metadata, onOrder: actions.order, sorts: [
@@ -147,6 +149,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
       order.render(state.query, busy, panel.hidden);
       notice.textContent = state.notice;
       const page = panel.hidden ? null : state.page;
+      reserveSpace(!panel.hidden && state.phase === 'loading' && page === null, rendered !== null);
       if (page !== rendered || page === null || executionStart !== renderedStart) {
         if (page) paint(page, state.pageNumber, executionStart);
         else empty(state.phase === 'loading' ? `Loading ${singular} observations…` : 'No observations loaded.');
@@ -182,6 +185,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
         focus: Object.keys(controls).find(key => controls[key] === document.activeElement) ?? null };
     },
     dispose() {
+      reserveSpace(false);
       order.dispose();
       for (const [node, event, action] of listeners) node.removeEventListener(event, action);
       rows.clear(); body.replaceChildren(); status.textContent = notice.textContent = status.title = '';

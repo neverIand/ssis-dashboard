@@ -22,7 +22,7 @@
             </div>
         </div>
         <p class="resource-status" data-overview-return-notice hidden></p>
-        <div class="detail-state">
+        <div class="detail-state resource-feedback" tabindex="0" aria-label="Execution status">
             <p class="resource-status" data-detail-status role="status">Waiting for settings.</p>
             <p class="resource-status" data-detail-request-id hidden></p>
             <button type="button" data-detail-retry hidden>Retry execution</button>
@@ -86,9 +86,11 @@
                         <label>Direction <select data-executables-direction><option value="asc">Ascending</option><option value="desc">Descending</option></select></label>
                     </div>
                     </details>
-                    <p class="resource-status" data-executables-notice role="status"></p>
-                    <p class="resource-status" data-executables-status role="status"></p>
-                    <button type="button" data-executables-retry hidden>Retry executable observations</button>
+                    <div class="resource-feedback" tabindex="0" aria-label="Section status">
+                        <p class="resource-status" data-executables-notice role="status"></p>
+                        <p class="resource-status" data-executables-status role="status"></p>
+                        <button type="button" data-executables-retry hidden>Retry executable observations</button>
+                    </div>
                     <div class="table-scroll" data-executables-scroll role="region" aria-label="Executable observations table" tabindex="0">
                         <table class="detail-table" data-executables-table>
                             <caption>Observed executable invocations</caption>
@@ -118,9 +120,11 @@
                         <label>Direction <select data-children-direction><option value="asc">Ascending</option><option value="desc">Descending</option></select></label>
                     </div>
                     </details>
-                    <p class="resource-status" data-children-notice role="status"></p>
-                    <p class="resource-status" data-children-status role="status"></p>
-                    <button type="button" data-children-retry hidden>Retry package calls</button>
+                    <div class="resource-feedback" tabindex="0" aria-label="Section status">
+                        <p class="resource-status" data-children-notice role="status"></p>
+                        <p class="resource-status" data-children-status role="status"></p>
+                        <button type="button" data-children-retry hidden>Retry package calls</button>
+                    </div>
                     <div class="table-scroll" data-children-scroll role="region" aria-label="Package calls table" tabindex="0">
                         <table class="detail-table" data-children-table>
                             <caption>Recorded package calls</caption>
@@ -148,21 +152,23 @@
                         <button type="submit" data-events-apply>Search</button>
                         <button type="button" data-events-reset>Reset filters</button>
                     </form>
-                    <p class="cell-detail" id="event-search-hint">Enter to search.</p>
-                    <p class="resource-status" data-events-scope></p>
-                    <p class="cell-detail" data-events-order-label></p>
-                    <details class="table-sort-options"><summary>More sort options</summary>
-                    <div class="table-controls" aria-label="Event order">
-                        <label>Sort <select data-events-sort><option value="message_time">Message time</option><option value="event_id">Event ID</option></select></label>
-                        <label>Direction <select data-events-direction><option value="asc">Ascending</option><option value="desc">Descending</option></select></label>
+                    <p class="visually-hidden" id="event-search-hint">Enter to search.</p>
+                    <div class="events-meta">
+                        <p class="resource-status" tabindex="0" aria-label="Applied event filters and order"><span data-events-scope></span><span data-events-order-label></span></p>
+                        <details class="table-sort-options"><summary>More sort options</summary>
+                            <div class="table-controls" aria-label="Event order">
+                                <label>Sort <select data-events-sort><option value="message_time">Message time</option><option value="event_id">Event ID</option></select></label>
+                                <label>Direction <select data-events-direction><option value="asc">Ascending</option><option value="desc">Descending</option></select></label>
+                            </div>
+                        </details>
                     </div>
-                    </details>
-                    <p class="resource-status" data-events-notice role="status"></p>
-                    <p class="resource-status" data-events-status role="status"></p>
-                    <button type="button" data-events-retry hidden>Retry events</button>
+                    <div class="resource-feedback" tabindex="0" aria-label="Section status">
+                        <p class="resource-status" data-events-notice role="status"></p>
+                        <p class="resource-status" data-events-status role="status"></p>
+                        <button type="button" data-events-retry hidden>Retry events</button>
+                    </div>
                     <div class="table-scroll" data-events-scroll role="region" aria-label="Events table" tabindex="0">
                         <table class="detail-table" data-events-table>
-                            <caption>Recorded events</caption>
                             <colgroup><col><col><col></colgroup>
                             <thead><tr><th scope="col" aria-sort="none"><button type="button" data-events-header-message_time>Time</button></th><th scope="col">Event / source</th><th scope="col">Message</th></tr></thead>
                             <tbody><tr><td colspan="3">Open this section to load events.</td></tr></tbody>
@@ -184,9 +190,11 @@
                     <div class="table-controls" aria-label="Parameter order">
                         <span class="cell-detail">Fixed order: Parameter ID, ascending</span>
                     </div>
-                    <p class="resource-status" data-parameters-notice role="status"></p>
-                    <p class="resource-status" data-parameters-status role="status"></p>
-                    <button type="button" data-parameters-retry hidden>Retry parameters</button>
+                    <div class="resource-feedback" tabindex="0" aria-label="Section status">
+                        <p class="resource-status" data-parameters-notice role="status"></p>
+                        <p class="resource-status" data-parameters-status role="status"></p>
+                        <button type="button" data-parameters-retry hidden>Retry parameters</button>
+                    </div>
                     <div class="table-scroll" data-parameters-scroll role="region" aria-label="Parameters table" tabindex="0">
                         <table class="detail-table" data-parameters-table>
                             <caption>Execution parameters</caption>
@@ -212,9 +220,11 @@
                     <div class="table-controls" aria-label="Override order">
                         <span class="cell-detail">Fixed order: Property ID, ascending</span>
                     </div>
-                    <p class="resource-status" data-overrides-notice role="status"></p>
-                    <p class="resource-status" data-overrides-status role="status"></p>
-                    <button type="button" data-overrides-retry hidden>Retry overrides</button>
+                    <div class="resource-feedback" tabindex="0" aria-label="Section status">
+                        <p class="resource-status" data-overrides-notice role="status"></p>
+                        <p class="resource-status" data-overrides-status role="status"></p>
+                        <button type="button" data-overrides-retry hidden>Retry overrides</button>
+                    </div>
                     <div class="table-scroll" data-overrides-scroll role="region" aria-label="Overrides table" tabindex="0">
                         <table class="detail-table" data-overrides-table>
                             <caption>Execution property overrides</caption>
@@ -252,9 +262,11 @@
                     </details>
                     <p class="detail-note">Estimates are not actual timings.</p>
                     <details class="detail-note"><summary>How estimates work</summary><p>Mean of up to five prior visible successful runs. Unavailable without a start or usable samples, for a zero mean, or when the estimated end is out of range. Visibility and retention can change estimates.</p></details>
-                    <p class="resource-status" data-history-notice role="status"></p>
-                    <p class="resource-status" data-history-status role="status"></p>
-                    <button type="button" data-history-retry hidden>Retry history</button>
+                    <div class="resource-feedback" tabindex="0" aria-label="Section status">
+                        <p class="resource-status" data-history-notice role="status"></p>
+                        <p class="resource-status" data-history-status role="status"></p>
+                        <button type="button" data-history-retry hidden>Retry history</button>
+                    </div>
                     <section class="history-duration-chart" aria-labelledby="history-duration-heading">
                         <div class="section-heading"><h3 id="history-duration-heading">Duration comparison</h3><button type="button" data-history-chart-toggle disabled aria-expanded="false" aria-controls="history-duration-chart">Show duration chart</button></div>
                         <div id="history-duration-chart" data-history-chart-panel hidden>
@@ -269,7 +281,7 @@
                                 <div class="chart-x-axis" data-history-chart-x-axis aria-label="Creation dates and execution IDs"></div>
                             </div>
                             <p class="chart-axis-caption">Created time →</p>
-                            <p class="resource-status" data-history-chart-empty hidden></p>
+                            <div class="chart-message"><p class="resource-status" data-history-chart-empty role="status" hidden></p></div>
                             <p class="resource-status chart-selection" data-history-chart-selected role="status" tabindex="0" aria-label="Selected execution values"></p>
                         </div>
                     </section>

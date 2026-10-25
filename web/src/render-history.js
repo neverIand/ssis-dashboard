@@ -3,6 +3,7 @@ import { executionHref } from './detail-navigation.js';
 import { mountHistoryChart } from './render-history-chart.js';
 import { mountTableOrder } from './table-order.js';
 import { allHistoryStatuses } from './history.js';
+import { reserveLoadingSpace } from './loading-space.js';
 
 export function mountHistory(root, { metadata, actions, navigation, executionId, restoreView = null }) {
   const document = root.ownerDocument, get = key => root.querySelector(`[data-history-${key}]`);
@@ -11,6 +12,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
   const panel = get('panel'), status = get('status'), notice = get('notice'), scope = get('scope'), form = get('filters');
   const presets = new Map(), statusOptions = get('status-options');
   const table = get('table'), body = table.querySelector('tbody'), rows = new Map(), listeners = [], choices = new Map();
+  const reserveSpace = reserveLoadingSpace(scroll);
   const display = createDisplay({ timeZone: metadata.display_timezone });
   const chart=mountHistoryChart(root,{metadata,restoreView:restoreView?.chart});
   const order = mountTableOrder(root, { resource: 'history', metadata, onOrder: actions.order,
@@ -121,6 +123,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
       scope.textContent = identity ? `All creation dates · ${state.query.status === allHistoryStatuses(metadata) ? 'All statuses' : state.query.status.split(',').map(code=>formatCode(metadata.execution_statuses.find(item=>String(item.code)===code) ?? {code:Number(code),name:'unknown'})).join(', ')}` : '';
       notice.textContent = state.notice;
       const page = panel.hidden ? null : state.page;
+      reserveSpace(!panel.hidden && state.phase === 'loading' && page === null, rendered !== null);
       chart.render({page,pageNumber:state.pageNumber,busy:isBusy,visible:!panel.hidden,stale:state.stale});
       if (page !== rendered || page === null) {
         if (page) paint(page,state.pageNumber); else empty(state.phase === 'loading' ? 'Loading package history…' : 'No history loaded.');
@@ -144,6 +147,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
       executionFocus:[...rows].find(([,row])=>row.link===document.activeElement)?.[0] ?? null,
       focus:Object.keys(controls).find(key=>controls[key]===document.activeElement) ?? null}; },
     dispose() {
+      reserveSpace(false);
       order.dispose();
       chart.dispose();
       for (const [node,event,handler] of listeners) node.removeEventListener(event,handler);

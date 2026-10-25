@@ -1,6 +1,7 @@
 import { createDisplay, formatCode } from './display.js';
 import { timelineSeries } from './timeline.js';
 import { chartAttribute as attribute, mountChartInteraction, renderChartAxes } from './chart-view.js';
+import { reserveLoadingSpace } from './loading-space.js';
 
 export function mountTimeline(root,{metadata,actions,restoreView=null}) {
   const document=root.ownerDocument, get=key=>root.querySelector(`[data-timeline-${key}]`);
@@ -12,6 +13,9 @@ export function mountTimeline(root,{metadata,actions,restoreView=null}) {
   const display=createDisplay({timeZone:metadata.display_timezone});
   const label=instant=>display.timestamp(instant);
   const initialFocus=document.activeElement,initialPosition={left:scroll.scrollLeft,top:scroll.scrollTop};
+  const reserveSpace=reserveLoadingSpace(panel);
+  const reserveTableSpace=reserveLoadingSpace(scroll);
+  let grainChanged=false;
   let current=null,rendered=null,busy=true,selected=typeof restoreView?.selected==='string'?restoreView.selected:null,returning=restoreView,order=[];
   const element=(tag,text)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;return node;};
   const text=(node,value)=>{if(node.textContent!==value)node.textContent=value;};
@@ -54,6 +58,8 @@ export function mountTimeline(root,{metadata,actions,restoreView=null}) {
     get('zero').hidden=maximum!==0;mark();
   }
   function paint(page){
+    if(grainChanged&&page.data.find(item=>item.start===selected)?.created_count===0)selected=null;
+    grainChanged=false;
     order=page.data.map(item=>item.start);
     const wanted=new Set();let rowAnchor=body.firstChild,optionAnchor=choice.firstChild,barAnchor=svg.firstChild;
     for(const item of page.data){
@@ -87,10 +93,14 @@ export function mountTimeline(root,{metadata,actions,restoreView=null}) {
   listen(choice,'change',()=>{selected=choice.value;mark();});
   return {
     render(state,isBusy,selection,page){
+      if(current&&state.bucket!==current.bucket)grainChanged=true;
       current=state;busy=isBusy;
+      reserveSpace(state.open&&selection!==null&&busy&&state.page===null,rendered!==null);
+      reserveTableSpace(state.open&&selection!==null&&busy&&state.page===null,rendered!==null);
       const focused=document.activeElement,panelFocused=panel.contains(focused),plotFocused=svg.contains(focused),position={left:scroll.scrollLeft,top:scroll.scrollTop};
       toggle.disabled=selection===null||page===null;toggle.textContent=`${state.open?'Hide':'Show'} timeline`;
-      toggle.setAttribute('aria-expanded',String(state.open&&page!==null));panel.hidden=!state.open||page===null;
+      panel.hidden=!state.open||selection===null||(!page&&!busy);
+      toggle.setAttribute('aria-expanded',String(!panel.hidden));
       bucket.value=state.bucket;bucket.disabled=retry.disabled=panel.hidden;
       bucket.setAttribute('aria-disabled',String(busy));retry.setAttribute('aria-disabled',String(busy));
       retry.hidden=state.error===null;svg.setAttribute('aria-busy',String(busy));
@@ -100,7 +110,7 @@ export function mountTimeline(root,{metadata,actions,restoreView=null}) {
       status.title=response?`Observed ${display.timestamp(response.meta.generated_at)} · ${response.meta.generated_at}`:'';
       status.textContent=panel.hidden?'':state.error?`${state.error.message}${state.error.requestId?` Request ID: ${state.error.requestId}`:''}${state.error.status===400?' Choose Day or adjust the creation range.':''}${state.stale?' Previous timeline shown.':''}`
         :state.stale?`${busy?'Refreshing… ':''}Previous timeline shown.`:response?`${display.count(response.data.length)} calendar ${response.data.length===1?'bucket':'buckets'}`:'Loading timeline…';
-      scope.title=panel.hidden?'':`Created ${display.timestamp(page.meta.from)} → ${display.timestamp(page.meta.to)} (exclusive)`;
+      scope.title=panel.hidden||!page?'':`Created ${display.timestamp(page.meta.from)} → ${display.timestamp(page.meta.to)} (exclusive)`;
       scope.textContent=panel.hidden?'':`Counts by creation time · ${selection.status.length?selection.status.map(code=>formatCode(metadata.execution_statuses.find(item=>item.code===code))).join(', '):'All statuses'} · All execution pages`;
       if(!panel.hidden&&plotFocused&&!focused.isConnected&&!choice.disabled)choice.focus({preventScroll:true});
       else if((panel.hidden&&panelFocused)||(focused===retry&&retry.hidden)||(response===null&&focused===choice)){
@@ -115,6 +125,6 @@ export function mountTimeline(root,{metadata,actions,restoreView=null}) {
     },
     checkpoint:()=>({selected,tableOpen:values.open,left:scroll.scrollLeft,top:scroll.scrollTop,
       focus:svg.contains(document.activeElement)?'plot':Object.keys(controls).find(key=>controls[key]===document.activeElement)??null}),
-    dispose(){disposeInteraction();for(const [node,event,handler] of listeners)node.removeEventListener(event,handler);clear();for(const node of Object.values(controls))node.disabled=true;panel.hidden=true;values.open=false;scope.textContent=status.textContent=scope.title=status.title='';current=rendered=returning=selected=null;},
+    dispose(){reserveSpace(false);reserveTableSpace(false);disposeInteraction();for(const [node,event,handler] of listeners)node.removeEventListener(event,handler);clear();for(const node of Object.values(controls))node.disabled=true;panel.hidden=true;values.open=false;scope.textContent=status.textContent=scope.title=status.title='';current=rendered=returning=selected=null;},
   };
 }

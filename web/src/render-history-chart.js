@@ -1,5 +1,6 @@
 import {createDisplay,formatCode} from './display.js';
 import {chartAttribute as attribute,durationTick,mountChartInteraction,renderChartAxes} from './chart-view.js';
+import {reserveLoadingSpace} from './loading-space.js';
 
 export function mountHistoryChart(root,{metadata,restoreView=null}) {
   const document=root.ownerDocument,get=key=>root.querySelector(`[data-history-chart-${key}]`);
@@ -7,6 +8,7 @@ export function mountHistoryChart(root,{metadata,restoreView=null}) {
   const xAxis=get('x-axis'),yAxis=get('y-axis');
   const display=createDisplay({timeZone:metadata.display_timezone}),rows=new Map(),controls={toggle,choice};
   const initialFocus=document.activeElement;
+  const reserveSpace=reserveLoadingSpace(panel);
   let open=restoreView?.open===true,selected=restoreView?.selected??null,returning=restoreView,current=null,rendered=null,order=[];
   const element=(tag)=>document.createElement(tag),shape=tag=>document.createElementNS('http://www.w3.org/2000/svg',tag);
   const duration=value=>value===null?'Unavailable':display.duration(value);
@@ -62,11 +64,12 @@ export function mountHistoryChart(root,{metadata,restoreView=null}) {
   }
   function render(context){
     current=context;const {page,pageNumber,busy,visible,stale}=context,focused=document.activeElement,plotFocused=svg.contains(focused),active=open&&visible;
+    reserveSpace(active&&busy&&!page,rendered!==null);
     if(!page&&!busy)selected=null;
     toggle.disabled=!visible;toggle.textContent=`${open?'Hide':'Show'} duration chart`;attribute(toggle,'aria-expanded',active);panel.hidden=!active;
     choice.disabled=!active||!page?.data.length;attribute(svg,'aria-busy',busy);
     if(!active||!page)clear();else if(page!==rendered){paint(page);rendered=page;}
-    scope.textContent=!active?'':page?`Loaded history page ${display.count(pageNumber)} only · ${display.count(page.data.length)} execution${page.data.length===1?'':'s'}${stale?' · Previous observation shown.':''}`:'No history page loaded.';
+    scope.textContent=!active?'':page?`Loaded history page ${display.count(pageNumber)} only · ${display.count(page.data.length)} execution${page.data.length===1?'':'s'}${stale?' · Previous observation shown.':''}`:busy?'Loading history page…':'No history page loaded.';
     if(visible&&((focused===choice&&choice.disabled)||(plotFocused&&!focused.isConnected))){
       if(!choice.disabled)choice.focus({preventScroll:true});else if(!toggle.disabled)toggle.focus({preventScroll:true});
     }
@@ -79,5 +82,5 @@ export function mountHistoryChart(root,{metadata,restoreView=null}) {
   const chosen=()=>{selected=choice.value;mark();};
   toggle.addEventListener('click',toggled);choice.addEventListener('change',chosen);
   return {render,checkpoint:()=>({open,selected,focus:svg.contains(document.activeElement)?'plot':Object.keys(controls).find(key=>controls[key]===document.activeElement)??null}),
-    dispose(){toggle.removeEventListener('click',toggled);choice.removeEventListener('change',chosen);disposeInteraction();clear();scope.textContent='';panel.hidden=toggle.disabled=choice.disabled=true;attribute(toggle,'aria-expanded',false);current=returning=selected=null;}};
+    dispose(){reserveSpace(false);toggle.removeEventListener('click',toggled);choice.removeEventListener('change',chosen);disposeInteraction();clear();scope.textContent='';panel.hidden=toggle.disabled=choice.disabled=true;attribute(toggle,'aria-expanded',false);current=returning=selected=null;}};
 }

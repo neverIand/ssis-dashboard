@@ -90,7 +90,7 @@
                         <div class="popover-actions"><button type="button" data-close-filter>Cancel</button><button type="button" class="button-primary" data-use-range>Use range</button></div>
                     </div>
                 </fieldset>
-                <p class="resource-status filter-notice" data-filter-notice role="status"></p>
+                <p class="resource-status filter-notice status-slot" data-filter-notice role="status"></p>
                 <button type="button" data-recover-filters hidden>Reset invalid filters</button>
             </form>
         </section>
@@ -99,10 +99,13 @@
             <div class="section-heading">
                 <h2 id="summary-heading">Summary</h2>
                 <p>All statuses in the creation window</p>
+            </div>
+            <p class="cohort-window status-slot" data-cohort-window tabindex="0" aria-label="Creation window"></p>
+            <div class="resource-feedback" tabindex="0" aria-label="Summary status">
+                <p class="resource-status" data-summary-status role="status"></p>
+                <p class="resource-status" data-summary-other-note hidden></p>
                 <button type="button" data-summary-retry hidden>Retry summary</button>
             </div>
-            <p class="cohort-window" data-cohort-window hidden></p>
-            <p class="resource-status" data-summary-status role="status"></p>
             <div class="panel summary-grid">
                 {% for key, label in [('total', 'Total executions'), ('running', 'Running'), ('succeeded', 'Succeeded'), ('failed', 'Failed'), ('other', 'Other')] %}
                 <a class="summary-card" data-status-card="{{ key }}" data-selection-link aria-disabled="true"{% if key == 'other' %} hidden{% endif %}>
@@ -110,7 +113,6 @@
                 </a>
                 {% endfor %}
             </div>
-            <p class="resource-status" data-summary-other-note hidden></p>
         </section>
 
         <section class="panel timeline-panel" aria-labelledby="timeline-heading">
@@ -122,7 +124,7 @@
                     <label>Calendar interval<select data-timeline-bucket><option value="day">Day</option><option value="hour">Hour</option></select></label>
                     <label class="timeline-choice">Selected bucket<select data-timeline-choice></select></label>
                 </div>
-                <p class="resource-status" data-timeline-status role="status"></p><button type="button" data-timeline-retry hidden>Retry timeline</button>
+                <div class="resource-feedback" tabindex="0" aria-label="Timeline status"><p class="resource-status" data-timeline-status role="status"></p><button type="button" data-timeline-retry hidden>Retry timeline</button></div>
                 <p class="cell-detail" data-timeline-scale></p>
                 <p class="detail-note duration-legend"><span data-chart-status="7">Succeeded</span><span data-chart-status="4">Failed</span><span data-chart-status="other">Other</span></p>
                 <div class="chart-frame">
@@ -131,7 +133,7 @@
                     <div class="chart-x-axis" data-timeline-x-axis aria-label="Calendar bucket starts"></div>
                 </div>
                 <p class="chart-axis-caption">Created time → · Hover or focus for values; Left/Right or Home/End to move.</p>
-                <p class="resource-status" data-timeline-zero hidden>Every bucket has zero created executions.</p>
+                <div class="chart-message"><p class="resource-status" data-timeline-zero role="status" hidden>Every bucket has zero created executions.</p></div>
                 <p class="resource-status chart-selection" data-timeline-selected role="status" tabindex="0" aria-label="Selected bucket values"></p>
                 <details data-timeline-values><summary>Data table</summary>
                     <div class="table-scroll timeline-scroll" data-timeline-scroll role="region" aria-label="Timeline values" tabindex="0">
@@ -156,10 +158,12 @@
                             <label>Direction <select data-order="direction" disabled><option value="desc">Descending</option><option value="asc">Ascending</option></select></label>
                         </div>
                     </details>
-                    <p class="resource-status" data-order-notice role="status"></p>
-                    <p class="resource-status" data-page-notice role="status"></p>
+                    <div class="resource-feedback" tabindex="0" aria-label="Execution page notices">
+                        <p class="resource-status" data-order-notice role="status"></p>
+                        <p class="resource-status" data-page-notice role="status"></p>
+                    </div>
                 </div>
-                <div class="table-scroll" role="region" aria-labelledby="executions-heading" tabindex="0">
+                <div class="table-scroll" data-execution-scroll data-loading role="region" aria-labelledby="executions-heading" tabindex="0">
                     <table data-execution-table>
                         <caption class="visually-hidden">Executions in the selected creation window</caption>
                         <thead><tr>
@@ -177,7 +181,7 @@
                     </table>
                 </div>
                 <div class="table-footer">
-                    <p class="resource-status" data-executions-status role="status"></p>
+                    <p class="resource-status status-slot" data-executions-status role="status"></p>
                     <label class="page-size">Rows per page <select data-order="limit" disabled><option>50</option></select></label>
                     <nav class="execution-pages" aria-label="Execution pages">
                         <button type="button" data-executions-previous disabled>Previous</button>

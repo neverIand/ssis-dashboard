@@ -104,6 +104,8 @@ main {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.2667rem 0.8rem;
+  height: 4rem;
+  overflow: auto;
 }
 
 [data-display-timezone] { margin-left: auto; }
@@ -127,6 +129,35 @@ main {
 .cohort-window, .resource-status:not(:empty) { margin-bottom: 0.8rem; }
 
 .section-actions .refresh-status { margin: 0; }
+
+/* Feedback can change without adding a row above the current content. Long
+   messages remain readable and keyboard-scrollable inside the reserved slot. */
+.resource-feedback { height: 3.5rem; overflow: auto; margin-block: 0.4rem; }
+.resource-feedback > .resource-status,
+.table-toolbar .resource-feedback > .resource-status:not(:empty) { margin: 0; }
+.status-slot { height: 2.8rem; overflow: auto; }
+.status-slot, .status-slot:not(:empty) { margin-block: 0.4rem; }
+.cohort-window.status-slot { height: 2.8rem; }
+.page-heading > .section-actions {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto 2.8rem;
+  width: 21rem;
+  max-width: 100%;
+  flex: 0 0 21rem;
+}
+.page-heading > .section-actions > button { grid-row: 1; }
+.page-heading > .section-actions > .refresh-status {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  height: 2.8rem;
+  overflow: auto;
+}
+[data-execution-scroll][data-loading] { min-height: 48rem; }
+.events-meta { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.5rem; margin-top: 0.4rem; }
+.events-meta > p { height: 2.8rem; overflow: auto; margin: 0; }
+.events-meta .table-sort-options { margin: 0; }
+[data-events-scope]:not(:empty)::after { content: ' · '; }
 
 .cell-detail {
   display: block;
@@ -404,7 +435,7 @@ tbody tr:hover { background: var(--sd-subtle); }
 [data-events-table] tr[data-severity="warning"] .event-name { color: var(--sd-warning); font-weight: 600; }
 .detail-entry-label { color: var(--sd-secondary); font-size: 0.8667rem; margin-bottom: 0.2667rem; }
 .detail-context { display: flex; align-items: center; flex-wrap: wrap; gap: 0.8rem; margin-top: 0.5333rem; }
-.detail-state:has([data-detail-status]:empty) { display: none; }
+.detail-state { margin: 0; }
 .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.6rem; }
 .detail-panel { padding: 1.0667rem; }
 .detail-panel h2 { margin-bottom: 1.0667rem; }
@@ -500,7 +531,7 @@ tbody tr:hover { background: var(--sd-subtle); }
 .chart-frame svg { display: block; grid-column: 2; grid-row: 1; width: 100%; height: 11rem; border-bottom: 1px solid var(--sd-control-border); background: linear-gradient(to bottom, transparent calc(50% - 0.5px), var(--sd-border) 50%, transparent calc(50% + 0.5px)); }
 .chart-y-axis { grid-column: 1; grid-row: 1; position: relative; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
 .chart-y-axis span { position: absolute; right: 0; transform: translateY(-50%); max-width: 100%; overflow-wrap: anywhere; text-align: right; }
-.chart-x-axis { grid-column: 2; grid-row: 2; display: flex; justify-content: space-between; gap: 0.4rem; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.chart-x-axis { grid-column: 2; grid-row: 2; display: flex; justify-content: space-between; gap: 0.4rem; height: 3.6rem; overflow: auto; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
 .chart-x-axis span { flex: 1; min-width: 0; max-width: 33%; white-space: pre-line; overflow-wrap: anywhere; text-align: center; }
 .chart-x-axis span:first-child { text-align: left; }
 .chart-x-axis span:last-child { text-align: right; }
@@ -532,6 +563,10 @@ tbody tr:hover { background: var(--sd-subtle); }
 [data-history-chart-scope], [data-history-chart-selected], [data-history-chart-scale] { overflow-wrap: anywhere; }
 .timeline-panel { padding: 1rem; margin: 1.5rem 0; }
 .timeline-scope { white-space: pre-wrap; overflow-wrap: anywhere; }
+.timeline-scope, [data-history-chart-scope] { height: 2.8rem; overflow: auto; }
+[data-timeline-scale], [data-history-chart-scale] { height: 1.4rem; }
+.chart-message { height: 2.8rem; overflow: auto; margin-block: 0.4rem; }
+.chart-message > .resource-status { margin: 0; }
 .timeline-choice { width: 28rem; min-width: 0; max-width: 100%; }
 .timeline-choice select { width: 100%; }
 .timeline-scroll { max-height: 24rem; }

@@ -1,6 +1,7 @@
 import { createDisplay } from './display.js';
 import { eventQuery } from './events.js';
 import { mountTableOrder } from './table-order.js';
+import { reserveLoadingSpace } from './loading-space.js';
 
 export function mountEvents(root, { metadata, actions, restoreView = null }) {
   const document = root.ownerDocument, enabled = metadata.capabilities.events;
@@ -10,6 +11,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
   const { toggle, retry, previous, next, latest, kind, q, apply, reset, scroll } = controls;
   const panel = get('panel'), status = get('status'), notice = get('notice'), scope = get('scope');
   const table = get('table'), body = table.querySelector('tbody'), form = get('filters');
+  const reserveSpace = reserveLoadingSpace(scroll);
   const display = createDisplay({ timeZone: metadata.display_timezone }), rows = new Map(), listeners = [];
   const order = mountTableOrder(root, { resource: 'events', metadata, onOrder: actions.order, sorts: [
     { key: 'message_time', label: 'Time', header: true }, { key: 'event_id', label: 'Event ID' },
@@ -118,6 +120,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
         applied.q === null ? '' : `Search: ${JSON.stringify(applied.q)}`].filter(Boolean).join(' · ');
       notice.textContent = state.notice;
       const page = panel.hidden ? null : state.page;
+      reserveSpace(!panel.hidden && state.phase === 'loading' && page === null, rendered !== null);
       if (page !== rendered || page === null || executionStart !== renderedStart) {
         if (page) paint(page, state.pageNumber, executionStart); else empty(state.phase === 'loading' ? 'Loading events…' : 'No events loaded.');
         rendered = page;
@@ -158,6 +161,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
         focus: Object.keys(controls).find(key => controls[key] === document.activeElement) ?? null };
     },
     dispose() {
+      reserveSpace(false);
       order.dispose();
       for (const [node, event, handler] of listeners) node.removeEventListener(event, handler);
       rows.clear(); body.replaceChildren(); status.textContent = notice.textContent = scope.textContent = q.value = status.title = '';

@@ -1,5 +1,6 @@
 import { createDisplay, formatBoolean, formatCode, formatId } from './display.js';
 import { mountTableOrder } from './table-order.js';
+import { reserveLoadingSpace } from './loading-space.js';
 
 function mountValueTable(root, { metadata, actions, restoreView = null }, resource) {
   const parameter = resource === 'parameters', identity = parameter ? 'execution_parameter_id' : 'property_id';
@@ -10,6 +11,7 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
   const { toggle, retry, previous, next, latest, scroll } = controls;
   const panel = get('panel'), status = get('status'), notice = get('notice'), table = get('table');
   const body = table.querySelector('tbody'), rows = new Map(), listeners = [];
+  const reserveSpace = reserveLoadingSpace(scroll);
   const display = createDisplay({ timeZone: metadata.display_timezone });
   const order = mountTableOrder(root, { resource, metadata, onOrder: actions.order });
   const initialFocus = document.activeElement, initialScroll = { left: scroll.scrollLeft, top: scroll.scrollTop };
@@ -102,6 +104,7 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
       order.render(state.query, busy, panel.hidden);
       notice.textContent = state.notice;
       const page = panel.hidden ? null : state.page;
+      reserveSpace(!panel.hidden && state.phase === 'loading' && page === null, rendered !== null);
       if (page !== rendered || page === null) {
         if (page) paint(page, state.pageNumber); else empty(state.phase === 'loading' ? `Loading ${resource}…` : `No ${resource} loaded.`);
         rendered = page;
@@ -141,6 +144,7 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
         focus: Object.keys(controls).find(key => controls[key] === document.activeElement) ?? null };
     },
     dispose() {
+      reserveSpace(false);
       order.dispose();
       for (const [node, event, handler] of listeners) node.removeEventListener(event, handler);
       rows.clear(); body.replaceChildren(); status.textContent = notice.textContent = status.title = '';

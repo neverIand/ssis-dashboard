@@ -3,8 +3,10 @@ export class Node extends EventTarget {
   constructor(document, tag, text = '') {
     super();
     Object.assign(this, { ownerDocument: document, tag, text, children: [], parentElement: null,
-      dataset: {}, attributes: new Map(), scrollLeft: 0, scrollTop: 0, hidden: false, disabled: false });
+      dataset: {}, attributes: new Map(), style: {}, layoutHeight: 0,
+      scrollLeft: 0, scrollTop: 0, hidden: false, disabled: false });
   }
+  getBoundingClientRect() { return { height: this.layoutHeight }; }
   get textContent() { return this.text + this.children.map(node => node.textContent).join(''); }
   set textContent(value) { this.replaceChildren(); this.text = String(value); }
   get firstChild() { return this.children[0] ?? null; }

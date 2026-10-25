@@ -3,6 +3,7 @@ import { executionHref } from './detail-navigation.js';
 import { createOverview } from './overview.js';
 import { selectionParams, selectionSearch } from './selection.js';
 import { mountTimeline } from './render-timeline.js';
+import { reserveLoadingSpace } from './loading-space.js';
 
 export function mountOverview(root, { api, metadata, appBase, retainedPaths, restoreView = null,
   serverTime = null, onSelect = () => {} }) {
@@ -26,6 +27,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   const pollToggle = root.querySelector('[data-poll-toggle]');
   const pollStatus = root.querySelector('[data-poll-status]');
   const scroll = table.parentElement;
+  const reserveSpace = reserveLoadingSpace(scroll);
   const rows = new Map();
   const cards = Object.fromEntries(['total', 'running', 'succeeded', 'failed', 'other']
     .map((key) => [key, root.querySelector(`[data-count="${key}"]`)]));
@@ -179,6 +181,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   const owner = createOverview({ api, metadata, retainedPaths, serverTime, autoRefresh: !autoPaused, restoreTimeline:restoreView?.timeline,
     visible: document.visibilityState !== 'hidden', publish(state) {
     const page = state.page;
+    reserveSpace(state.phase === 'loading-list' && page === null, renderedPage !== null);
     const refreshing = state.operation === 'refresh' || state.operation === 'summary-retry';
     appliedSelection = state.selection;
     selectionKey = state.selection === null ? null : JSON.stringify({ ...selectionParams(state.selection), created: state.selection.created ?? null });
@@ -227,7 +230,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     summaryStatus.textContent = state.phase === 'summary-error' ? failure(state.error) + summaryDetails
       : state.summaryStale ? (state.busy ? 'Refreshing…' + summaryDetails : summaryDetails.trimStart())
       : state.phase === 'loading-summary' ? 'Loading summary…' : '';
-    bounds.hidden = page === null;
+    bounds.hidden = false;
     if (page) {
       bounds.replaceChildren(document.createTextNode('Created: '), time(page.meta.from),
         document.createTextNode(' → '), time(page.meta.to), document.createTextNode(' (exclusive)'));
@@ -304,6 +307,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     },
     dispose() {
       owner.dispose();
+      reserveSpace(false);
       timelineView.dispose();
       document.removeEventListener('visibilitychange', visibilityChanged);
       pollToggle.removeEventListener('click', togglePolling);
