@@ -70,7 +70,7 @@ export function overviewDOM() {
     createTextNode: text => new Node(document, '#text', text) });
   const root = new Node(document, 'root');
   const elements = new Map();
-  for (const key of [...['toggle','panel','bucket','series','choice','retry','scroll','status','scope','chart','values','selected','scale','zero','table'].map(key=>`timeline-${key}`), 'executions-status', 'summary-status', 'list-retry', 'summary-retry', 'cohort-window',
+  for (const key of [...['toggle','panel','bucket','choice','retry','scroll','status','scope','chart','values','selected','scale','zero','table','x-axis','y-axis'].map(key=>`timeline-${key}`), 'executions-status', 'summary-status', 'list-retry', 'summary-retry', 'cohort-window',
     'app-status', 'executions-previous', 'executions-next', 'executions-latest', 'page-notice', 'overview-refresh', 'summary',
     'poll-toggle', 'poll-status', 'summary-other-note']) {
     const node = new Node(document, key.includes('retry') || ['overview-refresh', 'poll-toggle',
@@ -97,7 +97,7 @@ export function overviewDOM() {
   timelineTable.querySelector=selector=>selector==='tbody'?timelineBody:null;
   elements.get('[data-timeline-scroll]').append(timelineTable);
   const timelinePanel=elements.get('[data-timeline-panel]');
-  timelinePanel.append(...['bucket','series','choice','retry','scroll','status','scope','chart','values','selected','scale','zero'].map(key=>elements.get(`[data-timeline-${key}]`)));
+  timelinePanel.append(...['bucket','choice','retry','scroll','status','scope','chart','values','selected','scale','zero','x-axis','y-axis'].map(key=>elements.get(`[data-timeline-${key}]`)));
   root.querySelector = selector => elements.get(selector) ?? null;
   return { root, document, window, scroll, body, timelineBody, get: key => elements.get(`[data-${key}]`) };
 }

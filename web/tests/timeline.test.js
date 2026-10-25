@@ -109,12 +109,12 @@ test('one completion-based timer coalesces refresh and visible return behind tim
 test('zero buckets have a chart, keyboard selector and complete data table without inventing missing data',async t=>{
   const zero=timelinePage([timelineBucket(undefined,undefined,{created_count:0,started_count:0,succeeded_count:0,failed_count:0})]);
   const dom=screen(t,async(resource,options)=>resource==='metrics/timeline'?zero:response(resource,options));await dom.view.apply(selection());click(dom,'timeline-toggle');await flush();
-  assert.equal(dom.get('timeline-chart').children.length,1);assert.equal(dom.get('timeline-chart').children[0].getAttribute('height'),'0');assert.equal(dom.get('timeline-zero').hidden,false);
-  assert.equal(dom.timelineBody.children[0].children.length,6);assert.equal(dom.timelineBody.children[0].children[2].textContent,'0');assert.equal(dom.get('timeline-choice').children.length,1);
+  assert.equal(dom.get('timeline-chart').children.length,1);assert.equal(dom.get('timeline-chart').children[0].children[1].getAttribute('height'),'0');assert.equal(dom.get('timeline-zero').hidden,false);
+  assert.equal(dom.timelineBody.children[0].children.length,7);assert.equal(dom.timelineBody.children[0].children[2].textContent,'0');assert.equal(dom.get('timeline-choice').children.length,1);
   assert.equal(dom.timelineBody.children[0].children[0].children[0].getAttribute('datetime'),zero.data[0].start);assert.match(dom.get('timeline-scope').textContent,/All statuses/);
 });
 
-test('chart series, selected repeated hour, table/focus/scroll survive refresh and value-free checkpoint restoration',async t=>{
+test('stacked chart, selected repeated hour, table/focus/scroll survive refresh and value-free checkpoint restoration',async t=>{
   const bounds={from:'2026-10-25T00:00:00.0000000Z',to:'2026-10-25T02:00:00.0000000Z'};
   const rows=[timelineBucket(bounds.from,'2026-10-25T01:00:00.0000000Z'),timelineBucket('2026-10-25T01:00:00.0000000Z',bounds.to)];
   const get=async(resource,options)=>resource==='executions'?overviewPage(bounds):resource==='metrics/summary'?timelineSummary(bounds):timelinePage(rows,{...bounds,bucket:options.params.bucket});
@@ -127,11 +127,11 @@ test('chart series, selected repeated hour, table/focus/scroll survive refresh a
   assert.equal(first.title,`${rows[0].start} → ${rows[0].end}`);
   assert.equal(second.title,`${rows[1].start} → ${rows[1].end}`);
   dom.get('timeline-choice').value=rows[1].start;dom.get('timeline-choice').dispatchEvent(new Event('change'));
-  dom.get('timeline-series').value='failed_count';dom.get('timeline-series').dispatchEvent(new Event('change'));dom.get('timeline-values').open=true;dom.get('timeline-scroll').scrollLeft=120;
+  dom.get('timeline-values').open=true;dom.get('timeline-scroll').scrollLeft=120;
   const option=dom.get('timeline-choice').children[1];const refreshing=dom.view.refresh();dom.get('timeline-choice').focus();await refreshing;
-  assert.equal(dom.get('timeline-choice').children[1],option);assert.equal(dom.get('timeline-choice').value,rows[1].start);assert.equal(dom.get('timeline-series').value,'failed_count');assert.equal(dom.document.activeElement,dom.get('timeline-choice'));assert.equal(dom.get('timeline-scroll').scrollLeft,120);
+  assert.equal(dom.get('timeline-choice').children[1],option);assert.equal(dom.get('timeline-choice').value,rows[1].start);assert.equal(dom.document.activeElement,dom.get('timeline-choice'));assert.equal(dom.get('timeline-scroll').scrollLeft,120);
   const saved=dom.view.checkpoint();assert.doesNotMatch(JSON.stringify(saved.view.timeline),/"(?:data|meta|created_count|failed_count)":/);dom.view.dispose();
-  const restored=screen(t,get,{restoreView:saved.view,retainedPaths:saved.paths});await restored.view.apply(selection(),{restore:true});assert.equal(restored.get('timeline-series').value,'failed_count');assert.equal(restored.get('timeline-choice').value,rows[1].start);assert.equal(restored.get('timeline-values').open,true);
+  const restored=screen(t,get,{restoreView:saved.view,retainedPaths:saved.paths});await restored.view.apply(selection(),{restore:true});assert.equal(restored.get('timeline-choice').value,rows[1].start);assert.equal(restored.get('timeline-values').open,true);
 });
 
 test('timeline renders the full advertised 1000-bucket maximum without truncating its data alternative',async t=>{

@@ -5,7 +5,7 @@ import { executableQuery, readExecutablePage } from './executables.js';
 import { childQuery, readChildPage } from './children.js';
 import { eventQuery, readEventPage } from './events.js';
 import { parameterQuery, readParameterPage, overrideQuery, readOverridePage } from './values.js';
-import { historyQuery, readHistoryPage, historyIdentity, sameHistoryIdentity } from './history.js';
+import { historyQuery, readHistoryPage, historyIdentity, sameHistoryIdentity, allHistoryStatuses } from './history.js';
 import { defaultDetailTab, detailFragment, tabAllowed } from './detail-navigation.js';
 
 export function readExecutionDetail(response, executionId, display) {
@@ -77,7 +77,7 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
   const emptyPath = () => ({ entries: [null], index: 0, cohort: null });
   const allowed = key => ['parameters', 'overrides'].includes(key) ? metadata.capabilities.values : key !== 'events' || metadata.capabilities.events;
   const initialSection = key => ({ open: false, query: ['parameters', 'overrides'].includes(key) ? { section: key, limit: metadata.limits.default_limit }
-    : key === 'history' ? { status: '2,7', sort: 'execution_id', direction: 'desc', limit: metadata.limits.default_limit }
+    : key === 'history' ? { status: allHistoryStatuses(metadata), sort: 'execution_id', direction: 'desc', limit: metadata.limits.default_limit }
     : { sort: key === 'events' ? 'message_time' : 'started_at', direction: 'asc',
       limit: metadata.limits.default_limit, ...(key === 'events' ? { kind: 'all', q: null } : {}) },
     phase: 'idle', page: null, error: null, stale: false, notice: '' });

@@ -120,18 +120,23 @@
                 <details class="detail-note"><summary>About timeline counts</summary><p>Starts and current outcomes belong to each execution's creation bucket. Edge buckets include only the selected range.</p></details>
                 <div class="table-controls">
                     <label>Calendar interval<select data-timeline-bucket><option value="day">Day</option><option value="hour">Hour</option></select></label>
-                    <label>Series<select data-timeline-series></select></label>
                     <label class="timeline-choice">Selected bucket<select data-timeline-choice></select></label>
                 </div>
                 <p class="resource-status" data-timeline-status role="status"></p><button type="button" data-timeline-retry hidden>Retry timeline</button>
                 <p class="cell-detail" data-timeline-scale></p>
-                <svg class="timeline-chart" data-timeline-chart viewBox="0 0 1000 170" preserveAspectRatio="none" aria-hidden="true" focusable="false"></svg>
-                <p class="resource-status" data-timeline-zero hidden>This series has zero executions in every bucket.</p>
-                <p class="resource-status" data-timeline-selected role="status"></p>
+                <p class="detail-note duration-legend"><span data-chart-status="7">Succeeded</span><span data-chart-status="4">Failed</span><span data-chart-status="other">Other</span></p>
+                <div class="chart-frame">
+                    <div class="chart-y-axis" data-timeline-y-axis aria-label="Execution count scale"></div>
+                    <svg class="timeline-chart" data-timeline-chart viewBox="0 0 1000 170" preserveAspectRatio="none" role="listbox" aria-orientation="horizontal" aria-label="Created executions by current outcome, earliest to latest"></svg>
+                    <div class="chart-x-axis" data-timeline-x-axis aria-label="Calendar bucket starts"></div>
+                </div>
+                <p class="chart-axis-caption">Created time → · Hover or focus for values; Left/Right or Home/End to move.</p>
+                <p class="resource-status" data-timeline-zero hidden>Every bucket has zero created executions.</p>
+                <p class="resource-status chart-selection" data-timeline-selected role="status" tabindex="0" aria-label="Selected bucket values"></p>
                 <details data-timeline-values><summary>Data table</summary>
                     <div class="table-scroll timeline-scroll" data-timeline-scroll role="region" aria-label="Timeline values" tabindex="0">
                         <table data-timeline-table><caption>Creation-cohort counts per calendar interval</caption>
-                            <thead><tr><th scope="col">Bucket start (inclusive)</th><th scope="col">Bucket end (exclusive)</th><th scope="col">Created</th><th scope="col">With an actual start</th><th scope="col">Currently succeeded</th><th scope="col">Currently failed</th></tr></thead><tbody></tbody>
+                            <thead><tr><th scope="col">Bucket start (inclusive)</th><th scope="col">Bucket end (exclusive)</th><th scope="col">Created</th><th scope="col">With an actual start</th><th scope="col">Currently succeeded</th><th scope="col">Currently failed</th><th scope="col">Other</th></tr></thead><tbody></tbody>
                         </table>
                     </div>
                 </details>

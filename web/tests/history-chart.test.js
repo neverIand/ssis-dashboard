@@ -17,6 +17,7 @@ const click=(dom,key)=>dom.get(key).dispatchEvent(new Event('click'));
 const choose=(dom,id)=>{dom.get('history-chart-choice').value=id;dom.get('history-chart-choice').dispatchEvent(new Event('change'));};
 async function open(dom){await flush();click(dom,'history-toggle');await flush();click(dom,'history-chart-toggle');}
 const plot=dom=>dom.get('history-chart-plot'),groups=dom=>plot(dom).children;
+const group=(dom,id)=>groups(dom).find(node=>node.dataset.executionId===id);
 
 test('duration chart uses only the loaded history page; opening, selecting and closing add no request',async t=>{
   const dom=screen(t,async()=>historyPage([historyRow('3'),historyRow('2')]));await flush();assert.equal(dom.calls.length,2);
@@ -32,8 +33,8 @@ test('missing actual duration never becomes observed elapsed or estimate, while 
   const rows=[historyRow('3',{duration_seconds:0}),historyRow('2',{status:{code:2,name:'running'},ended_at:null,duration_seconds:null,elapsed_seconds:123,estimate:estimate({sample_count:1,duration_seconds:10})}),
     historyRow('1',{started_at:null,ended_at:null,duration_seconds:null,elapsed_seconds:null})];
   const dom=screen(t,async()=>historyPage(rows));await open(dom);
-  assert.equal(groups(dom)[0].children[1].getAttribute('height'),'0');assert.equal(groups(dom)[0].children[3].getAttribute('display'),'inline');
-  assert.equal(groups(dom)[1].children[1].getAttribute('display'),'none');assert.equal(groups(dom)[1].children[3].getAttribute('display'),'none');
+  assert.equal(group(dom,'3').children[1].getAttribute('height'),'0');assert.equal(group(dom,'3').children[3].getAttribute('display'),'inline');
+  assert.equal(group(dom,'2').children[1].getAttribute('display'),'none');assert.equal(group(dom,'2').children[3].getAttribute('display'),'none');
   choose(dom,'2');assert.match(dom.get('history-chart-selected').textContent,/Actual duration: Unavailable.*Elapsed \(observed\): 2 min 03 s.*Estimated duration: 10 s.*Mean of 1 prior successful run/);
   choose(dom,'1');assert.match(dom.get('history-chart-selected').textContent,/Actual duration: Unavailable · Estimated duration: Unavailable/);
   assert.doesNotMatch(dom.get('history-chart-selected').textContent,/Elapsed|Mean of/);
@@ -42,10 +43,13 @@ test('missing actual duration never becomes observed elapsed or estimate, while 
 test('finite huge and sub-millisecond durations keep finite plot geometry and separate exact returned estimates',async t=>{
   const dom=screen(t,async()=>historyPage([historyRow('3',{duration_seconds:Number.MAX_VALUE,estimate:estimate({duration_seconds:Number.MAX_VALUE})}),
     historyRow('2',{duration_seconds:0.0000001,estimate:estimate()}),historyRow('1',{duration_seconds:10})]));await open(dom);
-  for(const group of groups(dom))for(const bar of group.children.slice(1,3))for(const key of ['x','y','height','width'])assert.ok(Number.isFinite(Number(bar.getAttribute(key))));
-  assert.equal(groups(dom)[0].children[1].getAttribute('height'),'150');choose(dom,'2');
+  for(const row of groups(dom)){
+    for(const key of ['x','y','height','width'])assert.ok(Number.isFinite(Number(row.children[1].getAttribute(key))));
+    for(const key of ['x1','x2','y1','y2'])assert.ok(Number.isFinite(Number(row.children[2].getAttribute(key))));
+  }
+  assert.equal(group(dom,'3').children[1].getAttribute('height'),'150');choose(dom,'2');
   assert.match(dom.get('history-chart-selected').textContent,/Actual duration: <1 ms.*Estimated duration: <1 ms/);
-  assert.equal(groups(dom)[1].children[3].getAttribute('display'),'none');
+  assert.equal(group(dom,'2').children[3].getAttribute('display'),'none');
 });
 
 test('empty and unavailable-duration pages have explicit text without invented zero observations',async t=>{
@@ -59,11 +63,11 @@ test('empty and unavailable-duration pages have explicit text without invented z
 
 test('live estimate removal updates keyed chart values while current choice, table scroll and moved focus survive',async t=>{
   let changed=false;const dom=screen(t,async()=>historyPage([historyRow('2',{estimate:changed?null:estimate({duration_seconds:10})}),historyRow('1')]));await open(dom);
-  choose(dom,'2');const group=groups(dom)[0];dom.get('history-chart-choice').focus();dom.get('history-scroll').scrollLeft=120;
-  changed=true;click(dom,'detail-refresh');await flush();assert.equal(groups(dom)[0],group);assert.equal(dom.get('history-chart-choice').value,'2');
+  choose(dom,'2');const selectedGroup=group(dom,'2');dom.get('history-chart-choice').focus();dom.get('history-scroll').scrollLeft=120;
+  changed=true;click(dom,'detail-refresh');await flush();assert.equal(group(dom,'2'),selectedGroup);assert.equal(dom.get('history-chart-choice').value,'2');
   assert.equal(dom.document.activeElement,dom.get('history-chart-choice'));assert.equal(dom.get('history-scroll').scrollLeft,120);
   assert.match(dom.get('history-chart-selected').textContent,/Estimated duration: Unavailable/);assert.doesNotMatch(plot(dom).textContent,/Mean of/);
-  assert.equal(group.children[2].getAttribute('display'),'none');assert.equal(group.children[2].getAttribute('height'),'0');
+  assert.equal(selectedGroup.children[2].getAttribute('display'),'none');assert.equal(selectedGroup.children[2].getAttribute('y1'),'160');
   dom.get('legacy-detail-link').focus();click(dom,'detail-refresh');await flush();assert.equal(dom.document.activeElement,dom.get('legacy-detail-link'));
   assert.equal(dom.calls.length,7);
 });

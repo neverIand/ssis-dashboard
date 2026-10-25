@@ -16,6 +16,7 @@ import { historyMetadata, historyRow, historyPage, estimate } from './history-fi
 
 const flush = () => new Promise(resolve=>setImmediate(resolve)), metadata = historyMetadata();
 const query = {status:'2,7',sort:'execution_id',direction:'desc',limit:50}, identity = detailResponse().data;
+const allQuery = {...query,status:'1,2,3,4,5,6,7,8,9'};
 const display = createDisplay({timeZone:metadata.display_timezone});
 const response = (resource,{params}={}) => resource==='history' ? historyPage() : resource.endsWith('/executables') ? executablePage()
   : resource.endsWith('/children') ? childPage() : resource.endsWith('/events') ? eventPage()
@@ -69,7 +70,7 @@ test('lazy history requests exact detail identity without overview scope and sha
     return resource==='history' ? historyPage([historyRow(options.params.cursor?'1':'2')],{has_more:!options.params.cursor,next_cursor:options.params.cursor?null:'history-next',limit:options.params.limit,direction:options.params.direction}) : response(resource,options);
   },{metadata:all});
   await run.owner.load();assert.equal(run.calls.length,1);await run.owner.toggleHistory();await run.owner.nextHistory();
-  assert.equal(run.state.history.pageNumber,2);assert.deepEqual(run.calls.at(-1).params,{...query,...historyIdentity(identity),cursor:'history-next'});
+  assert.equal(run.state.history.pageNumber,2);assert.deepEqual(run.calls.at(-1).params,{...allQuery,...historyIdentity(identity),cursor:'history-next'});
   await run.owner.toggleExecutables();await run.owner.toggleChildren();await run.owner.toggleEvents();await run.owner.toggleParameters();await run.owner.toggleOverrides();
   const start=run.calls.length;await run.owner.refresh();assert.equal(run.calls.length-start,7);assert.equal(peak,1);
   assert.deepEqual(run.calls.slice(start).map(c=>c.params?.section??c.resource.split('/').at(-1)),['17','executables','children','events','parameters','overrides','history']);
@@ -122,14 +123,14 @@ test('history UI keeps actual and estimated timing separate, preserves lexical i
   const first=dom.historyBody.children[0];assert.equal(first.children.length,4);assert.match(first.children[2].textContent,/—Elapsed \(observed\)/);
   assert.equal(first.children[1].children[2].textContent,'Ended—');assert.match(first.children[3].textContent,/Estimated duration:.*Mean of 5 prior successful runs/s);
   assert.equal(first.children[3].children[1].children[0].getAttribute('datetime'),wireTime);assert.equal(first.children[0].children[0].href,'/ops/app/executions/3');
-  assert.equal(dom.historyBody.children[1].children[3].children[0].textContent,'Unavailable');assert.match(dom.get('history-scope').textContent,/All creation dates.*Running, Succeeded/s);
+  assert.equal(dom.historyBody.children[1].children[3].children[0].textContent,'Unavailable');assert.match(dom.get('history-scope').textContent,/All creation dates.*All statuses/s);
   assert.match(dom.get('history-status').textContent,/3 executions on this page/);
 });
 
 test('history status drafts survive order changes and refresh; Apply validates nonempty scope without inheriting dates',async t=>{
   const dom=screen(t,async(resource,options)=>resource==='history'?historyPage([],{direction:options.params.direction,limit:options.params.limit}):response(resource,options));await flush();click(dom,'history-toggle');await flush();
-  const inputs=dom.get('history-choices').children.map(label=>label.children[0]);inputs[3].checked=true;
-  dom.get('history-direction').value='asc';dom.get('history-direction').dispatchEvent(new Event('change'));await flush();assert.ok(inputs[3].checked);assert.equal(dom.calls.at(-1).params.status,'2,7');
+  const inputs=dom.get('history-choices').children.map(label=>label.children[0]);for(const input of inputs)input.checked=['2','4','7'].includes(input.value);
+  dom.get('history-direction').value='asc';dom.get('history-direction').dispatchEvent(new Event('change'));await flush();assert.ok(inputs[3].checked);assert.equal(dom.calls.at(-1).params.status,allQuery.status);
   dom.get('history-filters').dispatchEvent(new Event('submit'));await flush();assert.equal(dom.calls.at(-1).params.status,'2,4,7');
   for(const input of inputs)input.checked=false;const count=dom.calls.length;dom.get('history-filters').dispatchEvent(new Event('submit'));assert.equal(dom.calls.length,count);assert.match(dom.get('history-notice').textContent,/Choose at least one/);
 });

@@ -33,7 +33,7 @@ export function detailDOM() {
   for (const key of ['app-status', 'retry', 'request-id', 'display-timezone', 'execution-detail',
     'detail-status', 'detail-retry', 'detail-request-id', 'active-elapsed',
     'detail-refresh', 'detail-poll-toggle', 'detail-poll-status', 'overview-link', 'legacy-detail-link',
-    'overview-return-notice', 'parameters-unavailable', 'overrides-unavailable', 'overrides-policy', ...['toggle','panel','choice','plot','scope','selected','scale','empty'].map(key=>`history-chart-${key}`), ...['filters','choices','apply','scope'].map(key => `history-${key}`), ...['unavailable','filters','apply','reset','kind','q','scope'].map(key => `events-${key}`), ...['toggle', 'panel', 'status', 'notice', 'retry', 'sort', 'direction',
+    'overview-return-notice', 'parameters-unavailable', 'overrides-unavailable', 'overrides-policy', ...['toggle','panel','choice','plot','scope','selected','scale','empty','x-axis','y-axis'].map(key=>`history-chart-${key}`), ...['filters','choices','apply','scope','presets','status-options'].map(key => `history-${key}`), ...['unavailable','filters','apply','reset','kind','q','scope'].map(key => `events-${key}`), ...['toggle', 'panel', 'status', 'notice', 'retry', 'sort', 'direction',
       'limit', 'previous', 'next', 'latest', 'scroll', 'table', 'order-label'].flatMap(name => ['executables', 'children', 'events', 'parameters', 'overrides', 'history'].map(section => `${section}-${name}`))]) {
     const node = new Node(document, /-(limit|sort|direction|kind)$/.test(key) ? 'select' : key === 'events-q' ? 'input'
       : key.includes('retry') || /toggle|previous|next|latest|refresh$/.test(key) ? 'button' : 'div');
@@ -77,10 +77,11 @@ export function detailDOM() {
   }
   get('events-panel').append(get('events-filters'),get('events-scope'));
   get('events-filters').append(...['kind','q','apply','reset'].map(key => get(`events-${key}`)));
-  get('history-panel').append(get('history-filters'),get('history-scope'));
+  get('history-panel').append(get('history-presets'),get('history-status-options'),get('history-scope'));
+  get('history-status-options').append(get('history-filters'));
   get('history-filters').append(get('history-choices'),get('history-apply'));
   get('history-panel').append(get('history-chart-toggle'),get('history-chart-panel'));
-  get('history-chart-panel').append(...['choice','plot','scope','selected','scale','empty'].map(key=>get(`history-chart-${key}`)));
+  get('history-chart-panel').append(...['choice','plot','scope','selected','scale','empty','x-axis','y-axis'].map(key=>get(`history-chart-${key}`)));
   const body = bodies.executables;
   document.getElementById = id => id === 'main-content' ? main : {
     textContent: JSON.stringify({ app_base: '/ops/app/', api_base: '/ops/api/v1/',

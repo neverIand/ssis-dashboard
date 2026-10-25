@@ -2,12 +2,14 @@ import { createDisplay, formatCode } from './display.js';
 import { executionHref } from './detail-navigation.js';
 import { mountHistoryChart } from './render-history-chart.js';
 import { mountTableOrder } from './table-order.js';
+import { allHistoryStatuses } from './history.js';
 
 export function mountHistory(root, { metadata, actions, navigation, executionId, restoreView = null }) {
   const document = root.ownerDocument, get = key => root.querySelector(`[data-history-${key}]`);
   const controls = Object.fromEntries(['toggle','retry','previous','next','latest','direction','limit','apply','scroll'].map(key => [key,get(key)]));
   const { toggle,retry,previous,next,latest,apply,scroll } = controls;
   const panel = get('panel'), status = get('status'), notice = get('notice'), scope = get('scope'), form = get('filters');
+  const presets = new Map(), statusOptions = get('status-options');
   const table = get('table'), body = table.querySelector('tbody'), rows = new Map(), listeners = [], choices = new Map();
   const display = createDisplay({ timeZone: metadata.display_timezone });
   const chart=mountHistoryChart(root,{metadata,restoreView:restoreView?.chart});
@@ -23,6 +25,12 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
     return node;
   };
   const text = (node,value) => { if (node.textContent !== value) node.textContent = value; };
+  statusOptions.open = restoreView?.statusOptionsOpen === true;
+  for (const [key,label,status] of [['all','All',allHistoryStatuses(metadata)],['succeeded','Succeeded','7'],['failed','Failed','4'],['running','Running','2']]) {
+    if (status.split(',').some(code => !metadata.execution_statuses.some(item => String(item.code) === code))) continue;
+    const button = element('button',label); button.type = 'button'; button.dataset.historyPreset = key;
+    get('presets').append(button); presets.set(key,{button,status}); controls[`preset-${key}`] = button;
+  }
   for (const item of metadata.execution_statuses) {
     const label = element('label', undefined, 'check-label'), input = element('input');
     input.type = 'checkbox'; input.value = String(item.code);
@@ -50,8 +58,10 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
         const cells = Array.from({length:4},()=>element('td'));
         const link = element('a',id), badge = element('span',undefined,'status-badge');
         link.href = executionHref(id,navigation.selection,navigation);
+        node.dataset.current = String(id === executionId);
         if (id === executionId) link.setAttribute('aria-current','page');
         cells[0].append(link,element('br'),badge); cells[1].className = 'time-cell observation-times';
+        if (id === executionId) cells[0].append(element('span','Current execution','current-execution'));
         const times = {};
         for (const [key,label] of [['created_at','Created'],['started_at','Started'],['ended_at','Ended']]) {
           const line = element('div'); times[key] = element('span'); line.append(element('span',label,'cell-detail'),times[key]); cells[1].append(line);
@@ -77,6 +87,12 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
   const listen = (node,event,handler) => { node.addEventListener(event,handler); listeners.push([node,event,handler]); };
   listen(toggle,'click',actions.toggle); listen(retry,'click',actions.retry); listen(previous,'click',actions.previous);
   listen(next,'click',actions.next); listen(latest,'click',actions.latest);
+  for (const {button,status} of presets.values()) listen(button,'click',()=>{
+    if (busy || panel.hidden) return;
+    for (const [code,input] of choices) input.checked = status.split(',').includes(code);
+    notice.textContent = '';
+    if (status !== appliedStatus) actions.order({status});
+  });
   listen(form,'submit',event=>{
     event.preventDefault(); if (busy) return;
     const status = [...choices].filter(([,input])=>input.checked).map(([code])=>code).join(',');
@@ -90,8 +106,8 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
       const position = {left:scroll.scrollLeft,top:scroll.scrollTop};
       if (!state.open) returning = null;
       panel.hidden = !state.open || !authorized;
-      for (const node of [retry,previous,next,latest,apply,...choices.values()]) node.disabled = panel.hidden;
-      for (const node of [retry,latest,apply]) node.setAttribute('aria-disabled',String(busy));
+      for (const node of [retry,previous,next,latest,apply,...choices.values(),...[...presets.values()].map(item=>item.button)]) node.disabled = panel.hidden;
+      for (const node of [retry,latest,apply,...[...presets.values()].map(item=>item.button)]) node.setAttribute('aria-disabled',String(busy));
       previous.setAttribute('aria-disabled',String(busy || !state.hasPrevious)); next.setAttribute('aria-disabled',String(busy || !state.hasNext));
       table.setAttribute('aria-busy',String(busy)); retry.hidden = state.phase !== 'error' && !(busy && !retry.hidden);
       order.render(state.query,busy,panel.hidden);
@@ -100,8 +116,9 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
         for (const [code,input] of choices) input.checked = chosen.includes(code);
         appliedStatus = state.query.status;
       }
+      for (const {button,status} of presets.values()) button.setAttribute('aria-pressed',String(status === state.query.status));
       scope.title = identity ? `Folder: ${identity.folder_name} · Project: ${identity.project_name} · Package: ${identity.package_name}` : '';
-      scope.textContent = identity ? `All creation dates · ${state.query.status.split(',').map(code=>formatCode(metadata.execution_statuses.find(item=>String(item.code)===code) ?? {code:Number(code),name:'unknown'})).join(', ')}` : '';
+      scope.textContent = identity ? `All creation dates · ${state.query.status === allHistoryStatuses(metadata) ? 'All statuses' : state.query.status.split(',').map(code=>formatCode(metadata.execution_statuses.find(item=>String(item.code)===code) ?? {code:Number(code),name:'unknown'})).join(', ')}` : '';
       notice.textContent = state.notice;
       const page = panel.hidden ? null : state.page;
       chart.render({page,pageNumber:state.pageNumber,busy:isBusy,visible:!panel.hidden,stale:state.stale});
@@ -123,14 +140,14 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
         returning = null;
       }
     },
-    checkpoint() { return {left:scroll.scrollLeft,top:scroll.scrollTop,chart:chart.checkpoint(),draft:[...choices].filter(([,input])=>input.checked).map(([code])=>code),
+    checkpoint() { return {left:scroll.scrollLeft,top:scroll.scrollTop,chart:chart.checkpoint(),statusOptionsOpen:statusOptions.open,draft:[...choices].filter(([,input])=>input.checked).map(([code])=>code),
       executionFocus:[...rows].find(([,row])=>row.link===document.activeElement)?.[0] ?? null,
       focus:Object.keys(controls).find(key=>controls[key]===document.activeElement) ?? null}; },
     dispose() {
       order.dispose();
       chart.dispose();
       for (const [node,event,handler] of listeners) node.removeEventListener(event,handler);
-      rows.clear(); body.replaceChildren(); get('choices').replaceChildren(); scope.textContent = status.textContent = notice.textContent = scope.title = status.title = '';
+      rows.clear(); body.replaceChildren(); get('choices').replaceChildren(); get('presets').replaceChildren(); statusOptions.open = false; scope.textContent = status.textContent = notice.textContent = scope.title = status.title = '';
       for (const node of Object.values(controls)) node.disabled = true;
       panel.hidden = retry.hidden = true; returning = rendered = null;
     },

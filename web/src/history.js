@@ -3,6 +3,8 @@ import { formatCode, formatId } from './display.js';
 import { observationText, readObservationMeta } from './observation-page.js';
 import { timestampTicks } from './selection.js';
 
+export const allHistoryStatuses = metadata => metadata.execution_statuses.map(item => item.code).sort((a,b) => a-b).join(',');
+
 export function historyQuery(value, metadata) {
   const codes = typeof value.status === 'string' ? value.status.split(',') : [];
   if (!codes.length || new Set(codes).size !== codes.length || codes.some(code => !/^[1-9]$/.test(code)

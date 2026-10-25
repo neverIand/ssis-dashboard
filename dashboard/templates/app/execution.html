@@ -237,10 +237,13 @@
                 </div>
                 <div id="package-history" data-history-panel hidden>
                     <p class="detail-note history-scope" data-history-scope></p>
-                    <form data-history-filters>
-                        <fieldset class="status-options"><legend>History statuses</legend><div class="history-choices" data-history-choices></div></fieldset>
-                        <button type="submit" data-history-apply>Apply statuses</button>
-                    </form>
+                    <div class="history-presets" data-history-presets role="group" aria-label="History status presets"></div>
+                    <details class="history-status-options" data-history-status-options><summary>Choose statuses</summary>
+                        <form data-history-filters>
+                            <fieldset class="status-options"><legend>History statuses</legend><div class="history-choices" data-history-choices></div></fieldset>
+                            <button type="submit" data-history-apply>Apply statuses</button>
+                        </form>
+                    </details>
                     <p class="cell-detail" data-history-order-label></p>
                     <details class="table-sort-options"><summary>More sort options</summary>
                     <div class="table-controls" aria-label="History order">
@@ -256,13 +259,18 @@
                         <div class="section-heading"><h3 id="history-duration-heading">Duration comparison</h3><button type="button" data-history-chart-toggle disabled aria-expanded="false" aria-controls="history-duration-chart">Show duration chart</button></div>
                         <div id="history-duration-chart" data-history-chart-panel hidden>
                             <p class="detail-note" data-history-chart-scope></p>
-                            <p class="detail-note duration-legend"><span data-duration-key="actual">Actual duration</span><span data-duration-key="estimate">Estimated duration</span></p>
-                            <details class="detail-note"><summary>Chart key</summary><p>Circle: actual zero. No mark: unavailable. Full values and timestamps are in the history table.</p></details>
+                            <p class="detail-note duration-legend"><span data-duration-key="actual">Actual bar</span><span data-duration-key="estimate">Estimate marker</span><span data-chart-status="7">Succeeded</span><span data-chart-status="4">Failed / unexpected end</span><span data-chart-status="2">Running</span><span data-chart-status="5">Pending / stopping</span><span data-chart-status="other">Other</span></p>
+                            <details class="detail-note"><summary>Chart key</summary><p>Circle: actual zero. No mark: unavailable. Estimates are not actual timings. Hover or focus a point for values; use Left/Right or Home/End to move. Full values and timestamps are in the history table.</p></details>
                             <label class="history-chart-choice">Selected execution<select data-history-chart-choice></select></label>
                             <p class="cell-detail" data-history-chart-scale></p>
-                            <svg class="history-duration-plot" data-history-chart-plot viewBox="0 0 1000 170" preserveAspectRatio="none" aria-hidden="true" focusable="false"></svg>
+                            <div class="chart-frame">
+                                <div class="chart-y-axis" data-history-chart-y-axis aria-label="Duration scale"></div>
+                                <svg class="history-duration-plot" data-history-chart-plot viewBox="0 0 1000 170" preserveAspectRatio="none" role="listbox" aria-orientation="horizontal" aria-label="History durations, earliest to latest"></svg>
+                                <div class="chart-x-axis" data-history-chart-x-axis aria-label="Creation dates and execution IDs"></div>
+                            </div>
+                            <p class="chart-axis-caption">Created time →</p>
                             <p class="resource-status" data-history-chart-empty hidden></p>
-                            <p class="resource-status" data-history-chart-selected role="status"></p>
+                            <p class="resource-status chart-selection" data-history-chart-selected role="status" tabindex="0" aria-label="Selected execution values"></p>
                         </div>
                     </section>
                     <div class="table-scroll" data-history-scroll role="region" aria-label="Package history table" tabindex="0">
