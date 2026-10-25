@@ -38,7 +38,8 @@ test('detail bootstrap needs no overview controls and requests metadata, detail 
   assert.ok(dom.get('detail-poll-status').title.includes(detailResponse('17').meta.generated_at));
   dispose();
   assert.equal(dom.get('execution-detail').hidden, true);
-  assert.equal(dom.field('package').textContent, '—');
+  assert.equal(dom.field('package').textContent, 'Execution 9223372036854775807');
+  assert.equal(dom.field('status').hidden, true);
 });
 
 test('settings failure leaves detail unfetched; keyboard retry loads it after successful settings', async t => {
@@ -146,8 +147,8 @@ test('transient refresh is labeled with its old observation time; denial clears 
   dom.get('detail-refresh').dispatchEvent(new Event('click'));
   await settle();
   assert.equal(dom.get('execution-detail').hidden, true);
-  assert.equal(dom.field('package').textContent, '—');
-  assert.equal(dom.field('status').textContent, '—');
+  assert.equal(dom.field('package').textContent, 'Execution 9223372036854775807');
+  assert.equal(dom.field('status').textContent, ''); assert.equal(dom.field('status').hidden, true);
   assert.equal(dom.field('status').dataset.status, undefined);
   assert.doesNotMatch(dom.root.textContent, /Main\.dtsx|succeeded/);
   assert.ok(!dom.get('detail-poll-status').title.includes('Observed'));

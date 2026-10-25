@@ -29,7 +29,7 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
     cell.colSpan = parameter ? 5 : 3; row.append(cell); body.replaceChildren(row);
   }
   function paint(page, pageNumber) {
-    if (!page.data.length) { empty(pageNumber > 1 ? `No ${resource} remain on this page. Use Previous or First page.` : `No ${resource} on this page.`); return; }
+    if (!page.data.length) { empty(pageNumber > 1 ? `No ${resource} remain on this page. Use Previous or First page.` : `No ${resource}.`); return; }
     if (!rows.size) body.replaceChildren();
     const wanted = new Set(); let anchor = body.firstChild;
     for (const item of page.data) {
@@ -100,7 +100,7 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
       for (const node of [retry, previous, next, latest]) node.disabled = panel.hidden;
       for (const node of [retry, latest]) node.setAttribute('aria-disabled', String(busy));
       previous.setAttribute('aria-disabled', String(busy || !state.hasPrevious)); next.setAttribute('aria-disabled', String(busy || !state.hasNext));
-      table.setAttribute('aria-busy', String(busy)); retry.hidden = state.phase !== 'error' && !(busy && !retry.hidden);
+      table.setAttribute('aria-busy', String(busy)); retry.hidden = state.phase !== 'error' && !state.error && !(busy && !retry.hidden);
       order.render(state.query, busy, panel.hidden);
       notice.textContent = state.notice;
       const page = panel.hidden ? null : state.page;

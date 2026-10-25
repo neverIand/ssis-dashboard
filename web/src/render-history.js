@@ -153,7 +153,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
       for (const node of [retry,previous,next,latest,apply,custom,close,...choices.values(),...[...presets.values()].map(item=>item.button)]) node.disabled = panel.hidden;
       for (const node of [retry,latest,apply,custom,...[...presets.values()].map(item=>item.button)]) node.setAttribute('aria-disabled',String(busy));
       previous.setAttribute('aria-disabled',String(busy || !state.hasPrevious)); next.setAttribute('aria-disabled',String(busy || !state.hasNext));
-      table.setAttribute('aria-busy',String(busy)); retry.hidden = state.phase !== 'error' && !(busy && !retry.hidden);
+      table.setAttribute('aria-busy',String(busy)); retry.hidden = state.phase !== 'error' && !state.error && !(busy && !retry.hidden);
       order.render(state.query,busy,panel.hidden);
       if (appliedStatus !== state.query.status) {
         const chosen = appliedStatus === null && returning?.draft ? returning.draft : state.query.status.split(',');

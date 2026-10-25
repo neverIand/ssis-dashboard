@@ -60,7 +60,8 @@ export function mountHistoryChart(root,{metadata,restoreView=null}) {
     }
     for(const [id,row] of rows)if(!wanted.has(id)){row.group.remove();rows.delete(id);}
     scale.textContent=available?'Duration':'';
-    renderChartAxes(xAxis,yAxis,data.map(item=>({text:`${display.timestamp(item.created_at).slice(0,10)}\n#${item.execution_id}`,title:`${display.timestamp(item.created_at)} · Execution ${item.execution_id} · ${item.created_at}`})),maximum,value=>durationTick(value,display));
+    // Below seven executions the 48 px groups leave no room for dates; the title and readout keep them.
+    renderChartAxes(xAxis,yAxis,data.map(item=>({text:data.length<7?`#${item.execution_id}`:`${display.timestamp(item.created_at).slice(0,10)}\n#${item.execution_id}`,title:`${display.timestamp(item.created_at)} · Execution ${item.execution_id} · ${item.created_at}`})),maximum,value=>durationTick(value,display));
     empty.hidden=available!==0;empty.textContent=page.data.length?'No durations are available on this loaded history page.':'No executions on this loaded history page.';
     attribute(svg,'data-empty',available===0);
     mark();

@@ -5,8 +5,8 @@ import { reserveLoadingSpace } from './loading-space.js';
 export function mountObservationTable(root, { metadata, actions, restoreView = null, resource = 'executables' }) {
   const child = resource === 'children', singular = child ? 'package call' : 'executable';
   const idKey = child ? 'observation_id' : 'statistics_id';
-  const columns = child ? { count: 4, name: 0, timing: 1, duration: 2, state: 3 }
-    : { count: 5, name: 1, timing: 2, duration: 3, state: 4 };
+  const columns = child ? { count: 5, name: 0, started_at: 1, ended_at: 2, duration: 3, state: 4 }
+    : { count: 6, name: 1, started_at: 2, ended_at: 3, duration: 4, state: 5 };
   const document = root.ownerDocument;
   const get = name => root.querySelector(`[data-${resource}-${name}]`);
   const toggle = get('toggle'), panel = get('panel'), status = get('status'), notice = get('notice');
@@ -43,8 +43,8 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
     if (!page.data.length) {
       empty(pageNumber > 1 ? 'No observations remain on this page. Use Previous or First page.'
         : page.meta.availability === 'not-recorded' ? `No ${singular} observations recorded. Logging was disabled.`
-          : page.meta.availability === 'unknown' ? `No ${singular} observations on this page. Recording coverage is unknown.`
-            : `No ${singular} observations on this page.`);
+          : page.meta.availability === 'unknown' ? `No ${singular} observations. Recording coverage is unknown.`
+            : `No ${singular} observations.`);
       return;
     }
     if (!rows.size) body.replaceChildren();
@@ -57,10 +57,10 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
         const row = element('tr');
         row.dataset[child ? 'observationId' : 'statisticsId'] = item[idKey];
         const cells = Array.from({ length: columns.count }, (_, i) => element('td', undefined,
-          i === columns.timing ? 'time-cell observation-times' : i === columns.duration ? 'number-cell' : !child && i === 0 ? 'id-cell' : ''));
+          i === columns.started_at || i === columns.ended_at ? 'time-cell' : i === columns.duration ? 'number-cell' : !child && i === 0 ? 'id-cell' : ''));
         const name = element('span', undefined, child ? 'package-call-name' : '');
         const packageName = element('span', undefined, 'cell-detail');
-        const id = element(child ? 'dd' : 'span', undefined, child ? '' : 'cell-detail');
+        const id = child ? element('dd') : null;
         const source = element('dd'), sourceType = element('dd'), callPath = element('span', undefined, 'cell-detail call-path');
         cells[columns.name].className = child ? 'observation-name package-call' : 'observation-name';
         cells[columns.name].append(name);
@@ -74,14 +74,8 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
         pathFields.append(element('dt', 'Package path'), packagePath, element('dt', 'Execution path'), executionPath);
         paths.append(summary, pathFields);
         if (child) cells[0].append(callPath, paths);
-        else cells[1].append(packageName, id, paths);
-        const times = {};
-        for (const [key, label] of [['started_at', 'Started'], ['ended_at', 'Ended']]) {
-          const line = element('div');
-          times[key] = element('span');
-          line.append(element('span', label, 'cell-detail'), times[key]);
-          cells[columns.timing].append(line);
-        }
+        else cells[1].append(packageName, paths);
+        const times = { started_at: cells[columns.started_at], ended_at: cells[columns.ended_at] };
         cells[columns.state].append(element('span', undefined, child ? 'observation-state' : 'result-badge'));
         row.append(...cells);
         record = { row, cells, times, name, packageName, id, source, sourceType, callPath,
@@ -98,8 +92,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
         text(record.sourceType, item.source_type === null ? '—' : String(item.source_type));
       } else {
         text(record.cells[0], formatId(item.statistics_id));
-        text(record.packageName, `Package: ${literal(item.package_name)}`);
-        text(record.id, `Executable ID: ${formatId(item.executable_id)}`);
+        text(record.packageName, `Package: ${literal(item.package_name)} · Executable ID: ${formatId(item.executable_id)}`);
       }
       text(record.packagePath, literal(item.package_path));
       text(record.executionPath, literal(item.execution_path));
@@ -144,7 +137,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
       }
       previous.setAttribute('aria-disabled', String(busy || !state.hasPrevious));
       next.setAttribute('aria-disabled', String(busy || !state.hasNext));
-      retry.hidden = state.phase !== 'error' && !(busy && !retry.hidden);
+      retry.hidden = state.phase !== 'error' && !state.error && !(busy && !retry.hidden);
       table.setAttribute('aria-busy', String(busy));
       order.render(state.query, busy, panel.hidden);
       notice.textContent = state.notice;

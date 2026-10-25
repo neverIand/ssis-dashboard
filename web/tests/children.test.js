@@ -160,7 +160,7 @@ test('keyed child rendering updates incomplete pairs without result links, retai
   dom.get('children-toggle').dispatchEvent(new Event('click')); await flush();
   const row = dom.childBody.firstChild, paths = row.children[0].children[2], summary = paths.firstChild;
   assert.equal(dom.childBody.children.length, 2); assert.match(row.textContent, /End unconfirmed/);
-  assert.equal(row.children.length, 4);
+  assert.equal(row.children.length, 5);
   assert.equal(row.children[0].firstChild.textContent, 'Child.dtsx');
   assert.equal(row.children[0].children[1].textContent, 'Call path: Parent › Run[1] ');
   assert.equal(paths.children[1].children.at(-1).textContent, '\\Parent\\Run[1] ');
@@ -168,17 +168,18 @@ test('keyed child rendering updates incomplete pairs without result links, retai
   assert.equal(row.children[0].children[1].children.length, 0);
   assert.match(dom.get('children-status').textContent, /no public numeric ID/);
   assert.match(dom.get('children-status').textContent, /2 calls on this page/);
-  assert.equal(row.children[1].children.length, 2);
-  assert.equal(row.children[1].children[1].children[1].textContent, '—');
+  // Started and Ended are separate one-line cells.
+  assert.equal(row.children[1].children.length, 1);
+  assert.equal(row.children[2].textContent, '—');
   paths.open = true; summary.focus(); dom.get('detail-refresh').dispatchEvent(new Event('click')); await flush();
   dom.get('legacy-detail-link').focus(); dom.get('children-scroll').scrollLeft = 180;
   pending.resolve(childPage([child('1', { ended_at: wireTime, duration_seconds: 0, state: 'complete' }), child('3')])); await flush();
   assert.equal(dom.childBody.firstChild, row); assert.equal(paths.open, true);
   assert.equal(dom.document.activeElement, dom.get('legacy-detail-link')); assert.equal(dom.get('children-scroll').scrollLeft, 180);
   assert.match(row.textContent, /Start\/end recorded/); assert.doesNotMatch(row.textContent, /Success|Succeeded|Executable ID/);
-  assert.equal(row.children[3].firstChild.dataset.result, undefined);
-  assert.equal(row.children[2].textContent, display.duration(0));
-  assert.equal(row.children[1].children[1].children[1].firstChild.getAttribute('datetime'), wireTime);
+  assert.equal(row.children[4].firstChild.dataset.result, undefined);
+  assert.equal(row.children[3].textContent, display.duration(0));
+  assert.equal(row.children[2].firstChild.getAttribute('datetime'), wireTime);
 });
 
 test('visible call paths distinguish loops and tasks without merging repeated calls or claiming a total', async t => {

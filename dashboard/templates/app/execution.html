@@ -6,8 +6,8 @@
 {% block content %}
         <div class="page-heading detail-page-heading">
             <div class="detail-heading">
-                <nav class="detail-breadcrumb" aria-label="Execution context"><ol><li><a href="{{ app_config.app_base }}" data-overview-link>Overview</a></li><li><a data-detail-breadcrumb="folder">—</a></li><li><a data-detail-breadcrumb="project">—</a></li></ol></nav>
-                <div class="detail-title"><h1 data-detail-field="package">—</h1><span>#{{ app_config.execution_id }}</span><span class="status-badge" data-detail-field="status">—</span>{{ tip('entry-package-tip', 'About entry package', 'Entry package: the package used to start this execution. Recorded package calls appear in their own tab.') }}</div>
+                <nav class="detail-breadcrumb" aria-label="Execution context"><ol><li><a href="{{ app_config.app_base }}" data-overview-link>Overview</a></li><li hidden><a data-detail-breadcrumb="folder"></a></li><li hidden><a data-detail-breadcrumb="project"></a></li></ol></nav>
+                <div class="detail-title"><h1 data-detail-field="package">Execution {{ app_config.execution_id }}</h1><span data-detail-id hidden>#{{ app_config.execution_id }}</span><span class="status-badge" data-detail-field="status" hidden></span>{{ tip('entry-package-tip', 'About entry package', 'Entry package: the package used to start this execution. Recorded package calls appear in their own tab.') }}</div>
             </div>
             <div class="section-actions">
                 <p class="resource-status refresh-status" data-detail-poll-status data-detail-status role="status">Waiting for settings.</p>
@@ -44,9 +44,10 @@
                     <button type="button" id="detail-tab-overrides" data-overrides-toggle role="tab" aria-selected="false" aria-controls="detail-panel-overrides" aria-describedby="overrides-unavailable" tabindex="-1" disabled>Overrides</button>
                     <button type="button" id="detail-tab-history" data-history-toggle role="tab" aria-selected="false" aria-controls="detail-panel-history" tabindex="-1" disabled>History</button>
                 </div>
-                <p class="resource-status" id="events-unavailable" data-events-unavailable hidden>Event access is disabled for this application.</p>
-                <p class="resource-status" id="parameters-unavailable" data-parameters-unavailable hidden>Parameter access is disabled for this application.</p>
-                <p class="resource-status" id="overrides-unavailable" data-overrides-unavailable hidden>Override access is disabled for this application.</p>
+                <p class="resource-status tab-notes" data-tab-notes hidden></p>
+                <span class="visually-hidden" id="events-unavailable" data-events-unavailable hidden>Event access is disabled for this application.</span>
+                <span class="visually-hidden" id="parameters-unavailable" data-parameters-unavailable hidden>Parameter access is disabled for this application.</span>
+                <span class="visually-hidden" id="overrides-unavailable" data-overrides-unavailable hidden>Override access is disabled for this application.</span>
             </div>
             <section class="panel detail-panel observation-section" id="detail-panel-events" data-detail-tab-panel="events" role="tabpanel" aria-labelledby="detail-tab-events" tabindex="0" hidden>
                 <div id="execution-events" data-events-panel hidden>
@@ -81,9 +82,9 @@
                     <div class="table-scroll" data-executables-scroll role="region" aria-label="Executable observations table" tabindex="0">
                         <table class="detail-table" data-executables-table>
                             <caption class="visually-hidden">Observed executable invocations</caption>
-                            <colgroup><col><col><col><col><col></colgroup>
-                            <thead><tr><th scope="col" aria-sort="none"><button type="button" data-executables-header-statistics_id>Statistics ID</button></th><th scope="col">Executable / paths</th><th scope="col" aria-sort="none"><button type="button" data-executables-header-started_at>Started</button> / Ended</th><th scope="col">Duration</th><th scope="col">Result</th></tr></thead>
-                            <tbody><tr><td colspan="5">Open this section to load observations.</td></tr></tbody>
+                            <colgroup><col><col><col><col><col><col></colgroup>
+                            <thead><tr><th scope="col" aria-sort="none"><button type="button" data-executables-header-statistics_id>Statistics ID</button></th><th scope="col">Executable / paths</th><th scope="col" aria-sort="none"><button type="button" data-executables-header-started_at>Started</button></th><th scope="col">Ended</th><th scope="col" class="number-cell">Duration</th><th scope="col">Result</th></tr></thead>
+                            <tbody><tr><td colspan="6">Open this section to load observations.</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -98,9 +99,9 @@
                     <div class="table-scroll" data-children-scroll role="region" aria-label="Package calls table" tabindex="0">
                         <table class="detail-table" data-children-table>
                             <caption class="visually-hidden">Recorded package calls</caption>
-                            <colgroup><col><col><col><col></colgroup>
-                            <thead><tr><th scope="col">Package / call path</th><th scope="col" aria-sort="none"><button type="button" data-children-header-started_at>Started</button> / Ended</th><th scope="col">Duration</th><th scope="col">Recording {{ tip('recording-tip', 'About recording', 'Start/end recording is not a package result.') }}</th></tr></thead>
-                            <tbody><tr><td colspan="4">Open this section to load observations.</td></tr></tbody>
+                            <colgroup><col><col><col><col><col></colgroup>
+                            <thead><tr><th scope="col">Package / call path</th><th scope="col" aria-sort="none"><button type="button" data-children-header-started_at>Started</button></th><th scope="col">Ended</th><th scope="col" class="number-cell">Duration</th><th scope="col">Recording {{ tip('recording-tip', 'About recording', 'Start/end recording is not a package result.') }}</th></tr></thead>
+                            <tbody><tr><td colspan="5">Open this section to load observations.</td></tr></tbody>
                         </table>
                     </div>
                 </div>

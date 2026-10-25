@@ -31,7 +31,7 @@ export function detailDOM() {
   document.activeElement = document.body;
   const nodes = new Map();
   for (const key of ['app-status', 'retry', 'request-id', 'display-timezone', 'execution-detail',
-    'active-elapsed',
+    'active-elapsed', 'detail-id', 'tab-notes',
     'detail-refresh', 'detail-poll-toggle', 'detail-poll-status', 'overview-link', 'legacy-detail-link',
     'overview-return-notice', 'parameters-unavailable', 'overrides-unavailable', 'overrides-policy', ...['toggle','panel','plot','selected','scale','empty','x-axis','y-axis'].map(key=>`history-chart-${key}`), ...['filters','choices','apply','custom','close','presets','status-options'].map(key => `history-${key}`), ...['unavailable','filters','apply','reset','kind','q'].map(key => `events-${key}`), ...['toggle', 'panel', 'status', 'notice', 'retry', 'sort',
       'limit', 'previous', 'next', 'latest', 'scroll', 'table', 'order-label'].flatMap(name => ['executables', 'children', 'events', 'parameters', 'overrides', 'history'].map(section => `${section}-${name}`))]) {
@@ -48,9 +48,9 @@ export function detailDOM() {
   // Package/status live in the visible page heading, outside the hideable detail body.
   root.append(...fields.filter(node => ['package', 'status'].includes(node.dataset.detailField)));
   get('execution-detail').append(...fields.filter(node => !['package', 'status'].includes(node.dataset.detailField)));
-  for (const key of ['folder', 'project', 'package']) {
-    const node = new Node(document, key === 'package' ? 'span' : 'a');
-    nodes.set(`[data-detail-breadcrumb="${key}"]`, node); root.append(node);
+  for (const key of ['folder', 'project']) {
+    const item = new Node(document, 'li'), node = new Node(document, 'a');
+    nodes.set(`[data-detail-breadcrumb="${key}"]`, node); item.append(node); root.append(item);
   }
   const countLinks = fields.filter(node => ['all','warnings','errors','duplicate_warnings','memory_warnings'].includes(node.dataset.detailField));
   for (const node of countLinks) { node.tag = 'a'; node.dataset.eventCountLink = node.dataset.detailField.replaceAll('_','-'); }

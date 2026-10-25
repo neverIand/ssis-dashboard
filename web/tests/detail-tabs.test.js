@@ -342,10 +342,12 @@ test('breadcrumb renders literal authorized identity, scoped links and clears it
     return response;
   } }); await flush();
   const folder = dom.root.querySelector('[data-detail-breadcrumb="folder"]');
-  assert.equal(folder.textContent, '<Folder> + /');
+  assert.equal(folder.textContent, '<Folder> + /'); assert.equal(folder.parentElement.hidden, false);
   assert.equal(new URL(folder.href, dom.window.location.origin).searchParams.get('folder'), '<Folder> + /');
   denied = true; click(dom, 'detail-refresh'); await flush();
-  assert.equal(folder.textContent, '\u2014'); assert.equal(folder.getAttribute('href'), null);
+  // No placeholder crumb: the item disappears with its text and link.
+  assert.equal(folder.textContent, ''); assert.equal(folder.getAttribute('href'), null);
+  assert.equal(folder.parentElement.hidden, true);
 });
 
 test('tab loader selects the newest fragment even before the first base detail resolves', async t => {

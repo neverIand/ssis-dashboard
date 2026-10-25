@@ -64,6 +64,19 @@ export function mountDetailTabs(root, { metadata, select, revealInitial = true }
   for (const tab of tabs) tab.button.addEventListener('keydown', keyboard);
   window.addEventListener('hashchange', changed);
   window.addEventListener('scroll', cancelReveal, { passive: true });
+  const notes = root.querySelector('[data-tab-notes]');
+  const disabled = tabs.filter(({ key }) => ['events', 'parameters', 'overrides'].includes(key) && !tabAllowed(key, metadata));
+  if (notes) {
+    notes.textContent = disabled.length ? `Disabled for this application: ${disabled.map(tab => tab.label).join(', ')}` : '';
+    notes.hidden = !disabled.length;
+  }
+  // Horizontal only: a narrow tab strip scrolls to the selected tab without moving the page.
+  function keepVisible(button) {
+    const list = button.parentElement, box = list.getBoundingClientRect?.(), tab = button.getBoundingClientRect?.();
+    if (!box || !tab) return;
+    if (tab.left < box.left) list.scrollLeft -= box.left - tab.left;
+    else if (tab.right > box.right) list.scrollLeft += tab.right - box.right;
+  }
   function render(state) {
     const previous = current;
     current = state.response ? state : null;
@@ -78,6 +91,7 @@ export function mountDetailTabs(root, { metadata, select, revealInitial = true }
         button.setAttribute('aria-describedby', `${key}-unavailable`);
       } else button.removeAttribute('aria-describedby');
       panel.hidden = !selected;
+      if (selected && previous?.activeTab !== key) keepVisible(button);
     }
     if (current && previous && previous.activeTab !== state.activeTab) {
       const old = tabs.find(tab => tab.key === previous.activeTab);

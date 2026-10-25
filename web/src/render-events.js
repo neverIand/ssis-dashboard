@@ -28,9 +28,10 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
   const text = (node, value) => { if (node.textContent !== value) node.textContent = value; };
   const literal = value => value === null ? '—' : value === '' ? '(empty)' : String(value);
   const label = value => value === 'all' ? 'All events' : value.charAt(0).toUpperCase() + value.slice(1).replaceAll('-', ' ');
-  for (const value of metadata.event_kinds) {
-    const option = element('option', label(value)); option.value = value; kind.append(option);
-  }
+  // Replace, not append: a back/forward-cache restore mounts this view again on the same DOM.
+  kind.replaceChildren(...metadata.event_kinds.map(value => {
+    const option = element('option', label(value)); option.value = value; return option;
+  }));
   q.value = returning?.draft?.q ?? ''; kind.value = 'all';
   const showDraft = () => { apply.className = q.value !== (applied?.q ?? '') ? 'button-primary' : ''; };
   const fields = [['event_id', 'Event ID'], ['message_type', 'Message type'],
@@ -44,7 +45,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
     if (!page.data.length) {
       empty(pageNumber > 1 ? 'No events remain on this page. Use Previous or First page.'
         : page.meta.availability === 'not-recorded' ? 'No events recorded. Logging was disabled.'
-          : page.meta.availability === 'unknown' ? 'No matching events on this page. Recording coverage is unknown.' : 'No matching events on this page.');
+          : page.meta.availability === 'unknown' ? 'No matching events. Recording coverage is unknown.' : 'No matching events.');
       return;
     }
     if (!rows.size) body.replaceChildren();
@@ -113,7 +114,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
       for (const node of [retry, previous, next, latest, kind, q, apply, reset]) node.disabled = panel.hidden;
       for (const node of [retry, latest]) node.setAttribute('aria-disabled', String(busy));
       previous.setAttribute('aria-disabled', String(busy || !state.hasPrevious)); next.setAttribute('aria-disabled', String(busy || !state.hasNext));
-      table.setAttribute('aria-busy', String(busy)); retry.hidden = state.phase !== 'error' && !(busy && !retry.hidden);
+      table.setAttribute('aria-busy', String(busy)); retry.hidden = state.phase !== 'error' && !state.error && !(busy && !retry.hidden);
       order.render(state.query, busy, panel.hidden);
       kind.value = state.query.kind;
       if ((!applied && !returning?.draft) || (applied && applied.q !== state.query.q)) q.value = state.query.q ?? '';

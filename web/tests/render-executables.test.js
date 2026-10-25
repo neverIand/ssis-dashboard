@@ -7,7 +7,7 @@ import { detailDOM, detailResponse } from './detail-fixture.js';
 import { executable, executablePage } from './executable-fixture.js';
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
-const paths = row => row.children[1].children[3];
+const paths = row => row.children[1].children[2];
 function mount(t, get, restoreView) {
   const dom = detailDOM(), calls = [];
   const screen = mountDetail(dom.root, { metadata: metadata(), executionId: '17', appBase: '/ops/app/', restoreView,
@@ -27,11 +27,11 @@ test('default observations load once; keyed rows preserve literal paths, expansi
   assert.equal(dom.body.children.length, 2);
   assert.match(dom.body.textContent, /<b>Task 影狼<\/b>/);
   assert.match(dom.body.textContent, /\(empty\)/);
-  assert.equal(row.children.length, 5);
-  assert.equal(row.children[2].children[0].firstChild.textContent, 'Started');
-  assert.equal(row.children[2].children[1].firstChild.textContent, 'Ended');
-  assert.equal(row.children[2].children[0].children[1].firstChild.attributes.get('datetime'), '2026-10-17T16:00:00.1234567Z');
-  assert.equal(row.children[2].children[1].children[1].textContent, '—');
+  // Separate one-line Started and Ended cells; package and executable ID share one line.
+  assert.equal(row.children.length, 6);
+  assert.equal(row.children[1].children[1].textContent, 'Package: Main.dtsx · Executable ID: 2');
+  assert.equal(row.children[2].firstChild.attributes.get('datetime'), '2026-10-17T16:00:00.1234567Z');
+  assert.equal(row.children[3].textContent, '—');
   paths(row).open = true; summary.focus();
   dom.get('detail-refresh').dispatchEvent(new Event('click')); await settle();
   run.click('next'); dom.get('detail-refresh').dispatchEvent(new Event('click'));

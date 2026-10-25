@@ -228,7 +228,8 @@ test('event denial clears row text with a connected focus fallback; 404 also cle
   assert.doesNotMatch(run.dom.eventBody.textContent, /literal|影狼/);
   assert.equal(run.dom.document.activeElement, run.dom.get('events-scroll')); assert.equal(run.dom.field('package').textContent, 'Main.dtsx');
   failure = new ApiError('http', { status: 404 }); run.action('retry'); await flush();
-  assert.equal(run.dom.field('package').textContent, '—'); assert.equal(run.dom.field('status').textContent, '—');
+  assert.equal(run.dom.field('package').textContent, 'Execution 17'); assert.equal(run.dom.field('status').textContent, '');
+  assert.equal(run.dom.field('status').hidden, true);
 });
 
 test('retained message/source expansion restores after a fresh read and missing message focus uses the table', async t => {

@@ -108,43 +108,45 @@
                 {% endfor %}
             </div>
         </section>
-        <section class="panel timeline-panel" id="creation-timeline" data-timeline-panel aria-label="Creation timeline" hidden>
-            <div class="table-toolbar">
-                <label>Interval<select data-timeline-bucket><option value="day">Day</option><option value="hour">Hour</option></select></label>
-                <label class="timeline-choice">Bucket<select data-timeline-choice></select></label>
-                <div class="duration-legend"><span data-chart-status="7">Succeeded</span><span data-chart-status="4">Failed</span><span data-chart-status="other">Other</span></div>
-                <span class="info-tip"><button type="button" class="info-trigger" aria-label="About timeline counts" aria-describedby="timeline-tip"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="8"/><path d="M10 9v6 M10 5v1"/></svg></button><span class="info-text" hidden id="timeline-tip" role="tooltip"><span data-timeline-scope></span> Starts and current outcomes belong to each execution's creation bucket. Edge buckets include only the selected range. Hover or focus for values; Left/Right or Home/End to move.</span></span>
-                <div class="toolbar-meta"><p class="inline-status" data-timeline-status role="status"></p><button type="button" class="button-quiet" data-timeline-retry hidden>Retry</button></div>
-            </div>
-            <div class="chart-frame">
-                <div class="chart-y-axis" data-timeline-y-axis aria-label="Execution count scale"></div>
-                <svg class="timeline-chart" data-timeline-chart viewBox="0 0 1000 170" preserveAspectRatio="none" role="listbox" aria-orientation="horizontal" aria-label="Created executions by current outcome, earliest to latest"></svg>
-                <div class="chart-x-axis" data-timeline-x-axis aria-label="Calendar bucket starts"></div>
-                <span class="chart-axis-caption">Created time →</span><span class="visually-hidden" data-timeline-scale></span>
-            </div>
-            <p class="resource-status chart-empty" data-timeline-zero role="status" hidden>Every bucket has zero created executions.</p>
-            <p class="inline-status chart-selection" data-timeline-selected role="status" tabindex="0" aria-label="Selected bucket values"></p>
-            <details data-timeline-values><summary>Data table</summary>
-                <div class="table-scroll timeline-scroll" data-timeline-scroll role="region" aria-label="Timeline values" tabindex="0">
-                    <table data-timeline-table><caption class="visually-hidden">Creation-cohort counts per calendar interval</caption>
-                        <thead><tr><th scope="col">Bucket start (inclusive)</th><th scope="col">Bucket end (exclusive)</th><th scope="col">Created</th><th scope="col">With an actual start</th><th scope="col">Currently succeeded</th><th scope="col">Currently failed</th><th scope="col">Other</th></tr></thead><tbody></tbody>
-                    </table>
-                </div>
-            </details>
-        </section>
         <section class="executions panel" aria-labelledby="executions-heading">
             <div class="table-toolbar">
                 <h2 id="executions-heading">Executions</h2>
                 <div class="toolbar-meta"><span class="inline-notice" data-order-notice role="status"></span><span class="inline-notice" data-page-notice role="status"></span><p class="inline-status" data-executions-status role="status"></p><button type="button" class="button-quiet" data-list-retry hidden>Retry</button></div>
                 <button type="button" data-timeline-toggle disabled aria-expanded="false" aria-controls="creation-timeline">Timeline</button>
                 <label>Sort<select data-order="sort" disabled><option value="execution_id:desc">ID ↓</option></select></label>
+                <div class="table-paging">
                 <label class="page-size">Rows<select data-order="limit" disabled></select></label>
                 <nav class="pagination" aria-label="Execution pages">
                     <button type="button" class="icon-button" data-executions-latest disabled aria-label="First page" title="First page">{{ icon('first') }}</button>
                     <button type="button" class="icon-button" data-executions-previous disabled aria-label="Previous page" title="Previous page">{{ icon('previous') }}</button>
                     <button type="button" class="icon-button" data-executions-next disabled aria-label="Next page" title="Next page">{{ icon('next') }}</button>
                 </nav>
+                </div>
             </div>
+            <section class="timeline-panel" id="creation-timeline" data-timeline-panel aria-label="Creation timeline" hidden>
+                <div class="table-toolbar">
+                    <label>Interval<select data-timeline-bucket><option value="day">Day</option><option value="hour">Hour</option></select></label>
+                    <label class="timeline-choice">Bucket<select data-timeline-choice></select></label>
+                    <div class="duration-legend"><span data-chart-status="7">Succeeded</span><span data-chart-status="4">Failed</span><span data-chart-status="other">Other</span></div>
+                    <span class="info-tip"><button type="button" class="info-trigger" aria-label="About timeline counts" aria-describedby="timeline-tip"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="8"/><path d="M10 9v6 M10 5v1"/></svg></button><span class="info-text" hidden id="timeline-tip" role="tooltip"><span data-timeline-scope></span> Starts and current outcomes belong to each execution's creation bucket. Edge buckets include only the selected range. Hover or focus for values; Left/Right or Home/End to move.</span></span>
+                    <div class="toolbar-meta"><p class="inline-status" data-timeline-status role="status"></p><button type="button" class="button-quiet" data-timeline-retry hidden>Retry</button></div>
+                </div>
+                <div class="chart-frame">
+                    <div class="chart-y-axis" data-timeline-y-axis aria-label="Execution count scale"></div>
+                    <svg class="timeline-chart" data-timeline-chart viewBox="0 0 1000 170" preserveAspectRatio="none" role="listbox" aria-orientation="horizontal" aria-label="Created executions by current outcome, earliest to latest"></svg>
+                    <div class="chart-x-axis" data-timeline-x-axis aria-label="Calendar bucket starts"></div>
+                    <span class="chart-axis-caption">Created time →</span><span class="visually-hidden" data-timeline-scale></span>
+                </div>
+                <p class="resource-status chart-empty" data-timeline-zero role="status" hidden>Every bucket has zero created executions.</p>
+                <p class="inline-status chart-selection" data-timeline-selected role="status" tabindex="0" aria-label="Selected bucket values"></p>
+                <details data-timeline-values><summary>Data table</summary>
+                    <div class="table-scroll timeline-scroll" data-timeline-scroll role="region" aria-label="Timeline values" tabindex="0">
+                        <table data-timeline-table><caption class="visually-hidden">Creation-cohort counts per calendar interval</caption>
+                            <thead><tr><th scope="col">Bucket start (inclusive)</th><th scope="col">Bucket end (exclusive)</th><th scope="col">Created</th><th scope="col">With an actual start</th><th scope="col">Currently succeeded</th><th scope="col">Currently failed</th><th scope="col">Other</th></tr></thead><tbody></tbody>
+                        </table>
+                    </div>
+                </details>
+            </section>
             <div class="table-scroll" data-execution-scroll data-loading role="region" aria-labelledby="executions-heading" tabindex="0">
                 <table data-execution-table>
                     <caption class="visually-hidden">Executions in the selected creation window</caption>

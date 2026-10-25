@@ -7,10 +7,12 @@
 {%- endmacro %}
 
 {% macro pager(resource, label) -%}
+<div class="table-paging">
 <label class="page-size">Rows <select data-{{ resource }}-limit aria-label="{{ label }} rows per page"></select></label>
 <nav class="pagination" aria-label="{{ label }} pages">
     <button type="button" class="icon-button" data-{{ resource }}-latest aria-label="First page" title="First page">{{ icon('first') }}</button>
     <button type="button" class="icon-button" data-{{ resource }}-previous aria-disabled="true" aria-label="Previous page" title="Previous page">{{ icon('previous') }}</button>
     <button type="button" class="icon-button" data-{{ resource }}-next aria-disabled="true" aria-label="Next page" title="Next page">{{ icon('next') }}</button>
 </nav>
+</div>
 {%- endmacro %}

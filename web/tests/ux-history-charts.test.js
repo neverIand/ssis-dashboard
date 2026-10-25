@@ -89,9 +89,17 @@ test('history plots chronological creation order independently of table order, w
   const marker=groups[1].children[2];assert.equal(marker.tag,'line');assert.equal(marker.getAttribute('y1'),'85');assert.equal(marker.getAttribute('y2'),'85');
   assert.equal(groups[1].children[1].getAttribute('height'),'37.5');assert.equal(groups[0].children[3].getAttribute('display'),'inline');
   assert.deepEqual(dom.get('history-chart-y-axis').children.map(node=>node.textContent),['40 s','20 s','0 ms']);
-  assert.match(dom.get('history-chart-x-axis').textContent,/2026-10-15.*#17.*2026-10-17.*#16/s);
+  // Short projections use compact ID labels; each label's title keeps the full creation time.
+  assert.deepEqual(dom.get('history-chart-x-axis').children.map(node=>node.textContent),['#17','#19','#16']);
+  assert.match(dom.get('history-chart-x-axis').children[0].title,/2026-10-15.*Execution 17/);
   assert.equal(dom.get('history-chart-scale').textContent,'Duration');
   assert.equal(groups.filter(row=>row.getAttribute('tabindex')==='0').length,1);
+});
+
+test('history chart x labels show creation dates once seven executions give the axis room',async t=>{
+  const rows=Array.from({length:7},(_,index)=>historyRow(String(30-index),{created_at:stamp(10+index),duration_seconds:index+1}));
+  const dom=historyScreen(t,rows);await openHistory(dom,true);
+  assert.match(dom.get('history-chart-x-axis').textContent,/2026-10-10.*#30.*2026-10-16.*#24/s);
 });
 
 test('history hover and keyboard expose values without requests; keyed plot focus survives refresh and removal falls back',async t=>{

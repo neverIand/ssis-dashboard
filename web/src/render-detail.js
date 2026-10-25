@@ -28,6 +28,9 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   returnNotice.textContent = destination.notice;
   returnNotice.hidden = !destination.notice;
   const fields = [...root.querySelectorAll('[data-detail-field]')];
+  const title = fields.find(field => field.dataset.detailField === 'package');
+  const badge = fields.find(field => field.dataset.detailField === 'status');
+  const titleId = root.querySelector('[data-detail-id]');
   const position = () => ({ x: window.scrollX, y: window.scrollY });
   const restorePosition = value => {
     if (window.scrollX !== value.x || window.scrollY !== value.y) window.scrollTo(value.x, value.y);
@@ -86,7 +89,9 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   const clear = () => {
     content.hidden = true;
     elapsed.hidden = true;
-    for (const node of Object.values(breadcrumb)) { node.textContent = '—'; node.removeAttribute('href'); }
+    for (const node of Object.values(breadcrumb)) {
+      node.textContent = ''; node.removeAttribute('href'); node.parentElement.hidden = true;
+    }
     for (const [key, label] of Object.entries(countLabels)) label.textContent = key;
     for (const field of fields) {
       field.textContent = '—';
@@ -95,6 +100,10 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
       delete field.dataset.status;
       delete field.dataset.level;
     }
+    // No placeholder dashes in the title: name the execution until its package is known.
+    title.textContent = `Execution ${executionId}`;
+    badge.textContent = '';
+    badge.hidden = titleId.hidden = true;
   };
   const loader = createDetailLoader({ api, metadata, executionId, autoRefresh: !autoPaused,
     initialTab: readDetailFragment(window.location.hash, metadata) ?? returning?.activeTab ?? {},
@@ -142,6 +151,8 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
       for (const [key, label] of Object.entries(countLabels)) {
         label.textContent = data.event_counts[key] === 1 ? key.slice(0, -1) : key;
       }
+      for (const node of Object.values(breadcrumb)) node.parentElement.hidden = false;
+      badge.hidden = titleId.hidden = false;
       elapsed.hidden = data.started_at === null || data.ended_at !== null;
       content.hidden = false;
     }

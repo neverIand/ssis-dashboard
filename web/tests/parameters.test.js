@@ -197,7 +197,7 @@ test('invalid redaction clears all parameter DOM text and 404 clears the visible
   });
   await flush(); dom.get('parameters-toggle').dispatchEvent(new Event('click')); await flush(); mode = 'invalid'; dom.get('detail-refresh').dispatchEvent(new Event('click')); await flush();
   assert.doesNotMatch(dom.parameterBody.textContent, /1\.2300|forbidden-canary/); assert.equal(dom.field('package').textContent, 'Main.dtsx');
-  mode = '404'; dom.get('parameters-retry').dispatchEvent(new Event('click')); await flush(); assert.equal(dom.field('package').textContent, '—'); assert.equal(dom.field('status').textContent, '—');
+  mode = '404'; dom.get('parameters-retry').dispatchEvent(new Event('click')); await flush(); assert.equal(dom.field('package').textContent, 'Execution 17'); assert.equal(dom.field('status').hidden, true);
 });
 
 test('parameter checkpoints keep only IDs/view state and disabled or changed metadata revalidates before restoration', async t => {
