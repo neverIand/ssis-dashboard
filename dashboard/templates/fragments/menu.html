@@ -35,6 +35,9 @@
 
             <!-- Right nav -->
             <ul class="nav navbar-nav navbar-right">
+                {% if native_bookmark_url %}
+                <li><a href="{{ native_bookmark_url }}">Open native</a></li>
+                {% endif %}
                 <li><a href="#" onclick="javascript:window.location.reload()">{{ engine_info.server_name }}@{{ environment['timestamp'].strftime('%Y-%m-%d %H:%M') }} <i class="fa fa-refresh"></i></a></li> 
                 <li><a href="#"></a></li>
             </ul>

@@ -63,12 +63,14 @@ def create_app(config_overrides=None, *, config_path=None):
     from dashboard.observability import register_observability
     from dashboard.views import register_views
     from dashboard.frontend import register_frontend
+    from dashboard.legacy_navigation import register_legacy_navigation
 
     register_views(app)
     register_frontend(app)
     register_observability(app)
     # Before API input checks and every route's SQL; after request timing starts.
     register_browser_policy(app)
+    register_legacy_navigation(app)
     register_api(app)
     register_error_handlers(app)
     app.context_processor(processors.utility_processor)
