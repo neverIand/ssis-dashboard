@@ -7,6 +7,7 @@
 | Understand architecture, hosting and rollback | [Modernization plan](MODERNIZATION_PLAN.md) |
 | Find current status, open gates and the next task | [Progress](PROGRESS.md) |
 | Pick the next native detail/section task | [Phase 4 tasks](PROGRESS.md#phase-4--native-execution-workflows), [detail architecture](MODERNIZATION_PLAN.md#native-execution-detail-and-section-ownership) |
+| Compare legacy/native workflows and plan bookmark translation | [Frontend parity inventory](FRONTEND_PARITY.md) |
 | Prepare and run real-browser acceptance | [Frontend acceptance procedures](FRONTEND_ACCEPTANCE.md); current [pending status](PROGRESS.md#remaining-browser-acceptance) |
 | Build an API client | [API semantics](API_CONTRACT.md), [OpenAPI schemas/examples](openapi.yaml) |
 | Validate API correctness and performance | [API validation](API_ACCEPTANCE.md) |
