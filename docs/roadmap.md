@@ -52,9 +52,11 @@ Environment-dependent acceptance may wait while the user prepares the test envir
 
 ## Acceptance budgets
 
-Proposed budgets remain **targets**: 50-row execution page test-network p95 below one second, maximum 200 rows per list page, authored frontend JS+CSS below 150 KiB uncompressed. Record the entire bundle including selected libraries. Measure calculated sorts separately and deliberately document any target revision. Set detector latency/load, queues/replay and concurrent stream/API budgets after the prototype. Keep local SQL, WSGI, TCP and production measurements distinct.
+The 50-row execution page test-network p95 below one second remains a measurement target; list pages are capped at 200 rows. Measure calculated sorts separately. Set detector latency/load, queues/replay and concurrent stream/API budgets after the prototype. Keep local SQL, WSGI, TCP and production measurements distinct.
 
-At the user's request on 24 October 2026, enforcement of the authored-source size target is deferred to later code review/refactoring. Current feature tasks record actual source and packaged/gzip sizes in [progress](PROGRESS.md), with budget assessment and any justified simplification left to that review. The 150 KiB figure remains a reference target; this sequencing does not change API row limits or establish a network/performance result.
+Frontend review decision D2 (25 October 2026) replaces the 150 KiB authored-source reference target with enforced ceilings: **300 KiB (307,200 bytes)** of authored `web/src` JS+CSS and **64 KiB (65,536 bytes)** of packaged JS+CSS gzip. Count all recursive `.js`/`.css` files: raw authored bytes, and the sum of per-file deterministic gzip-9 bytes (`mtime=0`) in `dashboard/static/app/`, including `theme-init.js`, split chunks and any selected libraries. After `npm --prefix web run build`, `python -m unittest tests.test_frontend_assets` checks both ceilings and verifies that each check fails above its ceiling.
+
+Batch 2 measures **282,180 authored bytes**, **164,451 packaged bytes** and **48,605 packaged gzip bytes**. The 300 KiB ceiling allows limited headroom above the measured source while keeping growth checked; gzip also bounds the delivered bundle. A separate later task will deduplicate the detail section tables and section API, restore normal formatting in compressed modules and set a lower authored target. This revision does not change API row limits or establish a network/performance result; [progress](PROGRESS.md) records validation and remaining gates.
 
 ## Later
 

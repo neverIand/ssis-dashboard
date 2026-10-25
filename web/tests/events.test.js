@@ -5,7 +5,7 @@ import { createDetailLoader } from '../src/detail.js';
 import { createDisplay } from '../src/display.js';
 import { eventQuery, readEventPage } from '../src/events.js';
 import { mountDetail } from '../src/render-detail.js';
-import { detailDOM, detailResponse } from './detail-fixture.js';
+import { detailDOM, detailResponse, runningDetailResponse } from './detail-fixture.js';
 import { deferred, wireTime } from './fixtures.js';
 import { executablePage } from './executable-fixture.js';
 import { childPage } from './child-fixture.js';
@@ -134,7 +134,8 @@ test('event errors remain scoped, expiry resets once, and a section 404 clears a
 test('one completion-based scheduler waits for event work and coalesces manual and visibility recovery', async t => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
   const pending = deferred(); let count = 0;
-  const run = setup(t, resource => resource.endsWith('/events') && ++count === 2 ? pending.promise : Promise.resolve(response(resource)),
+  const run = setup(t, resource => resource === 'executions/17' ? runningDetailResponse('17')
+    : resource.endsWith('/events') && ++count === 2 ? pending.promise : Promise.resolve(response(resource)),
     { autoRefresh: true, pollIntervalMs: 1000 });
   await run.owner.load(); await run.owner.toggleEvents(); t.mock.timers.tick(1000); await flush();
   const requests = run.calls.length; run.owner.refresh(); run.owner.nextEvents(); run.owner.setVisible(false); run.owner.setVisible(true);

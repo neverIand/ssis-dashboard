@@ -1,5 +1,6 @@
 """Packaged browser assets work through Flask without Node or SQL at runtime."""
 
+import gzip
 import json
 from pathlib import Path, PurePosixPath
 import unittest
@@ -14,6 +15,44 @@ from dashboard import create_app
 
 
 ASSET_ROOT = Path(__file__).resolve().parents[1] / 'dashboard/static/app'
+SOURCE_ROOT = ASSET_ROOT.parents[2] / 'web/src'
+AUTHORED_BUDGET = 300 * 1024
+PACKAGED_GZIP_BUDGET = 64 * 1024
+
+
+class FrontendSizeBudgetTests(unittest.TestCase):
+    """Roadmap ceilings cover all authored and delivered JS/CSS, including chunks."""
+
+    def authored_bytes(self):
+        files = [path for path in SOURCE_ROOT.rglob('*') if path.suffix in {'.js', '.css'} and path.is_file()]
+        self.assertTrue(files, 'Authored JS/CSS is missing')
+        return sum(path.stat().st_size for path in files)
+
+    def packaged_gzip_bytes(self):
+        if not ASSET_ROOT.is_dir():
+            self.skipTest('Frontend assets are not built; run npm --prefix web run build')
+        files = [path for path in ASSET_ROOT.rglob('*') if path.suffix in {'.js', '.css'} and path.is_file()]
+        self.assertTrue(files, 'Packaged JS/CSS is missing; run npm --prefix web run build')
+        return sum(len(gzip.compress(path.read_bytes(), compresslevel=9, mtime=0)) for path in files)
+
+    def test_authored_source_budget(self):
+        size = self.authored_bytes()
+        self.assertLessEqual(size, AUTHORED_BUDGET, f'Authored JS+CSS: {size} > {AUTHORED_BUDGET} bytes')
+
+    def test_packaged_gzip_budget(self):
+        size = self.packaged_gzip_bytes()
+        self.assertLessEqual(size, PACKAGED_GZIP_BUDGET, f'Packaged gzip-9 JS+CSS: {size} > {PACKAGED_GZIP_BUDGET} bytes')
+
+    def test_budget_checks_accept_the_ceiling_and_reject_one_byte_above(self):
+        for method, budget, size in [('test_authored_source_budget', 'AUTHORED_BUDGET', self.authored_bytes()),
+                                     ('test_packaged_gzip_budget', 'PACKAGED_GZIP_BUDGET', self.packaged_gzip_bytes())]:
+            for ceiling, failures in [(size, 0), (size - 1, 1)]:
+                with self.subTest(method=method, ceiling=ceiling), patch(f'{__name__}.{budget}', ceiling):
+                    result = unittest.TestResult()
+                    FrontendSizeBudgetTests(method).run(result)
+                    self.assertEqual(result.errors, [])
+                    self.assertEqual(result.skipped, [])
+                    self.assertEqual(len(result.failures), failures)
 
 
 class PackagedFrontendTests(unittest.TestCase):

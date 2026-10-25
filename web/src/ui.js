@@ -4,8 +4,9 @@ const paths = {
   play: 'M8 5l11 7-11 7Z',
 };
 
-export function pollingButton(button, paused) {
-  const name = paused ? 'play' : 'pause', label = paused ? 'Resume auto refresh' : 'Pause auto refresh';
+export function pollingButton(button, paused, ended = false) {
+  const name = paused || ended ? 'play' : 'pause', label = ended ? 'Automatic refresh is off for an ended execution'
+    : paused ? 'Resume auto refresh' : 'Pause auto refresh';
   button.setAttribute('aria-label', label);
   button.title = label;
   if (button.dataset.icon === name) return;

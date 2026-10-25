@@ -95,7 +95,7 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     return [key, section];
   }));
   let active = null, disposed = false, generation = 0, tabInitialized = false;
-  let state = { phase: 'idle', executionId, response: null, error: null, stale: false,
+  let state = { phase: 'idle', executionId, response: null, terminal: false, error: null, stale: false,
     operation: 'initial', sectionBusy: null, activeTab: null, ...sections };
   const busy = () => state.phase === 'loading';
   const show = poll => publish({ ...state, busy: busy(), poll, ...Object.fromEntries(keys.map(key => [key, {
@@ -107,7 +107,7 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
   function emit(changes) {
     state = { ...state, ...changes };
     const errors = [state.error, ...keys.filter(key => state[key].open).map(key => state[key].error)].filter(Boolean);
-    show(loop.update({ busy: busy(), eligible: true, failed: errors.length > 0,
+    show(loop.update({ busy: busy(), eligible: !state.terminal, failed: errors.length > 0,
       retryable: errors.every(transient), coversReturn: state.operation === 'initial' || state.operation === 'select' }));
   }
   const updateSection = (key, changes) => { state = { ...state, [key]: { ...state[key], ...changes } }; };
@@ -185,7 +185,8 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
           paths.history = emptyPath();
           updateSection('history', { page: null, error: null, stale: false });
         }
-        emit({ response: detail, stale: false });
+        // Only a successful base read changes polling eligibility; failures keep it.
+        emit({ response: detail, terminal: detail.data.ended_at !== null, stale: false });
       }
       while (job.queue.size && state.response) {
         const key = job.queue.values().next().value;
@@ -338,12 +339,12 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
       if (id === state.executionId) return load();
       cancel(); loop.reset(); tabInitialized = false;
       paths = Object.fromEntries(keys.map(key => [key, emptyPath()]));
-      state = { phase: 'idle', executionId: id, response: null, error: null, stale: false, operation: 'select', sectionBusy: null,
+      state = { phase: 'idle', executionId: id, response: null, terminal: false, error: null, stale: false, operation: 'select', sectionBusy: null,
         ...Object.fromEntries(keys.map(key => [key, { ...initialSection(key), open: state[key].open }])) };
       return load();
     },
     setVisible: loop.setVisible,
-    togglePolling: () => loop.togglePaused(),
+    togglePolling: () => { if (!state.terminal) loop.togglePaused(); },
     dispose() {
       disposed = true; loop.dispose(); cancel();
       paths = Object.fromEntries(keys.map(key => [key, emptyPath()]));

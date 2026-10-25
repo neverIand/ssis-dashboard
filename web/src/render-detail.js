@@ -114,13 +114,14 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     const focused = document.activeElement;
     const protectedFocus = content.contains(focused);
     content.setAttribute('aria-busy', String(state.busy));
-    refresh.disabled = toggle.disabled = false;
+    refresh.disabled = false;
+    toggle.disabled = state.terminal;
     refresh.setAttribute('aria-disabled', String(state.busy));
     autoPaused = state.poll.paused;
-    pollingButton(toggle, autoPaused);
+    pollingButton(toggle, autoPaused, state.terminal);
     const observed = state.response ? `Observed ${display.timestamp(state.response.meta.generated_at)} · ${state.response.meta.generated_at}` : '';
     const error = state.error ? `${state.error.message}${state.error.requestId ? ` · Request ID: ${state.error.requestId}` : ''}` : '';
-    const refreshText = refreshStatus(display, state.response?.meta.generated_at, state.poll);
+    const refreshText = refreshStatus(display, state.response?.meta.generated_at, state.poll, state.terminal);
     const pageStatus = state.busy && state.operation !== 'section'
       ? (state.response ? 'Refreshing… Previous observation shown.' : 'Loading execution…')
       : state.phase === 'error' ? (state.stale

@@ -12,6 +12,12 @@ export function detailResponse(executionId = '9223372036854775807') {
   });
 }
 
+export function runningDetailResponse(executionId = '9223372036854775807') {
+  const response = detailResponse(executionId);
+  Object.assign(response.data, { status: { code: 2, name: 'running' }, ended_at: null, duration_seconds: null });
+  return response;
+}
+
 // DOM double for mounted startup/render behavior; no browser/layout claims.
 export function detailDOM() {
   const window = Object.assign(new EventTarget(), { location: { origin: 'https://example.test', search: '', hash: '', pathname: '/ops/app/executions/17' },

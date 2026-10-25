@@ -5,7 +5,7 @@ import { createDetailLoader } from '../src/detail.js';
 import { createDisplay } from '../src/display.js';
 import { executableQuery, readExecutablePage } from '../src/executables.js';
 import { deferred, metadata, wireTime } from './fixtures.js';
-import { detailResponse } from './detail-fixture.js';
+import { detailResponse, runningDetailResponse } from './detail-fixture.js';
 import { executable, executablePage } from './executable-fixture.js';
 
 const flush = () => new Promise(resolve => setImmediate(resolve));
@@ -68,7 +68,7 @@ test('section loads only when opened; paging and refresh retain query/path while
 test('one scheduler waits for base plus section and coalesces manual/paging/visibility actions', async t => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
   const pending = deferred(); let sections = 0;
-  const run = setup(t, async resource => !resource.endsWith('/executables') ? detailResponse('17')
+  const run = setup(t, async resource => !resource.endsWith('/executables') ? runningDetailResponse('17')
     : ++sections === 2 ? pending.promise : executablePage(),
   { autoRefresh: true, pollIntervalMs: 1000, maxPollIntervalMs: 10000 });
   await run.owner.load(); await run.owner.toggleExecutables();
@@ -128,7 +128,7 @@ test('section denial/malformed data clears that section; execution-scoped 404 cl
     new ApiError('http', { status: 404 })]) {
     let failed = false;
     const run = setup(t, async resource => {
-      if (!resource.endsWith('/executables')) return detailResponse('17');
+      if (!resource.endsWith('/executables')) return runningDetailResponse('17');
       if (failed) throw failure;
       return executablePage();
     }, { autoRefresh: true });
@@ -183,7 +183,7 @@ test('closing a denied section restores the base-only polling schedule', async t
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
   let denied = false;
   const run = setup(t, async resource => {
-    if (!resource.endsWith('/executables')) return detailResponse('17');
+    if (!resource.endsWith('/executables')) return runningDetailResponse('17');
     if (denied) throw new ApiError('http', { status: 403 });
     return executablePage();
   }, { autoRefresh: true, pollIntervalMs: 1000 });

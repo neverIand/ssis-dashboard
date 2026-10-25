@@ -93,8 +93,8 @@ export function createDisplay({ timeZone } = {}) {
   };
 }
 
-export function refreshStatus(display, generatedAt, poll) {
-  const mode = { idle: '', scheduled: poll.failures ? 'retry scheduled' : 'auto refresh on',
+export function refreshStatus(display, generatedAt, poll, ended = false) {
+  const mode = ended ? 'Execution ended · auto refresh off' : { idle: '', scheduled: poll.failures ? 'retry scheduled' : 'auto refresh on',
     paused: 'auto refresh paused', hidden: 'auto refresh paused (tab hidden)',
     updating: 'refreshing…', blocked: 'auto refresh stopped' }[poll.mode];
   const text = [generatedAt ? `Updated ${display.clock(generatedAt)}` : '', mode].filter(Boolean).join(' · ');

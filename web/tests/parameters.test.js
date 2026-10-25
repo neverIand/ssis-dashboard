@@ -6,7 +6,7 @@ import { createDisplay } from '../src/display.js';
 import { parameterQuery, readParameterPage } from '../src/values.js';
 import { mountDetail } from '../src/render-detail.js';
 import { deferred } from './fixtures.js';
-import { detailDOM, detailResponse } from './detail-fixture.js';
+import { detailDOM, detailResponse, runningDetailResponse } from './detail-fixture.js';
 import { executablePage } from './executable-fixture.js';
 import { childPage } from './child-fixture.js';
 import { eventMetadata, eventPage } from './event-fixture.js';
@@ -150,7 +150,7 @@ test('parameter deadlines, A to B to A generations and disposal reject late read
 test('the completion-based scheduler coalesces refresh and visibility recovery behind pending parameter work', async t => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
   const wait = deferred(); let delay = true;
-  const run = setup(t, resource => resource.endsWith('/values') && delay ? wait.promise : Promise.resolve(response(resource)), { autoRefresh: true, pollIntervalMs: 100 });
+  const run = setup(t, resource => resource === 'executions/17' ? runningDetailResponse('17') : resource.endsWith('/values') && delay ? wait.promise : Promise.resolve(response(resource)), { autoRefresh: true, pollIntervalMs: 100 });
   await run.owner.load(); const opening = run.owner.toggleParameters(); await flush(); t.mock.timers.tick(1000);
   await run.owner.refresh(); run.owner.setVisible(false); run.owner.setVisible(true); await flush(); assert.equal(run.calls.length, 2);
   delay = false; wait.resolve(parameterPage()); await opening; await flush();

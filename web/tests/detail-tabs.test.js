@@ -5,7 +5,7 @@ import { createDetailLoader } from '../src/detail.js';
 import { mountDetail } from '../src/render-detail.js';
 import { detailTabs, detailFragment, readDetailFragment, defaultDetailTab, executionHref, readOverviewReturn } from '../src/detail-navigation.js';
 import { defaultSelection } from '../src/selection.js';
-import { detailDOM, detailResponse } from './detail-fixture.js';
+import { detailDOM, detailResponse, runningDetailResponse } from './detail-fixture.js';
 import { deferred } from './fixtures.js';
 import { executablePage } from './executable-fixture.js';
 import { childPage } from './child-fixture.js';
@@ -299,12 +299,13 @@ test('selection during delayed base refresh replaces its pending section without
 });
 
 test('retained active tab refetches base and that tab only, retaining search draft in memory', async t => {
-  const first = mounted(t, { hash: '#events/errors' }); await flush();
+  const get = async (resource, { params }) => resource === 'executions/17' ? runningDetailResponse('17') : reply(resource, params);
+  const first = mounted(t, { hash: '#events/errors', get }); await flush();
   first.get('events-q').value = 'private draft'; first.get('detail-poll-toggle').dispatchEvent(new Event('click'));
   const saved = first.screen.checkpoint(); first.screen.dispose();
   assert.deepEqual(saved.activeTab, { tab: 'events', kind: 'errors' });
   assert.doesNotMatch(JSON.stringify(saved), /literal|source_name|Main\.dtsx/);
-  const next = mounted(t, { restoreView: saved }); await flush();
+  const next = mounted(t, { restoreView: saved, get }); await flush();
   assert.deepEqual(next.calls.map(call => call.resource), ['executions/17','executions/17/events']);
   assert.equal(next.get('events-kind').value, 'errors'); assert.equal(next.get('events-q').value, 'private draft');
   assert.equal(next.window.location.hash, '#events/errors');

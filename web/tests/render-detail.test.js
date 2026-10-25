@@ -5,7 +5,7 @@ import { mountDetail } from '../src/render-detail.js';
 import { deferred, envelope, jsonResponse, requestId } from './fixtures.js';
 import { ApiError } from '../src/api.js';
 import { metadata } from './fixtures.js';
-import { detailDOM, detailResponse } from './detail-fixture.js';
+import { detailDOM, detailResponse, runningDetailResponse } from './detail-fixture.js';
 import { executable, executablePage } from './executable-fixture.js';
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
@@ -34,7 +34,7 @@ test('detail bootstrap needs no overview controls and requests metadata, detail 
   assert.equal(dom.get('active-elapsed').hidden, true);
   assert.equal(dom.field('created').textContent, '2026-10-17 17:00:00');
   assert.equal(dom.field('created').getAttribute('title'), response.data.created_at);
-  assert.equal(dom.get('detail-poll-status').textContent, 'Updated 17:00:00 · auto refresh on');
+  assert.equal(dom.get('detail-poll-status').textContent, 'Updated 17:00:00 · Execution ended · auto refresh off');
   assert.ok(dom.get('detail-poll-status').title.includes(detailResponse('17').meta.generated_at));
   dispose();
   assert.equal(dom.get('execution-detail').hidden, true);
@@ -162,7 +162,7 @@ test('a retained detail checkpoint carries only pause/view state and re-fetches 
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
   const dom = detailDOM();
   const options = { metadata: metadata(), executionId: detailResponse().data.execution_id, appBase: '/ops/app/' };
-  const first = mountDetail(dom.root, { ...options, api: { get: async resource => resource.endsWith('/executables') ? observations() : detailResponse() } });
+  const first = mountDetail(dom.root, { ...options, api: { get: async resource => resource.endsWith('/executables') ? observations() : runningDetailResponse() } });
   await settle();
   dom.get('detail-poll-toggle').dispatchEvent(new Event('click'));
   dom.get('detail-refresh').focus();
@@ -176,7 +176,7 @@ test('a retained detail checkpoint carries only pause/view state and re-fetches 
   dom.window.scrollTo(0, 0);
   let calls = 0;
   const second = mountDetail(dom.root, { ...options, restoreView: checkpoint,
-    api: { async get(resource) { calls++; return resource.endsWith('/executables') ? observations() : detailResponse(); } } });
+    api: { async get(resource) { calls++; return resource.endsWith('/executables') ? observations() : runningDetailResponse(); } } });
   await settle();
   assert.equal(calls, 2);
   assert.equal(dom.window.scrollY, 450);
@@ -222,4 +222,89 @@ test('late retained restoration respects focus and scroll moved during revalidat
   await settle();
   assert.equal(dom.document.activeElement, dom.get('overview-link'));
   assert.equal(dom.window.scrollY, 250);
+});
+
+test('ended detail disables Pause with an explanation, ignores visible return and preserves manual two-read Refresh', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
+  const dom = detailDOM(), calls = [];
+  const screen = mountDetail(dom.root, { metadata: metadata(), executionId: detailResponse().data.execution_id,
+    appBase: '/ops/app/', api: { async get(resource) {
+      calls.push(resource); return resource.endsWith('/executables') ? observations() : detailResponse();
+    } } });
+  t.after(screen.dispose);
+  await settle();
+  const toggle = dom.get('detail-poll-toggle');
+  assert.equal(toggle.disabled, true);
+  assert.equal(toggle.getAttribute('aria-label'), 'Automatic refresh is off for an ended execution');
+  assert.equal(toggle.title, toggle.getAttribute('aria-label'));
+  assert.equal(dom.get('detail-refresh').disabled, false);
+  assert.equal(dom.get('detail-poll-status').textContent, 'Updated 17:00:00 · Execution ended · auto refresh off');
+  toggle.dispatchEvent(new Event('click'));
+  assert.equal(screen.checkpoint().autoPaused, false);
+  for (const state of ['hidden', 'visible']) {
+    dom.document.visibilityState = state;
+    dom.document.dispatchEvent(new Event('visibilitychange'));
+  }
+  t.mock.timers.tick(70000);
+  await settle();
+  assert.equal(calls.length, 2);
+  dom.get('detail-refresh').dispatchEvent(new Event('click'));
+  await settle();
+  assert.deepEqual(calls.slice(2), calls.slice(0, 2));
+});
+
+test('a later running read restores the toggle and respects the retained user pause', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
+  for (const paused of [false, true]) {
+    const dom = detailDOM();
+    let ended = false, reads = 0;
+    const screen = mountDetail(dom.root, { metadata: metadata(), executionId: detailResponse().data.execution_id,
+      appBase: '/ops/app/', api: { async get(resource) {
+        reads++; return resource.endsWith('/executables') ? observations() : ended ? detailResponse() : runningDetailResponse();
+      } } });
+    t.after(screen.dispose);
+    await settle();
+    const toggle = dom.get('detail-poll-toggle');
+    if (paused) toggle.dispatchEvent(new Event('click'));
+    ended = true;
+    dom.get('detail-refresh').dispatchEvent(new Event('click'));
+    await settle();
+    assert.equal(toggle.disabled, true);
+    assert.equal(screen.checkpoint().autoPaused, paused);
+    ended = false;
+    dom.get('detail-refresh').dispatchEvent(new Event('click'));
+    await settle();
+    assert.equal(toggle.disabled, false);
+    assert.equal(toggle.getAttribute('aria-label'), paused ? 'Resume auto refresh' : 'Pause auto refresh');
+    assert.equal(toggle.title, toggle.getAttribute('aria-label'));
+    assert.equal(dom.get('detail-poll-status').textContent,
+      `Updated 17:00:00 · auto refresh ${paused ? 'paused' : 'on'}`);
+    t.mock.timers.tick(30000);
+    await settle();
+    assert.equal(reads, paused ? 6 : 8);
+    screen.dispose();
+  }
+});
+
+test('ended cache return and fresh reload each refetch once without retaining a terminal flag or scheduling a timer', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
+  const dom = detailDOM();
+  let reads = 0, checkpoint = null;
+  for (const arrival of ['initial', 'cache', 'reload']) {
+    const before = reads;
+    const screen = mountDetail(dom.root, { metadata: metadata(), executionId: detailResponse().data.execution_id,
+      appBase: '/ops/app/', restoreView: arrival === 'cache' ? checkpoint : null,
+      api: { async get(resource) { reads++; return resource.endsWith('/executables') ? observations() : detailResponse(); } } });
+    t.after(screen.dispose);
+    await settle();
+    assert.equal(reads, before + 2, arrival);
+    assert.equal(dom.get('detail-poll-toggle').disabled, true);
+    checkpoint = screen.checkpoint();
+    assert.equal(checkpoint.autoPaused, false);
+    assert.equal(Object.hasOwn(checkpoint, 'terminal'), false);
+    t.mock.timers.tick(70000);
+    await settle();
+    assert.equal(reads, before + 2, arrival);
+    screen.dispose();
+  }
 });

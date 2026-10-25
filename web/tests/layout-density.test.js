@@ -4,7 +4,7 @@ import test from 'node:test';
 import { ApiError } from '../src/api.js';
 import { mountDetail } from '../src/render-detail.js';
 import { mountInfoTips } from '../src/ui.js';
-import { detailDOM, detailResponse } from './detail-fixture.js';
+import { detailDOM, detailResponse, runningDetailResponse } from './detail-fixture.js';
 import { eventPage } from './event-fixture.js';
 import { historyMetadata, historyPage, historyRow } from './history-fixture.js';
 import { deferred, requestId } from './fixtures.js';
@@ -79,7 +79,7 @@ test('a preset consumes an open Custom draft without an intermediate request', a
 
 test('busy refresh preserves icon names/focus, and closing Custom cannot dispatch while busy', async t => {
   const wait = deferred(); let slow = false;
-  const dom = screen(t, { read: () => slow ? wait.promise : historyPage() }); await flush();
+  const dom = screen(t, { response: () => runningDetailResponse('17'), read: () => slow ? wait.promise : historyPage() }); await flush();
   click(dom.get('history-custom')); chooseStatuses(dom, ['4']);
   const refresh = dom.get('detail-refresh'); refresh.focus(); slow = true; click(refresh); await flush();
   const count = dom.calls.length;
@@ -134,7 +134,7 @@ for (const count of [1, 2]) test(`history caps the centered bar projection for $
 
 test('normal detail status titles include the refresh text once through pause and resume', async t => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
-  const dom = screen(t); await flush();
+  const dom = screen(t, { response: () => runningDetailResponse('17') }); await flush();
   for (const [index, mode] of ['on', 'paused', 'on'].entries()) {
     const status = dom.get('detail-poll-status');
     assert.equal(status.textContent, `Updated 17:00:00 · auto refresh ${mode}`);

@@ -6,7 +6,7 @@ import { createDisplay } from '../src/display.js';
 import { childQuery, readChildPage } from '../src/children.js';
 import { mountDetail } from '../src/render-detail.js';
 import { deferred, metadata, wireTime } from './fixtures.js';
-import { detailDOM, detailResponse } from './detail-fixture.js';
+import { detailDOM, detailResponse, runningDetailResponse } from './detail-fixture.js';
 import { executablePage } from './executable-fixture.js';
 import { child, childPage } from './child-fixture.js';
 
@@ -94,7 +94,7 @@ test('closing an in-flight section preserves queued work and rejects its late ex
 
 test('section denial does not prevent other reads; closing it restores polling; child 404 clears both tables', async t => {
   let failure = null;
-  const run = setup(t, async resource => resource === 'executions/17' ? detailResponse('17')
+  const run = setup(t, async resource => resource === 'executions/17' ? runningDetailResponse('17')
     : resource.endsWith('/children') && failure ? Promise.reject(failure) : resourcePage(resource), { autoRefresh: true });
   await run.owner.load(); await run.owner.toggleExecutables(); await run.owner.toggleChildren();
   failure = new ApiError('http', { status: 403 }); await run.owner.refresh();
@@ -129,7 +129,7 @@ test('transient child error retains its page; expired child reset failure cannot
 test('polling waits for both pages and coalesces manual and visible-return activation', async t => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
   const pending = deferred(); let childCalls = 0;
-  const run = setup(t, resource => resource === 'executions/17' ? Promise.resolve(detailResponse('17'))
+  const run = setup(t, resource => resource === 'executions/17' ? Promise.resolve(runningDetailResponse('17'))
     : resource.endsWith('/children') && ++childCalls === 2 ? pending.promise : Promise.resolve(resourcePage(resource)),
   { autoRefresh: true, pollIntervalMs: 1000 });
   await run.owner.load(); await run.owner.toggleExecutables(); await run.owner.toggleChildren();

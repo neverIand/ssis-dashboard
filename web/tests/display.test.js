@@ -142,3 +142,10 @@ test('one refresh indicator keeps the last observation and distinguishes paused,
   assert.equal(refreshStatus(display, null, {mode:'updating'}), 'Refreshing…');
   assert.equal(refreshStatus(display, null, {mode:'paused'}), 'Auto refresh paused');
 });
+
+test('an ended execution has a compact status independent of pause, visibility and retry state', () => {
+  for (const mode of ['idle', 'paused', 'hidden', 'blocked', 'scheduled']) {
+    assert.equal(refreshStatus(display, wireTime, { mode, failures: 1 }, true),
+      'Updated 17:00:00 · Execution ended · auto refresh off');
+  }
+});
