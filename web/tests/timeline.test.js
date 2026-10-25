@@ -108,10 +108,15 @@ test('one completion-based timer coalesces refresh and visible return behind tim
 
 test('zero buckets have a chart, keyboard selector and complete data table without inventing missing data',async t=>{
   const zero=timelinePage([timelineBucket(undefined,undefined,{created_count:0,started_count:0,succeeded_count:0,failed_count:0})]);
-  const dom=screen(t,async(resource,options)=>resource==='metrics/timeline'?zero:response(resource,options));await dom.view.apply(selection());click(dom,'timeline-toggle');await flush();
+  const dom=screen(t,async(resource,options)=>resource==='metrics/timeline'?zero:response(resource,options));await dom.view.apply(selection());
+  assert.equal(dom.get('timeline-toggle').getAttribute('aria-expanded'),'false');assert.equal(dom.get('timeline-toggle').getAttribute('aria-pressed'),null);
+  click(dom,'timeline-toggle');await flush();
+  assert.equal(dom.get('timeline-toggle').getAttribute('aria-expanded'),'true');assert.equal(dom.get('timeline-toggle').getAttribute('aria-pressed'),null);
   assert.equal(dom.get('timeline-chart').children.length,1);assert.equal(dom.get('timeline-chart').children[0].children[1].getAttribute('height'),'0');assert.equal(dom.get('timeline-zero').hidden,false);
   assert.equal(dom.timelineBody.children[0].children.length,7);assert.equal(dom.timelineBody.children[0].children[2].textContent,'0');assert.equal(dom.get('timeline-choice').children.length,1);
   assert.equal(dom.timelineBody.children[0].children[0].children[0].getAttribute('datetime'),zero.data[0].start);assert.match(dom.get('timeline-scope').textContent,/All statuses/);
+  const reads=dom.calls.length;click(dom,'timeline-toggle');await flush();
+  assert.equal(dom.get('timeline-toggle').getAttribute('aria-expanded'),'false');assert.equal(dom.get('timeline-toggle').getAttribute('aria-pressed'),null);assert.equal(dom.calls.length,reads);
 });
 
 test('stacked chart, selected repeated hour, table/focus/scroll survive refresh and value-free checkpoint restoration',async t=>{

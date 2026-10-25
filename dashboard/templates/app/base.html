@@ -22,10 +22,10 @@
                 <p id="app-status" role="status" aria-live="polite" data-app-status>Starting dashboard. If this message remains, reload the page or use the legacy dashboard.</p>
                 <button type="button" data-retry aria-describedby="app-status" hidden>Retry settings</button>
                 <p data-request-id hidden></p>
-                <p data-display-timezone hidden></p>
                 <noscript><p>Enable JavaScript to use this page, or open the legacy dashboard.</p></noscript>
             </section>
             <nav aria-label="Dashboard navigation">
+                <p data-display-timezone hidden></p>
                 {% block navigation %}<a href="{{ url_for('packages') }}" aria-label="Legacy dashboard">Legacy</a>{% endblock %}
             </nav>
         </div>

@@ -7,20 +7,17 @@ import { mountEvents } from './render-events.js';
 import { mountParameters, mountOverrides } from './render-values.js';
 import { mountHistory } from './render-history.js';
 import { defaultSelection, selectionSearch } from './selection.js';
+import { inlineStatus, pollingButton } from './ui.js';
 
 export function mountDetail(root, { api, metadata, executionId, appBase, restoreView = null }) {
   const document = root.ownerDocument;
   const window = document.defaultView;
   const display = createDisplay({ timeZone: metadata.display_timezone });
   const content = root.querySelector('[data-execution-detail]');
-  const status = root.querySelector('[data-detail-status]');
-  const retry = root.querySelector('[data-detail-retry]');
-  const correlation = root.querySelector('[data-detail-request-id]');
   const elapsed = root.querySelector('[data-active-elapsed]');
   const refresh = root.querySelector('[data-detail-refresh]');
   const toggle = root.querySelector('[data-detail-poll-toggle]');
   const pollStatus = root.querySelector('[data-detail-poll-status]');
-  const header = root.querySelector('[data-app-status]');
   const main = document.getElementById('main-content');
   const returnLink = root.querySelector('[data-overview-link]');
   const returnNotice = root.querySelector('[data-overview-return-notice]');
@@ -38,16 +35,18 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   const focusTargets = { refresh, toggle, overview: returnLink, legacy: root.querySelector('[data-legacy-detail-link]'),
     executables: root.querySelector('[data-executables-toggle]'), children: root.querySelector('[data-children-toggle]'),
     events: root.querySelector('[data-events-toggle]'), parameters: root.querySelector('[data-parameters-toggle]'),
-    overrides: root.querySelector('[data-overrides-toggle]'), history: root.querySelector('[data-history-toggle]'), retry, main };
+    overrides: root.querySelector('[data-overrides-toggle]'), history: root.querySelector('[data-history-toggle]'), main };
   let returning = restoreView?.executionId === executionId ? restoreView : null;
   let autoPaused = returning?.autoPaused === true;
   const initialPosition = position(), initialFocus = document.activeElement;
   let rendered = null, activeTab = null;
   const tabView = mountDetailTabs(root, { metadata, revealInitial: !returning,
     select: target => { void loader.selectTab(target); } });
-  const breadcrumb = Object.fromEntries(['folder', 'project', 'package'].map(key =>
+  const breadcrumb = Object.fromEntries(['folder', 'project'].map(key =>
     [key, root.querySelector(`[data-detail-breadcrumb="${key}"]`)]));
   const countLinks = [...root.querySelectorAll('[data-event-count-link]')];
+  const countLabels = Object.fromEntries(['errors', 'warnings'].map(key =>
+    [key, root.querySelector(`[data-event-count-label="${key}"]`)]));
   const countActions = countLinks.map(link => {
     const kind = link.dataset.eventCountLink;
     const click = event => {
@@ -88,6 +87,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     content.hidden = true;
     elapsed.hidden = true;
     for (const node of Object.values(breadcrumb)) { node.textContent = '—'; node.removeAttribute('href'); }
+    for (const [key, label] of Object.entries(countLabels)) label.textContent = key;
     for (const field of fields) {
       field.textContent = '—';
       field.removeAttribute('datetime');
@@ -108,29 +108,25 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     refresh.disabled = toggle.disabled = false;
     refresh.setAttribute('aria-disabled', String(state.busy));
     autoPaused = state.poll.paused;
-    toggle.textContent = autoPaused ? 'Resume auto refresh' : 'Pause auto refresh';
-    pollStatus.textContent = refreshStatus(display, state.response?.meta.generated_at, state.poll);
-    pollStatus.title = state.response ? `Observed ${display.timestamp(state.response.meta.generated_at)} · ${state.response.meta.generated_at}` : '';
-    retry.hidden = state.phase !== 'error' && !(state.busy && !retry.hidden);
-    retry.disabled = false;
-    retry.setAttribute('aria-disabled', String(state.busy));
-    status.textContent = state.busy && state.operation === 'section' ? '' : state.busy ? (state.response ? 'Refreshing… Previous observation shown.' : 'Loading execution…')
-      : state.phase === 'ready' ? '' : `${state.error.message}${state.stale ? ' Previous observation shown.' : ''}`;
-    const sectionName = { executables: 'executable observations', children: 'package calls', events: 'events',
-      parameters: 'parameters', overrides: 'overrides', history: 'package history' }[state.sectionBusy] ?? 'sections';
-    header.textContent = state.busy && state.operation === 'section' ? `Loading ${sectionName}…`
-      : state.busy ? (state.response ? 'Refreshing…' : 'Loading execution…')
-      : state.phase === 'ready' ? '' : state.stale ? 'Refresh failed' : 'Execution unavailable';
-    correlation.hidden = !state.error?.requestId;
-    correlation.textContent = state.error?.requestId ? `Request ID: ${state.error.requestId}` : '';
+    pollingButton(toggle, autoPaused);
+    const observed = state.response ? `Observed ${display.timestamp(state.response.meta.generated_at)} · ${state.response.meta.generated_at}` : '';
+    const error = state.error ? `${state.error.message}${state.error.requestId ? ` · Request ID: ${state.error.requestId}` : ''}` : '';
+    const refreshText = refreshStatus(display, state.response?.meta.generated_at, state.poll);
+    const pageStatus = state.busy && state.operation !== 'section'
+      ? (state.response ? 'Refreshing… Previous observation shown.' : 'Loading execution…')
+      : state.phase === 'error' ? (state.stale
+        ? `⚠ Refresh failed · showing data from ${display.clock(state.response.meta.generated_at)}` : `⚠ Execution unavailable · ${state.error.message}`)
+        : refreshText;
+    inlineStatus(pollStatus, pageStatus, [observed, error,
+      pageStatus !== refreshText ? refreshText : ''].filter(Boolean).join(' · '));
     if (!state.response) clear();
     else if (state.response !== rendered) {
       const values = detailFields(state.response, display);
       const data = state.response.data;
+      if (data.environment.folder_name !== null) values.environment = `${data.environment.folder_name} / ${values.environment}`;
       const selection = destination.selection ?? defaultSelection(metadata);
       breadcrumb.folder.textContent = data.folder_name;
       breadcrumb.project.textContent = data.project_name;
-      breadcrumb.package.textContent = data.package_name;
       breadcrumb.folder.href = appBase + selectionSearch({ ...selection, folder: data.folder_name, project: null }, metadata);
       breadcrumb.project.href = appBase + selectionSearch({ ...selection, folder: data.folder_name, project: data.project_name }, metadata);
       for (const field of fields) {
@@ -140,8 +136,11 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
         if (time) { field.setAttribute('datetime', time); field.setAttribute('title', time); }
         else { field.removeAttribute('datetime'); field.removeAttribute('title'); }
         if (key === 'status') field.dataset.status = data.status.name === 'unknown' ? 'unknown' : String(data.status.code);
-        if (key === 'warnings' || key === 'errors') field.dataset.level =
-          data.event_counts[key] === 0 ? 'quiet' : key === 'warnings' ? 'warning' : 'error';
+        if (key in data.event_counts) field.dataset.level =
+          data.event_counts[key] === 0 ? 'quiet' : key === 'errors' ? 'error' : key === 'all' ? 'normal' : 'warning';
+      }
+      for (const [key, label] of Object.entries(countLabels)) {
+        label.textContent = data.event_counts[key] === 1 ? key.slice(0, -1) : key;
       }
       elapsed.hidden = data.started_at === null || data.ended_at !== null;
       content.hidden = false;
@@ -156,14 +155,14 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     for (const link of countLinks) {
       if (metadata.capabilities.events && state.response) link.href = detailFragment({ tab: 'events', kind: link.dataset.eventCountLink }, metadata);
       else link.removeAttribute('href');
-      link.setAttribute('aria-label', `${link.textContent} ${link.dataset.eventCountLink === 'all'
-        ? 'events' : link.dataset.eventCountLink.replaceAll('-', ' ')} for this execution`);
+      const kind = link.dataset.eventCountLink === 'all' ? 'events' : link.dataset.eventCountLink.replaceAll('-', ' ');
+      const label = state.response?.data.event_counts[link.dataset.detailField] === 1 ? kind.slice(0, -1) : kind;
+      link.setAttribute('aria-label', `${link.textContent} ${label} for this execution`);
     }
     tabView.render(state);
     activeTab = state.activeTab ? { tab: state.activeTab,
       ...(state.activeTab === 'events' ? { kind: state.events.query.kind } : {}) } : null;
-    if (focused === retry && retry.hidden) refresh.focus({ preventScroll: true });
-    else if (content.hidden && protectedFocus) main.focus({ preventScroll: true });
+    if (content.hidden && protectedFocus) main.focus({ preventScroll: true });
     if (currentPosition) restorePosition(currentPosition);
     if (returning && !state.busy) {
       if (state.response) {
@@ -181,7 +180,6 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   const load = () => { void loader.load(); };
   const togglePolling = () => loader.togglePolling();
   const visibilityChanged = () => loader.setVisible(document.visibilityState !== 'hidden');
-  retry.addEventListener('click', load);
   refresh.addEventListener('click', load);
   toggle.addEventListener('click', togglePolling);
   document.addEventListener('visibilitychange', visibilityChanged);
@@ -203,17 +201,12 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     historyView.dispose();
     tabView.dispose();
     for (const [link, click] of countActions) link.removeEventListener('click', click);
-    retry.removeEventListener('click', load);
     refresh.removeEventListener('click', load);
     toggle.removeEventListener('click', togglePolling);
     document.removeEventListener('visibilitychange', visibilityChanged);
     refresh.disabled = toggle.disabled = true;
-    retry.hidden = retry.disabled = true;
     pollStatus.textContent = '';
     pollStatus.title = '';
-    status.textContent = 'Waiting for settings.';
-    correlation.textContent = '';
-    correlation.hidden = true;
     returning = rendered = null;
     clear();
   } };

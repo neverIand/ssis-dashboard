@@ -10,12 +10,12 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
   const document = root.ownerDocument;
   const get = name => root.querySelector(`[data-${resource}-${name}]`);
   const toggle = get('toggle'), panel = get('panel'), status = get('status'), notice = get('notice');
-  const retry = get('retry'), sort = get('sort'), direction = get('direction'), limit = get('limit');
+  const retry = get('retry'), sort = get('sort'), limit = get('limit');
   const previous = get('previous'), next = get('next'), latest = get('latest');
   const region = get('scroll'), table = get('table'), body = table.querySelector('tbody');
   const reserveSpace = reserveLoadingSpace(region);
   const display = createDisplay({ timeZone: metadata.display_timezone });
-  const rows = new Map(), controls = { toggle, retry, sort, direction, limit, previous, next, latest, region };
+  const rows = new Map(), controls = { toggle, retry, sort, limit, previous, next, latest, region };
   const order = mountTableOrder(root, { resource, metadata, onOrder: actions.order, sorts: [
     { key: 'started_at', label: 'Started', header: true },
     { key: child ? 'observation_id' : 'statistics_id', label: child ? 'Observation ID' : 'Statistics ID', header: !child },
@@ -157,11 +157,12 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
         renderedStart = executionStart;
       }
       status.title = page ? `Observed ${display.timestamp(page.meta.generated_at)} · ${page.meta.generated_at}` : '';
-      const coverage = page?.meta.availability === 'available' ? '' : page?.meta.availability === 'not-recorded' ? ' · Not recorded' : ' · Recording coverage unknown';
-      const pageInfo = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} ${child ? 'calls on this page' : 'rows'}${coverage}${child && page.meta.has_unidentified_starts ? ' · Some starts have no public numeric ID and cannot be paged. Coverage is unknown.' : ''}` : '';
+      const coverage = page?.meta.availability === 'available' ? ' · recording: recorded' : page?.meta.availability === 'not-recorded' ? ' · Not recorded' : ' · Recording coverage unknown';
+      const pageInfo = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} ${child ? 'calls on this page' : 'executables'}${coverage}${child && page.meta.has_unidentified_starts ? ' · Some starts have no public numeric ID and cannot be paged. Coverage is unknown.' : ''}` : '';
       status.textContent = panel.hidden ? '' : state.error ? `${state.error.message}${state.error.requestId ? ` Request ID: ${state.error.requestId}` : ''}${state.stale ? ' Previous observation page shown. ' : ' '}${pageInfo}`
         : state.stale ? `Refreshing… Previous observation page shown. ${pageInfo}`
           : state.phase === 'loading' ? `Loading ${singular} observations…` : pageInfo;
+      status.title = [status.textContent, status.title].filter(Boolean).join(' · ');
       if (panel.hidden && panelFocused && authorized) toggle.focus({ preventScroll: true });
       else if (focused === retry && retry.hidden) toggle.focus({ preventScroll: true });
       else if (authorized && rowFocused && document.activeElement !== focused) (focused.isConnected ? focused : region).focus({ preventScroll: true });

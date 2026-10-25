@@ -1,6 +1,7 @@
 """Native shell routing, packaged builds and legacy coexistence without SQL."""
 
 import json
+from html.parser import HTMLParser
 from pathlib import Path
 import re
 from tempfile import TemporaryDirectory
@@ -62,11 +63,11 @@ class FrontendShellTests(unittest.TestCase):
             'app_base': '/app/', 'api_base': '/api/v1/', 'execution_base': '/execution/',
         })
         for markup in ['href="#main-content"', 'id="main-content" tabindex="-1"',
-                       'aria-labelledby="filters-heading"', 'aria-labelledby="summary-heading"',
+                       'aria-labelledby="filters-heading"', 'aria-label="Execution summary"',
                        'aria-labelledby="executions-heading"', 'role="status"', '<noscript>',
                        'disabled aria-describedby="app-status"', 'scope="col"',
-                       'Creation timeline', 'data-timeline-toggle disabled', 'data-timeline-panel hidden',
-                       'data-timeline-chart', 'data-timeline-table', 'Selected bucket', 'Data table',
+                       'Creation timeline', 'data-timeline-toggle disabled', 'data-timeline-panel aria-label="Creation timeline" hidden',
+                       'data-timeline-chart', 'data-timeline-table', 'Selected bucket values', 'Data table',
                        'About timeline counts', 'Edge buckets include only the selected range.']:
             self.assertIn(markup, html)
         references = re.findall(r'(?:href|src)="([^"]+)"', html)
@@ -116,11 +117,11 @@ class FrontendShellTests(unittest.TestCase):
                     for markup in ['data-screen="execution"', f'Execution {identifier}',
                                    f'href="{prefix}/app/"', f'href="{prefix}/execution/{identifier}"',
                                    f'src="{prefix}/static/app/assets/main.js"',
-                                   'aria-labelledby="identity-heading"', 'aria-labelledby="timing-heading"',
-                                   'aria-labelledby="events-heading"', 'data-execution-detail hidden',
-                                   'Actual duration', 'Active elapsed (observed)', 'Retry execution', '<noscript>']:
+                                   'aria-label="Execution summary"', 'class="detail-title"',
+                                   'class="event-counts"', 'data-execution-detail hidden',
+                                   'Duration', 'Active elapsed (observed)', 'aria-label="Refresh"', '<noscript>']:
                         self.assertIn(markup, html)
-                    for markup in ['data-detail-refresh disabled', 'data-detail-poll-toggle disabled',
+                    for markup in ['data-detail-refresh disabled', 'data-detail-poll-toggle data-icon="pause" disabled',
                                    'data-overview-link', 'data-legacy-detail-link', 'data-overview-return-notice hidden',
                                    'data-executables-toggle role="tab"', 'data-executables-panel hidden',
                                    'data-executables-table', 'data-children-table', 'data-children-toggle', 'data-events-toggle', 'data-events-filters', 'data-events-table',
@@ -130,14 +131,54 @@ class FrontendShellTests(unittest.TestCase):
                                    'Override access is disabled for this application.', 'Override values are hidden by application policy.',
                                    'aria-label="Override pages"', 'Property / ID',
                                    'data-history-toggle role="tab"', 'data-history-panel hidden', 'data-history-table',
-                                   'Duration comparison', 'data-history-chart-panel hidden', 'data-history-chart-plot',
-                                   'Selected execution', 'Chart key', 'Circle: actual zero.',
-                                   'Estimates are not actual timings.', 'How estimates work',
-                                   'History statuses', 'Apply statuses', 'aria-label="History pages"', 'Actual duration', 'Estimate',
+                                   'Duration comparison', 'data-history-chart-panel aria-label="Duration comparison" hidden', 'data-history-chart-plot',
+                                   'Selected execution values', 'Plots the loaded page only.', 'Circle: actual zero.',
+                                   'Estimates are not actual timings.', 'About estimates',
+                                   'History statuses', 'data-history-custom', 'aria-label="History pages"', 'Duration', 'Estimate',
                                    'Start/end recording is not a package result.', 'aria-label="Executable pages"']:
                         self.assertIn(markup, html)
                     for markup in ['overview-filters', 'data-status-choices', 'data-execution-table']:
                         self.assertNotIn(markup, html)
+        self.connect.assert_not_called()
+
+    def test_dense_shell_controls_have_described_tips_icon_names_and_no_empty_feedback_boxes(self):
+        class Inventory(HTMLParser):
+            def __init__(self, html):
+                super().__init__()
+                self.nodes = []
+                self.feed(html)
+
+            def handle_starttag(self, tag, attrs):
+                self.nodes.append((tag, dict(attrs)))
+
+        for path in ['/app/', '/app/executions/17']:
+            with self.subTest(path=path):
+                html = self.client.get(path).get_data(as_text=True)
+                nodes = Inventory(html).nodes
+                targets = {attrs['id']: attrs for _, attrs in nodes if 'id' in attrs}
+                ids = [attrs['id'] for _, attrs in nodes if 'id' in attrs]
+                self.assertEqual(len(ids), len(set(ids)))
+                tips = [attrs for tag, attrs in nodes if tag == 'button' and 'info-trigger' in attrs.get('class', '').split()]
+                self.assertGreater(len(tips), 1)
+                for attrs in tips:
+                    self.assertTrue(attrs['aria-label'])
+                    self.assertEqual(targets[attrs['aria-describedby']]['role'], 'tooltip')
+                for tag, attrs in nodes:
+                    if tag == 'button' and 'icon-button' in attrs.get('class', '').split():
+                        self.assertTrue(attrs['aria-label'])
+                        self.assertEqual(attrs['title'], attrs['aria-label'])
+                    if tag == 'caption':
+                        self.assertIn('visually-hidden', attrs.get('class', ''))
+                    if 'data-history-chart-toggle' in attrs or 'data-timeline-toggle' in attrs:
+                        self.assertEqual(attrs['aria-expanded'], 'false')
+                        self.assertIn(attrs['aria-controls'], targets)
+                        self.assertNotIn('aria-pressed', attrs)
+                if path.endswith('/17'):
+                    self.assertEqual({attrs['data-event-count-label'] for _, attrs in nodes
+                                      if 'data-event-count-label' in attrs}, {'errors', 'warnings'})
+                self.assertNotIn('resource-feedback', html)
+                self.assertNotIn('status-slot', html)
+                self.assertEqual(sum(tag == 'details' for tag, _ in nodes), 1 if path == '/app/' else 0)
         self.connect.assert_not_called()
 
     def test_invalid_detail_ids_fail_before_build_loading_or_sql(self):

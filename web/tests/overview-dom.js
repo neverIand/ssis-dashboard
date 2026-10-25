@@ -6,7 +6,7 @@ export class Node extends EventTarget {
       dataset: {}, attributes: new Map(), style: {}, layoutHeight: 0,
       scrollLeft: 0, scrollTop: 0, hidden: false, disabled: false });
   }
-  getBoundingClientRect() { return { height: this.layoutHeight }; }
+  getBoundingClientRect() { return { height: this.layoutHeight, left: 0, top: 0, bottom: this.layoutHeight, width: 800 }; }
   get textContent() { return this.text + this.children.map(node => node.textContent).join(''); }
   set textContent(value) { this.replaceChildren(); this.text = String(value); }
   get firstChild() { return this.children[0] ?? null; }
@@ -72,7 +72,7 @@ export function overviewDOM() {
     createTextNode: text => new Node(document, '#text', text) });
   const root = new Node(document, 'root');
   const elements = new Map();
-  for (const key of [...['toggle','panel','bucket','choice','retry','scroll','status','scope','chart','values','selected','scale','zero','table','x-axis','y-axis'].map(key=>`timeline-${key}`), 'executions-status', 'summary-status', 'list-retry', 'summary-retry', 'cohort-window',
+  for (const key of [...['toggle','panel','bucket','choice','retry','scroll','status','scope','chart','values','selected','scale','zero','table','x-axis','y-axis'].map(key=>`timeline-${key}`), 'executions-status', 'list-retry', 'cohort-window',
     'app-status', 'executions-previous', 'executions-next', 'executions-latest', 'page-notice', 'overview-refresh', 'summary',
     'poll-toggle', 'poll-status', 'summary-other-note']) {
     const node = new Node(document, key.includes('retry') || ['overview-refresh', 'poll-toggle',
@@ -80,6 +80,7 @@ export function overviewDOM() {
     elements.set(`[data-${key}]`, node);
     root.append(node);
   }
+  elements.set('[data-summary-status]', elements.get('[data-poll-status]'));
   for (const key of ['total', 'running', 'succeeded', 'failed', 'other']) {
     const node = new Node(document, 'dd');
     elements.set(`[data-count="${key}"]`, node);

@@ -13,10 +13,10 @@ const stamp = cell => cell.children[1].firstChild;
 const exact = (node, value, text) => {
   assert.equal(node.textContent, text);
   assert.equal(node.getAttribute('datetime'), value);
-  assert.equal(node.title, value);
+  assert.ok(node.title.includes(value));
 };
 
-test('detail observations use the execution date while history keeps full dates, exact attributes and compact status', async t => {
+test('detail observations use the execution date while history keeps creation and cross-day dates, exact attributes and compact status', async t => {
   const dom = detailDOM(), metadata = historyMetadata(), calls = [];
   metadata.capabilities.events = true; metadata.event_kinds = ['all'];
   const tomorrow = '2026-10-18T16:00:00.9876543Z';
@@ -44,18 +44,18 @@ test('detail observations use the execution date while history keeps full dates,
     if (section === 'events') {
       exact(dom.eventBody.children[0].children[0].firstChild, wireTime, '17:00:00.123');
       exact(dom.eventBody.children[1].children[0].firstChild, '2026-10-17T16:00:00.1240000Z', '17:00:00.124');
-      assert.equal(dom.get('events-scope').textContent, '');
+      assert.equal(dom.get('events-kind').value, 'all');
     }
   }
   assert.equal(calls.length, 5, 'One base read and one lazy read for each selected tab');
   for (const [row, item] of responses.history.data.entries()) {
     for (const [index, key] of ['created_at','started_at','ended_at'].entries()) {
       const value = item[key];
-      exact(stamp(dom.historyBody.children[row].children[1].children[index]), value,
-        value === tomorrow ? '2026-10-18 17:00:00' : '2026-10-17 17:00:00');
+      exact(dom.historyBody.children[row].children[index+1].firstChild, value,
+        value === tomorrow ? '2026-10-18 17:00:00' : index === 0 ? '2026-10-17 17:00:00' : '17:00:00');
     }
   }
-  exact(dom.historyBody.children[0].children[3].children[1].firstChild, wireTime, '2026-10-17 17:00:00');
+  exact(dom.historyBody.children[0].children[5].children[1].firstChild, wireTime, '17:00:00');
   dom.get('detail-refresh').dispatchEvent(new Event('click')); await settle();
   assert.equal(calls.length, 7, 'Refresh reads base detail and the active history tab only');
 });
@@ -82,9 +82,9 @@ test('a newly recorded execution start updates cached table labels without repla
   exact(stamp(row.children[2].children[0]), wireTime, '17:00:00.123');
   dom.get('history-toggle').dispatchEvent(new Event('click')); await settle();
   const historicalRow = dom.historyBody.children[0];
-  const historicalStart = stamp(historicalRow.children[1].children[1]);
-  exact(historicalStart, wireTime, '2026-10-17 17:00:00');
+  const historicalStart = historicalRow.children[2].firstChild;
+  exact(historicalStart, wireTime, '17:00:00');
   dom.get('detail-refresh').dispatchEvent(new Event('click')); await settle();
   assert.equal(dom.historyBody.children[0], historicalRow);
-  assert.equal(stamp(historicalRow.children[1].children[1]), historicalStart);
+  assert.equal(historicalRow.children[2].firstChild, historicalStart);
 });

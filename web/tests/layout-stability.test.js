@@ -74,7 +74,7 @@ for (const section of Object.keys(bodyKeys)) {
       assert.equal(dom.get('history-chart-panel').style.minHeight, '511px');
       assert.equal(dom.get('history-chart-plot').children.length, 0);
       assert.equal(dom.get('history-chart-selected').textContent, '');
-      assert.match(dom.get('history-chart-scope').textContent, /Loading/);
+      assert.match(dom.get('history-status').textContent, /Loading/);
     }
     const request = calls.at(-1);
     pending.resolve(reply(request.resource, request)); await flush();
@@ -204,17 +204,16 @@ test('timeline grain fallback survives a failed intermediate grain without claim
   assert.equal(dom.get('timeline-toggle').getAttribute('aria-expanded'), 'false');
 });
 
-test('native templates reserve feedback before content, consolidate Events metadata and retain live announcements', () => {
+test('native templates put live feedback in existing toolbars and a single page status', () => {
   const template = name => readFileSync(new URL(`../../dashboard/templates/app/${name}.html`, import.meta.url), 'utf8');
   const detail = template('execution'), overview = template('index');
-  assert.match(detail, /detail-state resource-feedback[^>]*>[\s\S]*?data-detail-status role="status"/);
+  assert.doesNotMatch(detail + overview, /resource-feedback|status-slot|detail-state|More sort options|Choose statuses|Chart key/);
   for (const resource of Object.keys(bodyKeys)) {
-    assert.match(detail, new RegExp(`class="resource-feedback"[^>]*>\\s*<p[^>]*data-${resource}-notice role="status"></p>\\s*<p[^>]*data-${resource}-status role="status"></p>`));
+    assert.match(detail, new RegExp(`class="toolbar-meta"><span[^>]*data-${resource}-notice role="status"></span><p[^>]*data-${resource}-status role="status"></p><button[^>]*data-${resource}-retry hidden>Retry</button>`));
   }
-  assert.match(detail, /class="events-meta">\s*<p[^>]*><span data-events-scope><\/span><span data-events-order-label><\/span><\/p>/);
-  assert.match(detail, /class="visually-hidden" id="event-search-hint"/);
-  assert.doesNotMatch(detail, /<caption>Recorded events<\/caption>/);
-  assert.match(overview, /class="cohort-window status-slot" data-cohort-window(?! hidden)/);
+  assert.match(detail, /data-detail-poll-status data-detail-status role="status"/);
+  assert.doesNotMatch(detail, /data-detail-retry|data-detail-request-id|event-search-hint|data-events-scope/);
+  assert.match(overview, /class="cohort-window" data-cohort-window/);
   assert.match(overview, /data-execution-scroll data-loading/);
-  assert.match(overview, /data-summary-status role="status"/);
+  assert.match(overview, /data-poll-status data-summary-status role="status"/);
 });

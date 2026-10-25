@@ -3,8 +3,6 @@ export function mountTableOrder(root, { resource, metadata, onOrder, sorts = [] 
   const document = root.ownerDocument, get = key => root.querySelector(`[data-${resource}-${key}]`);
   const limit = get('limit'), notice = get('notice');
   const sort = sorts.length > 1 ? get('sort') : null;
-  const direction = sorts.length ? get('direction') : null;
-  const label = sorts.length ? get('order-label') : null;
   const headers = Object.fromEntries(sorts.filter(item => item.header)
     .map(item => [`header-${item.key}`, get(`header-${item.key}`)]));
   const listeners = [];
@@ -15,16 +13,15 @@ export function mountTableOrder(root, { resource, metadata, onOrder, sorts = [] 
   function option(value, name = value) {
     const node = document.createElement('option'); node.value = String(value); node.textContent = String(name); return node;
   }
-  if (sort) sort.replaceChildren(...sorts.map(item => option(item.key, item.label)));
+  if (sort) sort.replaceChildren(...sorts.flatMap(item => ['asc', 'desc'].map(direction =>
+    option(`${item.key}:${direction}`, `${item.label} ${direction === 'asc' ? '↑' : '↓'}`))));
   function sync(query) {
     const sizes = [...new Set([25, 50, 100, 200, metadata.limits.default_limit, query.limit])]
       .filter(value => value >= 1 && value <= metadata.limits.max_limit).sort((a, b) => a - b);
     const key = sizes.join(',');
     if (key !== sizesKey) { limit.replaceChildren(...sizes.map(value => option(value))); sizesKey = key; }
     limit.value = String(query.limit);
-    if (sort) sort.value = query.sort;
-    if (direction) direction.value = query.direction;
-    if (label) label.textContent = `Sorted by ${sorts.find(item => item.key === query.sort).label} · ${query.direction === 'asc' ? 'Ascending' : 'Descending'}`;
+    if (sort) sort.value = `${query.sort}:${query.direction}`;
     for (const item of sorts.filter(item => item.header)) {
       headers[`header-${item.key}`].parentElement.setAttribute('aria-sort', query.sort !== item.key ? 'none'
         : query.direction === 'asc' ? 'ascending' : 'descending');
@@ -41,8 +38,10 @@ export function mountTableOrder(root, { resource, metadata, onOrder, sorts = [] 
     onOrder(changes);
   }
   listen(limit, 'change', () => change({ limit: Number(limit.value) }));
-  if (sort) listen(sort, 'change', () => change({ sort: sort.value }));
-  if (direction) listen(direction, 'change', () => change({ direction: direction.value }));
+  if (sort) listen(sort, 'change', () => {
+    const [key, direction] = sort.value.split(':');
+    change({ sort: key, direction });
+  });
   for (const item of sorts.filter(item => item.header)) listen(headers[`header-${item.key}`], 'click', () => {
     if (!current) return;
     change({ sort: item.key, direction: current.sort === item.key
@@ -52,13 +51,13 @@ export function mountTableOrder(root, { resource, metadata, onOrder, sorts = [] 
     headers,
     render(query, busy, hidden) {
       current = query; blocked = busy || hidden; sync(query);
-      for (const node of [limit, sort, direction, ...Object.values(headers)].filter(Boolean)) {
+      for (const node of [limit, sort, ...Object.values(headers)].filter(Boolean)) {
         node.disabled = hidden; node.setAttribute('aria-disabled', String(blocked));
       }
     },
     dispose() {
       for (const [node, event, handler] of listeners) node.removeEventListener(event, handler);
-      for (const node of [limit, sort, direction, ...Object.values(headers)].filter(Boolean)) node.disabled = true;
+      for (const node of [limit, sort, ...Object.values(headers)].filter(Boolean)) node.disabled = true;
       current = null; blocked = true;
     },
   };

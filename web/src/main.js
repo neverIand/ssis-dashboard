@@ -3,14 +3,18 @@ import './styles.css';
 import { mountBootstrap } from './bootstrap.js';
 import { mountDetail } from './render-detail.js';
 import { mountOverviewScreen } from './overview-screen.js';
+import { mountInfoTips } from './ui.js';
 
 const root = document.querySelector('[data-dashboard-app]');
 if (root) {
   let dispose;
+  let disposeTips;
   let checkpoint = () => null;
   let retained = null;
   const start = () => {
     dispose?.();
+    disposeTips?.();
+    disposeTips = mountInfoTips(root);
     const saved = retained;
     retained = null;
     checkpoint = () => null;
@@ -31,11 +35,13 @@ if (root) {
       root.dataset.startup = 'error';
       root.querySelector('[data-app-status]').textContent =
         'The dashboard could not start. Reload the page or use the legacy dashboard.';
+      root.querySelector('[data-app-status]').hidden = false;
     }
   };
   window.addEventListener('pagehide', (event) => {
     retained = event.persisted ? checkpoint() : null;
     dispose?.();
+    disposeTips?.();
   });
   window.addEventListener('pageshow', (event) => { if (event.persisted) start(); });
   start();

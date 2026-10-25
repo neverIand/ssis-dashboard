@@ -6,10 +6,10 @@ import { reserveLoadingSpace } from './loading-space.js';
 export function mountEvents(root, { metadata, actions, restoreView = null }) {
   const document = root.ownerDocument, enabled = metadata.capabilities.events;
   const get = name => root.querySelector(`[data-events-${name}]`);
-  const controls = Object.fromEntries(['toggle', 'retry', 'previous', 'next', 'latest', 'sort', 'direction',
+  const controls = Object.fromEntries(['toggle', 'retry', 'previous', 'next', 'latest', 'sort',
     'limit', 'kind', 'q', 'apply', 'reset', 'scroll'].map(key => [key, get(key)]));
   const { toggle, retry, previous, next, latest, kind, q, apply, reset, scroll } = controls;
-  const panel = get('panel'), status = get('status'), notice = get('notice'), scope = get('scope');
+  const panel = get('panel'), status = get('status'), notice = get('notice');
   const table = get('table'), body = table.querySelector('tbody'), form = get('filters');
   const reserveSpace = reserveLoadingSpace(scroll);
   const display = createDisplay({ timeZone: metadata.display_timezone }), rows = new Map(), listeners = [];
@@ -32,6 +32,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
     const option = element('option', label(value)); option.value = value; kind.append(option);
   }
   q.value = returning?.draft?.q ?? ''; kind.value = 'all';
+  const showDraft = () => { apply.className = q.value !== (applied?.q ?? '') ? 'button-primary' : ''; };
   const fields = [['event_id', 'Event ID'], ['message_type', 'Message type'],
     ['package_name', 'Package'], ['package_path', 'Package path'], ['execution_path', 'Execution path'],
     ['source_name', 'Source'], ['source_type', 'Source type'], ['subcomponent_name', 'Subcomponent']];
@@ -87,6 +88,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
     for (const [id, row] of rows) if (!wanted.has(id)) { row.node.remove(); rows.delete(id); }
   }
   const listen = (node, event, handler) => { node.addEventListener(event, handler); listeners.push([node, event, handler]); };
+  listen(q, 'input', showDraft);
   listen(toggle, 'click', actions.toggle); listen(retry, 'click', actions.retry);
   listen(previous, 'click', actions.previous); listen(next, 'click', actions.next); listen(latest, 'click', actions.latest);
   listen(form, 'submit', event => {
@@ -116,8 +118,8 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
       kind.value = state.query.kind;
       if ((!applied && !returning?.draft) || (applied && applied.q !== state.query.q)) q.value = state.query.q ?? '';
       applied = state.query;
-      scope.textContent = panel.hidden ? '' : [applied.kind === 'all' ? '' : label(applied.kind),
-        applied.q === null ? '' : `Search: ${JSON.stringify(applied.q)}`].filter(Boolean).join(' · ');
+      reset.hidden = applied.kind === 'all' && applied.q === null;
+      showDraft();
       notice.textContent = state.notice;
       const page = panel.hidden ? null : state.page;
       reserveSpace(!panel.hidden && state.phase === 'loading' && page === null, rendered !== null);
@@ -131,6 +133,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
       const info = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} events${coverage}${page.meta.has_unidentified_events ? ' · Some matching events have no public numeric ID and cannot be paged.' : ''}` : '';
       status.textContent = panel.hidden ? '' : state.error ? `${state.error.message}${state.error.requestId ? ` Request ID: ${state.error.requestId}` : ''}${state.stale ? ' Previous event page shown. ' : ' '}${info}`
         : state.stale ? `Refreshing… Previous event page shown. ${info}` : state.phase === 'loading' ? 'Loading events…' : info;
+      status.title = [status.textContent, status.title].filter(Boolean).join(' · ');
       if (panel.hidden && panelFocused && permitted) toggle.focus({ preventScroll: true });
       else if (focused === retry && retry.hidden) toggle.focus({ preventScroll: true });
       else if (rowFocused && permitted) {
@@ -164,7 +167,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
       reserveSpace(false);
       order.dispose();
       for (const [node, event, handler] of listeners) node.removeEventListener(event, handler);
-      rows.clear(); body.replaceChildren(); status.textContent = notice.textContent = scope.textContent = q.value = status.title = '';
+      rows.clear(); body.replaceChildren(); status.textContent = notice.textContent = q.value = status.title = '';
       for (const node of Object.values(controls)) node.disabled = true;
       panel.hidden = retry.hidden = true;
       current = returning = rendered = applied = null;

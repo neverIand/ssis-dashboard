@@ -12,10 +12,9 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
   const fieldset = get('fieldset'), notice = get('[data-filter-notice]');
   const reset = get('[data-reset-filters]');
   const recover = get('[data-recover-filters]'), status = get('#status');
-  const order = Object.fromEntries(['sort', 'direction', 'limit']
+  const order = Object.fromEntries(['sort', 'limit']
     .map(key => [key, root.querySelector(`[data-order="${key}"]`)]));
   const orderNotice = root.querySelector('[data-order-notice]');
-  const orderLabel = root.querySelector('[data-order-label]');
   const headers = [...root.querySelectorAll('[data-sort]')];
   const sortNames = { execution_id: 'ID', created_at: 'Created', started_at: 'Started', ended_at: 'Ended',
     project_name: 'Project', package_name: 'Entry package', environment: 'Environment', status: 'Status',
@@ -27,12 +26,12 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
     element.addEventListener(event, handler);
     removers.push(() => element.removeEventListener(event, handler));
   }
-  order.sort.replaceChildren(...metadata.execution_sorts.map(key => {
+  order.sort.replaceChildren(...metadata.execution_sorts.flatMap(key => ['desc', 'asc'].map(direction => {
     const option = document.createElement('option');
-    option.value = key;
-    option.textContent = sortNames[key] ?? key;
+    option.value = `${key}:${direction}`;
+    option.textContent = `${sortNames[key] ?? key} ${direction === 'asc' ? '↑' : '↓'}`;
     return option;
-  }));
+  })));
   function close({ focus = false, commitStatus = true } = {}) {
     if (!opened) return;
     clearTimeout(searchTimer);
@@ -77,8 +76,8 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
     order.limit.replaceChildren(...sizes.map(value => {
       const option = document.createElement('option'); option.value = String(value); option.textContent = String(value); return option;
     }));
-    for (const [key, control] of Object.entries(order)) control.value = String(selection[key]);
-    orderLabel.textContent = `Sorted by ${sortNames[selection.sort] ?? selection.sort} · ${selection.direction === 'asc' ? 'Ascending' : 'Descending'}`;
+    order.limit.value = String(selection.limit);
+    order.sort.value = `${selection.sort}:${selection.direction}`;
     for (const button of headers) {
       const supported = metadata.execution_sorts.includes(button.dataset.sort);
       button.disabled = !supported;
@@ -247,9 +246,12 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
   });
   for (const [key, control] of Object.entries(order)) listen(control, 'change', () => {
     try {
-      select({ [key]: key === 'limit' ? Number(control.value) : control.value });
+      if (key === 'sort') {
+        const [sort, direction] = control.value.split(':');
+        select({ sort, direction });
+      } else select({ limit: Number(control.value) });
     } catch (error) {
-      control.value = String(session.applied[key]);
+      control.value = key === 'sort' ? `${session.applied.sort}:${session.applied.direction}` : String(session.applied[key]);
       orderNotice.textContent = error instanceof SelectionError ? error.message : 'The table could not be updated.';
     }
   });
@@ -272,7 +274,6 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
       fieldset.disabled = true; recover.hidden = false;
       for (const control of Object.values(order)) control.disabled = true;
       for (const button of headers) button.disabled = true;
-      orderLabel.textContent = '';
       orderNotice.textContent = '';
       notice.textContent = `${error instanceof SelectionError ? error.message : 'Filters could not be restored.'} Reset invalid filters to start again.`;
       onApplied(null);

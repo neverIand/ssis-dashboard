@@ -104,7 +104,6 @@ export function mountRangeEditor(form, { metadata, listen, onChoose }) {
       const custom = selection.from !== null || selection.to !== null;
       mode = selection.created ?? (custom ? 'custom' : 'default');
       include.checked = original.from !== null || original.to !== null;
-      get('.exact-times').open = false;
       for (const [key, field] of Object.entries(fields)) {
         const projected = original[key] ? projectTime(original[key], zone) : { date: '', time: '00:00:00' };
         field.date.value = projected.date; field.time.value = projected.time;

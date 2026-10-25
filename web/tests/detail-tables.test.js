@@ -58,12 +58,13 @@ for (const [section, key, start] of [['executables', 'started_at', 'asc'], ['chi
   });
 }
 
-test('ID sorts without visible ID columns retain a readable order label and never claim another header is sorted', async t => {
+test('ID sorts without visible ID columns retain a readable combined sort choice and never claim another header is sorted', async t => {
   for (const [section, idKey, visibleKey] of [['events', 'event_id', 'message_time'], ['children', 'observation_id', 'started_at']]) {
     const run = mount(t, section); await settle();
-    run.get(`${section}-sort`).value = idKey; run.get(`${section}-sort`).dispatchEvent(new Event('change')); await settle();
+    run.get(`${section}-sort`).value = `${idKey}:asc`; run.get(`${section}-sort`).dispatchEvent(new Event('change')); await settle();
     assert.equal(run.calls.length, 3); assert.equal(run.calls.at(-1).params.sort, idKey);
-    assert.match(run.get(`${section}-order-label`).textContent, /ID · Ascending/);
+    assert.equal(run.get(`${section}-sort`).value, `${idKey}:asc`);
+    assert.ok(run.get(`${section}-sort`).children.some(option => option.value === `${idKey}:asc` && /ID ↑/.test(option.textContent)));
     assert.equal(run.get(`${section}-header-${visibleKey}`).parentElement.getAttribute('aria-sort'), 'none');
   }
   const run = mount(t, 'executables'); await settle();
@@ -145,5 +146,5 @@ test('busy order controls neither request nor relabel the page, while immediate 
   assert.equal(run.calls.at(-1).params.q, null); assert.equal(run.get('events-q').value, 'unapplied %_');
   assert.equal(run.calls[before - 1].signal.aborted, true);
   wait.resolve(reply('executions/17/events', { params: { limit: 50, sort: 'message_time', direction: 'asc' } })); await settle();
-  assert.match(run.get('events-scope').textContent, /Errors/); assert.equal(run.window.location.hash, '#events/errors');
+  assert.equal(run.get('events-kind').value, 'errors'); assert.equal(run.window.location.hash, '#events/errors');
 });

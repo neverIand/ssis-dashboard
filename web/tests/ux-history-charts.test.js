@@ -12,6 +12,7 @@ import {overviewPage,timelineBucket,timelineMetadata,timelinePage,timelineSummar
 
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 const click=node=>node.dispatchEvent(new Event('click'));
+const selected=dom=>dom.view.checkpoint().historyView.chart.selected;
 const all='1,2,3,4,5,6,7,8,9';
 const stamp=day=>`2026-10-${String(day).padStart(2,'0')}T00:00:00.0000000Z`;
 function interaction(svg,type,target,key){
@@ -36,9 +37,9 @@ test('D3 explicitly requests every known status and visibly marks a failed curre
   const dom=historyScreen(t,rows);await openHistory(dom);
   assert.equal(dom.calls.at(-1).params.status,all);assert.equal(dom.historyBody.children.length,3);
   const current=dom.historyBody.children[0];assert.equal(current.dataset.current,'true');
-  assert.equal(current.children[0].firstChild.getAttribute('aria-current'),'page');assert.match(current.textContent,/Current execution/);
-  assert.equal(dom.historyBody.children[1].dataset.current,'false');assert.doesNotMatch(dom.historyBody.children[1].textContent,/Current execution/);
-  assert.equal(dom.get('history-status-options').open,false);assert.equal(preset(dom,'all').getAttribute('aria-pressed'),'true');
+  assert.equal(current.children[0].firstChild.getAttribute('aria-current'),'page');assert.match(current.textContent,/current/);
+  assert.equal(dom.historyBody.children[1].dataset.current,'false');assert.doesNotMatch(dom.historyBody.children[1].textContent,/current/);
+  assert.equal(dom.get('history-status-options').hidden,true);assert.equal(preset(dom,'all').getAttribute('aria-pressed'),'true');
   current.children[0].firstChild.focus();click(dom.get('detail-refresh'));await flush();
   assert.equal(dom.historyBody.children[0],current);assert.equal(dom.document.activeElement,current.children[0].firstChild);
 });
@@ -53,7 +54,7 @@ test('history presets apply once, reset checkbox drafts, and leave estimates to 
     assert.equal(dom.calls.length,count+1);assert.equal(dom.calls.at(-1).params.status,status);
     assert.equal(preset(dom,key).getAttribute('aria-pressed'),'true');
     assert.deepEqual(choices.filter(input=>input.checked).map(input=>input.value),status.split(','));
-    if(key==='failed')assert.match(dom.historyBody.children[0].children[3].textContent,/Estimated duration: 12 s.*Mean of 5 prior successful runs/);
+    if(key==='failed')assert.match(dom.historyBody.children[0].children[5].textContent,/12 s · ends .*\(5\)/);
     click(preset(dom,key));await flush();assert.equal(dom.calls.length,count+1,'Reapplying the same preset adds no read');
   }
 });
@@ -71,11 +72,11 @@ test('busy history presets cannot send reads or change applied status and retain
 test('secondary history choices and a preset focus restore after fresh reads without persisting rows',async t=>{
   const rows=[historyRow('17',{status:{code:4,name:'failed'}})];
   const dom=historyScreen(t,rows);await openHistory(dom);click(preset(dom,'failed'));await flush();
-  dom.get('history-status-options').open=true;preset(dom,'failed').focus();
+  click(dom.get('history-custom'));dom.get('history-choices').children[0].firstChild.focus();
   const saved=dom.view.checkpoint();assert.doesNotMatch(JSON.stringify(saved),/Main\.dtsx|duration_seconds|sample_count/);dom.view.dispose();
   const restored=historyScreen(t,rows,{restoreView:saved});await flush();
   assert.equal(restored.calls.length,2);assert.equal(restored.calls.at(-1).params.status,'4');
-  assert.equal(restored.get('history-status-options').open,true);assert.equal(restored.document.activeElement,preset(restored,'failed'));
+  assert.equal(restored.get('history-status-options').hidden,false);assert.equal(restored.document.activeElement,restored.get('history-choices').children[0].firstChild);
 });
 
 test('history plots chronological creation order independently of table order, with labels, status and estimate markers',async t=>{
@@ -84,7 +85,7 @@ test('history plots chronological creation order independently of table order, w
   const dom=historyScreen(t,rows);await openHistory(dom,true);const plot=dom.get('history-chart-plot'),groups=plot.children;
   assert.deepEqual(groups.map(row=>row.dataset.executionId),['17','19','16']);
   assert.deepEqual(dom.historyBody.children.map(row=>row.dataset.historyId),['19','17','16']);
-  assert.equal(dom.get('history-chart-choice').value,'16');assert.equal(groups[1].getAttribute('data-status'),'4');
+  assert.equal(selected(dom),'16');assert.equal(groups[1].getAttribute('data-status'),'4');
   const marker=groups[1].children[2];assert.equal(marker.tag,'line');assert.equal(marker.getAttribute('y1'),'85');assert.equal(marker.getAttribute('y2'),'85');
   assert.equal(groups[1].children[1].getAttribute('height'),'37.5');assert.equal(groups[0].children[3].getAttribute('display'),'inline');
   assert.deepEqual(dom.get('history-chart-y-axis').children.map(node=>node.textContent),['40 s','20 s','0 ms']);
@@ -97,24 +98,24 @@ test('history hover and keyboard expose values without requests; keyed plot focu
   let rows=[historyRow('18',{duration_seconds:20}),historyRow('17',{duration_seconds:5})];
   const dom=historyScreen(t,rows,{get:()=>historyPage(rows)});await openHistory(dom,true);
   const plot=dom.get('history-chart-plot'),count=dom.calls.length,first=plot.children[0],last=plot.children[1];
-  interaction(plot,'mouseover',first.children[1]);assert.equal(dom.get('history-chart-choice').value,'17');
+  interaction(plot,'mouseover',first.children[1]);assert.equal(selected(dom),'17');
   assert.match(dom.get('history-chart-selected').textContent,/Actual duration: 5 s/);
   first.focus();interaction(plot,'focusin',first);assert.equal(first.getAttribute('aria-selected'),'true');
   assert.equal(interaction(plot,'keydown',first,'ArrowRight').defaultPrevented,true);
-  assert.equal(dom.document.activeElement,last);assert.equal(dom.get('history-chart-choice').value,'18');
+  assert.equal(dom.document.activeElement,last);assert.equal(selected(dom),'18');
   interaction(plot,'keydown',last,'Home');assert.equal(dom.document.activeElement,first);
   interaction(plot,'keydown',first,'End');assert.equal(dom.document.activeElement,last);
   interaction(plot,'keydown',last,'Enter');assert.equal(dom.calls.length,count);
   click(dom.get('detail-refresh'));await flush();assert.equal(plot.children[1],last);assert.equal(dom.document.activeElement,last);
   rows=[rows[1]];click(dom.get('detail-refresh'));await flush();
-  assert.equal(dom.get('history-chart-choice').value,'17');assert.equal(dom.document.activeElement,dom.get('history-chart-choice'));
+  assert.equal(selected(dom),'17');assert.equal(dom.document.activeElement,plot.children[0]);
 });
 
 test('history keeps exact high IDs for chronological ties, and missing actuals remain absent beside estimate markers',async t=>{
   const rows=[historyRow('9223372036854775807',{ended_at:null,duration_seconds:null,estimate:estimate({duration_seconds:20})}),historyRow('9007199254740993')];
   const dom=historyScreen(t,rows);await openHistory(dom,true);const groups=dom.get('history-chart-plot').children;
   assert.deepEqual(groups.map(row=>row.dataset.executionId),['9007199254740993','9223372036854775807']);
-  assert.equal(dom.get('history-chart-choice').value,'9223372036854775807');
+  assert.equal(selected(dom),'9223372036854775807');
   assert.equal(groups[1].children[1].getAttribute('display'),'none');assert.equal(groups[1].children[2].getAttribute('display'),'inline');
   assert.match(groups[1].getAttribute('aria-label'),/Actual duration: Unavailable.*Estimated duration: 20 s/);
 });

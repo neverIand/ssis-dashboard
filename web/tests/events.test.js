@@ -168,14 +168,16 @@ function mounted(t, get, options = {}) {
 test('event category applies immediately without committing search drafts; Enter submission validates literal search', async t => {
   const run = mounted(t, async (resource, { params }) => response(resource, params)); await flush(); run.action('toggle'); await flush();
   const { dom } = run; dom.get('events-kind').value = 'warnings'; dom.get('events-q').value = ' %_ 影狼 ';
-  assert.equal(dom.get('events-scope').textContent, ''); const count = run.calls.length;
+  assert.equal(dom.get('events-reset').hidden, true); const count = run.calls.length;
   dom.get('events-kind').dispatchEvent(new Event('change')); await flush();
   assert.equal(run.calls.length, count + 1); assert.equal(run.calls.at(-1).params.kind, 'warnings');
   assert.equal(run.calls.at(-1).params.q, null); assert.equal(dom.get('events-q').value, ' %_ 影狼 ');
   dom.get('detail-refresh').dispatchEvent(new Event('click')); await flush();
   assert.equal(run.calls.at(-1).params.q, null); assert.equal(dom.get('events-q').value, ' %_ 影狼 ');
   run.action('filters'); await flush(); assert.equal(run.calls.at(-1).params.q, ' %_ 影狼 '); assert.equal(run.calls.at(-1).params.kind, 'warnings');
-  assert.equal(dom.get('events-scope').textContent, 'Warnings · Search: " %_ 影狼 "');
+  assert.equal(dom.get('events-kind').value, 'warnings');
+  assert.equal(dom.get('events-q').value, ' %_ 影狼 ');
+  assert.equal(dom.get('events-reset').hidden, false);
   dom.get('events-q').value = 'x'.repeat(513); const current = run.calls.length; run.action('filters'); await flush();
   assert.equal(run.calls.length, current); assert.match(dom.get('events-notice').textContent, /512/);
   run.action('reset'); await flush(); assert.equal(run.calls.at(-1).params.q, null); assert.equal(run.calls.at(-1).params.kind, 'all');

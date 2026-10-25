@@ -308,7 +308,7 @@ test('retained active tab refetches base and that tab only, retaining search dra
   assert.deepEqual(next.calls.map(call => call.resource), ['executions/17','executions/17/events']);
   assert.equal(next.get('events-kind').value, 'errors'); assert.equal(next.get('events-q').value, 'private draft');
   assert.equal(next.window.location.hash, '#events/errors');
-  assert.equal(next.get('detail-poll-toggle').textContent, 'Resume auto refresh');
+  assert.equal(next.get('detail-poll-toggle').getAttribute('aria-label'), 'Resume auto refresh');
 });
 
 test('tab switches and retained return preserve the active event cursor, applied query and separate draft', async t => {

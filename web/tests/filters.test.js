@@ -51,7 +51,7 @@ test('status closes into one applied selection; range and scope changes preserve
   assert.equal(dom.applied.at(-1).project, null);
   assert.deepEqual(dom.applied.at(-1).status, [1]);
   assert.equal(dom.applied.at(-1).from, '2026-10-17T00:00:00.0000001Z');
-  const direction = dom.root.querySelector('[data-order="direction"]'); direction.value = 'asc'; direction.dispatchEvent(new Event('change'));
+  const sort = dom.root.querySelector('[data-order="sort"]'); sort.value = 'execution_id:asc'; sort.dispatchEvent(new Event('change'));
   dom.submit();
   assert.deepEqual(dom.applied.at(-1).status, [1]);
   assert.equal(dom.applied.at(-1).from, '2026-10-17T00:00:00.0000001Z');
@@ -237,10 +237,10 @@ test('table headers toggle aria-sort, additional keys remain visible and page si
   assert.equal(id.parentElement.getAttribute('aria-sort'), 'none');
   created.click(); assert.equal(created.parentElement.getAttribute('aria-sort'), 'ascending');
   for (const key of ['ended_at','environment','logging_level']) {
-    const sort = get('[data-order="sort"]'); sort.value = key; sort.dispatchEvent(new Event('change'));
+    const sort = get('[data-order="sort"]'); sort.value = `${key}:asc`; sort.dispatchEvent(new Event('change'));
     assert.equal(dom.applied.at(-1).sort, key);
-    assert.match(get('[data-order-label]').textContent, /Sorted by/);
-    assert.match(get('[data-order-label]').textContent, /Ended|Environment|Logging level/);
+    assert.equal(get('[data-order="sort"]').value, `${key}:asc`);
+    assert.ok(get('[data-order="sort"]').children.some(option => option.value === `${key}:asc` && /Ended|Environment|Logging level/.test(option.textContent)));
     assert.equal(created.parentElement.getAttribute('aria-sort'), 'none');
   }
   size.value = '100'; size.dispatchEvent(new Event('change'));

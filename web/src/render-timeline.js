@@ -33,6 +33,7 @@ export function mountTimeline(root,{metadata,actions,restoreView=null}) {
     }
     const row=rows.get(selected);
     get('selected').textContent=row?describe(row):'';
+    get('selected').title=get('selected').textContent;
   }
   const select=start=>{if(rows.has(start)&&selected!==start){selected=start;mark();}};
   const disposeInteraction=mountChartInteraction(svg,{field:'bucketStart',keys:()=>order,node:start=>rows.get(start)?.group,select});
@@ -55,7 +56,7 @@ export function mountTimeline(root,{metadata,actions,restoreView=null}) {
       return {text:current.bucket==='day'?value.slice(0,10):`${value.slice(0,10)}\n${value.slice(11,16)}${value.slice(19)}`,title:`${value} · ${start}`};
     }),maximum,value=>display.count(value),{counts:true});
     get('scale').textContent='Created executions';
-    get('zero').hidden=maximum!==0;mark();
+    get('zero').hidden=maximum!==0;attribute(svg,'data-empty',maximum===0);mark();
   }
   function paint(page){
     if(grainChanged&&page.data.find(item=>item.start===selected)?.created_count===0)selected=null;
@@ -98,7 +99,7 @@ export function mountTimeline(root,{metadata,actions,restoreView=null}) {
       reserveSpace(state.open&&selection!==null&&busy&&state.page===null,rendered!==null);
       reserveTableSpace(state.open&&selection!==null&&busy&&state.page===null,rendered!==null);
       const focused=document.activeElement,panelFocused=panel.contains(focused),plotFocused=svg.contains(focused),position={left:scroll.scrollLeft,top:scroll.scrollTop};
-      toggle.disabled=selection===null||page===null;toggle.textContent=`${state.open?'Hide':'Show'} timeline`;
+      toggle.disabled=selection===null||page===null;toggle.textContent='Timeline';toggle.title=state.open?'Hide timeline':'Show timeline';
       panel.hidden=!state.open||selection===null||(!page&&!busy);
       toggle.setAttribute('aria-expanded',String(!panel.hidden));
       bucket.value=state.bucket;bucket.disabled=retry.disabled=panel.hidden;
@@ -110,6 +111,7 @@ export function mountTimeline(root,{metadata,actions,restoreView=null}) {
       status.title=response?`Observed ${display.timestamp(response.meta.generated_at)} · ${response.meta.generated_at}`:'';
       status.textContent=panel.hidden?'':state.error?`${state.error.message}${state.error.requestId?` Request ID: ${state.error.requestId}`:''}${state.error.status===400?' Choose Day or adjust the creation range.':''}${state.stale?' Previous timeline shown.':''}`
         :state.stale?`${busy?'Refreshing… ':''}Previous timeline shown.`:response?`${display.count(response.data.length)} calendar ${response.data.length===1?'bucket':'buckets'}`:'Loading timeline…';
+      status.title=[status.textContent,status.title].filter(Boolean).join(' · ');
       scope.title=panel.hidden||!page?'':`Created ${display.timestamp(page.meta.from)} → ${display.timestamp(page.meta.to)} (exclusive)`;
       scope.textContent=panel.hidden?'':`Counts by creation time · ${selection.status.length?selection.status.map(code=>formatCode(metadata.execution_statuses.find(item=>item.code===code))).join(', '):'All statuses'} · All execution pages`;
       if(!panel.hidden&&plotFocused&&!focused.isConnected&&!choice.disabled)choice.focus({preventScroll:true});

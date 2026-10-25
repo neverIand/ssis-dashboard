@@ -4,7 +4,7 @@ import { ApiError } from '../src/api.js';
 import { mountOverview } from '../src/render-overview.js';
 import { mountDetail } from '../src/render-detail.js';
 import { defaultSelection, parseSelection } from '../src/selection.js';
-import { deferred, envelope, metadata, wireTime } from './fixtures.js';
+import { deferred, envelope, metadata, requestId, wireTime } from './fixtures.js';
 import { detailDOM, detailResponse } from './detail-fixture.js';
 import { overviewDOM } from './overview-dom.js';
 import { executable, executablePage } from './executable-fixture.js';
@@ -123,6 +123,7 @@ test('keyed rendering reuses rows and links, patches values, removes/adds/reorde
   assert.equal(dom.scroll.scrollTop, 5);
   assert.equal(dom.get('executions-status').textContent, 'Page 1 · 3 rows');
   assert.equal(dom.get('poll-status').textContent, 'Updated 17:00:00 · auto refresh on');
+  assert.equal(dom.get('poll-status').title, `Updated 17:00:00 · auto refresh on · Observed 2026-10-17 17:00:00 · ${wireTime}`);
   assert.doesNotMatch(dom.get('executions-status').textContent, /Updated|Live results/);
   assert.equal(dom.get('overview-refresh').attributes.get('aria-disabled'), 'false');
   view.dispose();
@@ -151,7 +152,7 @@ test('transient refresh errors retain and label existing DOM; denial removes it 
   const view = mountOverview(dom.root, { metadata: settings, appBase: '/app/',
     api: { get: async resource => {
       if (resource !== 'executions') return summary();
-      if (++lists === 2) throw new ApiError('http', { status: 503 });
+      if (++lists === 2) throw new ApiError('http', { status: 503, requestId });
       if (lists === 3) throw new ApiError('http', { status: 403 });
       return page([item('3')]);
     } } });
@@ -163,18 +164,76 @@ test('transient refresh errors retain and label existing DOM; denial removes it 
   await refreshing;
   assert.equal(dom.body.children[0], row);
   assert.match(dom.get('executions-status').textContent, /Previous results shown/);
-  assert.match(dom.get('summary-status').textContent, /Previous counts shown/);
+  assert.match(dom.get('summary-status').title, /Previous counts shown/);
   assert.ok(dom.get('executions-status').title.includes(wireTime));
   assert.ok(dom.get('summary-status').title.includes(wireTime));
   assert.doesNotMatch(dom.get('summary-status').textContent, /Refreshing/);
-  assert.equal(dom.get('app-status').textContent, 'Refresh failed');
+  assert.equal(dom.get('poll-status').textContent, '⚠ Refresh failed · showing data from 17:00:00');
+  for (const status of ['poll-status', 'executions-status']) {
+    assert.ok(dom.get(status).title.includes(requestId));
+    assert.match(dom.get(status).title, /The service is unavailable/);
+  }
+  assert.equal(dom.get('app-status').textContent, '');
   await view.refresh();
   assert.equal(row.isConnected, false);
   assert.equal(dom.root.querySelector('[data-count="total"]').textContent, '—');
   assert.doesNotMatch(dom.get('executions-status').textContent, /Previous results shown/);
+  assert.equal(dom.get('poll-status').textContent, '⚠ Executions unavailable');
   assert.equal(dom.get('overview-refresh').disabled, false);
   view.dispose();
   assert.equal(dom.get('overview-refresh').disabled, true);
+});
+
+for (const resource of ['executions', 'metrics/summary']) {
+  test(`first ${resource} failure has a short header and full inline error`, async t => {
+    const dom = overviewDOM(), calls = [];
+    const view = mountOverview(dom.root, { metadata: settings, appBase: '/app/', api: {
+      async get(name) {
+        calls.push(name);
+        if (name === resource) throw new ApiError('network', { requestId });
+        return page([item('3')]);
+      },
+    } });
+    t.after(view.dispose);
+    await view.apply(defaultSelection(settings));
+    assert.equal(dom.get('poll-status').textContent, `⚠ ${resource === 'executions' ? 'Executions' : 'Summary'} unavailable`);
+    for (const key of ['poll-status', 'executions-status']) {
+      assert.ok(dom.get(key).title.includes(requestId));
+      assert.match(dom.get(key).title, /Unable to connect\. Try again\./);
+      assert.doesNotMatch(dom.get(key).title, /Previous (results|counts) shown/);
+    }
+    assert.match(dom.get('executions-status').textContent, /Unable to connect\. Try again\./);
+    assert.deepEqual(calls, resource === 'executions' ? ['executions'] : ['executions', 'metrics/summary']);
+  });
+}
+
+test('summary refresh failure uses the retained counts time and preserves full inline details', async t => {
+  const dom = overviewDOM(), calls = [], counts = summary(); let fail = false;
+  counts.meta.generated_at = '2026-10-17T15:00:00.0000000Z';
+  const view = mountOverview(dom.root, { metadata: settings, appBase: '/app/', api: {
+    async get(resource) {
+      calls.push(resource);
+      if (resource === 'executions') return page([item('3')]);
+      if (fail) throw new ApiError('http', { status: 503, requestId });
+      return counts;
+    },
+  } });
+  t.after(view.dispose);
+  await view.apply(defaultSelection(settings));
+  fail = true; await view.refresh();
+  assert.equal(dom.get('poll-status').textContent, '⚠ Refresh failed · showing data from 16:00:00');
+  assert.ok(dom.get('poll-status').title.includes(counts.meta.generated_at));
+  assert.ok(dom.get('poll-status').title.includes(wireTime));
+  for (const key of ['poll-status', 'executions-status']) {
+    assert.ok(dom.get(key).title.includes(requestId));
+    assert.match(dom.get(key).title, /The service is unavailable.*Previous counts shown/);
+  }
+  assert.match(dom.get('executions-status').textContent, /Previous counts shown\. Page 1 · 1 rows/);
+  assert.deepEqual(calls, ['executions', 'metrics/summary', 'executions', 'metrics/summary']);
+  fail = false; dom.get('overview-refresh').dispatchEvent(new Event('click'));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls.length, 5, 'Summary retry keeps its existing single-request owner');
+  assert.equal(dom.get('poll-status').title.split('Updated 17:00:00 · auto refresh on').length, 2);
 });
 
 test('a browser-cache checkpoint retains only paths/view anchors and restores them after fresh requests', async () => {
@@ -218,9 +277,9 @@ test('pause/resume controls, manual refresh and a paused return checkpoint prese
   } } };
   const view = mountOverview(dom.root, config);
   await view.apply(defaultSelection(settings));
-  assert.equal(dom.get('poll-toggle').textContent, 'Pause auto refresh');
+  assert.equal(dom.get('poll-toggle').getAttribute('aria-label'), 'Pause auto refresh');
   dom.get('poll-toggle').dispatchEvent(new Event('click'));
-  assert.equal(dom.get('poll-toggle').textContent, 'Resume auto refresh');
+  assert.equal(dom.get('poll-toggle').getAttribute('aria-label'), 'Resume auto refresh');
   dom.document.visibilityState = 'hidden';
   dom.document.dispatchEvent(new Event('visibilitychange'));
   dom.document.visibilityState = 'visible';
@@ -237,7 +296,7 @@ test('pause/resume controls, manual refresh and a paused return checkpoint prese
   await restored.apply(defaultSelection(settings), { restore: true });
   t.mock.timers.tick(60000);
   assert.equal(calls, 6);
-  assert.equal(dom.get('poll-toggle').textContent, 'Resume auto refresh');
+  assert.equal(dom.get('poll-toggle').getAttribute('aria-label'), 'Resume auto refresh');
   dom.get('poll-toggle').dispatchEvent(new Event('click'));
   t.mock.timers.tick(0);
   await new Promise(resolve => setImmediate(resolve));

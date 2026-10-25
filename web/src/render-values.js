@@ -114,6 +114,7 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
       const previousPage = `Previous ${parameter ? 'parameter' : 'override'} page shown.`;
       status.textContent = panel.hidden ? '' : state.error ? `${state.error.message}${state.error.requestId ? ` Request ID: ${state.error.requestId}` : ''}${state.stale ? ` ${previousPage} ` : ' '}${info}`
         : state.stale ? `Refreshing… ${previousPage} ${info}` : state.phase === 'loading' ? `Loading ${resource}…` : info;
+      status.title = [status.textContent, status.title].filter(Boolean).join(' · ');
       if (panel.hidden && panelFocused && permitted) toggle.focus({ preventScroll: true });
       else if (focused === retry && retry.hidden) toggle.focus({ preventScroll: true });
       else if (rowFocused && permitted) {

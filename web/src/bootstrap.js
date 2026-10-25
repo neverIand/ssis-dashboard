@@ -109,6 +109,7 @@ export function mountBootstrap(root, { ready = () => {} } = {}) {
       root.dataset.startup = state.phase;
       status.textContent = state.phase === 'loading' ? 'Loading settings…'
         : state.phase === 'ready' ? 'Ready' : state.error.message;
+      status.hidden = state.phase === 'ready';
       retry.hidden = state.phase !== 'error';
       retry.disabled = state.phase === 'loading';
       correlation.hidden = state.phase !== 'error' || !state.error.requestId;

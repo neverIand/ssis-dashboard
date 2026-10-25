@@ -1,0 +1,16 @@
+{% macro icon(name) -%}
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="{{ {'refresh': 'M20 7v5h-5 M20 12a8 8 0 1 0-2 5 M4 17v-5h5', 'pause': 'M8 5v14 M16 5v14', 'play': 'M8 5l11 7-11 7Z', 'previous': 'M15 5l-7 7 7 7', 'next': 'M9 5l7 7-7 7', 'first': 'M5 5v14 M18 5l-7 7 7 7'}[name] }}"/></svg>
+{%- endmacro %}
+
+{% macro tip(id, label, text) -%}
+<span class="info-tip"><button type="button" class="info-trigger" aria-label="{{ label }}" aria-describedby="{{ id }}"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="8"/><path d="M10 9v6 M10 5v1"/></svg></button><span class="info-text" hidden id="{{ id }}" role="tooltip">{{ text }}{% if caller is defined %} {{ caller() }}{% endif %}</span></span>
+{%- endmacro %}
+
+{% macro pager(resource, label) -%}
+<label class="page-size">Rows <select data-{{ resource }}-limit aria-label="{{ label }} rows per page"></select></label>
+<nav class="pagination" aria-label="{{ label }} pages">
+    <button type="button" class="icon-button" data-{{ resource }}-latest aria-label="First page" title="First page">{{ icon('first') }}</button>
+    <button type="button" class="icon-button" data-{{ resource }}-previous aria-disabled="true" aria-label="Previous page" title="Previous page">{{ icon('previous') }}</button>
+    <button type="button" class="icon-button" data-{{ resource }}-next aria-disabled="true" aria-label="Next page" title="Next page">{{ icon('next') }}</button>
+</nav>
+{%- endmacro %}

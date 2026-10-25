@@ -1,64 +1,39 @@
 {% extends "app/base.html" %}
+{% from "app/controls.html" import icon, tip, pager %}
 {% block title %}Execution {{ app_config.execution_id }} · SSIS Dashboard{% endblock %}
 {% block screen %}execution{% endblock %}
-{% block navigation %}
-<a href="{{ app_config.execution_base }}{{ app_config.execution_id }}" data-legacy-detail-link>Legacy detail</a>
-{% endblock %}
+{% block navigation %}<a href="{{ app_config.execution_base }}{{ app_config.execution_id }}" data-legacy-detail-link>Legacy detail</a>{% endblock %}
 {% block content %}
-        <div class="page-heading">
+        <div class="page-heading detail-page-heading">
             <div class="detail-heading">
-                <a href="{{ app_config.app_base }}" data-overview-link>← Overview</a>
-                <nav class="detail-breadcrumb" aria-label="Execution context">
-                    <ol><li><a data-detail-breadcrumb="folder">—</a></li><li><a data-detail-breadcrumb="project">—</a></li><li><span data-detail-breadcrumb="package" aria-current="page">—</span></li></ol>
-                </nav>
-                <p class="detail-entry-label">Entry package</p>
-                <h1 data-detail-field="package">—</h1>
-                <p class="detail-context">Execution {{ app_config.execution_id }} <span class="status-badge" data-detail-field="status">—</span></p>
+                <nav class="detail-breadcrumb" aria-label="Execution context"><ol><li><a href="{{ app_config.app_base }}" data-overview-link>Overview</a></li><li><a data-detail-breadcrumb="folder">—</a></li><li><a data-detail-breadcrumb="project">—</a></li></ol></nav>
+                <div class="detail-title"><h1 data-detail-field="package">—</h1><span>#{{ app_config.execution_id }}</span><span class="status-badge" data-detail-field="status">—</span>{{ tip('entry-package-tip', 'About entry package', 'Entry package: the package used to start this execution. Recorded package calls appear in their own tab.') }}</div>
             </div>
             <div class="section-actions">
-                <p class="resource-status refresh-status" data-detail-poll-status role="status"></p>
-                <button type="button" data-detail-refresh disabled>Refresh</button>
-                <button type="button" data-detail-poll-toggle disabled>Pause auto refresh</button>
+                <p class="resource-status refresh-status" data-detail-poll-status data-detail-status role="status">Waiting for settings.</p>
+                <button type="button" class="icon-button" data-detail-refresh disabled aria-label="Refresh" title="Refresh">{{ icon('refresh') }}</button>
+                <button type="button" class="icon-button" data-detail-poll-toggle data-icon="pause" disabled aria-label="Pause auto refresh" title="Pause auto refresh">{{ icon('pause') }}</button>
             </div>
         </div>
         <p class="resource-status" data-overview-return-notice hidden></p>
-        <div class="detail-state resource-feedback" tabindex="0" aria-label="Execution status">
-            <p class="resource-status" data-detail-status role="status">Waiting for settings.</p>
-            <p class="resource-status" data-detail-request-id hidden></p>
-            <button type="button" data-detail-retry hidden>Retry execution</button>
-        </div>
         <div class="detail-grid" data-execution-detail hidden aria-busy="false">
-            <section class="panel detail-panel" aria-labelledby="identity-heading">
-                <h2 id="identity-heading">Execution context</h2>
+            <section class="panel detail-strip" aria-label="Execution summary">
                 <dl class="detail-fields">
-                    <div><dt>Logging level</dt><dd data-detail-field="logging">—</dd></div>
-                    <div><dt>Folder</dt><dd data-detail-field="folder">—</dd></div>
-                    <div><dt>Project</dt><dd data-detail-field="project">—</dd></div>
-                    <div><dt>Project version LSN</dt><dd data-detail-field="lsn">—</dd></div>
-                    <div><dt>Environment folder</dt><dd data-detail-field="environment-folder">—</dd></div>
-                    <div><dt>Environment</dt><dd data-detail-field="environment">—</dd></div>
-                </dl>
-            </section>
-            <section class="panel detail-panel" aria-labelledby="timing-heading">
-                <h2 id="timing-heading">Timing</h2>
-                <dl class="detail-fields">
-                    <div><dt>Created</dt><dd><time data-detail-field="created">—</time></dd></div>
                     <div><dt>Started</dt><dd><time data-detail-field="started">—</time></dd></div>
                     <div><dt>Ended</dt><dd><time data-detail-field="ended">—</time></dd></div>
-                    <div><dt>Actual duration</dt><dd data-detail-field="duration">—</dd></div>
+                    <div><dt>Duration</dt><dd data-detail-field="duration">—</dd></div>
                     <div data-active-elapsed hidden><dt>Active elapsed (observed)</dt><dd data-detail-field="elapsed">—</dd></div>
+                    <div><dt>Created</dt><dd><time data-detail-field="created">—</time></dd></div>
+                    <div><dt>Logging</dt><dd data-detail-field="logging">—</dd></div>
+                    <div><dt>Environment</dt><dd data-detail-field="environment">—</dd></div>
+                    <div><dt>Project version</dt><dd data-detail-field="lsn">—</dd></div>
                 </dl>
-            </section>
-            <section class="panel detail-panel" aria-labelledby="events-heading">
-                <h2 id="events-heading">Recorded events</h2>
-                <dl class="detail-fields">
-                    <div><dt>All events</dt><dd><a data-detail-field="all" data-event-count-link="all">—</a></dd></div>
-                    <div><dt>Warnings</dt><dd><a data-detail-field="warnings" data-event-count-link="warnings">—</a></dd></div>
-                    <div><dt>Errors</dt><dd><a data-detail-field="errors" data-event-count-link="errors">—</a></dd></div>
-                    <div><dt>Duplicate warnings</dt><dd><a data-detail-field="duplicate_warnings" data-event-count-link="duplicate-warnings">—</a></dd></div>
-                    <div><dt>Memory warnings</dt><dd><a data-detail-field="memory_warnings" data-event-count-link="memory-warnings">—</a></dd></div>
-                </dl>
-                <details class="detail-note"><summary>Count definitions</summary><p>Warnings include duplicate warnings. Memory warnings are separate.</p></details>
+                <div class="event-counts">Events:
+                    {% for key, kind, label in [('all','all','all'),('errors','errors','errors'),('warnings','warnings','warnings'),('duplicate_warnings','duplicate-warnings','duplicate'),('memory_warnings','memory-warnings','memory')] %}
+                    <span><a data-detail-field="{{ key }}" data-event-count-link="{{ kind }}">—</a> <span{% if key in ['errors', 'warnings'] %} data-event-count-label="{{ key }}"{% endif %}>{{ label }}</span></span>
+                    {% endfor %}
+                    {{ tip('counts-tip', 'Event count definitions', 'Warnings include duplicate warnings. Memory warnings are separate.') }}
+                </div>
             </section>
             <div class="detail-tabs">
                 <div class="detail-tab-list" role="tablist" aria-label="Execution sections">
@@ -73,232 +48,129 @@
                 <p class="resource-status" id="parameters-unavailable" data-parameters-unavailable hidden>Parameter access is disabled for this application.</p>
                 <p class="resource-status" id="overrides-unavailable" data-overrides-unavailable hidden>Override access is disabled for this application.</p>
             </div>
-            <section class="panel detail-panel observation-section" id="detail-panel-executables" data-detail-tab-panel="executables" role="tabpanel" aria-labelledby="detail-tab-executables" tabindex="0" hidden>
-                <div class="section-heading">
-                    <h2 id="executables-heading">Executable observations</h2>
-                </div>
-                <div id="executable-observations" data-executables-panel hidden>
-                    <details class="detail-note"><summary>About observations</summary><p>Each row is a recorded invocation. Repeated executable IDs remain separate.</p></details>
-                    <p class="cell-detail" data-executables-order-label></p>
-                    <details class="table-sort-options"><summary>More sort options</summary>
-                    <div class="table-controls" aria-label="Executable order">
-                        <label>Sort <select data-executables-sort><option value="started_at">Started</option><option value="statistics_id">Statistics ID</option></select></label>
-                        <label>Direction <select data-executables-direction><option value="asc">Ascending</option><option value="desc">Descending</option></select></label>
-                    </div>
-                    </details>
-                    <div class="resource-feedback" tabindex="0" aria-label="Section status">
-                        <p class="resource-status" data-executables-notice role="status"></p>
-                        <p class="resource-status" data-executables-status role="status"></p>
-                        <button type="button" data-executables-retry hidden>Retry executable observations</button>
-                    </div>
-                    <div class="table-scroll" data-executables-scroll role="region" aria-label="Executable observations table" tabindex="0">
-                        <table class="detail-table" data-executables-table>
-                            <caption>Observed executable invocations</caption>
-                            <colgroup><col><col><col><col><col></colgroup>
-                            <thead><tr><th scope="col" aria-sort="none"><button type="button" data-executables-header-statistics_id>Statistics ID</button></th><th scope="col">Executable / paths</th><th scope="col" aria-sort="none"><button type="button" data-executables-header-started_at>Started</button> / Ended</th><th scope="col">Duration</th><th scope="col">Result</th></tr></thead>
-                            <tbody><tr><td colspan="5">Open this section to load observations.</td></tr></tbody>
-                        </table>
-                    </div>
-                    <nav class="pagination" aria-label="Executable pages">
-                        <button type="button" data-executables-previous aria-disabled="true">Previous</button>
-                        <button type="button" data-executables-next aria-disabled="true">Next</button>
-                        <button type="button" data-executables-latest>First page</button>
-                        <label class="page-size">Rows per page <select data-executables-limit></select></label>
-                    </nav>
-                </div>
-            </section>
-            <section class="panel detail-panel observation-section" id="detail-panel-children" data-detail-tab-panel="children" role="tabpanel" aria-labelledby="detail-tab-children" tabindex="0" hidden>
-                <div class="section-heading">
-                    <h2 id="children-heading">Package calls</h2>
-                </div>
-                <div id="child-observations" data-children-panel hidden>
-                    <p class="detail-note">Start/end recording is not a package result.</p>
-                    <p class="cell-detail" data-children-order-label></p>
-                    <details class="table-sort-options"><summary>More sort options</summary>
-                    <div class="table-controls" aria-label="Package call order">
-                        <label>Sort <select data-children-sort><option value="started_at">Started</option><option value="observation_id">Observation ID</option></select></label>
-                        <label>Direction <select data-children-direction><option value="asc">Ascending</option><option value="desc">Descending</option></select></label>
-                    </div>
-                    </details>
-                    <div class="resource-feedback" tabindex="0" aria-label="Section status">
-                        <p class="resource-status" data-children-notice role="status"></p>
-                        <p class="resource-status" data-children-status role="status"></p>
-                        <button type="button" data-children-retry hidden>Retry package calls</button>
-                    </div>
-                    <div class="table-scroll" data-children-scroll role="region" aria-label="Package calls table" tabindex="0">
-                        <table class="detail-table" data-children-table>
-                            <caption>Recorded package calls</caption>
-                            <colgroup><col><col><col><col></colgroup>
-                            <thead><tr><th scope="col">Package / call path</th><th scope="col" aria-sort="none"><button type="button" data-children-header-started_at>Started</button> / Ended</th><th scope="col">Duration</th><th scope="col">Recording</th></tr></thead>
-                            <tbody><tr><td colspan="4">Open this section to load observations.</td></tr></tbody>
-                        </table>
-                    </div>
-                    <nav class="pagination" aria-label="Package call pages">
-                        <button type="button" data-children-previous aria-disabled="true">Previous</button>
-                        <button type="button" data-children-next aria-disabled="true">Next</button>
-                        <button type="button" data-children-latest>First page</button>
-                        <label class="page-size">Rows per page <select data-children-limit></select></label>
-                    </nav>
-                </div>
-            </section>
             <section class="panel detail-panel observation-section" id="detail-panel-events" data-detail-tab-panel="events" role="tabpanel" aria-labelledby="detail-tab-events" tabindex="0" hidden>
-                <div class="section-heading">
-                    <h2 id="event-log-heading">Events</h2>
-                </div>
                 <div id="execution-events" data-events-panel hidden>
-                    <form class="table-controls" data-events-filters aria-label="Event filters">
-                        <label>Category <select data-events-kind></select></label>
-                        <label>Search full messages <input type="search" data-events-q autocomplete="off" spellcheck="false" aria-describedby="event-search-hint"></label>
-                        <button type="submit" data-events-apply>Search</button>
-                        <button type="button" data-events-reset>Reset filters</button>
-                    </form>
-                    <p class="visually-hidden" id="event-search-hint">Enter to search.</p>
-                    <div class="events-meta">
-                        <p class="resource-status" tabindex="0" aria-label="Applied event filters and order"><span data-events-scope></span><span data-events-order-label></span></p>
-                        <details class="table-sort-options"><summary>More sort options</summary>
-                            <div class="table-controls" aria-label="Event order">
-                                <label>Sort <select data-events-sort><option value="message_time">Message time</option><option value="event_id">Event ID</option></select></label>
-                                <label>Direction <select data-events-direction><option value="asc">Ascending</option><option value="desc">Descending</option></select></label>
-                            </div>
-                        </details>
-                    </div>
-                    <div class="resource-feedback" tabindex="0" aria-label="Section status">
-                        <p class="resource-status" data-events-notice role="status"></p>
-                        <p class="resource-status" data-events-status role="status"></p>
-                        <button type="button" data-events-retry hidden>Retry events</button>
+                    <div class="table-toolbar">
+                        <form class="toolbar-filters" data-events-filters aria-label="Event filters">
+                            <label>Category<select data-events-kind></select></label>
+                            <label class="event-search"><span class="visually-hidden">Search full messages</span><input type="search" data-events-q placeholder="Search messages…" autocomplete="off" spellcheck="false"></label>
+                            <button type="submit" data-events-apply>Search</button><button type="button" class="button-quiet" data-events-reset hidden>Reset</button>
+                        </form>
+                        <div class="toolbar-meta"><span class="inline-notice" data-events-notice role="status"></span><p class="inline-status" data-events-status role="status"></p><button type="button" class="button-quiet" data-events-retry hidden>Retry</button></div>
+                        <label>Sort<select data-events-sort></select></label>
+                        {{ pager('events', 'Event') }}
                     </div>
                     <div class="table-scroll" data-events-scroll role="region" aria-label="Events table" tabindex="0">
                         <table class="detail-table" data-events-table>
+                            <caption class="visually-hidden">Recorded events</caption>
                             <colgroup><col><col><col></colgroup>
                             <thead><tr><th scope="col" aria-sort="none"><button type="button" data-events-header-message_time>Time</button></th><th scope="col">Event / source</th><th scope="col">Message</th></tr></thead>
                             <tbody><tr><td colspan="3">Open this section to load events.</td></tr></tbody>
                         </table>
                     </div>
-                    <nav class="pagination" aria-label="Event pages">
-                        <button type="button" data-events-previous aria-disabled="true">Previous</button>
-                        <button type="button" data-events-next aria-disabled="true">Next</button>
-                        <button type="button" data-events-latest>First page</button>
-                        <label class="page-size">Rows per page <select data-events-limit></select></label>
-                    </nav>
+                </div>
+            </section>
+            <section class="panel detail-panel observation-section" id="detail-panel-executables" data-detail-tab-panel="executables" role="tabpanel" aria-labelledby="detail-tab-executables" tabindex="0" hidden>
+                <div id="executable-observations" data-executables-panel hidden>
+                    <div class="table-toolbar">
+                        <div class="toolbar-meta"><span class="inline-notice" data-executables-notice role="status"></span><p class="inline-status" data-executables-status role="status"></p><button type="button" class="button-quiet" data-executables-retry hidden>Retry</button></div>
+                        {{ tip('observations-tip', 'About executable observations', 'Each row is a recorded invocation. Repeated executable IDs remain separate.') }}
+                        <label>Sort<select data-executables-sort></select></label>
+                        {{ pager('executables', 'Executable') }}
+                    </div>
+                    <div class="table-scroll" data-executables-scroll role="region" aria-label="Executable observations table" tabindex="0">
+                        <table class="detail-table" data-executables-table>
+                            <caption class="visually-hidden">Observed executable invocations</caption>
+                            <colgroup><col><col><col><col><col></colgroup>
+                            <thead><tr><th scope="col" aria-sort="none"><button type="button" data-executables-header-statistics_id>Statistics ID</button></th><th scope="col">Executable / paths</th><th scope="col" aria-sort="none"><button type="button" data-executables-header-started_at>Started</button> / Ended</th><th scope="col">Duration</th><th scope="col">Result</th></tr></thead>
+                            <tbody><tr><td colspan="5">Open this section to load observations.</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+            <section class="panel detail-panel observation-section" id="detail-panel-children" data-detail-tab-panel="children" role="tabpanel" aria-labelledby="detail-tab-children" tabindex="0" hidden>
+                <div id="child-observations" data-children-panel hidden>
+                    <div class="table-toolbar">
+                        <div class="toolbar-meta"><span class="inline-notice" data-children-notice role="status"></span><p class="inline-status" data-children-status role="status"></p><button type="button" class="button-quiet" data-children-retry hidden>Retry</button></div>
+                        <label>Sort<select data-children-sort></select></label>
+                        {{ pager('children', 'Package call') }}
+                    </div>
+                    <div class="table-scroll" data-children-scroll role="region" aria-label="Package calls table" tabindex="0">
+                        <table class="detail-table" data-children-table>
+                            <caption class="visually-hidden">Recorded package calls</caption>
+                            <colgroup><col><col><col><col></colgroup>
+                            <thead><tr><th scope="col">Package / call path</th><th scope="col" aria-sort="none"><button type="button" data-children-header-started_at>Started</button> / Ended</th><th scope="col">Duration</th><th scope="col">Recording {{ tip('recording-tip', 'About recording', 'Start/end recording is not a package result.') }}</th></tr></thead>
+                            <tbody><tr><td colspan="4">Open this section to load observations.</td></tr></tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
             <section class="panel detail-panel observation-section" id="detail-panel-parameters" data-detail-tab-panel="parameters" role="tabpanel" aria-labelledby="detail-tab-parameters" tabindex="0" hidden>
-                <div class="section-heading">
-                    <h2 id="parameters-heading">Parameters</h2>
-                </div>
                 <div id="execution-parameters" data-parameters-panel hidden>
-                    <div class="table-controls" aria-label="Parameter order">
-                        <span class="cell-detail">Fixed order: Parameter ID, ascending</span>
-                    </div>
-                    <div class="resource-feedback" tabindex="0" aria-label="Section status">
-                        <p class="resource-status" data-parameters-notice role="status"></p>
-                        <p class="resource-status" data-parameters-status role="status"></p>
-                        <button type="button" data-parameters-retry hidden>Retry parameters</button>
+                    <div class="table-toolbar">
+                        <div class="toolbar-meta"><span class="inline-notice" data-parameters-notice role="status"></span><p class="inline-status" data-parameters-status role="status"></p><button type="button" class="button-quiet" data-parameters-retry hidden>Retry</button></div>
+                        {{ tip('parameters-order-tip', 'About fixed order', 'Fixed order: Parameter ID, ascending.') }}
+                        {{ pager('parameters', 'Parameter') }}
                     </div>
                     <div class="table-scroll" data-parameters-scroll role="region" aria-label="Parameters table" tabindex="0">
                         <table class="detail-table" data-parameters-table>
-                            <caption>Execution parameters</caption>
+                            <caption class="visually-hidden">Execution parameters</caption>
                             <colgroup><col><col><col><col><col></colgroup>
                             <thead><tr><th scope="col">Parameter</th><th scope="col">Scope</th><th scope="col">Type</th><th scope="col">Value</th><th scope="col">Flags</th></tr></thead>
                             <tbody><tr><td colspan="5">Open this section to load parameters.</td></tr></tbody>
                         </table>
                     </div>
-                    <nav class="pagination" aria-label="Parameter pages">
-                        <button type="button" data-parameters-previous aria-disabled="true">Previous</button>
-                        <button type="button" data-parameters-next aria-disabled="true">Next</button>
-                        <button type="button" data-parameters-latest>First page</button>
-                        <label class="page-size">Rows per page <select data-parameters-limit></select></label>
-                    </nav>
                 </div>
             </section>
             <section class="panel detail-panel observation-section" id="detail-panel-overrides" data-detail-tab-panel="overrides" role="tabpanel" aria-labelledby="detail-tab-overrides" tabindex="0" hidden>
-                <div class="section-heading">
-                    <h2 id="overrides-heading">Overrides</h2>
-                </div>
                 <div id="execution-overrides" data-overrides-panel hidden>
-                    <p class="detail-note" data-overrides-policy hidden>Override values are hidden by application policy.</p>
-                    <div class="table-controls" aria-label="Override order">
-                        <span class="cell-detail">Fixed order: Property ID, ascending</span>
+                    <div class="table-toolbar">
+                        <div class="toolbar-meta"><span class="inline-notice" data-overrides-notice role="status"></span><p class="inline-status" data-overrides-status role="status"></p><button type="button" class="button-quiet" data-overrides-retry hidden>Retry</button></div>
+                        {{ tip('overrides-order-tip', 'About fixed order', 'Fixed order: Property ID, ascending.') }}
+                        {{ pager('overrides', 'Override') }}
                     </div>
-                    <div class="resource-feedback" tabindex="0" aria-label="Section status">
-                        <p class="resource-status" data-overrides-notice role="status"></p>
-                        <p class="resource-status" data-overrides-status role="status"></p>
-                        <button type="button" data-overrides-retry hidden>Retry overrides</button>
-                    </div>
+                    <p class="detail-note policy-notice" data-overrides-policy hidden>Override values are hidden by application policy.</p>
                     <div class="table-scroll" data-overrides-scroll role="region" aria-label="Overrides table" tabindex="0">
                         <table class="detail-table" data-overrides-table>
-                            <caption>Execution property overrides</caption>
+                            <caption class="visually-hidden">Execution property overrides</caption>
                             <colgroup><col><col><col></colgroup>
                             <thead><tr><th scope="col">Property / ID</th><th scope="col">Value</th><th scope="col">Sensitive</th></tr></thead>
                             <tbody><tr><td colspan="3">Open this section to load overrides.</td></tr></tbody>
                         </table>
                     </div>
-                    <nav class="pagination" aria-label="Override pages">
-                        <button type="button" data-overrides-previous aria-disabled="true">Previous</button>
-                        <button type="button" data-overrides-next aria-disabled="true">Next</button>
-                        <button type="button" data-overrides-latest>First page</button>
-                        <label class="page-size">Rows per page <select data-overrides-limit></select></label>
-                    </nav>
                 </div>
             </section>
             <section class="panel detail-panel observation-section" id="detail-panel-history" data-detail-tab-panel="history" role="tabpanel" aria-labelledby="detail-tab-history" tabindex="0" hidden>
-                <div class="section-heading">
-                    <h2 id="history-heading">Package history</h2>
-                </div>
                 <div id="package-history" data-history-panel hidden>
-                    <p class="detail-note history-scope" data-history-scope></p>
-                    <div class="history-presets" data-history-presets role="group" aria-label="History status presets"></div>
-                    <details class="history-status-options" data-history-status-options><summary>Choose statuses</summary>
-                        <form data-history-filters>
-                            <fieldset class="status-options"><legend>History statuses</legend><div class="history-choices" data-history-choices></div></fieldset>
-                            <button type="submit" data-history-apply>Apply statuses</button>
-                        </form>
-                    </details>
-                    <p class="cell-detail" data-history-order-label></p>
-                    <details class="table-sort-options"><summary>More sort options</summary>
-                    <div class="table-controls" aria-label="History order">
-                        <label>Direction <select data-history-direction><option value="desc">Descending</option><option value="asc">Ascending</option></select></label>
+                    <div class="table-toolbar">
+                        <div class="toolbar-filters history-presets" role="group" aria-label="History status presets"><span>Status</span><span data-history-presets></span><button type="button" data-history-custom aria-haspopup="dialog" aria-controls="history-status-picker" aria-expanded="false">Custom…</button>{{ tip('history-scope-tip', 'About package history', 'All creation dates for this exact folder, project and entry package. The status presets filter the executions shown.') }}</div>
+                        <div class="toolbar-meta"><span class="inline-notice" data-history-notice role="status"></span><p class="inline-status" data-history-status role="status"></p><button type="button" class="button-quiet" data-history-retry hidden>Retry</button></div>
+                        <button type="button" data-history-chart-toggle disabled aria-expanded="false" aria-controls="history-duration-chart">Chart</button>
+                        {{ pager('history', 'History') }}
                     </div>
-                    </details>
-                    <p class="detail-note">Estimates are not actual timings.</p>
-                    <details class="detail-note"><summary>How estimates work</summary><p>Mean of up to five prior visible successful runs. Unavailable without a start or usable samples, for a zero mean, or when the estimated end is out of range. Visibility and retention can change estimates.</p></details>
-                    <div class="resource-feedback" tabindex="0" aria-label="Section status">
-                        <p class="resource-status" data-history-notice role="status"></p>
-                        <p class="resource-status" data-history-status role="status"></p>
-                        <button type="button" data-history-retry hidden>Retry history</button>
+                    <div id="history-status-picker" class="filter-popover history-status-popover" data-history-status-options role="dialog" aria-labelledby="history-status-heading" hidden>
+                        <div class="popover-heading"><h2 id="history-status-heading">History statuses</h2><button type="button" class="button-quiet" data-history-close aria-label="Close history status picker">×</button></div>
+                        <form data-history-filters><fieldset class="status-options"><legend class="visually-hidden">History statuses</legend><div class="history-choices" data-history-choices></div></fieldset><button type="submit" data-history-apply>Done</button></form>
                     </div>
-                    <section class="history-duration-chart" aria-labelledby="history-duration-heading">
-                        <div class="section-heading"><h3 id="history-duration-heading">Duration comparison</h3><button type="button" data-history-chart-toggle disabled aria-expanded="false" aria-controls="history-duration-chart">Show duration chart</button></div>
-                        <div id="history-duration-chart" data-history-chart-panel hidden>
-                            <p class="detail-note" data-history-chart-scope></p>
-                            <p class="detail-note duration-legend"><span data-duration-key="actual">Actual bar</span><span data-duration-key="estimate">Estimate marker</span><span data-chart-status="7">Succeeded</span><span data-chart-status="4">Failed / unexpected end</span><span data-chart-status="2">Running</span><span data-chart-status="5">Pending / stopping</span><span data-chart-status="other">Other</span></p>
-                            <details class="detail-note"><summary>Chart key</summary><p>Circle: actual zero. No mark: unavailable. Estimates are not actual timings. Hover or focus a point for values; use Left/Right or Home/End to move. Full values and timestamps are in the history table.</p></details>
-                            <label class="history-chart-choice">Selected execution<select data-history-chart-choice></select></label>
-                            <p class="cell-detail" data-history-chart-scale></p>
-                            <div class="chart-frame">
-                                <div class="chart-y-axis" data-history-chart-y-axis aria-label="Duration scale"></div>
-                                <svg class="history-duration-plot" data-history-chart-plot viewBox="0 0 1000 170" preserveAspectRatio="none" role="listbox" aria-orientation="horizontal" aria-label="History durations, earliest to latest"></svg>
-                                <div class="chart-x-axis" data-history-chart-x-axis aria-label="Creation dates and execution IDs"></div>
-                            </div>
-                            <p class="chart-axis-caption">Created time →</p>
-                            <div class="chart-message"><p class="resource-status" data-history-chart-empty role="status" hidden></p></div>
-                            <p class="resource-status chart-selection" data-history-chart-selected role="status" tabindex="0" aria-label="Selected execution values"></p>
+                    <section class="history-duration-chart" id="history-duration-chart" data-history-chart-panel aria-label="Duration comparison" hidden>
+                        <div class="chart-heading"><div class="duration-legend"><span data-duration-key="actual">Actual</span><span data-duration-key="estimate">Estimate</span><span data-chart-status="7">Succeeded</span><span data-chart-status="4">Failed / unexpected end</span><span data-chart-status="2">Running</span><span data-chart-status="5">Pending / stopping</span><span data-chart-status="other">Other</span></div>{{ tip('history-chart-tip', 'About duration comparison', 'Plots the loaded page only. Circle: actual zero. No mark: unavailable. Estimates are not actual timings. Hover or focus a point for values; Left/Right or Home/End to move. Full values and timestamps are in the history table.') }}</div>
+                        <div class="chart-frame">
+                            <div class="chart-y-axis" data-history-chart-y-axis aria-label="Duration scale"></div>
+                            <svg class="history-duration-plot" data-history-chart-plot viewBox="0 0 1000 170" preserveAspectRatio="none" role="listbox" aria-orientation="horizontal" aria-label="History durations, earliest to latest"></svg>
+                            <div class="chart-x-axis" data-history-chart-x-axis aria-label="Creation dates and execution IDs"></div>
+                            <span class="chart-axis-caption">Created time →</span><span class="visually-hidden" data-history-chart-scale></span>
                         </div>
+                        <p class="resource-status chart-empty" data-history-chart-empty role="status" hidden></p>
+                        <p class="inline-status chart-selection" data-history-chart-selected role="status" tabindex="0" aria-label="Selected execution values"></p>
                     </section>
                     <div class="table-scroll" data-history-scroll role="region" aria-label="Package history table" tabindex="0">
                         <table class="detail-table" data-history-table>
-                            <caption>Executions of the exact entry package</caption>
-                            <colgroup><col><col><col><col></colgroup>
-                            <thead><tr><th scope="col" aria-sort="none"><button type="button" data-history-header-execution_id>Execution</button> / status</th><th scope="col">Timing</th><th scope="col">Actual duration</th><th scope="col">Estimate</th></tr></thead>
-                            <tbody><tr><td colspan="4">Open this section to load package history.</td></tr></tbody>
+                            <caption class="visually-hidden">Executions of the exact entry package</caption>
+                            <colgroup><col><col><col><col><col><col></colgroup>
+                            <thead><tr><th scope="col" aria-sort="none"><button type="button" data-history-header-execution_id>Execution</button></th><th scope="col">Created</th><th scope="col">Started</th><th scope="col">Ended</th><th scope="col">Duration</th><th scope="col">Estimate {{ tip('estimate-tip', 'About estimates', 'Estimates are not actual timings. Mean of up to five prior visible successful runs. Unavailable without a start or usable samples, for a zero mean, or when the estimated end is out of range. Visibility and retention can change estimates. The number in parentheses is the sample count.') }}</th></tr></thead>
+                            <tbody><tr><td colspan="6">Open this section to load package history.</td></tr></tbody>
                         </table>
                     </div>
-                    <nav class="pagination" aria-label="History pages">
-                        <button type="button" data-history-previous aria-disabled="true">Previous</button>
-                        <button type="button" data-history-next aria-disabled="true">Next</button>
-                        <button type="button" data-history-latest>First page</button>
-                        <label class="page-size">Rows per page <select data-history-limit></select></label>
-                    </nav>
                 </div>
             </section>
         </div>

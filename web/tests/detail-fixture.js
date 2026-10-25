@@ -31,9 +31,9 @@ export function detailDOM() {
   document.activeElement = document.body;
   const nodes = new Map();
   for (const key of ['app-status', 'retry', 'request-id', 'display-timezone', 'execution-detail',
-    'detail-status', 'detail-retry', 'detail-request-id', 'active-elapsed',
+    'active-elapsed',
     'detail-refresh', 'detail-poll-toggle', 'detail-poll-status', 'overview-link', 'legacy-detail-link',
-    'overview-return-notice', 'parameters-unavailable', 'overrides-unavailable', 'overrides-policy', ...['toggle','panel','choice','plot','scope','selected','scale','empty','x-axis','y-axis'].map(key=>`history-chart-${key}`), ...['filters','choices','apply','scope','presets','status-options'].map(key => `history-${key}`), ...['unavailable','filters','apply','reset','kind','q','scope'].map(key => `events-${key}`), ...['toggle', 'panel', 'status', 'notice', 'retry', 'sort', 'direction',
+    'overview-return-notice', 'parameters-unavailable', 'overrides-unavailable', 'overrides-policy', ...['toggle','panel','plot','selected','scale','empty','x-axis','y-axis'].map(key=>`history-chart-${key}`), ...['filters','choices','apply','custom','close','presets','status-options'].map(key => `history-${key}`), ...['unavailable','filters','apply','reset','kind','q'].map(key => `events-${key}`), ...['toggle', 'panel', 'status', 'notice', 'retry', 'sort',
       'limit', 'previous', 'next', 'latest', 'scroll', 'table', 'order-label'].flatMap(name => ['executables', 'children', 'events', 'parameters', 'overrides', 'history'].map(section => `${section}-${name}`))]) {
     const node = new Node(document, /-(limit|sort|direction|kind)$/.test(key) ? 'select' : key === 'events-q' ? 'input'
       : key.includes('retry') || /toggle|previous|next|latest|refresh$/.test(key) ? 'button' : 'div');
@@ -41,6 +41,7 @@ export function detailDOM() {
     root.append(node);
   }
   const get = key => nodes.get(`[data-${key}]`);
+  nodes.set('[data-detail-status]', get('detail-poll-status'));
   const fields = ['folder', 'project', 'package', 'lsn', 'environment-folder', 'environment', 'status', 'logging',
     'created', 'started', 'ended', 'duration', 'elapsed', 'all', 'warnings', 'errors', 'duplicate_warnings', 'memory_warnings']
     .map(key => Object.assign(new Node(document, 'dd'), { dataset: { detailField: key } }));
@@ -53,12 +54,16 @@ export function detailDOM() {
   }
   const countLinks = fields.filter(node => ['all','warnings','errors','duplicate_warnings','memory_warnings'].includes(node.dataset.detailField));
   for (const node of countLinks) { node.tag = 'a'; node.dataset.eventCountLink = node.dataset.detailField.replaceAll('_','-'); }
+  for (const key of ['errors', 'warnings']) {
+    const label = new Node(document, 'span', key);
+    nodes.set(`[data-event-count-label="${key}"]`, label); get('execution-detail').append(label);
+  }
   const bodies = {};
   for (const section of ['executables', 'children', 'events', 'parameters', 'overrides', 'history']) {
     const panel = new Node(document, 'section');
     nodes.set(`[data-detail-tab-panel="${section}"]`, panel);
     get('execution-detail').append(get(`${section}-toggle`), panel); panel.append(get(`${section}-panel`));
-    get(`${section}-panel`).append(...['status', 'notice', 'retry', 'sort', 'direction', 'limit',
+    get(`${section}-panel`).append(...['status', 'notice', 'retry', 'sort', 'limit',
       'previous', 'next', 'latest', 'scroll'].map(key => get(`${section}-${key}`)));
     get(`${section}-scroll`).append(get(`${section}-table`));
     const body = new Node(document, 'tbody');
@@ -75,18 +80,18 @@ export function detailDOM() {
     get(`${section}-table`).querySelector = selector => selector === 'tbody' ? body : null;
     get(`${section}-retry`).hidden = get(`${section}-panel`).hidden = true;
   }
-  get('events-panel').append(get('events-filters'),get('events-scope'));
+  get('events-panel').append(get('events-filters'));
   get('events-filters').append(...['kind','q','apply','reset'].map(key => get(`events-${key}`)));
-  get('history-panel').append(get('history-presets'),get('history-status-options'),get('history-scope'));
-  get('history-status-options').append(get('history-filters'));
+  get('history-panel').append(get('history-presets'),get('history-custom'),get('history-status-options'));
+  get('history-status-options').append(get('history-close'),get('history-filters'));
   get('history-filters').append(get('history-choices'),get('history-apply'));
   get('history-panel').append(get('history-chart-toggle'),get('history-chart-panel'));
-  get('history-chart-panel').append(...['choice','plot','scope','selected','scale','empty','x-axis','y-axis'].map(key=>get(`history-chart-${key}`)));
+  get('history-chart-panel').append(...['plot','selected','scale','empty','x-axis','y-axis'].map(key=>get(`history-chart-${key}`)));
   const body = bodies.executables;
   document.getElementById = id => id === 'main-content' ? main : {
     textContent: JSON.stringify({ app_base: '/ops/app/', api_base: '/ops/api/v1/',
       execution_base: '/ops/execution/', execution_id: '9223372036854775807' }) };
-  get('detail-retry').hidden = get('executables-retry').hidden = get('executables-panel').hidden = true;
+  get('executables-retry').hidden = get('executables-panel').hidden = true;
   root.querySelector = selector => { if (!nodes.has(selector)) throw new Error(`Missing detail fixture node: ${selector}`); return nodes.get(selector); };
   root.querySelectorAll = selector => {
     if (selector === '[data-detail-field]') return fields;

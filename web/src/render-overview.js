@@ -4,6 +4,7 @@ import { createOverview } from './overview.js';
 import { selectionParams, selectionSearch } from './selection.js';
 import { mountTimeline } from './render-timeline.js';
 import { reserveLoadingSpace } from './loading-space.js';
+import { inlineStatus, pollingButton } from './ui.js';
 
 export function mountOverview(root, { api, metadata, appBase, retainedPaths, restoreView = null,
   serverTime = null, onSelect = () => {} }) {
@@ -13,12 +14,9 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   const table = root.querySelector('[data-execution-table]');
   const body = table.querySelector('tbody');
   const listStatus = root.querySelector('[data-executions-status]');
-  const summaryStatus = root.querySelector('[data-summary-status]');
   const otherNote = root.querySelector('[data-summary-other-note]');
   const listRetry = root.querySelector('[data-list-retry]');
-  const summaryRetry = root.querySelector('[data-summary-retry]');
   const bounds = root.querySelector('[data-cohort-window]');
-  const header = root.querySelector('[data-app-status]');
   const previous = root.querySelector('[data-executions-previous]');
   const next = root.querySelector('[data-executions-next]');
   const latest = root.querySelector('[data-executions-latest]');
@@ -39,6 +37,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   let returning = restoreView;
   let selectionKey = null;
   let autoPaused = restoreView?.autoPaused === true;
+  let phase = 'idle';
   const timelineView=mountTimeline(root,{metadata,restoreView:restoreView?.timeline,
     actions:{toggle:()=>{void owner.toggleTimeline();},retry:()=>{void owner.retryTimeline();},bucket:value=>{void owner.setTimelineBucket(value);}}});
 
@@ -181,6 +180,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   const owner = createOverview({ api, metadata, retainedPaths, serverTime, autoRefresh: !autoPaused, restoreTimeline:restoreView?.timeline,
     visible: document.visibilityState !== 'hidden', publish(state) {
     const page = state.page;
+    phase = state.phase;
     reserveSpace(state.phase === 'loading-list' && page === null, renderedPage !== null);
     const refreshing = state.operation === 'refresh' || state.operation === 'summary-retry';
     appliedSelection = state.selection;
@@ -196,11 +196,10 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     refresh.setAttribute('aria-disabled', String(state.busy));
     autoPaused = state.poll.paused;
     pollToggle.disabled = state.selection === null;
-    pollToggle.textContent = autoPaused ? 'Resume auto refresh' : 'Pause auto refresh';
-    pollStatus.textContent = refreshStatus(display, page?.meta.generated_at, state.poll);
-    pollStatus.title = page ? `Observed ${display.timestamp(page.meta.generated_at)} · ${page.meta.generated_at}` : '';
-    listRetry.hidden = state.phase !== 'list-error';
-    summaryRetry.hidden = state.phase !== 'summary-error';
+    pollingButton(pollToggle, autoPaused);
+    listRetry.hidden = state.phase !== 'list-error' && !(state.busy && !listRetry.hidden);
+    listRetry.disabled = state.selection === null;
+    listRetry.setAttribute('aria-disabled', String(state.busy));
     // Native disabling blurs a focused button on every automatic refresh. Keep
     // paging focusable; the owner rejects busy and unavailable page actions.
     for (const control of [previous, next, latest]) control.disabled = state.selection === null;
@@ -208,10 +207,6 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     next.setAttribute('aria-disabled', String(!state.hasNext));
     latest.setAttribute('aria-disabled', String(state.busy || state.selection === null));
     pageNotice.textContent = state.notice;
-    header.textContent = refreshing && state.busy ? 'Refreshing…'
-      : state.pageStale ? 'Refresh failed' : ({ idle: 'No selection', 'loading-list': 'Loading executions…',
-      'loading-summary': 'Loading summary…', ready: '', 'list-error': 'Executions unavailable',
-      'summary-error': 'Summary unavailable', 'loading-timeline':'Loading timeline…' })[state.phase];
     if (page !== renderedPage) {
       if (page) renderRows(page, state.pageNumber, state.selection);
       else empty(state.phase === 'loading-list' ? 'Loading executions…' : 'No data loaded.');
@@ -221,20 +216,34 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
         : state.phase === 'list-error' ? 'Executions could not be loaded.' : 'No data loaded.');
     }
     const pageDetails = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} rows` : '';
+    const error = ['list-error', 'summary-error'].includes(state.phase) ? failure(state.error) : '';
+    const errorDetails = error ? [error, state.pageStale ? 'Previous results shown.' : '',
+      state.summaryStale ? 'Previous counts shown.' : ''].filter(Boolean).join(' ') : '';
     listStatus.title = page ? `Observed ${display.timestamp(page.meta.generated_at)} · ${page.meta.generated_at}` : '';
-    listStatus.textContent = state.phase === 'list-error'
-      ? `${failure(state.error)}${state.pageStale ? ` Previous results shown. ${pageDetails}` : ''}`
-      : state.pageStale ? `Refreshing… Previous results shown. ${pageDetails}` : pageDetails;
-    const summaryDetails = state.summaryStale ? ' Previous counts shown.' : '';
-    summaryStatus.title = state.summary ? `Observed ${display.timestamp(state.summary.meta.generated_at)} · ${state.summary.meta.generated_at}` : '';
-    summaryStatus.textContent = state.phase === 'summary-error' ? failure(state.error) + summaryDetails
-      : state.summaryStale ? (state.busy ? 'Refreshing…' + summaryDetails : summaryDetails.trimStart())
-      : state.phase === 'loading-summary' ? 'Loading summary…' : '';
+    listStatus.textContent = error
+      ? [errorDetails, pageDetails].filter(Boolean).join(' ')
+      : state.pageStale ? `Refreshing… Previous results shown. ${pageDetails}`
+      : state.phase === 'loading-list' ? 'Loading executions…' : pageDetails || 'No selection';
+    listStatus.title = [listStatus.textContent, listStatus.title].filter(Boolean).join(' · ');
+    const stale = state.pageStale || state.summaryStale;
+    const failedObservation = state.phase === 'summary-error' ? state.summary : page;
+    const refreshText = page ? refreshStatus(display, page.meta.generated_at, state.poll) : '';
+    const message = error ? (stale && failedObservation
+      ? `⚠ Refresh failed · showing data from ${display.clock(failedObservation.meta.generated_at)}`
+      : `⚠ ${state.phase === 'summary-error' ? 'Summary' : 'Executions'} unavailable`)
+      : stale ? 'Refreshing… Previous counts shown.'
+      : !page ? (state.selection ? 'Loading executions…' : 'No selection')
+      : state.phase === 'loading-summary' ? 'Loading summary…' : refreshText;
+    inlineStatus(pollStatus, message, [errorDetails,
+      page ? `Observed ${display.timestamp(page.meta.generated_at)} · ${page.meta.generated_at}` : '',
+      state.summaryStale && state.summary ? `Counts observed ${display.timestamp(state.summary.meta.generated_at)} · ${state.summary.meta.generated_at}` : '',
+      message !== refreshText ? refreshText : ''].filter(Boolean).join(' · '));
     bounds.hidden = false;
     if (page) {
-      bounds.replaceChildren(document.createTextNode('Created: '), time(page.meta.from),
-        document.createTextNode(' → '), time(page.meta.to), document.createTextNode(' (exclusive)'));
+      bounds.replaceChildren(document.createTextNode('Created '), time(page.meta.from),
+        document.createTextNode(' → '), time(page.meta.to));
     } else bounds.replaceChildren();
+    bounds.title = page ? `${bounds.textContent} (exclusive)` : '';
     const counts = state.summary ? Object.fromEntries(state.summary.data.by_status.map((item) => [item.code, item.count])) : null;
     const values = state.summary ? { total: state.summary.data.total, running: counts[2], succeeded: counts[7], failed: counts[4],
       other: state.summary.data.by_status.filter(item => ![2,4,7].includes(item.code)).reduce((total,item) => total + item.count, 0) } : null;
@@ -261,8 +270,9 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     otherNote.hidden = unknownCount === 0;
     otherNote.textContent = unknownCount ? `Other includes ${display.count(unknownCount)} executions with unknown status codes; its filter selects supported statuses.` : '';
     cardLinks.other.title = 'Other supported statuses: ' + metadata.execution_statuses.filter(item => statusSets.other.includes(item.code)).map(formatCode).join(', ')
-      + (unknownCount ? '. Counts also include unknown codes, which the API cannot filter.' : '');
+      + (unknownCount ? `. Counts include ${display.count(unknownCount)} unknown codes, which the API cannot filter.` : '');
     timelineView.render(state.timeline,state.busy,state.selection,page);
+    if (focused === listRetry && listRetry.hidden) refresh.focus({ preventScroll: true });
     if (rowFocus && document.activeElement !== focused) {
       (focused.isConnected ? focused : scroll).focus({ preventScroll: true });
     }
@@ -278,11 +288,10 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     }
   } });
   const retryList = () => { void owner.retryList(); };
-  const retrySummary = () => { void owner.retrySummary(); };
   const previousPage = () => { void owner.previous(); };
   const nextPage = () => { void owner.next(); };
   const latestPage = () => { void owner.latest(); };
-  const refreshPage = () => { void owner.refresh(); };
+  const refreshPage = () => { void (phase === 'summary-error' ? owner.retrySummary() : owner.refresh()); };
   const togglePolling = () => owner.togglePolling();
   const visibilityChanged = () => owner.setVisible(document.visibilityState !== 'hidden');
   document.addEventListener('visibilitychange', visibilityChanged);
@@ -292,7 +301,6 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   next.addEventListener('click', nextPage);
   latest.addEventListener('click', latestPage);
   listRetry.addEventListener('click', retryList);
-  summaryRetry.addEventListener('click', retrySummary);
   return {
     apply(selection, options) {
       if (!options?.restore) returning = null;
@@ -312,7 +320,6 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       document.removeEventListener('visibilitychange', visibilityChanged);
       pollToggle.removeEventListener('click', togglePolling);
       listRetry.removeEventListener('click', retryList);
-      summaryRetry.removeEventListener('click', retrySummary);
       previous.removeEventListener('click', previousPage);
       next.removeEventListener('click', nextPage);
       latest.removeEventListener('click', latestPage);

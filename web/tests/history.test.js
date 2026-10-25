@@ -120,26 +120,26 @@ test('history generation, deadlines and disposal reject late responses after A t
 test('history UI keeps actual and estimated timing separate, preserves lexical identity and links only valid selection',async t=>{
   const rows=[historyRow('3',{status:{code:2,name:'running'},ended_at:null,duration_seconds:null,estimate:estimate()}),historyRow('2'),historyRow('1',{estimate:estimate({sample_count:1,duration_seconds:10,ended_at:'2026-10-17T16:00:10.1234567Z'})})];
   const dom=screen(t,async(resource,options)=>resource==='history'?historyPage(rows):response(resource,options));await flush();click(dom,'history-toggle');await flush();
-  const first=dom.historyBody.children[0];assert.equal(first.children.length,4);assert.match(first.children[2].textContent,/—Elapsed \(observed\)/);
-  assert.equal(first.children[1].children[2].textContent,'Ended—');assert.match(first.children[3].textContent,/Estimated duration:.*Mean of 5 prior successful runs/s);
-  assert.equal(first.children[3].children[1].children[0].getAttribute('datetime'),wireTime);assert.equal(first.children[0].children[0].href,'/ops/app/executions/3');
-  assert.equal(dom.historyBody.children[1].children[3].children[0].textContent,'Unavailable');assert.match(dom.get('history-scope').textContent,/All creation dates.*All statuses/s);
+  const first=dom.historyBody.children[0];assert.equal(first.children.length,6);assert.match(first.children[4].textContent,/— · elapsed/);
+  assert.equal(first.children[3].textContent,'—');assert.match(first.children[5].textContent,/ends .*\(5\)/);
+  assert.equal(first.children[5].children[1].children[0].getAttribute('datetime'),wireTime);assert.equal(first.children[0].children[0].href,'/ops/app/executions/3');
+  assert.equal(dom.historyBody.children[1].children[5].children[0].textContent,'Unavailable');assert.equal(dom.get('history-custom').getAttribute('aria-pressed'),'false');
   assert.match(dom.get('history-status').textContent,/3 executions on this page/);
 });
 
 test('history status drafts survive order changes and refresh; Apply validates nonempty scope without inheriting dates',async t=>{
   const dom=screen(t,async(resource,options)=>resource==='history'?historyPage([],{direction:options.params.direction,limit:options.params.limit}):response(resource,options));await flush();click(dom,'history-toggle');await flush();
-  const inputs=dom.get('history-choices').children.map(label=>label.children[0]);for(const input of inputs)input.checked=['2','4','7'].includes(input.value);
-  dom.get('history-direction').value='asc';dom.get('history-direction').dispatchEvent(new Event('change'));await flush();assert.ok(inputs[3].checked);assert.equal(dom.calls.at(-1).params.status,allQuery.status);
+  click(dom,'history-custom');const inputs=dom.get('history-choices').children.map(label=>label.children[0]);for(const input of inputs)input.checked=['2','4','7'].includes(input.value);
+  dom.get('history-header-execution_id').dispatchEvent(new Event('click'));await flush();assert.ok(inputs[3].checked);assert.equal(dom.calls.at(-1).params.status,allQuery.status);
   dom.get('history-filters').dispatchEvent(new Event('submit'));await flush();assert.equal(dom.calls.at(-1).params.status,'2,4,7');
-  for(const input of inputs)input.checked=false;const count=dom.calls.length;dom.get('history-filters').dispatchEvent(new Event('submit'));assert.equal(dom.calls.length,count);assert.match(dom.get('history-notice').textContent,/Choose at least one/);
+  click(dom,'history-custom');for(const input of inputs)input.checked=false;const count=dom.calls.length;dom.get('history-filters').dispatchEvent(new Event('submit'));assert.equal(dom.calls.length,count);assert.match(dom.get('history-notice').textContent,/Choose at least one/);
 });
 
 test('live estimate loss clears previous estimate text while keyed link focus, draft and scroll survive refresh',async t=>{
   let changed=false;const dom=screen(t,async(resource,options)=>resource==='history'?historyPage([historyRow('1',{estimate:changed?null:estimate()})]):response(resource,options));
   await flush();click(dom,'history-toggle');await flush();const row=dom.historyBody.children[0],link=row.children[0].children[0];dom.get('history-scroll').scrollLeft=120;
   changed=true;click(dom,'detail-refresh');link.focus();await flush();assert.equal(dom.historyBody.children[0],row);assert.equal(dom.document.activeElement,link);
-  assert.equal(dom.get('history-scroll').scrollLeft,120);assert.doesNotMatch(row.children[3].textContent,/Mean of|Estimated duration/);assert.equal(row.children[3].children[1].textContent,'—');
+  assert.equal(dom.get('history-scroll').scrollLeft,120);assert.doesNotMatch(row.children[5].textContent,/Mean of|Estimated duration/);assert.equal(row.children[5].children[1].textContent,'—');
   const checkpoint=dom.mounted.checkpoint();assert.doesNotMatch(JSON.stringify(checkpoint),/Main\.dtsx|Folder|estimate|duration_seconds/);dom.mounted.dispose();
   const restored=screen(t,undefined,{restoreView:checkpoint});await flush();assert.equal(restored.calls.at(-1).resource,'history');assert.equal(restored.document.activeElement,restored.historyBody.children[0].children[0].children[0]);
 });
@@ -150,8 +150,8 @@ test('history navigation preserves only the validated overview selection, and bu
   t.after(mounted.dispose);await flush();click(dom,'history-toggle');await flush();
   assert.equal(dom.historyBody.children[0].children[0].children[0].href,'/ops/app/executions/1?overview=%3Ffolder%3DFold%252B%2B%252F%26limit%3D5');
   slow=true;click(dom,'detail-refresh');await flush();const count=calls.length;click(dom,'detail-refresh');
-  dom.get('history-direction').value='asc';dom.get('history-direction').dispatchEvent(new Event('change'));
-  dom.get('history-limit').value='8';dom.get('history-limit').dispatchEvent(new Event('change'));assert.equal(dom.get('history-direction').value,'desc');assert.equal(dom.get('history-limit').value,'50');assert.equal(calls.length,count);
+  dom.get('history-header-execution_id').dispatchEvent(new Event('click'));
+  dom.get('history-limit').value='8';dom.get('history-limit').dispatchEvent(new Event('change'));assert.equal(dom.get('history-header-execution_id').parentElement.getAttribute('aria-sort'),'descending');assert.equal(dom.get('history-limit').value,'50');assert.equal(calls.length,count);
   dom.get('legacy-detail-link').focus();wait.resolve(historyPage());await flush();assert.equal(dom.document.activeElement,dom.get('legacy-detail-link'));
   mounted.dispose();const closed=calls.length;click(dom,'history-toggle');assert.equal(calls.length,closed);assert.equal(dom.historyBody.textContent,'');
 });
