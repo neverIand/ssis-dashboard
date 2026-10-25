@@ -170,7 +170,8 @@ test('parameter UI renders literal types/flags and distinct redacted, NULL, empt
   for (const value of ['Decimal(18,4)', 'NULL (unredacted)', '(empty)', 'Redacted (sensitive)', 'Redacted (policy)', 'Unknown (-1)', 'Truncated to 16384 characters.']) assert.ok(text.includes(value));
   const first = dom.parameterBody.children[0]; assert.equal(first.children[0].children[0].textContent, rows[0].name);
   assert.equal(first.children[3].children[2].children[1].textContent, rows[0].value);
-  assert.equal(first.children[4].children[0].children[1].textContent, 'SensitiveNoRequiredYesValue setYesRuntime overrideNo');
+  assert.deepEqual(first.children[4].children[0].children.filter(node => !node.hidden).map(node => node.textContent), ['Required', 'Value set']);
+  assert.equal(first.title, 'Parameter ID: 1'); assert.equal(first.children[0].children.length, 1);
 });
 
 test('a keyed value becoming redacted clears expanded raw text and moves hidden-value focus to its table', async t => {
@@ -179,9 +180,10 @@ test('a keyed value becoming redacted clears expanded raw text and moves hidden-
     ? { value: null, sensitive: true, redacted: true, redaction_reason: 'sensitive' } : { value: 'private-ordinary-value '.repeat(20) })]) : response(resource));
   await flush(); dom.get('parameters-toggle').dispatchEvent(new Event('click')); await flush();
   const row = dom.parameterBody.children[0], value = row.children[3].children[2], flags = row.children[4].children[0];
-  value.open = flags.open = true; dom.get('parameters-scroll').scrollLeft = 120; dom.get('parameters-scroll').scrollTop = 75;
+  value.open = true; dom.get('parameters-scroll').scrollLeft = 120; dom.get('parameters-scroll').scrollTop = 75;
   redacted = true; dom.get('detail-refresh').dispatchEvent(new Event('click')); value.children[0].focus(); await flush();
-  assert.equal(dom.parameterBody.children[0], row); assert.equal(value.open, false); assert.equal(flags.open, true);
+  assert.equal(dom.parameterBody.children[0], row); assert.equal(value.open, false); assert.equal(row.children[4].children[0], flags);
+  assert.equal(flags.firstChild.textContent, 'Sensitive'); assert.equal(flags.firstChild.hidden, false);
   assert.doesNotMatch(row.textContent, /private-ordinary-value/); assert.equal(value.children[1].textContent, '');
   assert.equal(dom.document.activeElement, dom.get('parameters-scroll')); assert.equal(dom.get('parameters-scroll').scrollLeft, 120);
 });

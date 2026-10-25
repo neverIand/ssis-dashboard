@@ -1,17 +1,19 @@
 import { createDisplay, formatBoolean, formatCode, formatId } from './display.js';
+import { mountTableOrder } from './table-order.js';
 
 function mountValueTable(root, { metadata, actions, restoreView = null }, resource) {
   const parameter = resource === 'parameters', identity = parameter ? 'execution_parameter_id' : 'property_id';
-  const valueColumn = parameter ? 3 : 1, extraKey = parameter ? 'flags' : 'paths', extraFocus = parameter ? 'flagFocus' : 'pathFocus';
+  const valueColumn = parameter ? 3 : 1;
   const document = root.ownerDocument, enabled = metadata.capabilities.values;
   const get = name => root.querySelector(`[data-${resource}-${name}]`);
   const controls = Object.fromEntries(['toggle', 'retry', 'previous', 'next', 'latest', 'limit', 'scroll'].map(key => [key, get(key)]));
-  const { toggle, retry, previous, next, latest, limit, scroll } = controls;
+  const { toggle, retry, previous, next, latest, scroll } = controls;
   const panel = get('panel'), status = get('status'), notice = get('notice'), table = get('table');
   const body = table.querySelector('tbody'), rows = new Map(), listeners = [];
   const display = createDisplay({ timeZone: metadata.display_timezone });
+  const order = mountTableOrder(root, { resource, metadata, onOrder: actions.order });
   const initialFocus = document.activeElement, initialScroll = { left: scroll.scrollLeft, top: scroll.scrollTop };
-  let returning = enabled ? restoreView : null, current = null, rendered = null, busy = true;
+  let returning = enabled ? restoreView : null, rendered = null, busy = true;
   const element = (tag, value, className) => {
     const node = document.createElement(tag);
     if (value !== undefined) node.textContent = value;
@@ -20,13 +22,12 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
   };
   const text = (node, value) => { if (node.textContent !== value) node.textContent = value; };
   const flags = [['sensitive', 'Sensitive'], ['required', 'Required'], ['value_set', 'Value set'], ['runtime_override', 'Runtime override']];
-  limit.max = String(metadata.limits.max_limit);
   function empty(message) {
     rows.clear(); const row = element('tr'), cell = element('td', message, 'empty-state');
     cell.colSpan = parameter ? 5 : 3; row.append(cell); body.replaceChildren(row);
   }
   function paint(page, pageNumber) {
-    if (!page.data.length) { empty(pageNumber > 1 ? `No ${resource} remain on this page. Use Previous or Show latest.` : `No ${resource} on this page.`); return; }
+    if (!page.data.length) { empty(pageNumber > 1 ? `No ${resource} remain on this page. Use Previous or First page.` : `No ${resource} on this page.`); return; }
     if (!rows.size) body.replaceChildren();
     const wanted = new Set(); let anchor = body.firstChild;
     for (const item of page.data) {
@@ -37,27 +38,34 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
         const cells = Array.from({ length: parameter ? 5 : 3 }, () => element('td'));
         cells[0].className = parameter ? 'parameter-name' : 'override-property';
         if (parameter) cells[2].className = 'parameter-type';
-        const name = element('span'), identityLabel = element('span', undefined, 'cell-detail'); cells[0].append(name, identityLabel);
+        const name = element('span'), identityLabel = element('span', undefined, 'cell-detail');
+        cells[0].append(name); if (!parameter) cells[0].append(identityLabel);
         const preview = element('p', undefined, 'value-preview'), truncated = element('p', undefined, 'cell-detail');
-        const value = element('details'), valueSummary = element('summary', 'View value'), full = element('p', undefined, 'value-body');
+        const value = element('details'), valueSummary = element('summary', 'View value'), full = element('p', undefined, 'value-body bounded-detail');
+        full.tabIndex = 0; full.setAttribute('role', 'region'); full.setAttribute('aria-label', 'Full value');
         value.append(valueSummary, full); cells[valueColumn].append(preview, truncated, value);
-        const details = element('details'), summary = element('summary', parameter ? 'View flags' : 'View path');
-        const values = {}, fullPath = parameter ? null : element('p', undefined, 'override-path');
-        details.append(summary);
+        const details = parameter ? null : element('details'), summary = parameter ? null : element('summary', 'View path');
+        const values = {}, fullPath = parameter ? null : element('p', undefined, 'override-path bounded-detail');
+        let noFlags = null;
         if (parameter) {
-          const list = element('dl', undefined, 'parameter-flags');
-          for (const [key, label] of flags) { values[key] = element('dd'); list.append(element('dt', label), values[key]); }
-          details.append(list); cells[4].append(details);
-        } else { details.append(fullPath); cells[0].append(details); }
+          const list = element('div', undefined, 'flag-chips'); noFlags = element('span', '—');
+          for (const [key] of flags) { values[key] = element('span', undefined, 'flag-chip'); values[key].dataset.flag = key; list.append(values[key]); }
+          list.append(noFlags); cells[4].append(list);
+        } else {
+          fullPath.tabIndex = 0; fullPath.setAttribute('role', 'region'); fullPath.setAttribute('aria-label', 'Property path');
+          details.append(summary, fullPath); cells[0].append(details);
+        }
         node.append(...cells);
-        row = { node, cells, name, identity: identityLabel, preview, truncated, value, valueSummary, full, details, summary, values, fullPath }; rows.set(id, row);
+        row = { node, cells, name, identity: identityLabel, preview, truncated, value, valueSummary, full, details, summary, values, fullPath, noFlags }; rows.set(id, row);
       }
-      text(row.identity, `ID: ${formatId(id)}`);
       if (parameter) {
+        row.node.title = `Parameter ID: ${formatId(id)}`; row.node.dataset.scope = item.object_type.name;
         text(row.name, item.name); text(row.cells[1], formatCode(item.object_type));
         text(row.cells[2], item.sql_type === '' ? '(empty)' : item.sql_type);
-        for (const [key] of flags) text(row.values[key], formatBoolean(item[key]));
+        for (const [key, label] of flags) { text(row.values[key], item[key] ? label : ''); row.values[key].hidden = !item[key]; }
+        row.noFlags.hidden = flags.some(([key]) => item[key]); text(row.noFlags, row.noFlags.hidden ? '' : '—');
       } else {
+        text(row.identity, `ID: ${formatId(id)}`);
         const path = [...item.property_path];
         text(row.name, path.length > 160 ? path.slice(0, 160).join('') + '…' : item.property_path);
         text(row.fullPath, item.property_path); text(row.cells[2], formatBoolean(item.sensitive));
@@ -78,26 +86,20 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
   const listen = (node, event, handler) => { node.addEventListener(event, handler); listeners.push([node, event, handler]); };
   listen(toggle, 'click', actions.toggle); listen(retry, 'click', actions.retry);
   listen(previous, 'click', actions.previous); listen(next, 'click', actions.next); listen(latest, 'click', actions.latest);
-  listen(limit, 'change', () => {
-    if (busy || !current) { if (current) limit.value = String(current.query.limit); return; }
-    const value = Number(limit.value);
-    if (Number.isSafeInteger(value) && value >= 1 && value <= metadata.limits.max_limit) actions.order({ limit: value });
-    else notice.textContent = `Rows per page must be between 1 and ${metadata.limits.max_limit}.`;
-  });
   return {
     render(state, isBusy, authorized) {
-      current = state; busy = isBusy;
+      busy = isBusy;
       const focused = document.activeElement, rowFocused = body.contains(focused), panelFocused = panel.contains(focused);
       const position = { left: scroll.scrollLeft, top: scroll.scrollTop }, permitted = enabled && authorized;
       if (!state.open) returning = null;
       get('unavailable').hidden = enabled;
       if (!parameter) get('policy').hidden = !enabled || metadata.capabilities.override_values;
       panel.hidden = !state.open || !permitted;
-      for (const node of [retry, previous, next, latest, limit]) node.disabled = panel.hidden;
-      for (const node of [retry, latest, limit]) node.setAttribute('aria-disabled', String(busy));
+      for (const node of [retry, previous, next, latest]) node.disabled = panel.hidden;
+      for (const node of [retry, latest]) node.setAttribute('aria-disabled', String(busy));
       previous.setAttribute('aria-disabled', String(busy || !state.hasPrevious)); next.setAttribute('aria-disabled', String(busy || !state.hasNext));
       table.setAttribute('aria-busy', String(busy)); retry.hidden = state.phase !== 'error' && !(busy && !retry.hidden);
-      if (document.activeElement !== limit) limit.value = String(state.query.limit);
+      order.render(state.query, busy, panel.hidden);
       notice.textContent = state.notice;
       const page = panel.hidden ? null : state.page;
       if (page !== rendered || page === null) {
@@ -118,11 +120,11 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
       scroll.scrollLeft = position.left; scroll.scrollTop = position.top;
       if (returning && page && !busy) {
         for (const id of returning.values ?? []) if (rows.has(id) && !rows.get(id).value.hidden) rows.get(id).value.open = true;
-        for (const id of returning[extraKey] ?? []) if (rows.has(id)) rows.get(id).details.open = true;
+        for (const id of returning.paths ?? []) if (rows.get(id)?.details) rows.get(id).details.open = true;
         if (document.activeElement === initialFocus) {
           const row = rows.get(returning.valueFocus);
-          ((!row?.value.hidden && row?.valueSummary) || rows.get(returning[extraFocus])?.summary || controls[returning.focus]
-            || ((returning.valueFocus || returning[extraFocus]) ? scroll : null))?.focus({ preventScroll: true });
+          ((!row?.value.hidden && row?.valueSummary) || rows.get(returning.pathFocus)?.summary || controls[returning.focus]
+            || ((returning.valueFocus || returning.pathFocus || returning.flagFocus) ? scroll : null))?.focus({ preventScroll: true });
         }
         if (scroll.scrollLeft === initialScroll.left && scroll.scrollTop === initialScroll.top) {
           scroll.scrollLeft = returning.left; scroll.scrollTop = returning.top;
@@ -132,17 +134,19 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
     },
     checkpoint() {
       return { left: scroll.scrollLeft, top: scroll.scrollTop,
-        values: [...rows].filter(([, row]) => row.value.open).map(([id]) => id), [extraKey]: [...rows].filter(([, row]) => row.details.open).map(([id]) => id),
+        values: [...rows].filter(([, row]) => row.value.open).map(([id]) => id),
+        ...(!parameter ? { paths: [...rows].filter(([, row]) => row.details.open).map(([id]) => id),
+          pathFocus: [...rows].find(([, row]) => row.summary === document.activeElement)?.[0] ?? null } : {}),
         valueFocus: [...rows].find(([, row]) => row.valueSummary === document.activeElement)?.[0] ?? null,
-        [extraFocus]: [...rows].find(([, row]) => row.summary === document.activeElement)?.[0] ?? null,
         focus: Object.keys(controls).find(key => controls[key] === document.activeElement) ?? null };
     },
     dispose() {
+      order.dispose();
       for (const [node, event, handler] of listeners) node.removeEventListener(event, handler);
       rows.clear(); body.replaceChildren(); status.textContent = notice.textContent = status.title = '';
       for (const node of Object.values(controls)) node.disabled = true;
       panel.hidden = retry.hidden = true;
-      current = returning = rendered = null;
+      returning = rendered = null;
     },
   };
 }

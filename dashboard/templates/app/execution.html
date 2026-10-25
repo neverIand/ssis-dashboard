@@ -79,25 +79,29 @@
                 </div>
                 <div id="executable-observations" data-executables-panel hidden>
                     <details class="detail-note"><summary>About observations</summary><p>Each row is a recorded invocation. Repeated executable IDs remain separate.</p></details>
+                    <p class="cell-detail" data-executables-order-label></p>
+                    <details class="table-sort-options"><summary>More sort options</summary>
                     <div class="table-controls" aria-label="Executable order">
                         <label>Sort <select data-executables-sort><option value="started_at">Started</option><option value="statistics_id">Statistics ID</option></select></label>
                         <label>Direction <select data-executables-direction><option value="asc">Ascending</option><option value="desc">Descending</option></select></label>
-                        <label>Rows per page <input type="number" min="1" step="1" data-executables-limit></label>
                     </div>
+                    </details>
                     <p class="resource-status" data-executables-notice role="status"></p>
                     <p class="resource-status" data-executables-status role="status"></p>
                     <button type="button" data-executables-retry hidden>Retry executable observations</button>
                     <div class="table-scroll" data-executables-scroll role="region" aria-label="Executable observations table" tabindex="0">
-                        <table data-executables-table>
+                        <table class="detail-table" data-executables-table>
                             <caption>Observed executable invocations</caption>
-                            <thead><tr><th scope="col">Statistics ID</th><th scope="col">Executable</th><th scope="col">Paths</th><th scope="col">Timing</th><th scope="col">Duration</th><th scope="col">Result</th></tr></thead>
-                            <tbody><tr><td colspan="6">Open this section to load observations.</td></tr></tbody>
+                            <colgroup><col><col><col><col><col></colgroup>
+                            <thead><tr><th scope="col" aria-sort="none"><button type="button" data-executables-header-statistics_id>Statistics ID</button></th><th scope="col">Executable / paths</th><th scope="col" aria-sort="none"><button type="button" data-executables-header-started_at>Started</button> / Ended</th><th scope="col">Duration</th><th scope="col">Result</th></tr></thead>
+                            <tbody><tr><td colspan="5">Open this section to load observations.</td></tr></tbody>
                         </table>
                     </div>
                     <nav class="pagination" aria-label="Executable pages">
                         <button type="button" data-executables-previous aria-disabled="true">Previous</button>
                         <button type="button" data-executables-next aria-disabled="true">Next</button>
-                        <button type="button" data-executables-latest>Show latest</button>
+                        <button type="button" data-executables-latest>First page</button>
+                        <label class="page-size">Rows per page <select data-executables-limit></select></label>
                     </nav>
                 </div>
             </section>
@@ -107,25 +111,29 @@
                 </div>
                 <div id="child-observations" data-children-panel hidden>
                     <p class="detail-note">Start/end recording is not a package result.</p>
+                    <p class="cell-detail" data-children-order-label></p>
+                    <details class="table-sort-options"><summary>More sort options</summary>
                     <div class="table-controls" aria-label="Package call order">
                         <label>Sort <select data-children-sort><option value="started_at">Started</option><option value="observation_id">Observation ID</option></select></label>
                         <label>Direction <select data-children-direction><option value="asc">Ascending</option><option value="desc">Descending</option></select></label>
-                        <label>Rows per page <input type="number" min="1" step="1" data-children-limit></label>
                     </div>
+                    </details>
                     <p class="resource-status" data-children-notice role="status"></p>
                     <p class="resource-status" data-children-status role="status"></p>
                     <button type="button" data-children-retry hidden>Retry package calls</button>
                     <div class="table-scroll" data-children-scroll role="region" aria-label="Package calls table" tabindex="0">
-                        <table data-children-table>
+                        <table class="detail-table" data-children-table>
                             <caption>Recorded package calls</caption>
-                            <thead><tr><th scope="col">Package / call path</th><th scope="col">Timing</th><th scope="col">Duration</th><th scope="col">Recording</th></tr></thead>
+                            <colgroup><col><col><col><col></colgroup>
+                            <thead><tr><th scope="col">Package / call path</th><th scope="col" aria-sort="none"><button type="button" data-children-header-started_at>Started</button> / Ended</th><th scope="col">Duration</th><th scope="col">Recording</th></tr></thead>
                             <tbody><tr><td colspan="4">Open this section to load observations.</td></tr></tbody>
                         </table>
                     </div>
                     <nav class="pagination" aria-label="Package call pages">
                         <button type="button" data-children-previous aria-disabled="true">Previous</button>
                         <button type="button" data-children-next aria-disabled="true">Next</button>
-                        <button type="button" data-children-latest>Show latest</button>
+                        <button type="button" data-children-latest>First page</button>
+                        <label class="page-size">Rows per page <select data-children-limit></select></label>
                     </nav>
                 </div>
             </section>
@@ -136,30 +144,35 @@
                 <div id="execution-events" data-events-panel hidden>
                     <form class="table-controls" data-events-filters aria-label="Event filters">
                         <label>Category <select data-events-kind></select></label>
-                        <label>Search full messages <textarea rows="2" data-events-q autocomplete="off" spellcheck="false"></textarea></label>
-                        <button type="submit" data-events-apply>Apply filters</button>
+                        <label>Search full messages <input type="search" data-events-q autocomplete="off" spellcheck="false" aria-describedby="event-search-hint"></label>
+                        <button type="submit" data-events-apply>Search</button>
                         <button type="button" data-events-reset>Reset filters</button>
                     </form>
+                    <p class="cell-detail" id="event-search-hint">Enter to search.</p>
                     <p class="resource-status" data-events-scope></p>
+                    <p class="cell-detail" data-events-order-label></p>
+                    <details class="table-sort-options"><summary>More sort options</summary>
                     <div class="table-controls" aria-label="Event order">
                         <label>Sort <select data-events-sort><option value="message_time">Message time</option><option value="event_id">Event ID</option></select></label>
                         <label>Direction <select data-events-direction><option value="asc">Ascending</option><option value="desc">Descending</option></select></label>
-                        <label>Rows per page <input type="number" min="1" step="1" data-events-limit></label>
                     </div>
+                    </details>
                     <p class="resource-status" data-events-notice role="status"></p>
                     <p class="resource-status" data-events-status role="status"></p>
                     <button type="button" data-events-retry hidden>Retry events</button>
                     <div class="table-scroll" data-events-scroll role="region" aria-label="Events table" tabindex="0">
-                        <table data-events-table>
+                        <table class="detail-table" data-events-table>
                             <caption>Recorded events</caption>
-                            <thead><tr><th scope="col">Event ID</th><th scope="col">Time</th><th scope="col">Event</th><th scope="col">Message</th><th scope="col">Details</th></tr></thead>
-                            <tbody><tr><td colspan="5">Open this section to load events.</td></tr></tbody>
+                            <colgroup><col><col><col></colgroup>
+                            <thead><tr><th scope="col" aria-sort="none"><button type="button" data-events-header-message_time>Time</button></th><th scope="col">Event / source</th><th scope="col">Message</th></tr></thead>
+                            <tbody><tr><td colspan="3">Open this section to load events.</td></tr></tbody>
                         </table>
                     </div>
                     <nav class="pagination" aria-label="Event pages">
                         <button type="button" data-events-previous aria-disabled="true">Previous</button>
                         <button type="button" data-events-next aria-disabled="true">Next</button>
-                        <button type="button" data-events-latest>Show latest</button>
+                        <button type="button" data-events-latest>First page</button>
+                        <label class="page-size">Rows per page <select data-events-limit></select></label>
                     </nav>
                 </div>
             </section>
@@ -169,23 +182,24 @@
                 </div>
                 <div id="execution-parameters" data-parameters-panel hidden>
                     <div class="table-controls" aria-label="Parameter order">
-                        <span class="cell-detail">Parameter ID, ascending</span>
-                        <label>Rows per page <input type="number" min="1" step="1" data-parameters-limit></label>
+                        <span class="cell-detail">Fixed order: Parameter ID, ascending</span>
                     </div>
                     <p class="resource-status" data-parameters-notice role="status"></p>
                     <p class="resource-status" data-parameters-status role="status"></p>
                     <button type="button" data-parameters-retry hidden>Retry parameters</button>
                     <div class="table-scroll" data-parameters-scroll role="region" aria-label="Parameters table" tabindex="0">
-                        <table data-parameters-table>
+                        <table class="detail-table" data-parameters-table>
                             <caption>Execution parameters</caption>
-                            <thead><tr><th scope="col">Parameter / ID</th><th scope="col">Scope</th><th scope="col">Type</th><th scope="col">Value</th><th scope="col">Flags</th></tr></thead>
+                            <colgroup><col><col><col><col><col></colgroup>
+                            <thead><tr><th scope="col">Parameter</th><th scope="col">Scope</th><th scope="col">Type</th><th scope="col">Value</th><th scope="col">Flags</th></tr></thead>
                             <tbody><tr><td colspan="5">Open this section to load parameters.</td></tr></tbody>
                         </table>
                     </div>
                     <nav class="pagination" aria-label="Parameter pages">
                         <button type="button" data-parameters-previous aria-disabled="true">Previous</button>
                         <button type="button" data-parameters-next aria-disabled="true">Next</button>
-                        <button type="button" data-parameters-latest>Show latest</button>
+                        <button type="button" data-parameters-latest>First page</button>
+                        <label class="page-size">Rows per page <select data-parameters-limit></select></label>
                     </nav>
                 </div>
             </section>
@@ -196,15 +210,15 @@
                 <div id="execution-overrides" data-overrides-panel hidden>
                     <p class="detail-note" data-overrides-policy hidden>Override values are hidden by application policy.</p>
                     <div class="table-controls" aria-label="Override order">
-                        <span class="cell-detail">Property ID, ascending</span>
-                        <label>Rows per page <input type="number" min="1" step="1" data-overrides-limit></label>
+                        <span class="cell-detail">Fixed order: Property ID, ascending</span>
                     </div>
                     <p class="resource-status" data-overrides-notice role="status"></p>
                     <p class="resource-status" data-overrides-status role="status"></p>
                     <button type="button" data-overrides-retry hidden>Retry overrides</button>
                     <div class="table-scroll" data-overrides-scroll role="region" aria-label="Overrides table" tabindex="0">
-                        <table data-overrides-table>
+                        <table class="detail-table" data-overrides-table>
                             <caption>Execution property overrides</caption>
+                            <colgroup><col><col><col></colgroup>
                             <thead><tr><th scope="col">Property / ID</th><th scope="col">Value</th><th scope="col">Sensitive</th></tr></thead>
                             <tbody><tr><td colspan="3">Open this section to load overrides.</td></tr></tbody>
                         </table>
@@ -212,7 +226,8 @@
                     <nav class="pagination" aria-label="Override pages">
                         <button type="button" data-overrides-previous aria-disabled="true">Previous</button>
                         <button type="button" data-overrides-next aria-disabled="true">Next</button>
-                        <button type="button" data-overrides-latest>Show latest</button>
+                        <button type="button" data-overrides-latest>First page</button>
+                        <label class="page-size">Rows per page <select data-overrides-limit></select></label>
                     </nav>
                 </div>
             </section>
@@ -226,11 +241,12 @@
                         <fieldset class="status-options"><legend>History statuses</legend><div class="history-choices" data-history-choices></div></fieldset>
                         <button type="submit" data-history-apply>Apply statuses</button>
                     </form>
+                    <p class="cell-detail" data-history-order-label></p>
+                    <details class="table-sort-options"><summary>More sort options</summary>
                     <div class="table-controls" aria-label="History order">
-                        <span class="cell-detail">Execution ID</span>
                         <label>Direction <select data-history-direction><option value="desc">Descending</option><option value="asc">Ascending</option></select></label>
-                        <label>Rows per page <input type="number" min="1" step="1" data-history-limit></label>
                     </div>
+                    </details>
                     <p class="detail-note">Estimates are not actual timings.</p>
                     <details class="detail-note"><summary>How estimates work</summary><p>Mean of up to five prior visible successful runs. Unavailable without a start or usable samples, for a zero mean, or when the estimated end is out of range. Visibility and retention can change estimates.</p></details>
                     <p class="resource-status" data-history-notice role="status"></p>
@@ -250,16 +266,18 @@
                         </div>
                     </section>
                     <div class="table-scroll" data-history-scroll role="region" aria-label="Package history table" tabindex="0">
-                        <table data-history-table>
+                        <table class="detail-table" data-history-table>
                             <caption>Executions of the exact entry package</caption>
-                            <thead><tr><th scope="col">Execution / status</th><th scope="col">Timing</th><th scope="col">Actual duration</th><th scope="col">Estimate</th></tr></thead>
+                            <colgroup><col><col><col><col></colgroup>
+                            <thead><tr><th scope="col" aria-sort="none"><button type="button" data-history-header-execution_id>Execution</button> / status</th><th scope="col">Timing</th><th scope="col">Actual duration</th><th scope="col">Estimate</th></tr></thead>
                             <tbody><tr><td colspan="4">Open this section to load package history.</td></tr></tbody>
                         </table>
                     </div>
                     <nav class="pagination" aria-label="History pages">
                         <button type="button" data-history-previous aria-disabled="true">Previous</button>
                         <button type="button" data-history-next aria-disabled="true">Next</button>
-                        <button type="button" data-history-latest>Show latest</button>
+                        <button type="button" data-history-latest>First page</button>
+                        <label class="page-size">Rows per page <select data-history-limit></select></label>
                     </nav>
                 </div>
             </section>

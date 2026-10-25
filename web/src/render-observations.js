@@ -1,10 +1,11 @@
 import { createDisplay, formatCode, formatId } from './display.js';
+import { mountTableOrder } from './table-order.js';
 
 export function mountObservationTable(root, { metadata, actions, restoreView = null, resource = 'executables' }) {
   const child = resource === 'children', singular = child ? 'package call' : 'executable';
   const idKey = child ? 'observation_id' : 'statistics_id';
   const columns = child ? { count: 4, name: 0, timing: 1, duration: 2, state: 3 }
-    : { count: 6, name: 1, timing: 3, duration: 4, state: 5 };
+    : { count: 5, name: 1, timing: 2, duration: 3, state: 4 };
   const document = root.ownerDocument;
   const get = name => root.querySelector(`[data-${resource}-${name}]`);
   const toggle = get('toggle'), panel = get('panel'), status = get('status'), notice = get('notice');
@@ -13,10 +14,14 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
   const region = get('scroll'), table = get('table'), body = table.querySelector('tbody');
   const display = createDisplay({ timeZone: metadata.display_timezone });
   const rows = new Map(), controls = { toggle, retry, sort, direction, limit, previous, next, latest, region };
+  const order = mountTableOrder(root, { resource, metadata, onOrder: actions.order, sorts: [
+    { key: 'started_at', label: 'Started', header: true },
+    { key: child ? 'observation_id' : 'statistics_id', label: child ? 'Observation ID' : 'Statistics ID', header: !child },
+  ] });
+  Object.assign(controls, order.headers);
   const initialFocus = document.activeElement;
   const initialScroll = { left: region.scrollLeft, top: region.scrollTop };
-  let returning = restoreView, rendered = null, renderedStart = null, current = null, busy = true;
-  limit.max = String(metadata.limits.max_limit);
+  let returning = restoreView, rendered = null, renderedStart = null, busy = true;
   const element = (tag, text, className) => {
     const node = document.createElement(tag);
     if (text !== undefined) node.textContent = text;
@@ -34,7 +39,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
   }
   function paint(page, pageNumber, executionStart) {
     if (!page.data.length) {
-      empty(pageNumber > 1 ? 'No observations remain on this page. Use Previous or Show latest.'
+      empty(pageNumber > 1 ? 'No observations remain on this page. Use Previous or First page.'
         : page.meta.availability === 'not-recorded' ? `No ${singular} observations recorded. Logging was disabled.`
           : page.meta.availability === 'unknown' ? `No ${singular} observations on this page. Recording coverage is unknown.`
             : `No ${singular} observations on this page.`);
@@ -58,14 +63,16 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
         cells[columns.name].className = child ? 'observation-name package-call' : 'observation-name';
         cells[columns.name].append(name);
         const paths = element('details'), summary = element('summary', child ? 'Details' : 'Paths');
-        const pathFields = element('dl', undefined, 'observation-paths');
+        const pathFields = element('dl', undefined, 'observation-paths bounded-detail');
+        pathFields.tabIndex = 0; pathFields.setAttribute('role', 'region');
+        pathFields.setAttribute('aria-label', child ? 'Package call details' : 'Executable paths');
         const packagePath = element('dd'), executionPath = element('dd');
         if (child) pathFields.append(element('dt', 'Observation ID'), id, element('dt', 'Event source'), source,
           element('dt', 'Source type'), sourceType);
         pathFields.append(element('dt', 'Package path'), packagePath, element('dt', 'Execution path'), executionPath);
         paths.append(summary, pathFields);
         if (child) cells[0].append(callPath, paths);
-        else { cells[1].append(packageName, id); cells[2].append(paths); }
+        else cells[1].append(packageName, id, paths);
         const times = {};
         for (const [key, label] of [['started_at', 'Started'], ['ended_at', 'Ended']]) {
           const line = element('div');
@@ -117,37 +124,19 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
   }
   const listeners = [];
   function listen(node, event, action) { node.addEventListener(event, action); listeners.push([node, event, action]); }
-  const syncOrder = query => {
-    for (const [node, value] of [[sort, query.sort], [direction, query.direction], [limit, String(query.limit)]]) {
-      if (document.activeElement !== node) node.value = value;
-    }
-  };
-  const order = () => {
-    if (busy || !current) {
-      if (current) { sort.value = current.query.sort; direction.value = current.query.direction; limit.value = String(current.query.limit); }
-      return;
-    }
-    const size = Number(limit.value);
-    if (!Number.isSafeInteger(size) || size < 1 || size > metadata.limits.max_limit) {
-      notice.textContent = `Rows per page must be between 1 and ${metadata.limits.max_limit}.`;
-      return;
-    }
-    actions.order({ sort: sort.value, direction: direction.value, limit: size });
-  };
   listen(toggle, 'click', actions.toggle);
   listen(retry, 'click', actions.retry);
   listen(previous, 'click', actions.previous);
   listen(next, 'click', actions.next);
   listen(latest, 'click', actions.latest);
-  for (const node of [sort, direction, limit]) listen(node, 'change', order);
   return {
     render(state, isBusy, authorized, executionStart = null) {
-      current = state; busy = isBusy;
+      busy = isBusy;
       if (!state.open) returning = null;
       const focused = document.activeElement, rowFocused = body.contains(focused), panelFocused = panel.contains(focused);
       const position = { left: region.scrollLeft, top: region.scrollTop };
       panel.hidden = !state.open || !authorized;
-      for (const node of [retry, sort, direction, limit, previous, next, latest]) {
+      for (const node of [retry, previous, next, latest]) {
         node.disabled = !authorized || !state.open;
         node.setAttribute('aria-disabled', String(busy));
       }
@@ -155,7 +144,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
       next.setAttribute('aria-disabled', String(busy || !state.hasNext));
       retry.hidden = state.phase !== 'error' && !(busy && !retry.hidden);
       table.setAttribute('aria-busy', String(busy));
-      syncOrder(state.query);
+      order.render(state.query, busy, panel.hidden);
       notice.textContent = state.notice;
       const page = panel.hidden ? null : state.page;
       if (page !== rendered || page === null || executionStart !== renderedStart) {
@@ -193,11 +182,12 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
         focus: Object.keys(controls).find(key => controls[key] === document.activeElement) ?? null };
     },
     dispose() {
+      order.dispose();
       for (const [node, event, action] of listeners) node.removeEventListener(event, action);
       rows.clear(); body.replaceChildren(); status.textContent = notice.textContent = status.title = '';
       for (const node of Object.values(controls)) node.disabled = true;
       panel.hidden = retry.hidden = true;
-      returning = rendered = current = null;
+      returning = rendered = null;
     },
   };
 }

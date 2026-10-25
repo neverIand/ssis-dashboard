@@ -1,17 +1,21 @@
 import { createDisplay, formatCode } from './display.js';
 import { executionHref } from './detail-navigation.js';
 import { mountHistoryChart } from './render-history-chart.js';
+import { mountTableOrder } from './table-order.js';
 
 export function mountHistory(root, { metadata, actions, navigation, executionId, restoreView = null }) {
   const document = root.ownerDocument, get = key => root.querySelector(`[data-history-${key}]`);
   const controls = Object.fromEntries(['toggle','retry','previous','next','latest','direction','limit','apply','scroll'].map(key => [key,get(key)]));
-  const { toggle,retry,previous,next,latest,direction,limit,apply,scroll } = controls;
+  const { toggle,retry,previous,next,latest,apply,scroll } = controls;
   const panel = get('panel'), status = get('status'), notice = get('notice'), scope = get('scope'), form = get('filters');
   const table = get('table'), body = table.querySelector('tbody'), rows = new Map(), listeners = [], choices = new Map();
   const display = createDisplay({ timeZone: metadata.display_timezone });
   const chart=mountHistoryChart(root,{metadata,restoreView:restoreView?.chart});
+  const order = mountTableOrder(root, { resource: 'history', metadata, onOrder: actions.order,
+    sorts: [{ key: 'execution_id', label: 'Execution ID', header: true, initialDirection: 'desc' }] });
+  Object.assign(controls, order.headers);
   const initialFocus = document.activeElement, initialScroll = { left: scroll.scrollLeft, top: scroll.scrollTop };
-  let returning = restoreView, current = null, rendered = null, appliedStatus = null, busy = true;
+  let returning = restoreView, rendered = null, appliedStatus = null, busy = true;
   const element = (tag, value, className) => {
     const node = document.createElement(tag);
     if (value !== undefined) node.textContent = value;
@@ -24,7 +28,6 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
     input.type = 'checkbox'; input.value = String(item.code);
     label.append(input, element('span',formatCode(item))); get('choices').append(label); choices.set(input.value,input);
   }
-  limit.max = String(metadata.limits.max_limit);
   function empty(message) {
     rows.clear(); const row = element('tr'), cell = element('td',message,'empty-state');
     cell.colSpan = 4; row.append(cell); body.replaceChildren(row);
@@ -37,7 +40,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
     else { const stamp = element('time',display.timestamp(value)); stamp.setAttribute('datetime',value); stamp.title = value; node.replaceChildren(stamp); }
   }
   function paint(page,pageNumber) {
-    if (!page.data.length) { empty(pageNumber > 1 ? 'No executions remain on this page. Use Previous or Show latest.' : 'No executions match this package and status scope.'); return; }
+    if (!page.data.length) { empty(pageNumber > 1 ? 'No executions remain on this page. Use Previous or First page.' : 'No executions match this package and status scope.'); return; }
     if (!rows.size) body.replaceChildren();
     const wanted = new Set(); let anchor = body.firstChild;
     for (const item of page.data) {
@@ -74,16 +77,6 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
   const listen = (node,event,handler) => { node.addEventListener(event,handler); listeners.push([node,event,handler]); };
   listen(toggle,'click',actions.toggle); listen(retry,'click',actions.retry); listen(previous,'click',actions.previous);
   listen(next,'click',actions.next); listen(latest,'click',actions.latest);
-  listen(direction,'change',()=>{
-    if (busy) { if (current) direction.value = current.query.direction; return; }
-    actions.order({direction:direction.value});
-  });
-  listen(limit,'change',()=>{
-    if (busy || !current) { if (current) limit.value = String(current.query.limit); return; }
-    const value = Number(limit.value);
-    if (Number.isSafeInteger(value) && value >= 1 && value <= metadata.limits.max_limit) actions.order({limit:value});
-    else notice.textContent = `Rows per page must be between 1 and ${metadata.limits.max_limit}.`;
-  });
   listen(form,'submit',event=>{
     event.preventDefault(); if (busy) return;
     const status = [...choices].filter(([,input])=>input.checked).map(([code])=>code).join(',');
@@ -92,17 +85,16 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
   });
   return {
     render(state,isBusy,authorized,identity) {
-      current = state; busy = isBusy;
+      busy = isBusy;
       const focused = document.activeElement, rowFocused = body.contains(focused), panelFocused = panel.contains(focused);
       const position = {left:scroll.scrollLeft,top:scroll.scrollTop};
       if (!state.open) returning = null;
       panel.hidden = !state.open || !authorized;
-      for (const node of [retry,previous,next,latest,direction,limit,apply,...choices.values()]) node.disabled = panel.hidden;
-      for (const node of [retry,latest,direction,limit,apply]) node.setAttribute('aria-disabled',String(busy));
+      for (const node of [retry,previous,next,latest,apply,...choices.values()]) node.disabled = panel.hidden;
+      for (const node of [retry,latest,apply]) node.setAttribute('aria-disabled',String(busy));
       previous.setAttribute('aria-disabled',String(busy || !state.hasPrevious)); next.setAttribute('aria-disabled',String(busy || !state.hasNext));
       table.setAttribute('aria-busy',String(busy)); retry.hidden = state.phase !== 'error' && !(busy && !retry.hidden);
-      if (document.activeElement !== limit) limit.value = String(state.query.limit);
-      direction.value = state.query.direction;
+      order.render(state.query,busy,panel.hidden);
       if (appliedStatus !== state.query.status) {
         const chosen = appliedStatus === null && returning?.draft ? returning.draft : state.query.status.split(',');
         for (const [code,input] of choices) input.checked = chosen.includes(code);
@@ -135,11 +127,12 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
       executionFocus:[...rows].find(([,row])=>row.link===document.activeElement)?.[0] ?? null,
       focus:Object.keys(controls).find(key=>controls[key]===document.activeElement) ?? null}; },
     dispose() {
+      order.dispose();
       chart.dispose();
       for (const [node,event,handler] of listeners) node.removeEventListener(event,handler);
       rows.clear(); body.replaceChildren(); get('choices').replaceChildren(); scope.textContent = status.textContent = notice.textContent = scope.title = status.title = '';
       for (const node of Object.values(controls)) node.disabled = true;
-      panel.hidden = retry.hidden = true; current = returning = rendered = null;
+      panel.hidden = retry.hidden = true; returning = rendered = null;
     },
   };
 }

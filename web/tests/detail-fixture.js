@@ -34,8 +34,9 @@ export function detailDOM() {
     'detail-status', 'detail-retry', 'detail-request-id', 'active-elapsed',
     'detail-refresh', 'detail-poll-toggle', 'detail-poll-status', 'overview-link', 'legacy-detail-link',
     'overview-return-notice', 'parameters-unavailable', 'overrides-unavailable', 'overrides-policy', ...['toggle','panel','choice','plot','scope','selected','scale','empty'].map(key=>`history-chart-${key}`), ...['filters','choices','apply','scope'].map(key => `history-${key}`), ...['unavailable','filters','apply','reset','kind','q','scope'].map(key => `events-${key}`), ...['toggle', 'panel', 'status', 'notice', 'retry', 'sort', 'direction',
-      'limit', 'previous', 'next', 'latest', 'scroll', 'table'].flatMap(name => ['executables', 'children', 'events', 'parameters', 'overrides', 'history'].map(section => `${section}-${name}`))]) {
-    const node = new Node(document, key.includes('retry') || /toggle|previous|next|latest|refresh$/.test(key) ? 'button' : 'div');
+      'limit', 'previous', 'next', 'latest', 'scroll', 'table', 'order-label'].flatMap(name => ['executables', 'children', 'events', 'parameters', 'overrides', 'history'].map(section => `${section}-${name}`))]) {
+    const node = new Node(document, /-(limit|sort|direction|kind)$/.test(key) ? 'select' : key === 'events-q' ? 'input'
+      : key.includes('retry') || /toggle|previous|next|latest|refresh$/.test(key) ? 'button' : 'div');
     nodes.set(`[data-${key}]`, node);
     root.append(node);
   }
@@ -63,6 +64,14 @@ export function detailDOM() {
     const body = new Node(document, 'tbody');
     bodies[section] = body;
     get(`${section}-table`).append(body);
+    const head = new Node(document, 'thead');
+    const headerKeys = { executables: ['statistics_id', 'started_at'], children: ['started_at'], events: ['message_time'],
+      parameters: [], overrides: [], history: ['execution_id'] }[section];
+    for (const key of headerKeys) {
+      const cell = new Node(document, 'th'), button = new Node(document, 'button');
+      nodes.set(`[data-${section}-header-${key}]`, button); cell.append(button); head.append(cell);
+    }
+    get(`${section}-table`).append(head);
     get(`${section}-table`).querySelector = selector => selector === 'tbody' ? body : null;
     get(`${section}-retry`).hidden = get(`${section}-panel`).hidden = true;
   }

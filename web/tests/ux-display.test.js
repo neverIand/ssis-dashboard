@@ -37,13 +37,13 @@ test('detail observations use the execution date while history keeps full dates,
     assert.doesNotMatch(status.textContent, /Observed|Live results|Updated/);
     assert.ok(status.title.includes(wireTime));
     if (section === 'executables') {
-      exact(stamp(dom.body.children[0].children[3].children[0]), wireTime, '17:00:00.123');
-      exact(stamp(dom.body.children[1].children[3].children[0]), tomorrow, '2026-10-18 17:00:00.987');
+      exact(stamp(dom.body.children[0].children[2].children[0]), wireTime, '17:00:00.123');
+      exact(stamp(dom.body.children[1].children[2].children[0]), tomorrow, '2026-10-18 17:00:00.987');
     }
     if (section === 'children') exact(stamp(dom.childBody.children[0].children[1].children[0]), wireTime, '17:00:00.123');
     if (section === 'events') {
-      exact(dom.eventBody.children[0].children[1].firstChild, wireTime, '17:00:00.123');
-      exact(dom.eventBody.children[1].children[1].firstChild, '2026-10-17T16:00:00.1240000Z', '17:00:00.124');
+      exact(dom.eventBody.children[0].children[0].firstChild, wireTime, '17:00:00.123');
+      exact(dom.eventBody.children[1].children[0].firstChild, '2026-10-17T16:00:00.1240000Z', '17:00:00.124');
       assert.equal(dom.get('events-scope').textContent, '');
     }
   }
@@ -76,10 +76,10 @@ test('a newly recorded execution start updates cached table labels without repla
   t.after(screen.dispose); await settle();
   dom.get('executables-toggle').dispatchEvent(new Event('click')); await settle();
   const row = dom.body.children[0];
-  assert.equal(stamp(row.children[3].children[0]).textContent, '2026-10-17 17:00:00.123');
+  assert.equal(stamp(row.children[2].children[0]).textContent, '2026-10-17 17:00:00.123');
   started = true; dom.get('detail-refresh').dispatchEvent(new Event('click')); await settle();
   assert.equal(dom.body.children[0], row);
-  exact(stamp(row.children[3].children[0]), wireTime, '17:00:00.123');
+  exact(stamp(row.children[2].children[0]), wireTime, '17:00:00.123');
   dom.get('history-toggle').dispatchEvent(new Event('click')); await settle();
   const historicalRow = dom.historyBody.children[0];
   const historicalStart = stamp(historicalRow.children[1].children[1]);

@@ -165,14 +165,17 @@ function mounted(t, get, options = {}) {
   return { dom, screen, calls, action };
 }
 
-test('event UI separates draft filters from applied search, preserves invalid input and resets filters only', async t => {
+test('event category applies immediately without committing search drafts; Enter submission validates literal search', async t => {
   const run = mounted(t, async (resource, { params }) => response(resource, params)); await flush(); run.action('toggle'); await flush();
-  const { dom } = run; dom.get('events-kind').value = 'warnings'; dom.get('events-q').value = ' %_\r\n ';
+  const { dom } = run; dom.get('events-kind').value = 'warnings'; dom.get('events-q').value = ' %_ 影狼 ';
   assert.equal(dom.get('events-scope').textContent, ''); const count = run.calls.length;
+  dom.get('events-kind').dispatchEvent(new Event('change')); await flush();
+  assert.equal(run.calls.length, count + 1); assert.equal(run.calls.at(-1).params.kind, 'warnings');
+  assert.equal(run.calls.at(-1).params.q, null); assert.equal(dom.get('events-q').value, ' %_ 影狼 ');
   dom.get('detail-refresh').dispatchEvent(new Event('click')); await flush();
-  assert.equal(run.calls.at(-1).params.q, null); assert.equal(dom.get('events-q').value, ' %_\r\n ');
-  run.action('filters'); await flush(); assert.equal(run.calls.at(-1).params.q, ' %_\r\n '); assert.equal(run.calls.at(-1).params.kind, 'warnings');
-  assert.equal(dom.get('events-scope').textContent, 'Warnings · Search: " %_\\r\\n "');
+  assert.equal(run.calls.at(-1).params.q, null); assert.equal(dom.get('events-q').value, ' %_ 影狼 ');
+  run.action('filters'); await flush(); assert.equal(run.calls.at(-1).params.q, ' %_ 影狼 '); assert.equal(run.calls.at(-1).params.kind, 'warnings');
+  assert.equal(dom.get('events-scope').textContent, 'Warnings · Search: " %_ 影狼 "');
   dom.get('events-q').value = 'x'.repeat(513); const current = run.calls.length; run.action('filters'); await flush();
   assert.equal(run.calls.length, current); assert.match(dom.get('events-notice').textContent, /512/);
   run.action('reset'); await flush(); assert.equal(run.calls.at(-1).params.q, null); assert.equal(run.calls.at(-1).params.kind, 'all');
@@ -185,7 +188,7 @@ test('keyed event rows keep literal text, expanded source/message and current fo
     ? Promise.resolve(eventPage([eventRow('1', { message: '😀'.repeat(16384), truncated: true }), eventRow('2', { message: '' })],
       { has_unidentified_events: true, availability: 'unknown' })) : pending.promise : Promise.resolve(response(resource)));
   await flush(); run.action('toggle'); await flush();
-  const row = run.dom.eventBody.firstChild, message = row.children[3].children[2], source = row.children[4].firstChild;
+  const row = run.dom.eventBody.firstChild, message = row.children[2].children[2], source = row.children[1].children[1];
   assert.match(row.textContent, /Truncated to 16384/); assert.match(run.dom.get('events-status').textContent, /no public numeric ID/);
   assert.match(run.dom.eventBody.children[1].textContent, /\(empty\)/);
   message.open = source.open = true; source.firstChild.focus();
@@ -194,7 +197,7 @@ test('keyed event rows keep literal text, expanded source/message and current fo
   pending.resolve(eventPage([eventRow('1', { message: '<b>updated</b>' })])); await flush();
   assert.equal(run.dom.eventBody.firstChild, row); assert.equal(source.open, true);
   assert.equal(run.dom.document.activeElement, run.dom.get('legacy-detail-link')); assert.equal(run.dom.get('events-scroll').scrollLeft, 140);
-  assert.match(row.textContent, /<b>updated<\/b>/); assert.equal(row.children[1].firstChild.getAttribute('datetime'), wireTime);
+  assert.match(row.textContent, /<b>updated<\/b>/); assert.equal(row.children[0].firstChild.getAttribute('datetime'), wireTime);
 });
 
 test('retained event state holds only user query/view anchors and revalidates; disabled metadata drops it', async t => {
@@ -218,7 +221,7 @@ test('event denial clears row text with a connected focus fallback; 404 also cle
     return eventPage();
   });
   await flush(); run.action('toggle'); await flush();
-  run.dom.eventBody.firstChild.children[4].firstChild.firstChild.focus();
+  run.dom.eventBody.firstChild.children[1].children[1].firstChild.focus();
   failure = new ApiError('http', { status: 403 }); run.dom.get('detail-refresh').dispatchEvent(new Event('click')); await flush();
   assert.doesNotMatch(run.dom.eventBody.textContent, /literal|影狼/);
   assert.equal(run.dom.document.activeElement, run.dom.get('events-scroll')); assert.equal(run.dom.field('package').textContent, 'Main.dtsx');
@@ -230,12 +233,12 @@ test('retained message/source expansion restores after a fresh read and missing 
   let long = true;
   const get = async resource => resource.endsWith('/events') ? eventPage([eventRow('1', { message: long ? 'x'.repeat(200) : 'short' })]) : response(resource);
   const first = mounted(t, get); await flush(); first.action('toggle'); await flush();
-  const row = first.dom.eventBody.firstChild, message = row.children[3].children[2], source = row.children[4].firstChild;
+  const row = first.dom.eventBody.firstChild, message = row.children[2].children[2], source = row.children[1].children[1];
   message.open = source.open = true; message.firstChild.focus();
   const saved = first.screen.checkpoint(); first.screen.dispose();
   const next = mounted(t, get, { restoreView: saved }); await flush();
-  assert.equal(next.dom.eventBody.firstChild.children[3].children[2].open, true);
-  assert.equal(next.dom.eventBody.firstChild.children[4].firstChild.open, true);
+  assert.equal(next.dom.eventBody.firstChild.children[2].children[2].open, true);
+  assert.equal(next.dom.eventBody.firstChild.children[1].children[1].open, true);
   long = false;
   const short = mounted(t, get, { restoreView: saved }); await flush();
   assert.equal(short.dom.document.activeElement, short.dom.get('events-scroll'));

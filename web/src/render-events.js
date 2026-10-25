@@ -1,15 +1,20 @@
-import { createDisplay, formatId } from './display.js';
+import { createDisplay } from './display.js';
 import { eventQuery } from './events.js';
+import { mountTableOrder } from './table-order.js';
 
 export function mountEvents(root, { metadata, actions, restoreView = null }) {
   const document = root.ownerDocument, enabled = metadata.capabilities.events;
   const get = name => root.querySelector(`[data-events-${name}]`);
   const controls = Object.fromEntries(['toggle', 'retry', 'previous', 'next', 'latest', 'sort', 'direction',
     'limit', 'kind', 'q', 'apply', 'reset', 'scroll'].map(key => [key, get(key)]));
-  const { toggle, retry, previous, next, latest, sort, direction, limit, kind, q, apply, reset, scroll } = controls;
+  const { toggle, retry, previous, next, latest, kind, q, apply, reset, scroll } = controls;
   const panel = get('panel'), status = get('status'), notice = get('notice'), scope = get('scope');
   const table = get('table'), body = table.querySelector('tbody'), form = get('filters');
   const display = createDisplay({ timeZone: metadata.display_timezone }), rows = new Map(), listeners = [];
+  const order = mountTableOrder(root, { resource: 'events', metadata, onOrder: actions.order, sorts: [
+    { key: 'message_time', label: 'Time', header: true }, { key: 'event_id', label: 'Event ID' },
+  ] });
+  Object.assign(controls, order.headers);
   const initialFocus = document.activeElement, initialScroll = { left: scroll.scrollLeft, top: scroll.scrollTop };
   let returning = enabled ? restoreView : null, current = null, rendered = null, renderedStart = null, applied = null, busy = true;
   const element = (tag, text, className) => {
@@ -24,17 +29,17 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
   for (const value of metadata.event_kinds) {
     const option = element('option', label(value)); option.value = value; kind.append(option);
   }
-  q.value = returning?.draft?.q ?? ''; kind.value = returning?.draft?.kind ?? 'all';
-  limit.max = String(metadata.limits.max_limit);
-  const fields = [['package_name', 'Package'], ['package_path', 'Package path'], ['execution_path', 'Execution path'],
+  q.value = returning?.draft?.q ?? ''; kind.value = 'all';
+  const fields = [['event_id', 'Event ID'], ['message_type', 'Message type'],
+    ['package_name', 'Package'], ['package_path', 'Package path'], ['execution_path', 'Execution path'],
     ['source_name', 'Source'], ['source_type', 'Source type'], ['subcomponent_name', 'Subcomponent']];
   function empty(message) {
     rows.clear(); const row = element('tr'), cell = element('td', message, 'empty-state');
-    cell.colSpan = 5; row.append(cell); body.replaceChildren(row);
+    cell.colSpan = 3; row.append(cell); body.replaceChildren(row);
   }
   function paint(page, pageNumber, executionStart) {
     if (!page.data.length) {
-      empty(pageNumber > 1 ? 'No events remain on this page. Use Previous or Show latest.'
+      empty(pageNumber > 1 ? 'No events remain on this page. Use Previous or First page.'
         : page.meta.availability === 'not-recorded' ? 'No events recorded. Logging was disabled.'
           : page.meta.availability === 'unknown' ? 'No matching events on this page. Recording coverage is unknown.' : 'No matching events on this page.');
       return;
@@ -46,23 +51,25 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
       let row = rows.get(item.event_id);
       if (!row) {
         const node = element('tr'); node.dataset.eventId = item.event_id;
-        const cells = Array.from({ length: 5 }, (_, i) => element('td', undefined, i === 0 ? 'id-cell' : i === 1 ? 'time-cell' : ''));
-        const time = element('time'), name = element('span'), code = element('span', undefined, 'cell-detail');
-        cells[1].append(time); cells[2].className = 'event-name'; cells[2].append(name, code);
+        const cells = Array.from({ length: 3 }, (_, i) => element('td', undefined, i === 0 ? 'time-cell' : ''));
+        const time = element('time'), name = element('span');
+        cells[0].append(time); cells[1].className = 'event-name'; cells[1].append(name);
         const preview = element('p', undefined, 'event-preview'), message = element('details');
-        const messageSummary = element('summary', 'View message'), full = element('p', undefined, 'event-body');
+        const messageSummary = element('summary', 'View message'), full = element('p', undefined, 'event-body bounded-detail');
+        full.tabIndex = 0; full.setAttribute('role', 'region'); full.setAttribute('aria-label', 'Event message');
         const truncated = element('p', undefined, 'cell-detail'); message.append(messageSummary, full);
-        cells[3].append(preview, truncated, message);
+        cells[2].append(preview, truncated, message);
         const details = element('details'), summary = element('summary', 'Source');
-        const list = element('dl', undefined, 'observation-paths'), values = {};
+        const list = element('dl', undefined, 'observation-paths bounded-detail'), values = {};
+        list.tabIndex = 0; list.setAttribute('role', 'region'); list.setAttribute('aria-label', 'Event source details');
         for (const [key, title] of fields) { values[key] = element('dd'); list.append(element('dt', title), values[key]); }
-        details.append(summary, list); cells[4].append(details); node.append(...cells);
-        row = { node, cells, time, name, code, preview, message, messageSummary, full, truncated, details, summary, values };
+        details.append(summary, list); cells[1].append(details); node.append(...cells);
+        row = { node, cells, time, name, preview, message, messageSummary, full, truncated, details, summary, values };
         rows.set(item.event_id, row);
       }
-      text(row.cells[0], formatId(item.event_id)); text(row.time, display.tableTimestamp(item.message_time, executionStart));
+      text(row.time, display.tableTimestamp(item.message_time, executionStart));
       row.time.setAttribute('datetime', item.message_time); row.time.title = item.message_time;
-      text(row.name, literal(item.event_name)); text(row.code, `Message type: ${item.message_type}`);
+      text(row.name, literal(item.event_name));
       row.node.dataset.severity = ['OnError', 'OnTaskFailed'].includes(item.event_name) ? 'error'
         : item.event_name === 'OnWarning' ? 'warning' : 'none';
       const characters = item.message === null ? [] : [...item.message];
@@ -82,15 +89,15 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
   listen(previous, 'click', actions.previous); listen(next, 'click', actions.next); listen(latest, 'click', actions.latest);
   listen(form, 'submit', event => {
     event.preventDefault(); if (!current || !current.open || !enabled) return;
-    try { actions.apply(eventQuery({ ...current.query, kind: kind.value, q: q.value }, metadata)); }
+    try { actions.apply(eventQuery({ ...current.query, q: q.value }, metadata)); }
     catch { notice.textContent = `Enter a supported category and valid search text of at most ${metadata.limits.max_search_characters} characters.`; }
   });
-  listen(reset, 'click', () => { kind.value = 'all'; q.value = ''; actions.apply({ kind: 'all', q: null }); });
-  for (const node of [sort, direction, limit]) listen(node, 'change', () => {
-    if (busy || !current) return;
-    try { actions.order(eventQuery({ ...current.query, sort: sort.value, direction: direction.value, limit: Number(limit.value) }, metadata)); }
-    catch { notice.textContent = `Rows per page must be between 1 and ${metadata.limits.max_limit}.`; }
+  listen(kind, 'change', () => {
+    if (!current?.open || !enabled) return;
+    try { actions.apply(eventQuery({ ...current.query, kind: kind.value }, metadata)); }
+    catch { kind.value = current.query.kind; }
   });
+  listen(reset, 'click', () => { kind.value = 'all'; q.value = ''; actions.apply({ kind: 'all', q: null }); });
   return {
     render(state, isBusy, authorized, executionStart = null) {
       current = state; busy = isBusy;
@@ -99,16 +106,13 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
       if (!state.open) returning = null;
       get('unavailable').hidden = enabled;
       panel.hidden = !state.open || !permitted;
-      for (const node of [retry, previous, next, latest, sort, direction, limit, kind, q, apply, reset]) node.disabled = panel.hidden;
-      for (const node of [retry, sort, direction, limit, latest]) node.setAttribute('aria-disabled', String(busy));
+      for (const node of [retry, previous, next, latest, kind, q, apply, reset]) node.disabled = panel.hidden;
+      for (const node of [retry, latest]) node.setAttribute('aria-disabled', String(busy));
       previous.setAttribute('aria-disabled', String(busy || !state.hasPrevious)); next.setAttribute('aria-disabled', String(busy || !state.hasNext));
       table.setAttribute('aria-busy', String(busy)); retry.hidden = state.phase !== 'error' && !(busy && !retry.hidden);
-      for (const [node, value] of [[sort, state.query.sort], [direction, state.query.direction], [limit, String(state.query.limit)]]) {
-        if (document.activeElement !== node) node.value = value;
-      }
-      if ((!applied && !returning?.draft) || (applied && (applied.kind !== state.query.kind || applied.q !== state.query.q))) {
-        kind.value = state.query.kind; q.value = state.query.q ?? '';
-      }
+      order.render(state.query, busy, panel.hidden);
+      kind.value = state.query.kind;
+      if ((!applied && !returning?.draft) || (applied && applied.q !== state.query.q)) q.value = state.query.q ?? '';
       applied = state.query;
       scope.textContent = panel.hidden ? '' : [applied.kind === 'all' ? '' : label(applied.kind),
         applied.q === null ? '' : `Search: ${JSON.stringify(applied.q)}`].filter(Boolean).join(' · ');
@@ -146,7 +150,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
       }
     },
     checkpoint() {
-      return { draft: { kind: kind.value, q: q.value }, left: scroll.scrollLeft, top: scroll.scrollTop,
+      return { draft: { q: q.value }, left: scroll.scrollLeft, top: scroll.scrollTop,
         messages: [...rows].filter(([, row]) => row.message.open).map(([id]) => id),
         sources: [...rows].filter(([, row]) => row.details.open).map(([id]) => id),
         messageFocus: [...rows].find(([, row]) => row.messageSummary === document.activeElement)?.[0] ?? null,
@@ -154,6 +158,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
         focus: Object.keys(controls).find(key => controls[key] === document.activeElement) ?? null };
     },
     dispose() {
+      order.dispose();
       for (const [node, event, handler] of listeners) node.removeEventListener(event, handler);
       rows.clear(); body.replaceChildren(); status.textContent = notice.textContent = scope.textContent = q.value = status.title = '';
       for (const node of Object.values(controls)) node.disabled = true;
