@@ -4,13 +4,17 @@ import json
 import logging
 from pathlib import Path, PurePosixPath
 
-from flask import Blueprint, current_app, make_response, render_template, url_for
+from flask import Blueprint, current_app, make_response, render_template, request, url_for
 
 from dashboard.api_validation import identifier
 from dashboard.observability import log_event, request_id
 
 
 blueprint = Blueprint('frontend', __name__, url_prefix='/app')
+NATIVE_CSP = (
+    "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; "
+    "connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+)
 
 
 def _entry_assets():
@@ -76,6 +80,7 @@ def _shell(template, **config):
             'execution_base': url_for('execution', execution_id=0).rsplit('/', 1)[0] + '/',
             **config,
         }))
+        response.headers['Content-Security-Policy'] = NATIVE_CSP
     response.headers['Cache-Control'] = 'no-store'
     return response
 
@@ -91,5 +96,14 @@ def execution(execution_id):
     return _shell('app/execution.html', execution_id=execution_id)
 
 
+def _asset_cache_headers(response):
+    filename = (request.view_args or {}).get('filename', '')
+    if (request.endpoint == 'static' and response.status_code in (200, 206, 304)
+            and filename.startswith('app/assets/') and '..' not in PurePosixPath(filename).parts):
+        response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+    return response
+
+
 def register_frontend(app):
     app.register_blueprint(blueprint)
+    app.after_request(_asset_cache_headers)

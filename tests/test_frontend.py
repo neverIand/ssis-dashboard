@@ -53,6 +53,69 @@ class FrontendShellTests(unittest.TestCase):
     def write_manifest(self, manifest):
         self.manifest_path.write_text(json.dumps(manifest), encoding='utf-8')
 
+    def test_only_successful_native_shells_receive_the_strict_content_security_policy(self):
+        strict = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; "
+                  "connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
+        for prefix in ['', '/ops/monitor']:
+            client = Client(DispatcherMiddleware(Flask('mount'), {prefix: self.app}), Response) if prefix else self.client
+            for path in ['/app/', '/app/executions/17']:
+                for method in ['GET', 'HEAD']:
+                    with self.subTest(prefix=prefix, path=path, method=method):
+                        response = client.open(prefix + path, method=method)
+                        self.assertEqual(response.status_code, 200)
+                        self.assertEqual(response.headers['Content-Security-Policy'], strict)
+                        self.assertEqual(response.headers['X-Frame-Options'], 'DENY')
+                        self.assertEqual(response.headers['X-Content-Type-Options'], 'nosniff')
+                        self.assertEqual(response.headers['Cache-Control'], 'no-store')
+        with patch('dashboard.views.monitor', LegacyMonitorFixture):
+            for path in ['/', '/execution/17']:
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.headers['Content-Security-Policy'], "frame-ancestors 'none'")
+        self.manifest_path.unlink()
+        for path, status in [('/app/', 503), ('/app/executions/17', 503),
+                             ('/app/executions/0', 400), ('/app/unknown', 404)]:
+            response = self.client.get(path)
+            self.assertEqual(response.status_code, status)
+            self.assertEqual(response.headers['Content-Security-Policy'], "frame-ancestors 'none'")
+        self.connect.assert_not_called()
+
+    def test_native_templates_have_no_inline_styles_handlers_or_executable_scripts(self):
+        class InlineInventory(HTMLParser):
+            def __init__(self, html):
+                super().__init__()
+                self.violations = []
+                self.executable_script = False
+                self.feed(html)
+
+            def handle_starttag(self, tag, attrs):
+                attributes = dict(attrs)
+                for name in attributes:
+                    if name == 'style' or name.startswith('on'):
+                        self.violations.append(f'{tag}[{name}]')
+                if tag == 'script':
+                    self.executable_script = attributes.get('type', '').lower() != 'application/json'
+                    if self.executable_script and not attributes.get('src'):
+                        self.violations.append('inline executable script')
+
+            def handle_data(self, data):
+                if self.executable_script and data.strip():
+                    self.violations.append('executable script body')
+
+            def handle_endtag(self, tag):
+                if tag == 'script':
+                    self.executable_script = False
+
+        inputs = {str(path.relative_to(ROOT)): path.read_text(encoding='utf-8')
+                  for path in (ROOT / 'dashboard/templates/app').rglob('*.html')}
+        for path in ['/app/', '/app/executions/17']:
+            inputs[path] = self.client.get(path).get_data(as_text=True)
+        self.assertGreater(len(inputs), 2)
+        for path, html in inputs.items():
+            with self.subTest(path=path):
+                self.assertEqual(InlineInventory(html).violations, [])
+        self.connect.assert_not_called()
+
     def test_shell_is_semantic_database_free_and_loads_only_local_entry_assets(self):
         response = self.client.get('/app/')
         self.assertEqual(response.status_code, 200)

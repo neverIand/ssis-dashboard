@@ -16,7 +16,7 @@ export function renderChartAxes(xAxis, yAxis, labels, maximum, format, { counts 
   yAxis.replaceChildren(...ticks.map(value => {
     const node = document.createElement('span');
     node.textContent = format(value); node.title = node.textContent;
-    node.setAttribute('style', `top: ${(10 + (maximum === 0 ? 150 : (1 - value / maximum) * 150)) / 170 * 100}%`);
+    node.style.top = `${(10 + (maximum === 0 ? 150 : (1 - value / maximum) * 150)) / 170 * 100}%`;
     return node;
   }));
   chartAttribute(yAxis, 'data-zero', maximum === 0);

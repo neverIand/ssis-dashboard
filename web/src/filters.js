@@ -123,6 +123,7 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
     const message = get(`[data-catalog-status="${key}"]`), more = get(`[data-catalog-more="${key}"]`);
     const retry = get(`[data-catalog-retry="${key}"]`), exact = get(`[data-exact-scope="${key}"]`);
     const owner = createCatalogSearch({ api, kind: `${key}s`, limit: metadata.limits.default_limit,
+      maxLimit: metadata.limits.max_limit,
       publish(state) {
         const focused = document.activeElement;
         const focusId = choices.contains(focused) ? focused?.dataset?.catalogId : undefined;

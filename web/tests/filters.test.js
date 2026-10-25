@@ -24,6 +24,49 @@ function setup(t, query = '', effectiveWindow = () => null, customSettings = set
   return { ...dom, calls, applied, select: filters.select };
 }
 
+test('both pickers use metadata max_limit for term searches and retain default_limit and focus for browsing', async t => {
+  for (const key of ['folder', 'project']) {
+    const dom = setup(t, search(folder, project));
+    dom.open(key); await settled();
+    const input = dom.get(`#${key}-search`);
+    assert.equal(dom.calls.at(-1).limit, settings.limits.default_limit);
+    dom.edit(`#${key}-search`, key === 'folder' ? 'Fold' : 'Pro');
+    const enter = new Event('keydown'); Object.defineProperty(enter, 'key', { value: 'Enter' });
+    input.dispatchEvent(enter); await settled();
+    assert.equal(dom.calls.at(-1).limit, settings.limits.max_limit);
+    assert.equal(dom.calls.at(-1).kind, `${key}s`);
+    assert.equal(dom.calls.at(-1).folder, key === 'project' ? folder : null);
+    assert.equal(dom.document.activeElement, input);
+    assert.equal(dom.get(`[data-catalog-choices="${key}"]`).children.length, 1);
+    dom.close(); dom.open(key); await settled();
+    assert.equal(dom.calls.at(-1).limit, settings.limits.default_limit);
+  }
+});
+
+test('max-limit Search more preserves moved focus and otherwise focuses the first new choice', async t => {
+  for (const moveFocus of [false, true]) {
+    const custom = metadata(); custom.limits.default_limit = 1; custom.limits.max_limit = 4;
+    const dom = filtersDOM(custom), late = deferred(), calls = [];
+    const response = (id, limit, next = null) => ({ ...envelope([{ folder_id: id, name: `Match ${id}`, description: null }]),
+      meta: { ...envelope().meta, from: null, to: null, limit, sort: 'name', direction: 'asc',
+        has_more: next !== null, next_cursor: next } });
+    const filters = mountFilters(dom.root, { metadata: custom, appBase: '/dashboard/app/', api: { async get(kind, { params }) {
+      calls.push(params);
+      return params.cursor ? late.promise : response('1', params.limit, 'more');
+    } } }); t.after(() => filters.dispose());
+    dom.open('folder'); await settled();
+    dom.edit('#folder-search', 'Match');
+    const input = dom.get('#folder-search'), enter = new Event('keydown'); Object.defineProperty(enter, 'key', { value: 'Enter' });
+    input.dispatchEvent(enter); await settled();
+    const more = dom.get('[data-catalog-more="folder"]'); more.focus(); more.click();
+    assert.equal(more.getAttribute('aria-disabled'), 'true');
+    if (moveFocus) input.focus();
+    late.resolve(response('2', 4)); await settled();
+    assert.equal(calls.at(-1).limit, 4); assert.equal(calls.at(-1).cursor, 'more');
+    assert.equal(dom.document.activeElement, moveFocus ? input : dom.get('[data-catalog-choices="folder"]').children[1]);
+  }
+});
+
 for (const newline of ['\r', '\n', '\r\n']) test(`exact URL names with ${JSON.stringify(newline)} survive browsing and unchanged Apply`, async t => {
   const exactFolder = `Fold${newline}er`, exactProject = `Pro${newline}ject`;
   const dom = setup(t, search(exactFolder, exactProject));

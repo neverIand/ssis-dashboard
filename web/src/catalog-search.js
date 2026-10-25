@@ -3,7 +3,7 @@ import { readNavigation } from './navigation.js';
 
 // Search the accessible catalog through the existing bounded API. Never call a
 // loaded-page-only filter a catalog search, or publish late results after a switch.
-export function createCatalogSearch({ api, kind, limit, publish, timeoutMs = 15000, pageBudget = 20 }) {
+export function createCatalogSearch({ api, kind, limit, maxLimit = limit, publish, timeoutMs = 15000, pageBudget = 20 }) {
   let generation = 0, active = null, disposed = false;
   let folder = null, term = '', cursor = null, rows = [], complete = false, failure = null;
   let seenCursors = new Set();
@@ -22,18 +22,21 @@ export function createCatalogSearch({ api, kind, limit, publish, timeoutMs = 150
     emit('loading');
     try {
       const target = rows.length + limit;
-      for (let page = 0; page < pageBudget; page += 1) {
+      const requestLimit = term ? maxLimit : limit;
+      // Keep the same row budget, rounded up to a complete cursor page.
+      const pages = Math.ceil(pageBudget * limit / requestLimit);
+      for (let page = 0; page < pages; page += 1) {
         let timedOut = false;
         job.timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
         let response;
         try {
           response = await api.get(kind, { signal: controller.signal,
-            params: { limit, sort: 'name', direction: 'asc', folder: kind === 'projects' ? folder : null, cursor } });
+            params: { limit: requestLimit, sort: 'name', direction: 'asc', folder: kind === 'projects' ? folder : null, cursor } });
         } catch (error) { throw timedOut ? new ApiError('timeout') : error; }
         finally { clearTimeout(job.timer); }
         if (disposed || current !== generation) return;
         if (controller.signal.aborted) throw new ApiError('timeout');
-        const pageRows = readNavigation(response, kind, limit);
+        const pageRows = readNavigation(response, kind, requestLimit);
         const next = response.meta.next_cursor;
         if (next !== null && seenCursors.has(next)) throw new ApiError('invalid_response');
         if (next !== null) seenCursors.add(next);

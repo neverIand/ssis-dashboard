@@ -58,6 +58,44 @@ class PackagedFrontendTests(unittest.TestCase):
                 self.assertIn('data-screen="execution"', html)
         self.connect.assert_not_called()
 
+    def test_only_hashed_assets_have_immutable_cache_headers_including_conditional_reads(self):
+        assets = [path.relative_to(ASSET_ROOT).as_posix()
+                  for path in (ASSET_ROOT / 'assets').rglob('*') if path.is_file()]
+        self.assertTrue(assets)
+        for prefix in ['', '/dashboard']:
+            client = Client(DispatcherMiddleware(Flask('mount'), {prefix: self.app}), Response) if prefix else self.app.test_client()
+            for filename in assets:
+                url = f'{prefix}/static/app/{filename}'
+                with self.subTest(prefix=prefix, filename=filename):
+                    with client.get(url) as response:
+                        self.assertEqual(response.status_code, 200)
+                        etag = response.headers['ETag']
+                        self.assertEqual(response.headers['Cache-Control'], 'public, max-age=31536000, immutable')
+                    for method, headers, status in [('HEAD', {}, 200), ('GET', {'If-None-Match': etag}, 304),
+                                                     ('GET', {'Range': 'bytes=0-7'}, 206)]:
+                        with client.open(url, method=method, headers=headers) as response:
+                            self.assertEqual(response.status_code, status)
+                            self.assertEqual(response.headers['Cache-Control'], 'public, max-age=31536000, immutable')
+            for path in ['app/theme-init.js', 'app/LICENSES.txt', 'app/manifest.json', 'css/main.css',
+                         'app/assets/../theme-init.js', 'app/assets/../LICENSES.txt',
+                         'app/assets/%2e%2e/manifest.json', 'app/assets/../../css/main.css']:
+                url = f'{prefix}/static/{path}'
+                with self.subTest(prefix=prefix, path=path):
+                    with client.get(url) as response:
+                        self.assertEqual(response.status_code, 200)
+                        self.assertEqual(response.headers['Cache-Control'], 'no-cache')
+                        etag = response.headers['ETag']
+                    with client.get(url, headers={'If-None-Match': etag}) as response:
+                        self.assertEqual(response.status_code, 304)
+                        self.assertEqual(response.headers['Cache-Control'], 'no-cache')
+            for path, method, headers, status in [('assets/missing.js', 'GET', {}, 404),
+                                                  (assets[0], 'POST', {}, 405),
+                                                  (assets[0], 'GET', {'Sec-Fetch-Site': 'cross-site'}, 403)]:
+                with client.open(f'{prefix}/static/app/{path}', method=method, headers=headers) as response:
+                    self.assertEqual(response.status_code, status)
+                    self.assertNotIn('immutable', response.headers.get('Cache-Control', ''))
+        self.connect.assert_not_called()
+
     def test_manifest_assets_load_at_root_and_mounted_prefix_without_sql(self):
         files = {chunk['file'] for chunk in self.manifest.values()} | {'LICENSES.txt', 'theme-init.js'}
         files.update(filename for chunk in self.manifest.values() for filename in chunk.get('css', []))

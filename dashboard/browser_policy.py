@@ -19,9 +19,9 @@ def _reject_cross_site():
 
 def _isolation_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
-    # Framing only; this is not a script policy for the retained legacy pages.
+    # Native shells supply their strict policy; legacy pages keep framing only.
     response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['Content-Security-Policy'] = "frame-ancestors 'none'"
+    response.headers.setdefault('Content-Security-Policy', "frame-ancestors 'none'")
     return response
 
 

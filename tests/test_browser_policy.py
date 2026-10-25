@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 import pyodbc
 
 from dashboard import create_app
+from dashboard.frontend import NATIVE_CSP
 from tests.fixtures import LegacyMonitorFixture
 
 
@@ -29,8 +30,10 @@ class BrowserPolicyTests(unittest.TestCase):
         self.app = create_app({'TESTING': True, 'API_EVENTS_ENABLED': True, 'API_VALUES_ENABLED': True})
         self.client = self.app.test_client()
 
-    def assert_isolated(self, response):
+    def assert_isolated(self, response, *, native=False):
         for name, value in ISOLATION.items():
+            if native and name == 'Content-Security-Policy':
+                value = NATIVE_CSP
             self.assertEqual(response.headers.get(name), value, name)
 
     def test_cross_site_subresources_and_frames_are_rejected_before_any_query(self):
@@ -96,5 +99,5 @@ class BrowserPolicyTests(unittest.TestCase):
                 response = self.client.get(path, headers=LOCAL)
                 if status is not None:
                     self.assertEqual(response.status_code, status)
-                self.assert_isolated(response)
+                self.assert_isolated(response, native=path == '/app/' and response.status_code == 200)
                 response.close()
