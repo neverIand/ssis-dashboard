@@ -1,6 +1,6 @@
 # Implementation progress
 
-Updated 25 October 2026. Development base: `dev-next`; implementation checkpoint: `864ec53`. [Roadmap](roadmap.md) owns scope and priorities; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns current status, the work queue and open acceptance gates.
+Updated 26 October 2026. Development base: `dev-next`; implementation checkpoint: `864ec53`. [Roadmap](roadmap.md) owns scope and priorities; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns current status, the work queue and open acceptance gates.
 
 ## Current status
 
@@ -13,13 +13,13 @@ Updated 25 October 2026. Development base: `dev-next`; implementation checkpoint
 | Legacy replacement | P0a inventory/local review is complete; G01 independent history, G02 operational labels and G05 legacy-prefix limitations remain [explicit gaps](FRONTEND_PARITY.md#remaining-gaps-and-documentation-work). |
 | Environment and hosting | Unavailable-environment acceptance remains parked under the 18 October instruction. Hosting/production streams remain deferred under the 15 October instruction. Local checks do not close these gates. |
 
-**Verification at `864ec53`, 25 October:** 413 Node tests pass; Python discovery runs 412 tests, with 400 passing and 12 opt-in native SQL tests skipped. This status check did not run native SQL. The accepted refactor's production build and 26 focused Python checks are recorded in its independent review. Authored JS+CSS is 271,258 bytes; packaged JS+CSS is 155,913 bytes, 47,302 gzip-9 bytes. [Roadmap budgets](roadmap.md#acceptance-budgets) own the enforced ceilings.
+**Verification on 26 October, application baseline `864ec53`:** 415 Node tests pass; Python discovery runs 414 tests, with 401 passing and 13 opt-in native SQL tests skipped. The new native timeout/recovery test passes separately with explicit opt-in; the [C8.2c replay](API_ACCEPTANCE.md#c82c-local-resource-results-26-october-2026) records actual SQL/HTTP evidence. The production build passes. Authored JS+CSS remains 271,258 bytes; packaged JS+CSS is 155,913 bytes, 47,302 gzip-9 bytes. [Roadmap budgets](roadmap.md#acceptance-budgets) own the enforced ceilings.
 
 ## Next actions
 
-The documentation/status reconciliation is complete. The following three tasks remain pending, in priority order; listing them does not resume parked work or claim an acceptance result.
+The documentation/status reconciliation is complete. Work proceeds through the following three tasks in priority order, one at a time. C8.2c is complete locally and independently reviewed; the other two tasks have not started. Listing them does not resume parked work or claim an unavailable-environment acceptance result.
 
-- [ ] **1. C8.2c — resource and concurrency acceptance.** Exercise bounded repeated/concurrent requests, multi-page refresh, rapid execution/tab changes, slow-request cancellation, query timeouts, failures/retries and maximum text pages. Verify request isolation and that active requests, logical connections/cursors and task-owned processes return to their expected baseline. Start with locally available conditions; retain missing native/reader/environment cases as `NOT RUN`. Browser abort alone does not establish SQL cancellation.
+- [x] **1. C8.2c — resource and concurrency acceptance: complete locally, independently reviewed 26 October.** Local repeated/concurrent, failure/retry, rapid replacement, maximum-text and actual driver timeout/cancellation/disconnect checks pass. Logical owners return to zero and task-owned servers/processes/tabs have exited. See [results and limits](API_ACCEPTANCE.md#c82c-local-resource-results-26-october-2026). Missing reader/representative-environment cases retain `NOT RUN`; HTTP disconnect was observed to leave SQL running until its timeout. This does not close Stage C or approve production capacity.
 - [ ] **2. Resolve the recorded legacy-replacement gaps.** Start with G01's independent history entry/bookmarks, then G02's missing operational labels and G05's legacy-prefix behavior. For each, implement a separately scoped solution or record an explicit user decision accepting the workflow difference. Replay affected legacy/native paths and permission boundaries using the existing BM/WF inventory; do not repeat the completed inventory or remove legacy coverage prematurely.
 - [ ] **3. Review new changes and their integration boundaries.** Scope subsequent reviews to changes from tasks 1/2, their frontend/API/SQL interactions and reproduced advisories below. Require matching regression and native/browser evidence where applicable. Preserve the accepted security/performance baseline; reopen it only for a concrete regression or changed assumption. Reader, actual lifecycle, corporate-browser and hosting checks keep their existing holds.
 
@@ -27,10 +27,10 @@ The documentation/status reconciliation is complete. The following three tasks r
 
 | Step | Deliverable / exit evidence | Status |
 | --- | --- | --- |
-| C8.2c.1 — define the run | Bounded workload/failure matrix, explicit concurrency and timeout limits, expected ownership counts, baseline observations and cleanup procedure. Reuse the existing environment and ignored helpers. | Planned |
-| C8.2c.2 — local repeated/concurrent replay | Success/failure/retry and execution/section replacement with independent request IDs and no cross-request state. Record active/high-water/final ownership counts and payloads; separate fake-driver, in-process and HTTP results. | Planned |
-| C8.2c.3 — native timeout/cancellation | Observe driver/server completion and logical cleanup after disconnect/cancel/timeout. Distinguish pooled physical sessions from leaked logical owners. Record missing permissions or unavailable conditions explicitly. | Planned |
-| C8.2c.4 — integration and review | Reconcile results, necessary fixes, regression evidence and process cleanup; obtain a scoped independent review. Leave C8.3/OBS-02/network/hosting gates separate. | Planned |
+| C8.2c.1 — define the run | Bounded workload/failure matrix, explicit concurrency and timeout limits, expected ownership counts, baseline observations and cleanup procedure. Reuse the existing environment and ignored helpers. | Complete locally: [run protocol](API_ACCEPTANCE.md#c82c-resource-and-concurrency-protocol). |
+| C8.2c.2 — local repeated/concurrent replay | Success/failure/retry and execution/section replacement with independent request IDs and no cross-request state. Record active/high-water/final ownership counts and payloads; separate fake-driver, in-process and HTTP results. | Complete locally: fake-driver 48 requests; native 200 WSGI + 200 HTTP workload responses; frontend owners and packaged browser replay. |
+| C8.2c.3 — native timeout/cancellation | Observe driver/server completion and logical cleanup after disconnect/cancel/timeout. Distinguish pooled physical sessions from leaked logical owners. Record missing permissions or unavailable conditions explicitly. | Complete for the configured local administrator: real timeout/recovery, explicit driver `HY008`, server WAITFOR removal and disconnect-to-timeout cleanup. Reader/representative-load cases remain open. |
+| C8.2c.4 — integration and review | Reconcile results, necessary fixes, regression evidence and process cleanup; obtain a scoped independent review. Leave C8.3/OBS-02/network/hosting gates separate. | Complete locally; scoped independent review accepted. Three P3 evidence/wording clarifications are resolved with additive provenance; no application/SQL fix was required. |
 
 ## Baseline and backend foundation
 
@@ -79,7 +79,7 @@ The documentation/status reconciliation is complete. The following three tasks r
 | C8.2b.2b / .2b.R1 | Complete locally; independently accepted 24 October | [Observation/text results](API_ACCEPTANCE.md#c82b2b-observation-and-text-results) and [child pairing](API_ACCEPTANCE.md#c82b2br1-child-pairing-results). Pairing source work remains bounded from 2,000 to 50,000 repeated starts; missing-end scans and heap-fixture candidate-selection work remain documented limits. |
 | C8.2b.2c | Complete locally; independently accepted 24 October | [Summary/timeline/history results](API_ACCEPTANCE.md#c82b2c-aggregate-and-history-results): exact oracles at 2,000/20,000/100,000 executions; bounded prior-success materialization. |
 | C8.2b.3 | Complete locally | [Query remedies](API_ACCEPTANCE.md#c82b3-execution-query-remedies): narrow calculated cohorts, cached ID selection/logging and measured event join order; retained small-catalog tradeoffs. |
-| C8.2c | Planned — next | [Resource/concurrency submilestones](#c82c-submilestones). |
+| C8.2c | Complete locally; independently reviewed 26 October | [Resource/concurrency submilestones](#c82c-submilestones) and [26 October results](API_ACCEPTANCE.md#c82c-local-resource-results-26-october-2026). Four-client acceptance does not establish representative sustained capacity. |
 | C8.3 | Planned; required identity/session unavailable | Actual Windows-reader API sign-in/HTTP, hidden/absent equivalence and network timings. Legacy reader replay or administrator impersonation does not substitute. |
 | OBS-02 | Partly unobserved | Native cleanup-failure observation; use the existing controlled procedure when the condition exists. |
 | Reader SHOWPLAN | NOT RUN | Required existing permission is unavailable. Do not grant permissions merely to pass a check. |
