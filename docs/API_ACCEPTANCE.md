@@ -6,6 +6,7 @@ This document owns correctness coverage, workload protocols and dated results. [
 - [Workload protocol](#workload-protocol): cases, sampling, SQL diagnostics and evidence
 - [Review replay](#review-replay-17-october-2026) and [post-remedy replay](#sql-remedies-replay-17-october-2026)
 - [Milestone evidence](#retained-evidence), [current-catalog measurements](#c82b1-retained-baseline), [20,000-execution results](#c82b2a-retained-execution-cardinality-results) and [SQL remedies](#c82b3-execution-query-remedies)
+- [G01 wildcard history and G02 labels](#g01g02-local-api-results-26-october-2026)
 
 ## Operation matrix
 
@@ -14,6 +15,7 @@ Every row requires no-store JSON, a server-generated request ID and the document
 | Operation | Accepted behavior and intended legacy difference | Combined native check | Local result |
 | --- | --- | --- | --- |
 | `GET /api/v1/meta` | Public limits/vocabularies/effective capabilities; no connection or server identity. Browser identity headers do not change SQL scope or capabilities. | Effective flags and all twelve execution sorts; zero queries. | PASS: WSGI/SQL |
+| `GET /api/v1/server` | Explicit operational server label under the configured SQL identity, with no login/service/connection secrets; five-second maximum driver limits. | Same server label as legacy, safe isolated failure, one query. | PASS: local native HTTP/browser, schema and controlled failure; separate from original fourteen-operation Stage C evidence. |
 | `GET /healthz` | Process health independent of SSISDB; no legacy page dependency. | Healthy during a database timeout; zero queries. | PASS: WSGI/SQL |
 | `GET /readyz` | One zero-row catalog dependency query, with a one/two-second driver cap; no diagnostic exception text. | Ready, native timeout, recovery; one query per call. | PASS: WSGI/SQL |
 | `GET /api/v1/folders` | Visible folder IDs/names with visible projects, unique aliases and bounded keyset paging. | Compare the full collection with independent catalog folders/projects. | PASS: WSGI/SQL |
@@ -26,7 +28,35 @@ Every row requires no-store JSON, a server-generated request ID and the document
 | `GET /api/v1/executions/{id}/children` | Exact invocation/path observations; ambiguous/missing ends stay incomplete. Unidentified starts are explicit unknown coverage. | Identified start IDs and unidentified coverage versus independently selected raw start events. | PASS: WSGI/SQL |
 | `GET /api/v1/executions/{id}/events` | Default capability denied before SQL. Once enabled: full-source literal Unicode search/category filtering, bounded text and explicit unknown coverage for NULL IDs. | Five category traversals/counts versus visible raw events and detail counters; hidden/absent IDs have identical 404. | PASS: WSGI/SQL |
 | `GET /api/v1/executions/{id}/values` | Default capability denied; parameters/overrides are separate pages. Sensitive values always NULL; override display requires its additional policy flag. | Both ID inventories and sensitive/policy markers versus independent metadata, without reading sensitive source values. | PASS: WSGI/SQL |
-| `GET /api/v1/history` | Exact folder/project/package, no overview date scope, bounded ID pages and separate estimates. Latest five prior visible successes exclude self/future runs; actual ends are retained. | Full default history versus independent identity/status selection and estimate calculation; common fields match detail/list. | PASS: WSGI/SQL |
+| `GET /api/v1/history` | Exact names by default or explicit LIKE folder/project/package, no overview dates, bounded ID pages and separate estimates. Latest five prior visible successes of each row's exact package exclude self/future runs; actual ends are retained. | Exact and mixed-package traversal versus independent identity/status/estimate selection; common fields match detail/list. | PASS: WSGI/native SQL; LIKE growth/plan limits below. |
+
+## G01/G02 local API results: 26 October 2026
+
+Task 2 extends history with explicit bound SQL LIKE selectors and adds one separately scoped server-label GET. Exact history resources, default cursor binding and the earlier fourteen-operation evidence remain intact. The new operation is included in current schema/shared-boundary tests; it is not retroactively part of the original Stage C replay.
+
+Three opt-in native history tests pass against the existing local SQL Server/ODBC configuration: exact pages in both directions, sampling edge cases, and mixed-package LIKE pages/bracket patterns compared with an independent per-package estimate oracle. Native HTTP/browser replay shows the configured server label matching legacy and history/detail common identities. Metadata remains zero-query; the label executes one scalar query with at most five-second login/query limits. Controlled browser/driver failures verify safe isolation and no label retry/polling. These observations use the configured local administrator, not an independent reader.
+
+Connection-local fixtures contain 2,000 / 20,000 / 100,000 executions across 200 exact package identities. Each page batch selects 201 IDs (200 returned plus continuation detection) before event/logging/estimate enrichment. Actual plans retain at most 201 enriched rows and 200 page scopes; this fixture materializes 0–1,129 prior-success rows. Candidate ranking reads the historical source once across page scopes. This removes the prototype's per-package floor rescans: the 2,000-row descending case falls from 2,592,402 to 2,402 source rows read. Exact-mode SQL is unchanged. No `RECOMPILE`, catalog write, permission change, shared-cache flush or new dependency was added.
+
+Five uninstrumented SQL execute/fetch samples per page case are retained in full. The following are local medians and observed ranges, not p95 or capacity claims. Logical reads and scan counts cover the diagnostic batch, including temporary work; source rows read refer specifically to fixture execution accesses.
+
+| Source rows / page case | Execution-source rows read | Logical reads / scans | Median ms | Observed range ms |
+| --- | ---: | ---: | ---: | ---: |
+| 2,000 / descending first | 2,402 | 1,315 / 412 | 104.603 | 83.949–259.567 |
+| 2,000 / ascending first | 2,402 | 906 / 412 | 67.635 | 36.143–238.073 |
+| 2,000 / descending midpoint | 2,402 | 1,308 / 412 | 62.901 | 60.353–140.006 |
+| 20,000 / descending first | 20,402 | 1,731 / 412 | 251.277 | 158.529–586.035 |
+| 20,000 / ascending first | 20,402 | 1,323 / 412 | 125.446 | 51.059–185.078 |
+| 20,000 / descending midpoint | 20,402 | 1,731 / 412 | 166.188 | 107.448–218.290 |
+| 100,000 / descending first | 100,402 | 3,806 / 412 | 730.537 | 665.016–11,850.341 |
+| 100,000 / ascending first | 100,402 | 3,398 / 412 | 327.750 | 289.643–392.493 |
+| 100,000 / descending midpoint | 100,402 | 3,802 / 412 | 351.011 | 262.032–460.214 |
+
+**Retained concern for task 3:** plans report memory-grant warnings and some 20,000/100,000 descending cases spill a sort to tempdb. The 11.85-second sample remains included; its cause is not established. A separate diagnostic pass retains full IO/TIME/plan messages, including compilation CPU and elapsed time (individual observed messages up to 691 ms); these instrumented messages are not a latency decomposition or a recurring per-request estimate. No stable network/production latency acceptance follows from these results.
+
+The first-page fence has separate broad/selective actual plans at every size. It reads 1 / 3 source rows respectively, with 3 logical reads at 2,000/20,000 and 5 at 100,000, one scan, and recorded compile elapsed messages of 0–11 ms. Independent MAX selection confirms the returned upper ID. WSGI serialization/schema checks return 200 rows in 115,089 / 115,494 / 115,488 bytes and 234.668 / 555.059 / 1,641.340 ms respectively, with exactly two SQL queries. For this response-size phase only, intentionally invalid negative-duration fixture rows are normalized to zero; native correctness/oracle checks retain their original edge cases.
+
+Selected evidence and source/helper hashes are retained under `.local/reports/backend/20261026-legacy-gaps/`, preserving run-relative paths. Raw five-sample measurements, diagnostic plans, initial prototype and excluded pilot failures are distinguished in its index. SQL growth remains linear in visible history for exact sampling, and the fixture is not a reader/catalog-visibility substitute. Reader SHOWPLAN/HTTP, representative workload, actual browser lifecycle and hosting gates remain open; task 3 independently reviews these changed boundaries.
 
 ## Shared boundary checks
 

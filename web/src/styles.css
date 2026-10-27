@@ -144,7 +144,8 @@ h2 {
 }
 
 .header-content nav {
-  flex-shrink: 0;
+  flex-shrink: 1;
+  max-width: 100%;
   font-size: 0.9333rem;
 }
 .theme-choice { display: flex; align-items: center; gap: 0.4rem; color: var(--sd-secondary); font-size: 0.8667rem; }
@@ -699,3 +700,8 @@ tbody tr:hover { background: var(--sd-subtle); }
   .history-presets, [data-history-presets] { flex-wrap: wrap; }
   .timeline-choice { max-width: 100%; }
 }
+.history-scope { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; border: 0; padding: .75rem 0; }
+.history-scope label { display: flex; flex: 1; flex-direction: column; min-width: min(12rem, 100%); gap: .25rem; }
+.history-scope input, .history-scope select { width: 100%; }
+.history-identity { display: block; font-size: .8rem; overflow-wrap: anywhere; max-width: 24rem; }
+.server-label { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

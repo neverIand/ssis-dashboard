@@ -68,8 +68,8 @@ def build_executions():
 def estimate(rows, row):
     if row['start_time'] is None:
         return 0, None
-    candidates = [r for r in rows if r['execution_id'] != row['execution_id'] and r['folder_name'] == 'F'
-                  and r['project_name'] == 'P' and r['package_name'] == 'Target.dtsx' and r['status'] == 7
+    candidates = [r for r in rows if r['execution_id'] != row['execution_id']
+                  and all(r[key] == row[key] for key in ('folder_name', 'project_name', 'package_name')) and r['status'] == 7
                   and r['start_time'] is not None and r['end_time'] is not None
                   and r['start_time'] <= r['end_time'] <= row['start_time']]
     candidates.sort(key=lambda r: (r['end_time'], r['execution_id']), reverse=True)
@@ -107,7 +107,7 @@ class HistorySQLTests(unittest.TestCase):
                 return rows
 
     def query(self, resource, parameters):
-        self.run_batch('DROP TABLE IF EXISTS #history_page, #history_counts, #history_rows, #history_successes;')
+        self.run_batch('DROP TABLE IF EXISTS #history_page, #history_counts, #history_rows, #history_successes, #history_scopes;')
         sql = load_query(resource)
         for source, target in (('catalog.executions', '#h_executions'), ('catalog.event_messages', '#h_events'),
                                ('catalog.execution_parameter_values', '#h_parameters')):
@@ -139,6 +139,30 @@ class HistorySQLTests(unittest.TestCase):
         self.assertTrue({0, 1, 4, 5} <= set(counts))
         ends = [r['end_time'] for r in self.rows if r['status'] == 7 and r['end_time'] is not None]
         self.assertLess(len(set(ends)), len(ends))
+
+    def test_like_scope_pages_preserve_each_packages_independent_estimates(self):
+        statuses = tuple(range(1, 10))
+        for descending in (True, False):
+            selection = ('%', 'P', '%', *statuses)
+            upper = self.query('api-history-pattern-fence.sql', selection)[0]['upper_id']
+            actual, last = [], 0
+            for _ in range(30):
+                rows = self.query('api-history-pattern-page.sql', (*selection, 51, upper, last, int(descending)))
+                page = rows[:50]
+                actual.extend((row['execution_id'], row['estimate_sample_count'],
+                               None if row['estimate_total_ticks'] is None else int(row['estimate_total_ticks'])) for row in page)
+                if len(rows) <= 50:
+                    break
+                last = page[-1]['execution_id']
+            else:
+                self.fail('Non-progressing pattern history')
+            expected = [(row['execution_id'], *estimate(self.rows, row)) for row in
+                        sorted(self.rows, key=lambda row: row['execution_id'], reverse=descending)]
+            self.assertEqual(actual, expected)
+        for package in ('T_rget[.]dtsx', '%Target%', '[OT]%'):
+            selection = ('%', 'P', package, *statuses)
+            expected = self.run_batch('SELECT MAX(execution_id) upper_id FROM #h_executions WHERE package_name LIKE ?', (package,))
+            self.assertEqual(self.query('api-history-pattern-fence.sql', selection), expected)
 
     def test_every_page_of_both_directions_matches_independent_estimates(self):
         for statuses in ((2, 7), (2, 4, 6), (3,)):

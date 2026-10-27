@@ -1,0 +1,32 @@
+{% extends "app/base.html" %}
+{% from "app/controls.html" import icon, pager, tip %}
+{% block title %}History · SSIS Dashboard{% endblock %}
+{% block screen %}history{% endblock %}
+{% block content %}
+<section aria-labelledby="history-heading">
+    <div class="page-heading">
+        <h1 id="history-heading">History</h1>
+        <div class="section-actions">
+            <p class="resource-status refresh-status" data-history-poll-status role="status"></p>
+            <button type="button" class="icon-button" data-history-refresh disabled aria-label="Refresh" title="Refresh">{{ icon('refresh') }}</button>
+            <button type="button" class="icon-button" data-history-poll-toggle disabled aria-label="Pause auto refresh" title="Pause auto refresh">{{ icon('pause') }}</button>
+        </div>
+    </div>
+    <form data-history-scope-form>
+        <fieldset class="history-scope" data-history-scope disabled>
+            <legend class="visually-hidden">History scope</legend>
+            <label>Match<select name="match"><option value="exact">Exact names</option><option value="like">LIKE patterns</option></select></label>
+            <label>Folder<input name="folder" required maxlength="512" autocomplete="off"></label>
+            <label>Project<input name="project" required maxlength="512" autocomplete="off"></label>
+            <label>Package<input name="package" required maxlength="512" autocomplete="off"></label>
+            <button type="submit">Load history</button>
+        </fieldset>
+        <p class="detail-note">LIKE patterns: * or % matches any text, _ matches one character, [abc] matches a set. All creation dates.</p>
+        <p class="inline-notice" data-history-scope-notice role="status"></p>
+    </form>
+</section>
+<section class="panel detail-panel observation-section">
+    <button type="button" data-history-toggle hidden>History</button>
+    {% include "app/history-panel.html" %}
+</section>
+{% endblock %}

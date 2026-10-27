@@ -18,7 +18,7 @@
     <a class="skip-link" href="#main-content">Skip to content</a>
     <header class="page-header">
         <div class="header-content">
-            <p class="brand">SSIS Dashboard</p>
+            <p class="brand">SSIS Dashboard <span>v{{ app_version }}</span></p>
             <section class="connection-state" aria-label="Connection status">
                 <p id="app-status" role="status" aria-live="polite" data-app-status>Starting dashboard. If this message remains, reload the page or use the legacy dashboard.</p>
                 <button type="button" data-retry aria-describedby="app-status" hidden>Retry settings</button>
@@ -26,7 +26,10 @@
                 <noscript><p>Enable JavaScript to use this page, or open the legacy dashboard.</p></noscript>
             </section>
             <nav aria-label="Dashboard navigation">
+                <a href="{{ url_for('frontend.overview') }}">Overview</a>
+                <a href="{{ url_for('frontend.history') }}">History</a>
                 <p data-display-timezone hidden></p>
+                <p class="server-label" data-server-name hidden></p>
                 <label class="theme-choice">Theme<select data-theme-choice><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
                 {% block navigation %}<a href="{{ url_for('packages') }}" aria-label="Legacy dashboard">Legacy</a>{% endblock %}
             </nav>

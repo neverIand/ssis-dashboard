@@ -206,7 +206,8 @@ test('timeline grain fallback survives a failed intermediate grain without claim
 
 test('native templates put live feedback in existing toolbars and a single page status', () => {
   const template = name => readFileSync(new URL(`../../dashboard/templates/app/${name}.html`, import.meta.url), 'utf8');
-  const detail = template('execution'), overview = template('index');
+  const detail = template('execution').replace('{% include "app/history-panel.html" %}', template('history-panel'));
+  const overview = template('index');
   assert.doesNotMatch(detail + overview, /resource-feedback|status-slot|detail-state|More sort options|Choose statuses|Chart key/);
   for (const resource of Object.keys(bodyKeys)) {
     assert.match(detail, new RegExp(`class="toolbar-meta"><span[^>]*data-${resource}-notice role="status"></span><p[^>]*data-${resource}-status role="status"></p><button[^>]*data-${resource}-retry hidden>Retry</button>`));

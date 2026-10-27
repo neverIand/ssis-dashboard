@@ -1,5 +1,6 @@
 import { formatId } from './display.js';
 import { parseSelection, selectionSearch, validateSelection } from './selection.js';
+import { readHistoryReturn } from './history-navigation.js';
 
 export const detailTabs = [
   ['events', 'Events'], ['executables', 'Executables'], ['children', 'Package calls'],
@@ -61,6 +62,7 @@ export function readOverviewReturn(search, { appBase, origin, metadata }) {
   const base = overviewBase(appBase, origin);
   const fallback = { href: base.pathname, notice: '', selection: null };
   if (!search) return fallback;
+  if (readHistoryReturn(search, { appBase, origin, metadata })) return fallback;
   try {
     const params = new URLSearchParams(search);
     if ([...params.keys()].length !== 1 || !params.has('overview')

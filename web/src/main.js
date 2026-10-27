@@ -3,6 +3,7 @@ import './styles.css';
 import { mountBootstrap } from './bootstrap.js';
 import { mountDetail } from './render-detail.js';
 import { mountOverviewScreen } from './overview-screen.js';
+import { mountHistoryScreen } from './history-screen.js';
 import { mountInfoTips, mountThemeChoice } from './ui.js';
 
 const root = document.querySelector('[data-dashboard-app]');
@@ -32,6 +33,10 @@ if (root) {
         const overview = mountOverviewScreen(root, saved);
         dispose = overview.dispose;
         checkpoint = overview.checkpoint;
+      } else if (root.dataset.screen === 'history') {
+        const history = mountHistoryScreen(root, saved);
+        dispose = history.dispose;
+        checkpoint = history.checkpoint;
       } else throw new TypeError('Unknown screen.');
     } catch {
       root.dataset.startup = 'error';

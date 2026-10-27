@@ -103,7 +103,7 @@ export function mountBootstrap(root, { ready = () => {} } = {}) {
   const timezone = root.querySelector('[data-display-timezone]');
   const config = JSON.parse(document.getElementById('app-config').textContent);
   const api = createApi(config.api_base, { origin: document.location.origin });
-  let disposeScreen;
+  let disposeScreen, disposeServer;
   const loader = createMetadataLoader({
     request: (options) => api.get('meta', options),
     publish(state) {
@@ -120,6 +120,8 @@ export function mountBootstrap(root, { ready = () => {} } = {}) {
         const metadata = state.metadata;
         timezone.textContent = metadata.display_timezone;
         timezone.setAttribute('aria-label', `Display timezone: ${metadata.display_timezone}`);
+        disposeServer?.();
+        disposeServer = mountServerLabel(root.querySelector('[data-server-name]'), api);
         disposeScreen?.();
         disposeScreen = ready(metadata, api, config, state.serverTime);
       }
@@ -131,6 +133,21 @@ export function mountBootstrap(root, { ready = () => {} } = {}) {
   return () => {
     loader.dispose();
     disposeScreen?.();
+    disposeServer?.();
     retry.removeEventListener('click', reload);
   };
+}
+
+export function mountServerLabel(node, api) {
+  if (!node) return () => {};
+  const controller = new AbortController();
+  let disposed = false;
+  node.hidden = false; node.textContent = 'Server…';
+  const unavailable = () => { if (!disposed) node.textContent = 'Server unavailable'; };
+  const timer = setTimeout(() => { controller.abort(); unavailable(); }, 10000);
+  void api.get('server', { signal: controller.signal }).then(({ data }) => {
+    if (typeof data.server_name !== 'string' || !data.server_name || data.server_name.length > 128) throw new TypeError();
+    if (!disposed && !controller.signal.aborted) node.textContent = node.title = data.server_name;
+  }).catch(unavailable).finally(() => clearTimeout(timer));
+  return () => { disposed = true; controller.abort(); clearTimeout(timer); node.textContent = node.title = ''; node.hidden = true; };
 }

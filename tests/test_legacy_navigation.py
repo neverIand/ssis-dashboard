@@ -28,9 +28,11 @@ class LinkReader(HTMLParser):
         self.links = {}
         self.href = None
         self.text = ''
+        self.urls = []
         self.feed(html)
 
     def handle_starttag(self, tag, attrs):
+        self.urls.extend(value for key, value in attrs if key in ('href', 'src') and value)
         if tag == 'a':
             self.href, self.text = dict(attrs).get('href'), ''
 
@@ -78,6 +80,86 @@ class LegacyBookmarkTests(unittest.TestCase):
                 for method in ('GET', 'HEAD'):
                     with self.subTest(prefix=prefix, path=path, method=method):
                         self.assert_redirect(path + '?native=1', destination, prefix, method)
+        self.monitor.assert_not_called()
+
+    def test_every_authored_legacy_link_and_asset_stays_inside_its_mount(self):
+        for prefix in PREFIXES:
+            assets = set()
+            for path in LEGACY_PATHS:
+                response = self.get(path, prefix)
+                self.assertEqual(response.status_code, 200)
+                for url in LinkReader(response.get_data(as_text=True)).urls:
+                    if url.startswith('/'):
+                        self.assertTrue(url.startswith(prefix + '/'), url)
+                        if '/static/' in url:
+                            assets.add(url)
+            self.assertTrue(assets)
+            for url in assets:
+                with self.clients[prefix].get(url) as response:
+                    self.assertEqual(response.status_code, 200, url)
+
+    def test_query_aliases_preserve_separator_names_and_scope_in_native_conversion(self):
+        instance = LegacyMonitorFixture()
+        self.monitor.return_value = instance
+        self.monitor.side_effect = None
+        for prefix in PREFIXES:
+            selectors = {'folder': 'F/東京', 'project': 'P\\Load + 東京', 'status': 'failed'}
+            response = self.clients[prefix].get(prefix + '/legacy/overview', query_string=selectors)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(instance.folder_name, selectors['folder'])
+            self.assertEqual(instance.project_name, selectors['project'])
+            self.assertEqual(instance.status, 'failed')
+            self.monitor.reset_mock()
+            converted = self.clients[prefix].get(prefix + '/legacy/overview', query_string={**selectors, 'native': 1})
+            self.assertEqual(converted.status_code, 302)
+            location = urlsplit(converted.headers['Location'])
+            self.assertEqual(location.path, prefix + '/app/')
+            self.assertEqual(parse_qs(location.query), {'folder': [selectors['folder']],
+                             'project': [selectors['project']], 'status': ['4']})
+            self.monitor.assert_not_called()
+            history = {**selectors, 'folder': 'F/%', 'project': 'P*', 'package': 'Load/A_[1].dtsx', 'native': 1}
+            converted = self.clients[prefix].get(prefix + '/legacy/history', query_string=history)
+            location = urlsplit(converted.headers['Location'])
+            self.assertEqual(location.path, prefix + '/app/history')
+            self.assertEqual(parse_qs(location.query), {'folder': ['F/%'], 'project': ['P%'],
+                             'package': ['Load/A_[1].dtsx'], 'match': ['like'], 'status': ['2,7']})
+
+    def test_unsupported_alias_conversion_fallback_retains_all_selectors(self):
+        for prefix in PREFIXES:
+            selectors = {'folder': 'A*/B', 'project': 'P', 'status': 'failed', 'native': 1}
+            response = self.clients[prefix].get(prefix + '/legacy/overview', query_string=selectors)
+            self.assertEqual(response.status_code, 409)
+            links = LinkReader(response.get_data(as_text=True)).links
+            fallback = urlsplit(links['Open legacy page'])
+            self.assertEqual(fallback.path, prefix + '/legacy/overview')
+            self.assertEqual(parse_qs(fallback.query), {key: [value] for key, value in selectors.items() if key != 'native'})
+        self.monitor.assert_not_called()
+
+    def test_generated_separator_links_use_query_aliases_and_are_decoded_once(self):
+        from dashboard.legacy_navigation import legacy_url
+        for prefix in PREFIXES:
+            with self.app.test_request_context('/', environ_overrides={'SCRIPT_NAME': prefix}):
+                url = legacy_url('folder_project', folder_name='A/B', project_name='P\\X')
+            location = urlsplit(url)
+            self.assertEqual(location.path, prefix + '/legacy/overview')
+            self.assertEqual(parse_qs(location.query), {'folder': ['A/B'], 'project': ['P\\X']})
+        instance = LegacyMonitorFixture()
+        self.monitor.side_effect = None
+        self.monitor.return_value = instance
+        response = self.client_alias('/legacy/history?folder=A%252FB&project=P&package=X%2525.dtsx')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(instance.folder_name, 'A%2FB')
+        self.assertEqual(instance.package_name, 'X%25.dtsx')
+
+    def client_alias(self, path):
+        return self.clients[''].get(path)
+
+    def test_alias_unknown_duplicate_or_invalid_inputs_fail_before_sql(self):
+        for query in ('folder=X&folder=Y', 'extra=X', 'folder=%FF', 'folder=%00', 'native=0',
+                      'folder=' + 'x' * 101, 'status=unknown'):
+            for path in ('/legacy/overview', '/legacy/history'):
+                response = self.client_alias(path + '?' + query)
+                self.assertEqual(response.status_code, 400, (path, query))
         self.monitor.assert_not_called()
 
     def test_every_status_and_category_uses_the_native_vocabulary(self):
@@ -139,15 +221,19 @@ class LegacyBookmarkTests(unittest.TestCase):
                         self.assertEqual(fallback.query, '')
         self.monitor.assert_not_called()
 
-    def test_independent_history_remains_an_explicit_unsupported_entry(self):
+    def test_independent_history_preserves_actual_legacy_status_scope(self):
         for prefix in PREFIXES:
             for status in ('all', 'failed', 'succeeded'):
                 for method in ('GET', 'HEAD'):
                     with self.subTest(prefix=prefix, status=status, method=method):
                         path = f'/history/Finance/project/Load/status/{status}/package/Load.dtsx?native=1'
                         response = self.clients[prefix].open(prefix + path, method=method)
-                        self.assertEqual(response.status_code, 409)
+                        self.assertEqual(response.status_code, 302)
                         self.assertEqual(response.headers['Cache-Control'], 'no-store')
+                        location = urlsplit(response.headers['Location'])
+                        self.assertEqual(location.path, prefix + '/app/history')
+                        self.assertEqual(parse_qs(location.query), {'match': ['like'], 'folder': ['Finance'],
+                                         'project': ['Load'], 'package': ['Load.dtsx'], 'status': ['2,7']})
                         if method == 'HEAD':
                             self.assertEqual(response.data, b'')
         self.monitor.assert_not_called()
@@ -187,7 +273,7 @@ class LegacyBookmarkTests(unittest.TestCase):
                 ('/execution/0/events/unknown', 400), ('/execution/42/events/unknown', 400),
                 ('/folder/Finance/project/Load/status/4', 400),
                 ('/history/F/project/P/status/unknown/package/X', 400),
-                ('/folder/A%2FB', 404), ('/unknown', 404), ('/app/history', 404),
+                ('/folder/A%2FB', 404), ('/unknown', 404), ('/app/history', 200),
                 ('/execution/-1', 404), ('/execution/+1', 404), ('/execution/1.5', 404),
             ):
                 with self.subTest(prefix=prefix, path=path):
@@ -208,23 +294,20 @@ class LegacyBookmarkTests(unittest.TestCase):
                             self.assertEqual(response.data, b'')
                         else:
                             links = LinkReader(response.get_data(as_text=True)).links
-                            if path.startswith('/history/'):
-                                self.assertNotIn('Open native', links)
-                            else:
-                                self.assertEqual(links['Open native'], prefix + path + '?native=1')
-                                self.monitor.reset_mock()
-                                converted = self.clients[prefix].get(links['Open native'])
-                                self.assertEqual(converted.status_code, 302)
-                                self.monitor.assert_not_called()
+                            self.assertEqual(links['Open native'], prefix + path + '?native=1')
+                            self.monitor.reset_mock()
+                            converted = self.clients[prefix].get(links['Open native'])
+                            self.assertEqual(converted.status_code, 302)
+                            self.monitor.assert_not_called()
 
-    def test_plain_queries_and_extra_decoding_stay_legacy_only(self):
+    def test_plain_queries_remain_legacy_only_and_route_names_are_decoded_once(self):
         instance = LegacyMonitorFixture()
         self.monitor.return_value = instance
         self.monitor.side_effect = None
         for query in ('q=private&status=failed&from=ignored', 'return=https://outside.invalid', 'x=%ZZ', 'x=%FF'):
             response = self.get('/folder/A%252FB?' + query)
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(instance.folder_name, 'A/B')
+            self.assertEqual(instance.folder_name, 'A%2FB')
             self.assertEqual(instance.status, 'all')
             self.assertNotIn('Open native', LinkReader(response.get_data(as_text=True)).links)
         response = self.get('/?ignored=1')
@@ -234,7 +317,7 @@ class LegacyBookmarkTests(unittest.TestCase):
         with self.app.app_context():
             response = self.get('/')
             self.assertIn('Open native', LinkReader(response.get_data(as_text=True)).links)
-            for path in ('/folder/A*B', LEGACY_PATHS[-1]):
+            for path in ('/folder/A*B', '/history/A%5CB/project/Load/status/all/package/Load.dtsx'):
                 response = self.get(path)
                 self.assertEqual(response.status_code, 200)
                 self.assertNotIn('Open native', LinkReader(response.get_data(as_text=True)).links)

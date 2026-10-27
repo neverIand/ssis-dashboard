@@ -1,4 +1,4 @@
-"""Bounded exact-package history and estimates from prior visible successes."""
+"""Bounded exact/LIKE history; estimates stay within each visible package."""
 
 from decimal import Decimal
 
@@ -10,7 +10,7 @@ from dashboard.timestamps import TICKS_PER_SECOND, Timestamp, as_timestamp, pars
 from dashboard.validation import InvalidInput
 
 
-QUERY_PARAMETERS = ('folder', 'project', 'package', 'status', 'limit', 'cursor', 'sort', 'direction')
+QUERY_PARAMETERS = ('folder', 'project', 'package', 'match', 'status', 'limit', 'cursor', 'sort', 'direction')
 _MAX_DURATION_TICKS = parse_timestamp('9999-12-31T23:59:59.9999999Z').utc_ticks
 
 
@@ -43,9 +43,16 @@ def history_page(values, config):
     now = utc_now()
     try:
         if not {'folder', 'project', 'package'} <= values.keys():
-            raise InvalidInput('An exact package identity is required.')
-        selection = {name: inputs.catalog_name(values[name], utf16_units=260 if name == 'package' else 128)
+            raise InvalidInput('A complete history scope is required.')
+        matching = values.get('match', 'exact')
+        if matching not in ('exact', 'like'):
+            raise InvalidInput('Unsupported history matching mode.')
+        selection = {name: inputs.catalog_name(values[name], utf16_units=512 if matching == 'like'
+                                               else 260 if name == 'package' else 128)
                      for name in ('folder', 'project', 'package')}
+        if matching == 'like':
+            selection = {name: value.replace('*', '%') for name, value in selection.items()}
+            selection['match'] = 'like'
         selection.update(status=inputs.statuses(values['status']) if 'status' in values else (2, 7),
                          limit=inputs.integer(values['limit']) if 'limit' in values else 50,
                          sort=values.get('sort', 'execution_id'), direction=values.get('direction', 'desc'))
@@ -73,16 +80,17 @@ def history_page(values, config):
                              typed_timestamps=True, on_complete=record_query)
 
     status = selection['status']
+    resource = 'api-history-pattern' if matching == 'like' else 'api-history'
     # Duplicate an included status rather than binding unused NULLs: identical
     # IN membership without pyodbc's per-NULL parameter-type descriptions.
     parameters = (selection['folder'], selection['project'], selection['package'], *status, *([status[0]] * (9 - len(status))))
     as_of = now if state is None else parse_timestamp(state['as_of'])
     if state is None:
-        upper = query('api-history-fence.sql', parameters, one_row=True)['upper_id']
+        upper = query(resource + '-fence.sql', parameters, one_row=True)['upper_id']
         last = None
         if upper is not None:
             wire.bigint(upper)
-    rows = [] if upper is None else query('api-history-page.sql', (
+    rows = [] if upper is None else query(resource + '-page.sql', (
         *parameters, selection['limit'] + 1, upper, 0 if last is None else last, int(selection['direction'] == 'desc')))
     if len(rows) > selection['limit'] + 1:
         raise ValueError('Unexpected history page size.')

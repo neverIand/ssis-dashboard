@@ -1,27 +1,40 @@
 # Implementation progress
 
-Updated 26 October 2026. Development base: `dev-next`; implementation checkpoint: `864ec53`. [Roadmap](roadmap.md) owns scope and priorities; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns current status, the work queue and open acceptance gates.
+Updated 27 October 2026. Development base: `dev-next`; task 2 implementation base: `d350af8`. [Roadmap](roadmap.md) owns scope and priorities; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns current status, the work queue and open acceptance gates.
 
 ## Current status
 
 | Area | Status |
 | --- | --- |
-| Backend foundation and read-only API | Implemented locally: all 14 GET operations and 12 execution sorts. Stage C remains open for resource, reader and representative-environment acceptance. |
+| Backend foundation and read-only API | Implemented locally: 14 Stage C GET operations plus the separate G02 server-label GET (15 total), and 12 execution sorts. Stage C remains open for reader and representative-environment acceptance. |
 | Native overview and execution workflows | P4.1a–P4.7c complete locally, including sections, charts, supported bookmark mapping and packaged workflow replay. This does not approve legacy retirement or a homepage switch. |
 | Security/performance review | Backend fixes, frontend batches 1/2 and the section-table refactor have passed independent review and are committed. See [accepted reviews](#accepted-reviews). |
 | UX and themes | Batches A–H, including F2 light/dark/System themes, are accepted. Earlier “review pending” statements are superseded by the receipt table below. |
-| Legacy replacement | P0a inventory/local review is complete; G01 independent history, G02 operational labels and G05 legacy-prefix limitations remain [explicit gaps](FRONTEND_PARITY.md#remaining-gaps-and-documentation-work). |
+| Legacy replacement | G01 independent exact/LIKE history, G02 operational labels and G05 prefix-safe legacy links/selector aliases are complete locally. [Scope and limits](FRONTEND_PARITY.md#g01g02g05-local-integration-26-october-2026); task 3 integration review remains separate. |
 | Environment and hosting | Unavailable-environment acceptance remains parked under the 18 October instruction. Hosting/production streams remain deferred under the 15 October instruction. Local checks do not close these gates. |
 
-**Verification on 26 October, application baseline `864ec53`:** 415 Node tests pass; Python discovery runs 414 tests, with 401 passing and 13 opt-in native SQL tests skipped. The new native timeout/recovery test passes separately with explicit opt-in; the [C8.2c replay](API_ACCEPTANCE.md#c82c-local-resource-results-26-october-2026) records actual SQL/HTTP evidence. The production build passes. Authored JS+CSS remains 271,258 bytes; packaged JS+CSS is 155,913 bytes, 47,302 gzip-9 bytes. [Roadmap budgets](roadmap.md#acceptance-budgets) own the enforced ceilings.
+**Verification completed 27 October, task 2 candidate over `d350af8`:** 427 Node tests pass; Python discovery runs 427 tests, with 413 passing and 14 opt-in native SQL tests skipped. Three native history tests pass separately with opt-in, including an independent mixed-package estimate oracle. The production build and local native/synthetic browser replay pass. Authored JS+CSS is 286,504 bytes (216 below the enforced ceiling); packaged JS+CSS is 163,981 bytes, 49,571 gzip-9 bytes. [Roadmap budgets](roadmap.md#acceptance-budgets) own the ceilings. [SQL observations](API_ACCEPTANCE.md#g01g02-local-api-results-26-october-2026) retain sort spills and the 11.85-second outlier for task 3; this is not stable latency or reader acceptance. Task 1's [C8.2c receipt](API_ACCEPTANCE.md#c82c-local-resource-results-26-october-2026) remains separate.
 
 ## Next actions
 
-The documentation/status reconciliation is complete. Work proceeds through the following three tasks in priority order, one at a time. C8.2c is complete locally and independently reviewed; the other two tasks have not started. Listing them does not resume parked work or claim an unavailable-environment acceptance result.
+Work proceeds through the following three tasks in priority order, one at a time. C8.2c is complete locally and independently reviewed; task 2 is complete locally and task 3 has not started. Listing them does not resume parked work or claim unavailable-environment acceptance.
 
 - [x] **1. C8.2c — resource and concurrency acceptance: complete locally, independently reviewed 26 October.** Local repeated/concurrent, failure/retry, rapid replacement, maximum-text and actual driver timeout/cancellation/disconnect checks pass. Logical owners return to zero and task-owned servers/processes/tabs have exited. See [results and limits](API_ACCEPTANCE.md#c82c-local-resource-results-26-october-2026). Missing reader/representative-environment cases retain `NOT RUN`; HTTP disconnect was observed to leave SQL running until its timeout. This does not close Stage C or approve production capacity.
-- [ ] **2. Resolve the recorded legacy-replacement gaps.** Start with G01's independent history entry/bookmarks, then G02's missing operational labels and G05's legacy-prefix behavior. For each, implement a separately scoped solution or record an explicit user decision accepting the workflow difference. Replay affected legacy/native paths and permission boundaries using the existing BM/WF inventory; do not repeat the completed inventory or remove legacy coverage prematurely.
+- [x] **2. Resolve the recorded legacy-replacement gaps: complete locally, 27 October.** G01 preserves full wildcard history through a standalone entry/bookmarks, with exact mode, bounded pages and per-package estimates; G02 restores version/server labels independently; G05 fixes authored legacy prefix links/assets and adds strict separator-selector aliases with single decoding. [Affected BM/WF replay](FRONTEND_PARITY.md#g01g02g05-local-integration-26-october-2026), regression, native SQL, growth diagnostics and cleanup are recorded. Default homepage/legacy coverage and parked gates remain intact; independent integration review is task 3.
 - [ ] **3. Review new changes and their integration boundaries.** Scope subsequent reviews to changes from tasks 1/2, their frontend/API/SQL interactions and reproduced advisories below. Require matching regression and native/browser evidence where applicable. Preserve the accepted security/performance baseline; reopen it only for a concrete regression or changed assumption. Reader, actual lifecycle, corporate-browser and hosting checks keep their existing holds.
+
+### Legacy-replacement submilestones
+
+Task 2 proceeds through these bounded changes. On 26 October the user explicitly selected full preservation of wildcard history filtering; exact-only replacement is not an accepted workflow change.
+
+| Step | Deliverable / exit evidence | Status |
+| --- | --- | --- |
+| G01 — independent history | Database-free `/app/history`; explicit exact/LIKE scope, bounded global ID pages and per-package estimates; legacy conversion without a proxy execution, preserving legacy 2/7 semantics. | Complete locally: scope/return/race/failure tests, native exact/mixed-package oracle, 2k/20k/100k page/fence plans and WSGI size checks; packaged navigation/page/refresh/recovery/return pass. |
+| G02 — operational labels | Version and authorized SQL server label with explicit API/security scope; independent safe failure, no identity/connection secrets in metadata. | Complete locally: native/legacy label comparison, current operation schema/shared boundaries and synthetic failure/deadline/disposal checks. |
+| G05 — legacy prefix | Prefix-safe legacy links/assets and explicit handling of path-separator selector names. | Complete locally: strict query aliases retain literal selectors/LIKE/status behavior, decode once, and preserve root/prefix navigation and unsupported fallback. |
+| Integration | Reconcile parity/usage/contracts/status and affected BM/WF evidence. Keep homepage/legacy coverage; task 3 and parked gates remain separate. | Complete locally: build/regression/docs and 1280/768/375 px replay; shared-header overflow fixed. Evidence and source hashes: `.local/reports/backend/20261026-legacy-gaps/`. Owned tabs/processes/port and markers cleared. |
+
+Task 3 should review G01's new SQL/frontend/cursor boundaries, G02 identity-label scope and independent lifetime, and G05 single-decoding/alias compatibility. Retain the measured reduction in repeated SQL reads while assessing sort spills, compilation and the unexplained slow sample. Review is not yet accepted; no new delegate was started for task 2. Reader SHOWPLAN/HTTP, representative catalog/workload, actual hidden/cache/corporate-browser and hosting checks retain their existing holds.
 
 ### C8.2c submilestones
 
@@ -36,7 +49,7 @@ The documentation/status reconciliation is complete. Work proceeds through the f
 
 | ID | Status | Delivered scope / remaining condition |
 | --- | --- | --- |
-| P0a | Complete locally | Workflow/field inventory and local replacement replay; G01/G02/G05 remain required cutover decisions. |
+| P0a | Complete locally | Workflow/field inventory and local replacement replay; G01/G02/G05 now have local implementations/evidence. Scoped task 3 review and environment/cutover gates remain separate. |
 | P0b | Awaiting integration | Real SQL 2022 fixtures and legacy Windows-reader HTTP pass; native cleanup-failure observation remains open. |
 | B1–B4 | Complete locally | App factory/config isolation, bound query ownership/timeouts, strict legacy inputs/safe errors and legacy query budgets of 6/7/4/5/2. |
 | B5a1/B5a2 | Complete locally | Pinned dependencies and clean Windows x64 CPython 3.14.8 environment; native imports and offline installation checked. |

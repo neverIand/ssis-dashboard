@@ -76,6 +76,46 @@ class HistoryTests(unittest.TestCase):
     def payload(self, page):
         return json.loads(base64.urlsafe_b64decode(page['meta']['next_cursor'].split('.')[0]+'=='))
 
+    def test_explicit_like_mode_binds_patterns_and_keeps_mixed_package_identities(self):
+        def query(resource, parameters, **settings):
+            self.assertEqual(parameters[:3], ('F%', 'Project_[AB]', '%'))
+            if resource == 'api-history-pattern-fence.sql':
+                return {'upper_id': 2}
+            self.assertEqual(resource, 'api-history-pattern-page.sql')
+            return [history(2, folder_name='Finance', project_name='Project_A', package_name='A.dtsx'),
+                    history(1, folder_name='Folder', project_name='Project_B', package_name='B.dtsx')]
+        self.query.side_effect = query
+        response = self.page({'match': 'like', 'folder': 'F*', 'project': 'Project_[AB]', 'package': '%'})
+        self.assertEqual([row['package_name'] for row in response['data']], ['A.dtsx', 'B.dtsx'])
+        self.assertEqual(self.query.call_count, 2)
+        self.connect.assert_not_called()
+
+    def test_like_mode_cursors_cannot_be_reused_as_exact_or_changed_patterns(self):
+        def query(resource, parameters, **settings):
+            if resource.endswith('fence.sql'):
+                return {'upper_id': 3}
+            return [history(3), history(2)]
+        self.query.side_effect = query
+        response = self.page({'match': 'like', 'limit': '1'})
+        cursor = response['meta']['next_cursor']
+        self.query.reset_mock()
+        for changes in ({'match': 'exact'}, {'match': 'like', 'folder': 'F*'}, {'match': 'like', 'package': '*'}):
+            with self.subTest(changes=changes):
+                rejected = self.get({'limit': '1', 'cursor': cursor, **changes})
+                self.assertEqual(rejected.status_code, 400)
+        self.query.assert_not_called()
+
+    def test_like_mode_width_validation_and_empty_scope_are_bounded(self):
+        self.query.side_effect = lambda *args, **kwargs: {'upper_id': None}
+        empty = self.page({'match': 'like', 'folder': '界' * 512})
+        self.assertEqual(empty['data'], [])
+        self.assertEqual(self.query.call_count, 1)
+        self.query.reset_mock()
+        for values in ({'match': 'unknown'}, {'match': 'like', 'folder': '界' * 513},
+                       {'match': 'like', 'package': ''}, {'match': 'like', 'project': '\0'}):
+            self.assertEqual(self.get(values).status_code, 400)
+        self.query.assert_not_called()
+
     def invalid_cursor(self, values):
         before = self.query.call_count
         response = self.get(values)

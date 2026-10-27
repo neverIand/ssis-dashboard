@@ -21,10 +21,11 @@ test('detail bootstrap needs no overview controls and requests metadata, detail 
   });
   const dispose = mountBootstrap(dom.root, { ready: (metadata, api, config) =>
     mountDetail(dom.root, { metadata, api, executionId: config.execution_id, appBase: config.app_base }).dispose });
+  t.after(dispose);
   assert.deepEqual(calls, ['/ops/api/v1/meta']);
   settings.resolve(jsonResponse(envelope()));
   await settle();
-  assert.deepEqual(calls, ['/ops/api/v1/meta', '/ops/api/v1/executions/9223372036854775807',
+  assert.deepEqual(calls, ['/ops/api/v1/meta', '/ops/api/v1/server', '/ops/api/v1/executions/9223372036854775807',
     '/ops/api/v1/executions/9223372036854775807/executables?sort=started_at&direction=asc&limit=50']);
   assert.equal(dom.get('execution-detail').hidden, false);
   assert.equal(dom.field('package').textContent, response.data.package_name);
@@ -55,13 +56,14 @@ test('settings failure leaves detail unfetched; keyboard retry loads it after su
   });
   const dispose = mountBootstrap(dom.root, { ready: (metadata, api, config) =>
     mountDetail(dom.root, { metadata, api, executionId: config.execution_id, appBase: config.app_base }).dispose });
+  t.after(dispose);
   await settle();
   assert.deepEqual(calls, ['/ops/api/v1/meta']);
   assert.equal(dom.get('retry').hidden, false);
   assert.equal(dom.get('app-status').textContent, 'The service is unavailable. Try again.');
   dom.get('retry').dispatchEvent(new Event('click'));
   await settle();
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, 5);
   assert.equal(dom.get('execution-detail').hidden, false);
   dispose();
 });
@@ -74,12 +76,14 @@ test('safe detail failure and retry expose only validated correlation; active ti
     status: { code: -1, name: 'unknown' } });
   t.mock.method(globalThis, 'fetch', async url => {
     if (url.pathname.endsWith('/meta')) return jsonResponse(envelope());
+    if (url.pathname.endsWith('/server')) return jsonResponse(envelope({ server_name: 'Synthetic server' }));
     if (url.pathname.endsWith('/executables')) return jsonResponse(observations());
     if (++attempts === 1) return jsonResponse({ detail: '<script>private error</script>' }, { status: 404 });
     return jsonResponse(response);
   });
   const dispose = mountBootstrap(dom.root, { ready: (metadata, api, config) =>
     mountDetail(dom.root, { metadata, api, executionId: config.execution_id, appBase: config.app_base }).dispose });
+  t.after(dispose);
   await settle();
   assert.equal(dom.get('execution-detail').hidden, true);
   assert.match(dom.get('detail-status').textContent, /Execution unavailable.*The requested resource is unavailable/);

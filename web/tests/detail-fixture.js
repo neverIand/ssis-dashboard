@@ -36,10 +36,10 @@ export function detailDOM() {
   document.body = new Node(document, 'body');
   document.activeElement = document.body;
   const nodes = new Map();
-  for (const key of ['app-status', 'retry', 'request-id', 'display-timezone', 'execution-detail',
+  for (const key of ['app-status', 'retry', 'request-id', 'display-timezone', 'server-name', 'execution-detail',
     'active-elapsed', 'detail-id', 'tab-notes',
     'detail-refresh', 'detail-poll-toggle', 'detail-poll-status', 'overview-link', 'legacy-detail-link',
-    'overview-return-notice', 'parameters-unavailable', 'overrides-unavailable', 'overrides-policy', ...['toggle','panel','plot','selected','scale','empty','x-axis','y-axis'].map(key=>`history-chart-${key}`), ...['filters','choices','apply','custom','close','presets','status-options'].map(key => `history-${key}`), ...['unavailable','filters','apply','reset','kind','q'].map(key => `events-${key}`), ...['toggle', 'panel', 'status', 'notice', 'retry', 'sort',
+    'overview-return-notice', 'history-return', 'parameters-unavailable', 'overrides-unavailable', 'overrides-policy', ...['toggle','panel','plot','selected','scale','empty','x-axis','y-axis'].map(key=>`history-chart-${key}`), ...['filters','choices','apply','custom','close','presets','status-options'].map(key => `history-${key}`), ...['unavailable','filters','apply','reset','kind','q'].map(key => `events-${key}`), ...['toggle', 'panel', 'status', 'notice', 'retry', 'sort',
       'limit', 'previous', 'next', 'latest', 'scroll', 'table', 'order-label'].flatMap(name => ['executables', 'children', 'events', 'parameters', 'overrides', 'history'].map(section => `${section}-${name}`))]) {
     const node = new Node(document, /-(limit|sort|direction|kind)$/.test(key) ? 'select' : key === 'events-q' ? 'input'
       : key.includes('retry') || /toggle|previous|next|latest|refresh$/.test(key) ? 'button' : 'div');

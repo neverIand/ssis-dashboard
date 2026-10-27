@@ -8,6 +8,7 @@ from flask import Blueprint, current_app, make_response, render_template, reques
 
 from dashboard.api_validation import identifier
 from dashboard.observability import log_event, request_id
+from dashboard.version import APP_VERSION
 
 
 blueprint = Blueprint('frontend', __name__, url_prefix='/app')
@@ -74,7 +75,7 @@ def _shell(template, **config):
             request_id=request_id(),
         ), 503)
     else:
-        response = make_response(render_template(template, assets=assets, app_config={
+        response = make_response(render_template(template, assets=assets, app_version=APP_VERSION, app_config={
             'app_base': url_for('frontend.overview'),
             'api_base': url_for('api.metadata').rsplit('/', 1)[0] + '/',
             'execution_base': url_for('execution', execution_id=0).rsplit('/', 1)[0] + '/',
@@ -94,6 +95,11 @@ def overview():
 def execution(execution_id):
     identifier(execution_id)
     return _shell('app/execution.html', execution_id=execution_id)
+
+
+@blueprint.get('/history', merge_slashes=False)
+def history():
+    return _shell('app/history.html')
 
 
 def _asset_cache_headers(response):

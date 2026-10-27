@@ -15,6 +15,7 @@ from werkzeug.test import Client
 from werkzeug.wrappers import Response
 
 from dashboard import create_app
+from dashboard.version import APP_VERSION
 from tests.fixtures import LegacyMonitorFixture
 
 
@@ -58,7 +59,7 @@ class FrontendShellTests(unittest.TestCase):
                   "connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
         for prefix in ['', '/ops/monitor']:
             client = Client(DispatcherMiddleware(Flask('mount'), {prefix: self.app}), Response) if prefix else self.client
-            for path in ['/app/', '/app/executions/17']:
+            for path in ['/app/', '/app/executions/17', '/app/history']:
                 for method in ['GET', 'HEAD']:
                     with self.subTest(prefix=prefix, path=path, method=method):
                         response = client.open(prefix + path, method=method)
@@ -73,7 +74,7 @@ class FrontendShellTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.headers['Content-Security-Policy'], "frame-ancestors 'none'")
         self.manifest_path.unlink()
-        for path, status in [('/app/', 503), ('/app/executions/17', 503),
+        for path, status in [('/app/', 503), ('/app/executions/17', 503), ('/app/history', 503),
                              ('/app/executions/0', 400), ('/app/unknown', 404)]:
             response = self.client.get(path)
             self.assertEqual(response.status_code, status)
@@ -108,7 +109,7 @@ class FrontendShellTests(unittest.TestCase):
 
         inputs = {str(path.relative_to(ROOT)): path.read_text(encoding='utf-8')
                   for path in (ROOT / 'dashboard/templates/app').rglob('*.html')}
-        for path in ['/app/', '/app/executions/17']:
+        for path in ['/app/', '/app/executions/17', '/app/history']:
             inputs[path] = self.client.get(path).get_data(as_text=True)
         self.assertGreater(len(inputs), 2)
         for path, html in inputs.items():
@@ -136,7 +137,7 @@ class FrontendShellTests(unittest.TestCase):
             self.assertIn(markup, html)
         references = re.findall(r'(?:href|src)="([^"]+)"', html)
         self.assertEqual(set(references), {
-            '#main-content', '/', '/static/app/assets/main.js', '/static/app/assets/main.css',
+            '#main-content', '/', '/app/', '/app/history', '/static/app/assets/main.js', '/static/app/assets/main.css',
             '/static/app/theme-init.js',
         })
         # The theme script is classic and render-blocking, ahead of the stylesheet it configures.
@@ -146,6 +147,28 @@ class FrontendShellTests(unittest.TestCase):
         for legacy_dependency in ['jquery', 'bootstrap', 'morris', 'raphael', 'smartmenus',
                                   'http-equiv="refresh"', 'google-analytics']:
             self.assertNotIn(legacy_dependency, html.lower())
+        self.connect.assert_not_called()
+
+    def test_independent_history_shell_has_no_execution_proxy_and_preserves_mount_and_methods(self):
+        for prefix in ['', '/ops/monitor']:
+            client = Client(DispatcherMiddleware(Flask('history-mount'), {prefix: self.app}), Response) if prefix else self.client
+            path = prefix + '/app/history'
+            response = client.get(path + '?match=like&folder=*&project=*&package=*')
+            self.assertEqual(response.status_code, 200)
+            html = response.get_data(as_text=True)
+            self.assertEqual(shell_config(html), {
+                'app_base': prefix + '/app/', 'api_base': prefix + '/api/v1/',
+                'execution_base': prefix + '/execution/',
+            })
+            for markup in ['data-screen="history"', 'data-history-scope-form', 'LIKE patterns', 'Exact names',
+                           'name="folder"', 'name="project"', 'name="package"', 'data-history-table',
+                           'data-server-name hidden', 'data-history-poll-toggle disabled', 'History durations']:
+                self.assertIn(markup, html)
+            self.assertIn('href="' + prefix + '/app/history"', html)
+            self.assertIn('v' + APP_VERSION, html)
+            self.assertNotIn('data-execution-detail', html)
+            self.assertEqual(client.head(path).data, b'')
+            self.assertEqual(client.post(path).status_code, 405)
         self.connect.assert_not_called()
 
     def test_missing_theme_script_makes_the_shell_unavailable_like_other_assets(self):
@@ -225,7 +248,7 @@ class FrontendShellTests(unittest.TestCase):
             def handle_starttag(self, tag, attrs):
                 self.nodes.append((tag, dict(attrs)))
 
-        for path in ['/app/', '/app/executions/17']:
+        for path in ['/app/', '/app/executions/17', '/app/history']:
             with self.subTest(path=path):
                 html = self.client.get(path).get_data(as_text=True)
                 nodes = Inventory(html).nodes

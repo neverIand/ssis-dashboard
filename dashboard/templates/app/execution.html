@@ -4,6 +4,7 @@
 {% block screen %}execution{% endblock %}
 {% block navigation %}<a href="{{ app_config.execution_base }}{{ app_config.execution_id }}" data-legacy-detail-link>Legacy detail</a>{% endblock %}
 {% block content %}
+<a data-history-return hidden>Back to History</a>
         <div class="page-heading detail-page-heading">
             <div class="detail-heading">
                 <nav class="detail-breadcrumb" aria-label="Execution context"><ol><li><a href="{{ app_config.app_base }}" data-overview-link>Overview</a></li><li hidden><a data-detail-breadcrumb="folder"></a></li><li hidden><a data-detail-breadcrumb="project"></a></li></ol></nav>
@@ -142,37 +143,8 @@
                 </div>
             </section>
             <section class="panel detail-panel observation-section" id="detail-panel-history" data-detail-tab-panel="history" role="tabpanel" aria-labelledby="detail-tab-history" tabindex="0" hidden>
-                <div id="package-history" data-history-panel hidden>
-                    <div class="table-toolbar">
-                        <div class="toolbar-filters history-presets" role="group" aria-label="History status presets"><span>Status</span><span data-history-presets></span><button type="button" data-history-custom aria-haspopup="dialog" aria-controls="history-status-picker" aria-expanded="false">Custom…</button>{{ tip('history-scope-tip', 'About package history', 'All creation dates for this exact folder, project and entry package. The status presets filter the executions shown.') }}</div>
-                        <div class="toolbar-meta"><span class="inline-notice" data-history-notice role="status"></span><p class="inline-status" data-history-status role="status"></p><button type="button" class="button-quiet" data-history-retry hidden>Retry</button></div>
-                        <button type="button" data-history-chart-toggle disabled aria-expanded="false" aria-controls="history-duration-chart">Chart</button>
-                        {{ pager('history', 'History') }}
-                    </div>
-                    <div id="history-status-picker" class="filter-popover history-status-popover" data-history-status-options role="dialog" aria-labelledby="history-status-heading" hidden>
-                        <div class="popover-heading"><h2 id="history-status-heading">History statuses</h2><button type="button" class="button-quiet" data-history-close aria-label="Close history status picker">×</button></div>
-                        <form data-history-filters><fieldset class="status-options"><legend class="visually-hidden">History statuses</legend><div class="history-choices" data-history-choices></div></fieldset><button type="submit" data-history-apply>Done</button></form>
-                    </div>
-                    <section class="history-duration-chart" id="history-duration-chart" data-history-chart-panel aria-label="Duration comparison" hidden>
-                        <div class="chart-heading"><div class="duration-legend"><span data-duration-key="actual">Actual</span><span data-duration-key="estimate">Estimate</span><span data-chart-status="7">Succeeded</span><span data-chart-status="4">Failed / unexpected end</span><span data-chart-status="2">Running</span><span data-chart-status="5">Pending / stopping</span><span data-chart-status="other">Other</span></div>{{ tip('history-chart-tip', 'About duration comparison', 'Plots the loaded page only. Circle: actual zero. No mark: unavailable. Estimates are not actual timings. Hover or focus a point for values; Left/Right or Home/End to move. Full values and timestamps are in the history table.') }}</div>
-                        <div class="chart-frame">
-                            <div class="chart-y-axis" data-history-chart-y-axis aria-label="Duration scale"></div>
-                            <svg class="history-duration-plot" data-history-chart-plot viewBox="0 0 1000 170" preserveAspectRatio="none" role="listbox" aria-orientation="horizontal" aria-label="History durations, earliest to latest"></svg>
-                            <div class="chart-x-axis" data-history-chart-x-axis aria-label="Creation dates and execution IDs"></div>
-                            <span class="chart-axis-caption">Created time →</span><span class="visually-hidden" data-history-chart-scale></span>
-                        </div>
-                        <p class="resource-status chart-empty" data-history-chart-empty role="status" hidden></p>
-                        <p class="inline-status chart-selection" data-history-chart-selected role="status" tabindex="0" aria-label="Selected execution values"></p>
-                    </section>
-                    <div class="table-scroll" data-history-scroll role="region" aria-label="Package history table" tabindex="0">
-                        <table class="detail-table" data-history-table>
-                            <caption class="visually-hidden">Executions of the exact entry package</caption>
-                            <colgroup><col><col><col><col><col><col></colgroup>
-                            <thead><tr><th scope="col" aria-sort="none"><button type="button" data-history-header-execution_id>Execution</button></th><th scope="col">Created</th><th scope="col">Started</th><th scope="col">Ended</th><th scope="col">Duration</th><th scope="col">Estimate {{ tip('estimate-tip', 'About estimates', 'Estimates are not actual timings. Mean of up to five prior visible successful runs. Unavailable without a start or usable samples, for a zero mean, or when the estimated end is out of range. Visibility and retention can change estimates. The number in parentheses is the sample count.') }}</th></tr></thead>
-                            <tbody><tr><td colspan="6">Open this section to load package history.</td></tr></tbody>
-                        </table>
-                    </div>
-                </div>
+                {% include "app/history-panel.html" %}
+
             </section>
         </div>
 {% endblock %}

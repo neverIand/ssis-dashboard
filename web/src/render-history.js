@@ -2,9 +2,10 @@ import { formatCode } from './display.js';
 import { executionHref } from './detail-navigation.js';
 import { mountHistoryChart } from './render-history-chart.js';
 import { allHistoryStatuses } from './history.js';
+import { historyExecutionHref } from './history-navigation.js';
 import { mountSectionTable } from './section-table.js';
 
-export function mountHistory(root, { metadata, actions, navigation, executionId, restoreView = null }) {
+export function mountHistory(root, { metadata, actions, navigation, executionId, restoreView = null, showIdentity = false }) {
   const view = mountSectionTable(root, { metadata, actions, restoreView }, {
     resource: 'history',
     columns: 6,
@@ -75,11 +76,17 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
       node.dataset.historyId = id;
       const cells = Array.from({ length: 6 }, () => element('td'));
       const link = element('a', id), badge = element('span', undefined, 'status-badge');
-      link.href = executionHref(id, navigation.selection, navigation);
+      link.href = navigation.historySelection ? historyExecutionHref(id, navigation.historySelection, navigation)
+        : executionHref(id, navigation.selection, navigation);
       node.dataset.current = String(id === executionId);
       if (id === executionId) link.setAttribute('aria-current', 'page');
       cells[0].append(link, document.createTextNode(' '), badge);
       if (id === executionId) cells[0].append(element('span', 'current', 'current-execution'));
+      if (showIdentity) {
+        const identity = element('span', `${item.folder_name} / ${item.project_name} / ${item.package_name}`, 'history-identity');
+        identity.title = identity.textContent;
+        cells[0].append(identity);
+      }
       const times = {};
       for (const key of ['created_at', 'started_at', 'ended_at']) {
         times[key] = cells[{ created_at: 1, started_at: 2, ended_at: 3 }[key]];

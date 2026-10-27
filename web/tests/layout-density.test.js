@@ -205,7 +205,8 @@ test('info tips work on hover/focus, fit the viewport, dismiss on Escape and rem
 
 test('native templates retain only row/timeline disclosures and one pager per toolbar', () => {
   const read = name => readFileSync(new URL(`../../dashboard/templates/app/${name}.html`, import.meta.url), 'utf8');
-  const overview = read('index'), detail = read('execution'), controls = read('controls');
+  const overview = read('index'), detail = read('execution').replace('{% include "app/history-panel.html" %}',
+    read('history-panel')), controls = read('controls');
   assert.equal((overview.match(/<details/g) ?? []).length, 1); assert.match(overview, /<details data-timeline-values>/);
   assert.doesNotMatch(detail, /<details|data-history-chart-choice|data-history-direction|data-events-scope/);
   assert.equal((detail.match(/{{ pager\(/g) ?? []).length, 6);

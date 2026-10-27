@@ -163,6 +163,15 @@ def executions():
     return resource_response(data, meta=meta)
 
 
+@blueprint.get('/server', merge_slashes=False)
+def server():
+    config = current_app.config
+    row = execute_query('api-server.sql', connection_string=config['CONNECTION_STRING']['main'], one_row=True,
+                        login_timeout=min(5, config['DB_LOGIN_TIMEOUT_SECONDS']),
+                        query_timeout=min(5, config['DB_QUERY_TIMEOUT_SECONDS']), on_complete=record_query)
+    return resource_response({'server_name': wire.catalog_text(row['server_name'], 128, units=True)})
+
+
 @blueprint.get('/folders', merge_slashes=False)
 @query_parameters(*NAVIGATION_PARAMETERS)
 def folders():

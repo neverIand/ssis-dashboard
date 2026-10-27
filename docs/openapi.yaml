@@ -368,16 +368,33 @@ paths:
   /api/v1/history:
     get:
       operationId: listHistory
-      summary: Exact package history with separate estimates
+      summary: Exact or explicit LIKE package history with separate estimates
       description: Implemented in C7a/C7b. Default last 50 running/succeeded; exact catalog equality
-        for folder/project/package, ID paging in either direction and no implicit dashboard time range.
-        Estimates use up to five visible successful runs completed by each target start; actual fields retain observed values.
+        for folder/project/package by default; match=like enables bound SQL LIKE patterns and translates * to %.
+        ID paging works in either direction without an implicit dashboard time range. Each row's estimate uses
+        up to five visible successful runs of its own exact package completed by its start; actual fields retain observed values.
       x-implementation-status: implemented
       x-milestone: C7a/C7b
       parameters:
-      - {$ref: '#/components/parameters/RequiredFolder'}
-      - {$ref: '#/components/parameters/RequiredProject'}
-      - {$ref: '#/components/parameters/RequiredPackage'}
+      - in: query
+        name: folder
+        required: true
+        schema: {type: string, minLength: 1, maxLength: 512}
+        description: Exact folder (128 UTF-16 units) or, with match=like, a SQL LIKE pattern (512 units).
+      - in: query
+        name: project
+        required: true
+        schema: {type: string, minLength: 1, maxLength: 512}
+        description: Exact project (128 UTF-16 units) or, with match=like, a SQL LIKE pattern (512 units).
+      - in: query
+        name: package
+        required: true
+        schema: {type: string, minLength: 1, maxLength: 512}
+        description: Exact package (260 UTF-16 units) or, with match=like, a SQL LIKE pattern (512 units).
+      - in: query
+        name: match
+        schema: {type: string, enum: [exact, like], default: exact}
+        description: LIKE uses %, _, bracket sets/ranges and the * alias; all is an ordinary API pattern/name.
       - {$ref: '#/components/parameters/HistoryStatus'}
       - {$ref: '#/components/parameters/Limit'}
       - {$ref: '#/components/parameters/Cursor'}
@@ -394,6 +411,32 @@ paths:
               schema: {$ref: '#/components/schemas/HistoryResponse'}
               examples:
                 synthetic: {$ref: '#/components/examples/HistoryResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '503': {$ref: '#/components/responses/DatabaseUnavailable'}
+        '504': {$ref: '#/components/responses/DatabaseTimeout'}
+  /api/v1/server:
+    get:
+      operationId: getServerLabel
+      summary: Configured SQL server display label
+      description: One read under the configured SQL identity, capped at five seconds. Same operational
+        label as legacy; no login, service name, connection string or credentials. Metadata stays database-free.
+      x-implementation-status: implemented
+      x-milestone: G02
+      parameters: []
+      responses:
+        '200':
+          description: Server label; null when the server does not supply one.
+          headers:
+            X-Request-ID: {$ref: '#/components/headers/RequestId'}
+            Cache-Control: {$ref: '#/components/headers/NoStore'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ServerResponse'}
+              examples:
+                synthetic: {$ref: '#/components/examples/ServerResponse'}
         '400': {$ref: '#/components/responses/BadRequest'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '405': {$ref: '#/components/responses/MethodNotAllowed'}
@@ -1586,6 +1629,18 @@ components:
       properties:
         data: {$ref: '#/components/schemas/Meta'}
         meta: {$ref: '#/components/schemas/ResponseMeta'}
+    ServerResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [server_name]
+          properties:
+            server_name: {type: [string, 'null'], maxLength: 128}
+        meta: {$ref: '#/components/schemas/ResponseMeta'}
     FoldersResponse:
       type: object
       additionalProperties: false
@@ -2158,6 +2213,11 @@ components:
           example: {type: 'about:blank', title: Gateway Timeout, status: 504, detail: The monitoring database did
               not respond in time. Please try again later., code: database_timeout, request_id: 0123456789abcdef0123456789abcdef}
   examples:
+    ServerResponse:
+      summary: Synthetic operational label; not live output
+      value:
+        data: {server_name: Synthetic SQL Server}
+        meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z'}
     MetaResponse:
       summary: Synthetic target response; not live output
       value:

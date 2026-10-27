@@ -1,6 +1,6 @@
 # Read-only API contract
 
-All 14 Stage C GET operations are implemented. [OpenAPI](openapi.yaml) is the field/schema/example reference (`1.0.0-draft.1`); this document defines semantic rules and local access policy. [Acceptance](API_ACCEPTANCE.md) records evidence; [progress](PROGRESS.md) records unfinished gates. The production stream belongs to phase 5.
+All 14 Stage C GET operations and the separate G02 operational server-label GET are implemented (15 operations in the current inventory). [OpenAPI](openapi.yaml) is the field/schema/example reference (`1.0.0-draft.1`); this document defines semantic rules and local access policy. [Acceptance](API_ACCEPTANCE.md) records evidence; [progress](PROGRESS.md) records unfinished gates. The production stream belongs to phase 5.
 
 ## Transport and local access
 
@@ -41,7 +41,8 @@ Folder/project/environment names allow 128 UTF-16 units and packages 260. OpenAP
 | `/executions/{id}/children` | `limit,cursor,sort,direction`; default started time/ascending |
 | `/executions/{id}/events` | `limit,cursor,sort,direction,kind,q`; default message time/ascending, kind all |
 | `/executions/{id}/values` | `section=parameters|overrides` (default parameters), `limit,cursor`; fixed section-ID/ascending |
-| `/history` | Required exact `folder,project,package`; optional `status,limit,cursor,sort,direction`; default statuses 2/7 and execution ID/descending; no overview dates or patterns |
+| `/history` | Required `folder,project,package`; optional `match,status,limit,cursor,sort,direction`; exact by default, explicit `match=like` accepts SQL LIKE patterns; default statuses 2/7 and execution ID/descending; no overview dates |
+| `/server` | No query parameters; one read of the configured SQL server display name, driver login/query caps at five seconds. No login/service/connection/credential fields; metadata remains database-free. |
 
 Navigation ignores overview scope and returns actual folder/project IDs with unique aliases. Missing/hidden/empty named navigation and history scopes give equivalent empty 200 collections. Descriptions preserve NULL/empty text and allow 1024 UTF-16 units.
 
@@ -109,7 +110,7 @@ Return a display-safe string/NULL rather than arbitrary sql_variant JSON. Parame
 
 ## History and estimates
 
-History requires exact folder/project/package, has no implicit time window, and defaults to the latest 50 running/succeeded executions (statuses 2/7). Explicit known-status selection and both ID directions are allowed. It preserves real execution IDs and actual timings. Missing/hidden named scopes are empty 200 collections. Candidate IDs are bounded before event/logging/metadata enrichment; duplicate system logging rows fail safely, and integer conversion guards the system parameter identity.
+History requires folder/project/package, has no implicit time window, and defaults to the latest 50 running/succeeded executions (statuses 2/7). Omitted `match` or `match=exact` retains exact identity and the original 128/128/260 UTF-16 name limits. Explicit `match=like` accepts three bound SQL LIKE selectors up to 512 UTF-16 units each: `%` and `*` match any text, `_` matches one character, and SQL bracket sets/ranges retain their catalog-collation semantics. The API treats `all` as ordinary text; only legacy bookmark conversion translates that path sentinel to `%`. Mode and normalized selectors bind cursors, preventing reuse across exact/pattern or changed scope. Explicit known-status selection and both ID directions are allowed. It preserves real execution IDs and actual timings. Missing/hidden named scopes are empty 200 collections. Candidate IDs are bounded before event/logging/metadata enrichment; duplicate system logging rows fail safely, and integer conversion guards the system parameter identity. Broad history estimates still sample only each row's own exact folder/project/package, never neighboring packages in the matched result.
 
 An estimate uses at most five visible successful runs of the same exact identity, excluding the target, with non-NULL start/end, nonnegative duration and end at or before the target start. Choose by end time descending, then ID descending; sample eligibility is independent of page status/ID fences. Include zero-duration samples. Return NULL if there is no sample/start, the mean is zero or the estimated end exceeds the supported UTC range.
 

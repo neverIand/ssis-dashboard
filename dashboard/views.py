@@ -1,7 +1,6 @@
 from datetime import datetime
-import urllib.parse
 
-from flask import abort, render_template
+from flask import abort, g, render_template
 from dashboard.ssis import monitor
 from dashboard.validation import event_query, status_code, validate_execution_id
 
@@ -10,8 +9,6 @@ from dashboard.version import APP_VERSION as version
 # Define routes
 def packages(folder_name=monitor.all, project_name=monitor.all, status=monitor.all):
     status_code(status)
-    folder_name = urllib.parse.unquote(folder_name)
-    project_name = urllib.parse.unquote(project_name)
 
     m = monitor()
     m.folder_name = folder_name
@@ -141,9 +138,6 @@ def package_execution_values(execution_id):
 
 def package_history(folder_name, project_name, status, package_name):
     status_code(status)
-    folder_name = urllib.parse.unquote(folder_name)
-    project_name = urllib.parse.unquote(project_name)
-    package_name = urllib.parse.unquote(package_name)
 
     m = monitor()
     m.project_name = project_name
@@ -196,6 +190,8 @@ def package_history(folder_name, project_name, status, package_name):
 def register_views(app):
     """Retain legacy endpoint names used by templates and existing links."""
     app.add_url_rule('/', view_func=packages)
+    app.add_url_rule('/legacy/overview', view_func=legacy_overview)
+    app.add_url_rule('/legacy/history', view_func=legacy_history)
     app.add_url_rule('/folder/<folder_name>', view_func=folder)
     app.add_url_rule('/folder/<folder_name>/project/<project_name>', view_func=folder_project)
     app.add_url_rule(
@@ -209,4 +205,12 @@ def register_views(app):
         '/history/<folder_name>/project/<project_name>/status/<status>/package/<package_name>',
         view_func=package_history,
     )
+
+
+def legacy_overview():
+    return packages(**g.legacy_query_values)
+
+
+def legacy_history():
+    return package_history(**g.legacy_query_values)
 

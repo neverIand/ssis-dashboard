@@ -11,7 +11,7 @@ from openapi_spec_validator import OpenAPIV31SpecValidator
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 STAGE_C_PATHS = {
-    '/api/v1/meta', '/api/v1/folders', '/api/v1/projects',
+    '/api/v1/meta', '/api/v1/server', '/api/v1/folders', '/api/v1/projects',
     '/api/v1/metrics/summary', '/api/v1/metrics/timeline', '/api/v1/executions',
     '/api/v1/executions/{id}', '/api/v1/executions/{id}/executables',
     '/api/v1/executions/{id}/children', '/api/v1/executions/{id}/events',
@@ -69,10 +69,11 @@ class APIContractTests(unittest.TestCase):
                 self.assertEqual(set(item), {'get'})
                 operation = item['get']
                 self.assertIn(operation['x-implementation-status'], {'planned', 'implemented'})
-                self.assertTrue(operation['x-milestone'].startswith('C'))
+                self.assertTrue(operation['x-milestone'].startswith('C') or
+                                (path == '/api/v1/server' and operation['x-milestone'] == 'G02'))
                 self.assertNotIn('requestBody', operation)
                 operations.append(operation['operationId'])
-                parameters = [self.resolve(p['$ref']) for p in operation['parameters']]
+                parameters = [self.resolve(p['$ref']) if '$ref' in p else p for p in operation['parameters']]
                 keys = [(p['in'], p['name']) for p in parameters]
                 self.assertEqual(len(keys), len(set(keys)))
         self.assertEqual(len(operations), len(set(operations)))

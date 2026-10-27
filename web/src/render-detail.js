@@ -8,6 +8,7 @@ import { mountParameters, mountOverrides } from './render-values.js';
 import { mountHistory } from './render-history.js';
 import { defaultSelection, selectionSearch } from './selection.js';
 import { inlineStatus, pollingButton } from './ui.js';
+import { readHistoryReturn } from './history-navigation.js';
 
 export function mountDetail(root, { api, metadata, executionId, appBase, restoreView = null }) {
   const document = root.ownerDocument;
@@ -27,6 +28,12 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   returnLink.title = 'Return to overview filters at page one.';
   returnNotice.textContent = destination.notice;
   returnNotice.hidden = !destination.notice;
+  const historyReturn = readHistoryReturn(window.location.search, { appBase, origin: window.location.origin, metadata });
+  const historyLink = root.querySelector('[data-history-return]');
+  if (historyLink) {
+    historyLink.hidden = historyReturn === null;
+    if (historyReturn) historyLink.href = historyReturn.href;
+  }
   const fields = [...root.querySelectorAll('[data-detail-field]')];
   const title = fields.find(field => field.dataset.detailField === 'package');
   const badge = fields.find(field => field.dataset.detailField === 'status');

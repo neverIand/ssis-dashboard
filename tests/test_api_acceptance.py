@@ -15,6 +15,7 @@ from tests import test_api_contract as contract_tests
 WINDOW = {'from':'2026-10-14T00:00:00Z', 'to':'2026-10-17T00:00:00Z'}
 OPERATIONS = {
     '/api/v1/meta': ('MetaResponse', {}),
+    '/api/v1/server': ('ServerResponse', {}),
     '/healthz': ('LivenessResponse', {}),
     '/readyz': ('ReadinessResponse', {}),
     '/api/v1/folders': ('FoldersResponse', {}),
@@ -128,7 +129,7 @@ class APIAcceptanceTests(unittest.TestCase):
             records = [json.loads(item.getMessage()) for item in logged.records]
             completed = [item for item in records if item['event']=='request_completed']
             self.assertEqual(len(completed), len(OPERATIONS))
-            self.assertEqual(sorted(item['query_count'] for item in completed), [0,0]+[1]*12)
+            self.assertEqual(sorted(item['query_count'] for item in completed), [0,0]+[1]*(len(OPERATIONS)-2))
             self.assertNotIn('private-', '\n'.join(logged.output))
 
     def test_default_text_value_guards_ignore_claimed_identity_including_head_options(self):

@@ -31,7 +31,7 @@ export function readHistoryPage(response, _executionId, query, metadata, display
       previous = id;
       for (const [key, width] of [['folder_name',128], ['project_name',128], ['package_name',260]]) {
         observationText(row[key], width, true);
-        if (!row[key] || row[key].includes('\0') || row[key] !== identity[key]) throw new TypeError();
+        if (!row[key] || row[key].includes('\0') || (!identity.collection && row[key] !== identity[key])) throw new TypeError();
       }
       if (!query.status.split(',').includes(String(row.status?.code))
           || row.status.name !== metadata.execution_statuses.find(item => item.code === row.status.code)?.name) throw new TypeError();
