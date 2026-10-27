@@ -42,7 +42,7 @@ Folder/project/environment names allow 128 UTF-16 units and packages 260. OpenAP
 | `/executions/{id}/events` | `limit,cursor,sort,direction,kind,q`; default message time/ascending, kind all |
 | `/executions/{id}/values` | `section=parameters|overrides` (default parameters), `limit,cursor`; fixed section-ID/ascending |
 | `/history` | Required `folder,project,package`; optional `match,status,limit,cursor,sort,direction`; exact by default, explicit `match=like` accepts SQL LIKE patterns; default statuses 2/7 and execution ID/descending; no overview dates |
-| `/server` | No query parameters; one read of the configured SQL server display name, driver login/query caps at five seconds. No login/service/connection/credential fields; metadata remains database-free. |
+| `/server` | No query parameters; one read of the legacy display label (`@@SERVERNAME`, or `DEMO` for its SQL Azure edition branch), driver login/query caps at five seconds. No login/service/connection/credential fields; metadata remains database-free. |
 
 Navigation ignores overview scope and returns actual folder/project IDs with unique aliases. Missing/hidden/empty named navigation and history scopes give equivalent empty 200 collections. Descriptions preserve NULL/empty text and allow 1024 UTF-16 units.
 

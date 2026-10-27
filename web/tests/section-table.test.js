@@ -102,6 +102,18 @@ test('shared status preserves error request IDs, stale wording, observation titl
   assert.equal(status.title, '');
 });
 
+test('shared recovery focuses the table region when its section toggle is hidden', t => {
+  const run = mount(t), retry = run.get('events-retry');
+  run.get('events-toggle').hidden = true;
+  run.view.render(state([], { phase: 'error', error: { message: 'Retry.' } }), false, true);
+  retry.focus();
+  run.view.render(state([], { phase: 'loading' }), true, true);
+  assert.equal(run.document.activeElement, retry);
+  run.view.render(state([{ id: '1' }]), false, true);
+  assert.equal(retry.hidden, true);
+  assert.equal(run.document.activeElement, run.scroll);
+});
+
 test('shared controls keep Retry during busy recovery and return its focus when the error clears', t => {
   const run = mount(t), retry = run.get('events-retry');
   run.view.render(state([], { phase: 'error', error: { message: 'Retry.' } }), false, true);

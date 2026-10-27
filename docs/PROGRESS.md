@@ -1,6 +1,6 @@
 # Implementation progress
 
-Updated 27 October 2026. Development base: `dev-next`; task 2 implementation base: `d350af8`. [Roadmap](roadmap.md) owns scope and priorities; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns current status, the work queue and open acceptance gates.
+Updated 27 October 2026. Development base: `dev-next`; task 3 review base: `131fece`, including task 1 at `d350af8`. [Roadmap](roadmap.md) owns scope and priorities; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns current status, the work queue and open acceptance gates.
 
 ## Current status
 
@@ -10,18 +10,18 @@ Updated 27 October 2026. Development base: `dev-next`; task 2 implementation bas
 | Native overview and execution workflows | P4.1a–P4.7c complete locally, including sections, charts, supported bookmark mapping and packaged workflow replay. This does not approve legacy retirement or a homepage switch. |
 | Security/performance review | Backend fixes, frontend batches 1/2 and the section-table refactor have passed independent review and are committed. See [accepted reviews](#accepted-reviews). |
 | UX and themes | Batches A–H, including F2 light/dark/System themes, are accepted. Earlier “review pending” statements are superseded by the receipt table below. |
-| Legacy replacement | G01 independent exact/LIKE history, G02 operational labels and G05 prefix-safe legacy links/selector aliases are complete locally. [Scope and limits](FRONTEND_PARITY.md#g01g02g05-local-integration-26-october-2026); task 3 integration review remains separate. |
+| Legacy replacement | G01 independent exact/LIKE history, G02 operational labels and G05 prefix-safe legacy links/selector aliases are complete locally; task 3 scoped integration review is accepted. [Scope and limits](FRONTEND_PARITY.md#task-3-scoped-integration-review-27-october-2026). |
 | Environment and hosting | Unavailable-environment acceptance remains parked under the 18 October instruction. Hosting/production streams remain deferred under the 15 October instruction. Local checks do not close these gates. |
 
-**Verification completed 27 October, task 2 candidate over `d350af8`:** 427 Node tests pass; Python discovery runs 427 tests, with 413 passing and 14 opt-in native SQL tests skipped. Three native history tests pass separately with opt-in, including an independent mixed-package estimate oracle. The production build and local native/synthetic browser replay pass. Authored JS+CSS is 286,504 bytes (216 below the enforced ceiling); packaged JS+CSS is 163,981 bytes, 49,571 gzip-9 bytes. [Roadmap budgets](roadmap.md#acceptance-budgets) own the ceilings. [SQL observations](API_ACCEPTANCE.md#g01g02-local-api-results-26-october-2026) retain sort spills and the 11.85-second outlier for task 3; this is not stable latency or reader acceptance. Task 1's [C8.2c receipt](API_ACCEPTANCE.md#c82c-local-resource-results-26-october-2026) remains separate.
+**Verification completed 27 October, task 3 candidate over `131fece`:** 430 Node tests pass; Python discovery runs 427 tests, with 413 passing and 14 opt-in native SQL tests skipped. Task 2's three native history/oracle passes remain separately preserved. The production build, corrected packaged-browser keyboard replay and local native legacy/server-label comparison pass. Authored JS+CSS is 286,678 bytes (42 below the enforced ceiling); packaged JS+CSS is 164,065 bytes, 49,600 gzip-9 bytes. [Roadmap budgets](roadmap.md#acceptance-budgets) own the ceilings. [SQL follow-up](API_ACCEPTANCE.md#task-3-scoped-follow-up-27-october-2026) retains sort spills; 30 descending samples did not repeat the original 11.85-second outlier, whose cause remains unresolved. This is not stable latency or reader acceptance. Task 1's [C8.2c receipt](API_ACCEPTANCE.md#c82c-local-resource-results-26-october-2026) remains separate.
 
 ## Next actions
 
-Work proceeds through the following three tasks in priority order, one at a time. C8.2c is complete locally and independently reviewed; task 2 is complete locally and task 3 has not started. Listing them does not resume parked work or claim unavailable-environment acceptance.
+The following three tasks were completed in priority order, one at a time. C8.2c and the scoped task 3 integration review are independently accepted; all three are complete locally. Parked work and unavailable-environment acceptance retain their existing holds.
 
 - [x] **1. C8.2c — resource and concurrency acceptance: complete locally, independently reviewed 26 October.** Local repeated/concurrent, failure/retry, rapid replacement, maximum-text and actual driver timeout/cancellation/disconnect checks pass. Logical owners return to zero and task-owned servers/processes/tabs have exited. See [results and limits](API_ACCEPTANCE.md#c82c-local-resource-results-26-october-2026). Missing reader/representative-environment cases retain `NOT RUN`; HTTP disconnect was observed to leave SQL running until its timeout. This does not close Stage C or approve production capacity.
-- [x] **2. Resolve the recorded legacy-replacement gaps: complete locally, 27 October.** G01 preserves full wildcard history through a standalone entry/bookmarks, with exact mode, bounded pages and per-package estimates; G02 restores version/server labels independently; G05 fixes authored legacy prefix links/assets and adds strict separator-selector aliases with single decoding. [Affected BM/WF replay](FRONTEND_PARITY.md#g01g02g05-local-integration-26-october-2026), regression, native SQL, growth diagnostics and cleanup are recorded. Default homepage/legacy coverage and parked gates remain intact; independent integration review is task 3.
-- [ ] **3. Review new changes and their integration boundaries.** Scope subsequent reviews to changes from tasks 1/2, their frontend/API/SQL interactions and reproduced advisories below. Require matching regression and native/browser evidence where applicable. Preserve the accepted security/performance baseline; reopen it only for a concrete regression or changed assumption. Reader, actual lifecycle, corporate-browser and hosting checks keep their existing holds.
+- [x] **2. Resolve the recorded legacy-replacement gaps: complete locally, 27 October.** G01 preserves full wildcard history through a standalone entry/bookmarks, with exact mode, bounded pages and per-package estimates; G02 restores version/server labels independently; G05 fixes authored legacy prefix links/assets and adds strict separator-selector aliases with single decoding. [Affected BM/WF replay](FRONTEND_PARITY.md#g01g02g05-local-integration-26-october-2026), regression, native SQL, growth diagnostics and cleanup are recorded. The scoped independent integration review is accepted under task 3.
+- [x] **3. Review new changes and their integration boundaries: complete locally, independently accepted 27 October.** A read-only reviewer audited commits `d350af8`/`131fece`, all 402 preserved task 2 artifacts and the source-bound fixes. Standalone History Retry now restores visible focus; terminal Pause hands focus to Refresh; server labels preserve legacy naming. Matching regression, native label/SQL and packaged-browser evidence pass. Evidence: `.local/reports/backend/20261027-task3-review/`. Reader, actual lifecycle, corporate-browser, representative-workload and hosting checks keep their existing holds.
 
 ### Legacy-replacement submilestones
 
@@ -32,9 +32,17 @@ Task 2 proceeds through these bounded changes. On 26 October the user explicitly
 | G01 — independent history | Database-free `/app/history`; explicit exact/LIKE scope, bounded global ID pages and per-package estimates; legacy conversion without a proxy execution, preserving legacy 2/7 semantics. | Complete locally: scope/return/race/failure tests, native exact/mixed-package oracle, 2k/20k/100k page/fence plans and WSGI size checks; packaged navigation/page/refresh/recovery/return pass. |
 | G02 — operational labels | Version and authorized SQL server label with explicit API/security scope; independent safe failure, no identity/connection secrets in metadata. | Complete locally: native/legacy label comparison, current operation schema/shared boundaries and synthetic failure/deadline/disposal checks. |
 | G05 — legacy prefix | Prefix-safe legacy links/assets and explicit handling of path-separator selector names. | Complete locally: strict query aliases retain literal selectors/LIKE/status behavior, decode once, and preserve root/prefix navigation and unsupported fallback. |
-| Integration | Reconcile parity/usage/contracts/status and affected BM/WF evidence. Keep homepage/legacy coverage; task 3 and parked gates remain separate. | Complete locally: build/regression/docs and 1280/768/375 px replay; shared-header overflow fixed. Evidence and source hashes: `.local/reports/backend/20261026-legacy-gaps/`. Owned tabs/processes/port and markers cleared. |
+| Integration | Reconcile parity/usage/contracts/status and affected BM/WF evidence. Keep homepage/legacy coverage and parked gates explicit. | Complete locally: build/regression/docs and 1280/768/375 px replay; shared-header overflow fixed. Evidence and source hashes: `.local/reports/backend/20261026-legacy-gaps/`. Scoped review accepted under task 3; original evidence is unchanged. |
 
-Task 3 should review G01's new SQL/frontend/cursor boundaries, G02 identity-label scope and independent lifetime, and G05 single-decoding/alias compatibility. Retain the measured reduction in repeated SQL reads while assessing sort spills, compilation and the unexplained slow sample. Review is not yet accepted; no new delegate was started for task 2. Reader SHOWPLAN/HTTP, representative catalog/workload, actual hidden/cache/corporate-browser and hosting checks retain their existing holds.
+Task 3 independently accepted G01's SQL/frontend/cursor boundaries, G02 identity-label scope and independent lifetime, and G05 single-decoding/alias compatibility. The measured reduction in repeated SQL reads is retained; sort spills, compilation and the unexplained slow sample remain disclosed in [API validation](API_ACCEPTANCE.md#task-3-scoped-follow-up-27-october-2026). Reader SHOWPLAN/HTTP, representative catalog/workload, actual hidden/cache/corporate-browser and hosting checks retain their existing holds.
+
+### Task 3 review submilestones
+
+| Step | Scope / concrete exit | Status |
+| --- | --- | --- |
+| R3.1 — bind and review | Review commits `d350af8` and `131fece`, their preserved evidence and changed frontend/API/SQL boundaries. Reopen accepted earlier work only for a reproduced regression or changed assumption. | Complete: user-authorized read-only reviewer verified commit/tree/source binding and all 402 task 2 artifact hashes; 38 focused Node and 54 Python tests pass independently. |
+| R3.2 — reproduce and resolve | Reproduce actionable findings and relevant advisories; measure broad-pattern SQL spills/compilation/outlier without changing catalog data, permissions or caches. Fix concrete regressions and keep deferred environment gates explicit. | Complete locally: Retry/terminal focus and legacy-label compatibility fixed. Unchanged history SQL replayed over 100k connection-local rows; spill/outlier limitations retained. |
+| R3.3 — verify and close | Matching regression/native/browser checks for actual fixes, independent re-review, durable findings/dispositions and verified resource cleanup. | Complete locally; independent verdict ACCEPTED with no required changes. Final regression/build/native-label/browser receipts and exact source/test hashes are retained in `.local/reports/backend/20261027-task3-review/`. All three preview servers exited, port released, tabs absent and markers cleared. |
 
 ### C8.2c submilestones
 
@@ -49,7 +57,7 @@ Task 3 should review G01's new SQL/frontend/cursor boundaries, G02 identity-labe
 
 | ID | Status | Delivered scope / remaining condition |
 | --- | --- | --- |
-| P0a | Complete locally | Workflow/field inventory and local replacement replay; G01/G02/G05 now have local implementations/evidence. Scoped task 3 review and environment/cutover gates remain separate. |
+| P0a | Complete locally | Workflow/field inventory and local replacement replay; G01/G02/G05 have local implementations/evidence and accepted task 3 scoped review. Environment/cutover gates remain separate. |
 | P0b | Awaiting integration | Real SQL 2022 fixtures and legacy Windows-reader HTTP pass; native cleanup-failure observation remains open. |
 | B1–B4 | Complete locally | App factory/config isolation, bound query ownership/timeouts, strict legacy inputs/safe errors and legacy query budgets of 6/7/4/5/2. |
 | B5a1/B5a2 | Complete locally | Pinned dependencies and clean Windows x64 CPython 3.14.8 environment; native imports and offline installation checked. |
@@ -199,7 +207,7 @@ Complete locally at `ef133e3`: SQL-blocked packaged WF-01–07 and bookmark roun
 
 ## Accepted reviews
 
-The following statuses were reconciled against the actual local review receipts on 25 October. Historical implementer “review pending” text does not override these final receipts. Acceptance applies to the specified candidate and scope, not every environment gate.
+The following statuses were reconciled against the actual local review receipts, including the scoped follow-up on 27 October. Historical implementer “review pending” text does not override these final receipts. Acceptance applies to the specified candidate and scope, not every environment gate.
 
 ### Backend review fixes
 
@@ -229,6 +237,7 @@ Private review task: `ssis-backend-review-fixes-20261023`, `rounds/003/review-co
 | Frontend security/performance batch 1 | Round 001 accepted; `65a43ef` | Strict native CSP, bounded max-limit catalog search and immutable hashed assets. Native CSP/theme/chart checks pass. |
 | Frontend security/performance batch 2 | Round 001 accepted; `029201e` | Stop ended-execution polling; preserve manual/section actions; enforce measured size budgets. Native ended execution produced zero automatic reads over 95 s. Running/visibility simulation does not establish genuinely running or actual hidden-tab acceptance. |
 | FE-6 section-table refactor | Round 002 accepted; `864ec53` | Shared table lifetime and generic section actions; normal formatting/140-character guard. 413 Node tests, build, 26 focused Python checks and scoped local SSISDB overview/detail evidence pass. |
+| Task 3 frontend/API/SQL integration | Accepted 27 October; `d350af8`/`131fece` plus source-bound follow-up | History/cursor/estimates, label lifetime/compatibility, prefix/aliases and resource evidence; two reproduced focus issues resolved. Read-only reviewer ran 38 Node/54 Python checks and audited retained local native/browser evidence; reviewer live replay was not run. Receipt: `.local/reports/backend/20261027-task3-review/`. |
 
 Private receipts live in the sibling `collab-contract/runs/` checkout. The recently reconciled task/round pairs are `20261025-ux-f2-design-system/002`, `20261025-fe-review-fixes-2/001` and `20261025-fe-dedupe-refactor/002`; each `status.json` is `ACCEPTED` with no required pending task gate. Review reports are under `rounds/<round>/`. These local receipts are not installation prerequisites.
 
@@ -239,15 +248,15 @@ The refactor reduced authored JS+CSS from 282,180 to 271,258 bytes and packaged 
 | Observation | Disposition |
 | --- | --- |
 | FE-4: full hidden event/value/path text is populated in closed disclosures | Advisory. Measure maximum-text DOM/render cost before proposing lazy population; preserve disclosure restoration and redaction. No optimization is implied by this documentation task. |
-| Batch 2 R1-F001: focused Pause/Resume becomes natively disabled at execution end | P3 advisory. Reproduce keyboard focus and evaluate a Refresh fallback in a scoped follow-up. |
+| Batch 2 R1-F001: focused Pause/Resume becomes natively disabled at execution end | Closed locally by task 3: reproduced focus loss, enabled Refresh fallback, retained-focus and unrelated-focus tests, clean packaged synthetic terminal-poll replay. Actual cached-document/live-execution acceptance remains separate. |
 | Refactor O-1: timeline status shifts transiently by about 254 px on refresh | Pre-existing browser observation; retain for a later UX pass. The behavior-preserving refactor did not resolve it. |
 | P4.5 focus observation | Unattributed; later controlled passes do not close it. Reproduce before assigning a fix. |
 
 ## Evidence and documentation maintenance
 
-Documentation consolidation on 25 October reconciled accepted reviews, replaced duplicated implementation journals with status/evidence summaries and added the three next actions. The obsolete roadmap-order advisory UX A R1-04 is resolved by this user-requested priority update. No application, SQL, test, dependency or runtime configuration changed. Validation for this edit is document links/anchors, required milestone/checklist coverage, whitespace and scope review; it is not a new browser/native acceptance run.
+Documentation consolidation on 25 October reconciled accepted reviews, replaced duplicated implementation journals with status/evidence summaries and added the three next actions. The obsolete roadmap-order advisory UX A R1-04 was resolved by that user-requested priority update. That documentation-only edit changed no application, SQL, test, dependency or runtime configuration. Its validation covered document links/anchors, required milestone/checklist coverage, whitespace and scope review.
 
-Validation passes: 20 documents, 468 local links/anchors, all 16 Stage C IDs and 30 backend cases; `git diff --check` is clean and the six changed files are Markdown documentation only. The existing route/field/bookmark/BM/WF definitions and SQL/hosting/stream constraints remain unchanged. The three reconciled acceptance receipts still report `ACCEPTED` with no required task gate.
+The 25 October validation passed 20 documents, 468 local links/anchors, all 16 Stage C IDs and 30 backend cases; its six changed files were Markdown documentation only. Task 3's current regression, review and cleanup receipts are recorded above and preserved separately; earlier evidence and commit receipts are immutable. Route/field/bookmark/BM/WF and SQL/hosting/stream boundaries retain their documented scope.
 
 Full earlier journals are recoverable from Git: `864ec53:docs/PROGRESS.md` contains the detailed record through this checkpoint; `36b48f8` retains pre-17-October-consolidation logs. Private source-bound evidence remains in the existing ignored reports/runs and sibling review records; no evidence files are moved or deleted.
 

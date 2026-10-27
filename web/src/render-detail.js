@@ -118,6 +118,8 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     content.setAttribute('aria-busy', String(state.busy));
     refresh.disabled = false;
     toggle.disabled = state.terminal;
+    if (state.terminal && focused === toggle) refresh.focus({ preventScroll: true });
+    focusTargets.toggle = state.terminal ? refresh : toggle;
     refresh.setAttribute('aria-disabled', String(state.busy));
     autoPaused = state.poll.paused;
     pollingButton(toggle, autoPaused, state.terminal);

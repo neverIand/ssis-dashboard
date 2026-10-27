@@ -4,7 +4,7 @@ Scope authority for modernization on `dev-next`. [Progress](PROGRESS.md) owns co
 
 ## Current product
 
-The retained Flask/Jinja dashboard and native `/app/` screens coexist over public `SSISDB.catalog.*` views. The native read-only API/UI provides exact scope/date/status filters, bounded server-sorted pages, in-place refresh, execution detail tabs, searchable events, redacted values, independent exact/LIKE package history and timeline/duration charts. Supported legacy bookmarks can opt into native destinations. Operational labels and prefix-safe legacy coexistence have local coverage; environment acceptance and scoped integration review remain explicit.
+The retained Flask/Jinja dashboard and native `/app/` screens coexist over public `SSISDB.catalog.*` views. The native read-only API/UI provides exact scope/date/status filters, bounded server-sorted pages, in-place refresh, execution detail tabs, searchable events, redacted values, independent exact/LIKE package history and timeline/duration charts. Supported legacy bookmarks can opt into native destinations. Operational labels and prefix-safe legacy coexistence have local coverage and accepted scoped integration review; environment acceptance remains gated.
 
 Current scope is project deployment and monitoring. Legacy `msdb` storage, package start/stop/rerun, SQL Agent administration and unrelated automation are excluded.
 
@@ -22,13 +22,13 @@ Hosting remains on hold under the 15 October 2026 instruction: B5c, HOST-01/02/0
 
 ## Next priorities
 
-The [three-item task queue](PROGRESS.md#next-actions) owns checkbox status, bounded submilestones and evidence:
+The [three-item task queue](PROGRESS.md#next-actions) owns checkbox status, bounded submilestones and evidence. All three are complete locally, with scoped independent acceptance recorded on 27 October:
 
-1. **C8.2c resource/concurrency acceptance:** repeated requests, cancellation/timeouts and cleanup under bounded load, after reconciling accepted review status.
-2. **Legacy-replacement gaps:** independent history entry, operational labels and legacy-prefix behavior are implemented locally; preserve their regression/native/browser evidence and intentional workflow differences through review before cutover.
-3. **Scoped integration review:** review resulting changes and their frontend/API/SQL boundaries, retaining existing independent reader/browser/hosting gates.
+1. **C8.2c resource/concurrency acceptance:** local repeated requests, cancellation/timeouts and cleanup under bounded load are independently accepted.
+2. **Legacy-replacement gaps:** independent history entry, operational labels and legacy-prefix behavior are implemented and reviewed locally with regression/native/browser evidence and intentional workflow differences.
+3. **Scoped integration review:** resulting frontend/API/SQL boundaries are independently accepted; reproduced focus and legacy-label compatibility findings are resolved. Independent reader/browser/workload/hosting gates remain open.
 
-The completed broad security/performance reviews, dark-mode work and local parity inventory remain the baseline in Progress. New feature ideas stay below until these priorities have a clear disposition.
+The completed broad security/performance reviews, dark-mode work and local parity inventory remain the baseline in Progress. Completing this queue does not resume parked environment/hosting work or start the later feature ideas below; those need a new priority decision.
 
 ## Delivery phases
 

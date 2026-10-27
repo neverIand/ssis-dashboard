@@ -131,7 +131,7 @@ export function mountSectionTable(root, { metadata, actions, restoreView = null 
           status.title = [status.textContent, status.title].filter(Boolean).join(' · ');
           view.afterStatus?.();
           if (panel.hidden && panelFocused && permitted) toggle.focus({ preventScroll: true });
-          else if (focused === retry && retry.hidden) toggle.focus({ preventScroll: true });
+          else if (focused === retry && retry.hidden) (toggle.hidden ? scroll : toggle).focus({ preventScroll: true });
           else if (rowFocused && permitted) {
             if (focusMode === 'removed') {
               if (!focused.isConnected) scroll.focus({ preventScroll: true });

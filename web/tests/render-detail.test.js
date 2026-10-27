@@ -257,6 +257,36 @@ test('ended detail disables Pause with an explanation, ignores visible return an
   assert.deepEqual(calls.slice(2), calls.slice(0, 2));
 });
 
+test('ending an execution returns focused Pause to Refresh and leaves other focus alone', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
+  for (const target of ['detail-poll-toggle', 'overview-link']) {
+    const dom = detailDOM();
+    let ended = false;
+    const screen = mountDetail(dom.root, { metadata: metadata(), executionId: detailResponse().data.execution_id,
+      appBase: '/ops/app/', api: { async get(resource) {
+        return resource.endsWith('/executables') ? observations() : ended ? detailResponse() : runningDetailResponse();
+      } } });
+    t.after(screen.dispose);
+    await settle();
+    dom.get(target).focus(); ended = true;
+    t.mock.timers.tick(30000); await settle();
+    assert.equal(dom.get('detail-poll-toggle').disabled, true);
+    assert.equal(dom.document.activeElement, dom.get(target === 'detail-poll-toggle' ? 'detail-refresh' : target));
+    screen.dispose();
+  }
+});
+
+test('a retained Pause focus revalidating an ended execution restores to enabled Refresh', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
+  const dom = detailDOM(), id = detailResponse().data.execution_id;
+  const screen = mountDetail(dom.root, { metadata: metadata(), executionId: id, appBase: '/ops/app/',
+    restoreView: { executionId: id, autoPaused: true, focus: 'toggle' },
+    api: { async get(resource) { return resource.endsWith('/executables') ? observations() : detailResponse(); } } });
+  t.after(screen.dispose); await settle();
+  assert.equal(dom.get('detail-poll-toggle').disabled, true);
+  assert.equal(dom.document.activeElement, dom.get('detail-refresh'));
+});
+
 test('a later running read restores the toggle and respects the retained user pause', async t => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
   for (const paused of [false, true]) {

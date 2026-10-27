@@ -58,6 +58,22 @@ The first-page fence has separate broad/selective actual plans at every size. It
 
 Selected evidence and source/helper hashes are retained under `.local/reports/backend/20261026-legacy-gaps/`, preserving run-relative paths. Raw five-sample measurements, diagnostic plans, initial prototype and excluded pilot failures are distinguished in its index. SQL growth remains linear in visible history for exact sampling, and the fixture is not a reader/catalog-visibility substitute. Reader SHOWPLAN/HTTP, representative workload, actual browser lifecycle and hosting gates remain open; task 3 independently reviews these changed boundaries.
 
+### Task 3 scoped follow-up: 27 October 2026
+
+Independent review retained the bounded-page/per-package estimate algorithm and its measured reduction in repeated source reads. The unchanged pattern-page SQL was repeated over the same connection-local 100,000-row / 200-package shape, with two explicitly excluded warmups per case. All repeated DTO fingerprints remain identical within their case.
+
+| Case | Measured samples | Median ms | Observed range ms | Execution-source rows read / logical reads |
+| --- | ---: | ---: | ---: | ---: |
+| Descending first 200 | 30 | 570.454 | 450.503–619.592 | 100,402 / 3,806 |
+| Ascending first 200 | 5 | 278.210 | 247.724–292.642 | 100,402 / 3,398 |
+| Descending midpoint 200 | 5 | 421.513 | 352.470–439.890 | 100,402 / 3,802 |
+
+The prior 11.85-second sample did not recur; its cause is still unknown and its original receipt is preserved. Descending-first diagnostics still spill a sort. The retained earlier plan shows 73,632 actual sort rows versus 838 estimated, with 486 pages written/read to tempdb; a separate excessive-grant warning belongs to the small scope-index build. Compilation/IO/TIME messages and actual plans remain available. The follow-up does not establish representative reader/network capacity or resolve the spill. No history SQL hint, cache/statistics/catalog change or replacement algorithm was introduced merely to suppress the warning.
+
+Review also identified a naming mismatch between `SERVERPROPERTY('ServerName')` and legacy's `@@SERVERNAME` / SQL Azure `DEMO` branch. The scalar API now follows the legacy expression while returning only `server_name`. Native local WSGI/schema replay matches legacy, returns 145 bytes in one measured 19.211 ms response and preserves no-store/request IDs and metadata isolation. Actual renamed-host and SQL Azure conditions are `NOT RUN`; static branch alignment is not environment acceptance.
+
+Task-3 source/test/review/browser/native receipts and cleanup are retained separately in `.local/reports/backend/20261027-task3-review/`. The original task-1/task-2 archives and commit receipt remain unchanged. [Progress](PROGRESS.md#task-3-review-submilestones) owns the scoped review verdict; parked gates remain open.
+
 ## Shared boundary checks
 
 Run the [tracked test suite](installation.md#test-and-diagnose). Tracked tests cover every production GET's unknown/duplicate/empty/invalid input, request body rejection, safe 405/Allow, no-store/request IDs, driver-error mapping and zero-SQL capability guards. Resource tests cover typed data, sorting, NULL/tie precision, cursor binding, redaction and failure cleanup. Contract tests validate OpenAPI/references/examples and invalid instances. Every API bind marker must have an explicit SQL type declaration before optimized NULL binding can be used.
