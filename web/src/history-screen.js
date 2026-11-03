@@ -17,13 +17,10 @@ export function mountHistoryScreen(root, saved = null) {
     const toggle = root.querySelector('[data-history-poll-toggle]'), status = root.querySelector('[data-history-poll-status]');
     const navigation = { appBase: config.app_base, origin: window.location.origin, metadata,
       selection: defaultSelection(metadata), historySelection: null };
-    let selection, valid = true, paused = saved?.paused === true;
-    try { selection = parseHistorySelection(window.location.search, metadata); }
-    catch { selection = parseHistorySelection('', metadata); valid = false; }
+    let selection = parseHistorySelection('', metadata), paused = saved?.paused === true;
     const controls = Object.fromEntries(['match', 'folder', 'project', 'package'].map(key => [key, form.elements.namedItem(key)]));
     const show = () => { for (const [key, input] of Object.entries(controls)) input.value = selection[key]; };
-    show(); fields.disabled = false; refresh.disabled = toggle.disabled = false;
-    if (!valid) notice.textContent = invalid;
+    fields.disabled = false; refresh.disabled = toggle.disabled = false;
     const select = (value, push = true) => {
       try {
         selection = historySelection(value, metadata); navigation.historySelection = selection; show(); notice.textContent = '';
@@ -34,7 +31,6 @@ export function mountHistoryScreen(root, saved = null) {
     const view = mountHistory(root, { metadata, executionId: null, navigation, showIdentity: true, restoreView: saved?.view,
       actions: { toggle() {}, order: changes => select({ ...selection, ...changes }),
         retry: () => owner.retry(), previous: () => owner.previous(), next: () => owner.next(), latest: () => owner.latest() } });
-    navigation.historySelection = selection;
     const owner = createHistoryLoader({ api, metadata, selection, paused, visible: document.visibilityState !== 'hidden',
       publish(state) {
         view.render(state, state.busy, true);
@@ -47,17 +43,20 @@ export function mountHistoryScreen(root, saved = null) {
       event.preventDefault(); select({ ...selection, ...Object.fromEntries(Object.entries(controls).map(([key, input]) =>
         [key, input.value])) });
     };
+    // Without a scope, show the defaults and wait for Load history.
     const pop = () => {
-      try { select(parseHistorySelection(window.location.search, metadata), false); }
-      catch { owner.clear(); notice.textContent = invalid; }
+      const search = window.location.search;
+      try { selection = parseHistorySelection(search, metadata); notice.textContent = ''; }
+      catch { selection = parseHistorySelection('', metadata); notice.textContent = invalid; }
+      navigation.historySelection = selection; show();
+      if (search.length > 1 && !notice.textContent) void owner.select(selection); else owner.clear();
     };
     const update = () => owner.refresh(), pause = () => owner.togglePolling();
     const visibility = () => owner.setVisible(document.visibilityState !== 'hidden');
     form.addEventListener('submit', submit); refresh.addEventListener('click', update); toggle.addEventListener('click', pause);
     window.addEventListener('popstate', pop); document.addEventListener('visibilitychange', visibility);
     checkpoint = () => ({ paused, view: view.checkpoint() });
-    if (valid) void owner.load();
-    else owner.clear();
+    pop();
     return () => {
       owner.dispose(); view.dispose(); checkpoint = () => null;
       form.removeEventListener('submit', submit); refresh.removeEventListener('click', update);

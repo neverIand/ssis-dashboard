@@ -4,9 +4,11 @@ import { ApiError } from '../src/api.js';
 import { createHistoryLoader } from '../src/history-loader.js';
 import { historyExecutionHref, historySearch, parseHistorySelection, readHistoryReturn } from '../src/history-navigation.js';
 import { historyMetadata, historyPage, historyRow } from './history-fixture.js';
-import { deferred, wireTime } from './fixtures.js';
+import { deferred, envelope, jsonResponse, wireTime } from './fixtures.js';
 import { mountHistory } from '../src/render-history.js';
+import { mountHistoryScreen } from '../src/history-screen.js';
 import { detailDOM } from './detail-fixture.js';
+import { Node } from './overview-dom.js';
 
 const metadata = historyMetadata();
 const defaults = () => parseHistorySelection('', metadata);
@@ -154,4 +156,66 @@ test('standalone rows show their package identity and provide a validated page-o
   assert.ok(readHistoryReturn(new URL(link.href, navigation.origin).search, navigation));
   view.dispose();
   assert.equal(dom.historyBody.children.length, 0);
+});
+
+function screenDOM(t, search) {
+  const dom = detailDOM(), extra = new Map(), calls = [];
+  const node = (key, tag = 'div') => { const value = new Node(dom.document, tag); extra.set(`[data-${key}]`, value); return value; };
+  const form = node('history-scope-form', 'form'), inputs = {};
+  for (const key of ['match', 'folder', 'project', 'package']) inputs[key] = new Node(dom.document, 'input');
+  form.elements = { namedItem: key => inputs[key] };
+  for (const key of ['history-scope', 'history-scope-notice', 'history-poll-status']) node(key);
+  for (const key of ['history-refresh', 'history-poll-toggle']) node(key, 'button');
+  const query = dom.root.querySelector;
+  dom.root.querySelector = selector => extra.get(selector) ?? query(selector);
+  Object.assign(dom.window.location, { pathname: '/ops/app/history', search });
+  dom.window.history.pushState = (state, title, href) => dom.window.history.replaceState(state, title, href);
+  t.mock.method(globalThis, 'fetch', async url => {
+    calls.push(url.pathname + url.search);
+    if (url.pathname.endsWith('/meta')) return jsonResponse(envelope(metadata));
+    if (url.pathname.endsWith('/server')) return jsonResponse(envelope({ server_name: 'Server' }));
+    return jsonResponse(page(Object.fromEntries(url.searchParams)));
+  });
+  return { ...dom, inputs, form, calls, notice: extra.get('[data-history-scope-notice]'),
+    history: () => calls.filter(call => call.startsWith('/ops/api/v1/history')) };
+}
+
+test('an unscoped History entry fills the default pattern but waits for Load history', async t => {
+  const dom = screenDOM(t, '');
+  const screen = mountHistoryScreen(dom.root);
+  t.after(screen.dispose);
+  await settle();
+  assert.deepEqual(dom.calls, ['/ops/api/v1/meta', '/ops/api/v1/server']);
+  assert.deepEqual(Object.fromEntries(Object.entries(dom.inputs).map(([key, input]) => [key, input.value])),
+    { match: 'like', folder: '*', project: '*', package: '*' });
+  assert.equal(dom.notice.textContent, '');
+  assert.equal(dom.historyBody.textContent, 'No history loaded.');
+  dom.inputs.package.value = 'Main*';
+  dom.form.dispatchEvent(new Event('submit', { cancelable: true }));
+  await settle();
+  assert.equal(dom.history().length, 1);
+  assert.equal(new URL(dom.history()[0], navigation.origin).searchParams.get('package'), 'Main*');
+  assert.equal(dom.window.location.pathname, '/ops/app/history');
+  assert.match(dom.window.location.search, /package=Main/);
+  Object.assign(dom.window.location, { search: '' });
+  dom.window.dispatchEvent(new Event('popstate'));
+  await settle();
+  assert.equal(dom.history().length, 1);
+  assert.equal(dom.inputs.package.value, '*');
+  assert.equal(dom.historyBody.textContent, 'No history loaded.');
+});
+
+test('a scoped or invalid History URL loads or reports it on entry and on Back/Forward', async t => {
+  const dom = screenDOM(t, '?match=exact&folder=Folder&project=Project&package=Main.dtsx');
+  const screen = mountHistoryScreen(dom.root);
+  t.after(screen.dispose);
+  await settle();
+  assert.equal(dom.history().length, 1);
+  assert.equal(dom.inputs.match.value, 'exact');
+  Object.assign(dom.window.location, { search: '?match=other' });
+  dom.window.dispatchEvent(new Event('popstate'));
+  await settle();
+  assert.equal(dom.history().length, 1);
+  assert.match(dom.notice.textContent, /Invalid history filters/);
+  assert.equal(dom.historyBody.textContent, 'No history loaded.');
 });
