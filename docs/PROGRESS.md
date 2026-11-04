@@ -1,6 +1,6 @@
 # Implementation progress
 
-Updated 3 November 2026. Development base: `dev-next`; task 3 review base: `131fece`, including task 1 at `d350af8`. [Roadmap](roadmap.md) owns scope and priorities; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns current status, the work queue and open acceptance gates.
+Updated 4 November 2026. Development base: `dev-next`; previous-queue task 3 review base: `131fece`, including task 1 at `d350af8`. [Roadmap](roadmap.md) owns scope and priorities; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns current status, the work queue and open acceptance gates.
 
 ## Current status
 
@@ -17,7 +17,15 @@ Updated 3 November 2026. Development base: `dev-next`; task 3 review base: `131f
 
 ## Next actions
 
-The following three tasks were completed in priority order, one at a time. C8.2c and the scoped task 3 integration review are independently accepted; all three are complete locally. Parked work and unavailable-environment acceptance retain their existing holds.
+The user set this queue on 4 November 2026. Work it in order, one task at a time. Parked work and unavailable-environment acceptance retain their existing holds.
+
+- [x] **1. Budget and queue: complete, 4 November.** The authored JS+CSS ceiling rises from 280 KiB to 320 KiB (327,680 bytes), leaving about 41 KB of room over the current 286,708 bytes. The 64 KiB packaged gzip ceiling is unchanged and stays the per-page limit (currently 49,367 bytes, including `theme-init.js`). The build is one shared bundle without code splitting. A throwaway per-screen split probe measured initial gzip loads of 31,917 bytes (overview), 36,290 (detail) and 26,022 (History) against 49,076 unsplit, excluding `theme-init.js`. The extra requests and cross-screen cost do not justify splitting yet. The [roadmap budget](roadmap.md#acceptance-budgets) records when to split and how the check must then change. Validation: `tests.test_frontend_assets`. No application code changed.
+- [ ] **2. Recorded observations.** Reproduce or measure before fixing: O-1 timeline status shift of about 254 px on refresh; FE-4 maximum-text DOM/render cost of closed disclosures; the unattributed P4.5 focus movement. Fix only what reproduces, with regression and browser evidence; record a measured "no change" otherwise. See [follow-up observations](#follow-up-observations).
+- [ ] **3. P5.1 — SSISDB change detection (local).** Record submilestones before implementation. Expected shape: (a) detection query for new executions and state transitions of existing active executions, with an exact oracle; (b) SQL work at 2k/20k/100k executions under representative visibility, following the AGENTS SQL rules; (c) one owned in-process detector with explicit start/stop, bounded timing, no reloader duplicates and no connection held per subscriber; (d) independent review. SSE transport, multi-worker coordination and production stream capacity remain deferred under the hosting hold; see [production live updates](MODERNIZATION_PLAN.md#production-live-updates).
+
+### Previous queue
+
+The following tasks were completed in priority order, one at a time. C8.2c and the scoped task 3 integration review are independently accepted; all are complete locally.
 
 - [x] **1. C8.2c — resource and concurrency acceptance: complete locally, independently reviewed 26 October.** Local repeated/concurrent, failure/retry, rapid replacement, maximum-text and actual driver timeout/cancellation/disconnect checks pass. Logical owners return to zero and task-owned servers/processes/tabs have exited. See [results and limits](API_ACCEPTANCE.md#c82c-local-resource-results-26-october-2026). Missing reader/representative-environment cases retain `NOT RUN`; HTTP disconnect was observed to leave SQL running until its timeout. This does not close Stage C or approve production capacity.
 - [x] **2. Resolve the recorded legacy-replacement gaps: complete locally, 27 October.** G01 preserves full wildcard history through a standalone entry/bookmarks, with exact mode, bounded pages and per-package estimates; G02 restores version/server labels independently; G05 fixes authored legacy prefix links/assets and adds strict separator-selector aliases with single decoding. [Affected BM/WF replay](FRONTEND_PARITY.md#g01g02g05-local-integration-26-october-2026), regression, native SQL, growth diagnostics and cleanup are recorded. The scoped independent integration review is accepted under task 3.

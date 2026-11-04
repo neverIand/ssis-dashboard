@@ -22,13 +22,13 @@ Hosting remains on hold under the 15 October 2026 instruction: B5c, HOST-01/02/0
 
 ## Next priorities
 
-The [three-item task queue](PROGRESS.md#next-actions) owns checkbox status, bounded submilestones and evidence. All three are complete locally, with scoped independent acceptance recorded on 27 October:
+The [task queue](PROGRESS.md#next-actions) owns checkbox status, bounded submilestones and evidence. The previous queue (C8.2c, legacy-replacement gaps, scoped integration review and unscoped History) is complete locally. On 4 November 2026 the user set this order:
 
-1. **C8.2c resource/concurrency acceptance:** local repeated requests, cancellation/timeouts and cleanup under bounded load are independently accepted.
-2. **Legacy-replacement gaps:** independent history entry, operational labels and legacy-prefix behavior are implemented and reviewed locally with regression/native/browser evidence and intentional workflow differences.
-3. **Scoped integration review:** resulting frontend/API/SQL boundaries are independently accepted; reproduced focus and legacy-label compatibility findings are resolved. Independent reader/browser/workload/hosting gates remain open.
+1. **Budget and queue:** record the per-page budget model and the raised authored ceiling.
+2. **Recorded observations:** reproduce or measure the open frontend follow-ups (timeline refresh shift, maximum-text disclosure cost, P4.5 focus) before fixing them.
+3. **P5.1 change detection:** a local, owned, bounded SSISDB detector for new executions and active-state transitions, with measured SQL work. SSE transport and production stream acceptance stay under the hosting hold.
 
-The completed broad security/performance reviews, dark-mode work and local parity inventory remain the baseline in Progress. Completing this queue does not resume parked environment/hosting work or start the later feature ideas below; those need a new priority decision.
+Environment-blocked gates (C8.3, reader SHOWPLAN, real active/Scale Out, actual browser conditions, hosting) keep their holds. The later feature ideas below still need their own priority decision.
 
 ## Delivery phases
 
@@ -46,7 +46,9 @@ The completed broad security/performance reviews, dark-mode work and local parit
 
 The 50-row execution-page test-network p95 below one second remains a measurement target; list pages are capped at 200 rows. Measure calculated sorts separately. Set detector load/latency, queues/replay and concurrent stream/API budgets after the prototype. Keep SQL, in-process WSGI, TCP/browser and production measurements distinct.
 
-The accepted frontend review/refactor establishes enforced ceilings of **280 KiB (286,720 bytes)** authored JS+CSS and **64 KiB (65,536 bytes)** packaged gzip. Count all recursive `.js`/`.css`: raw bytes under `web/src`, and the sum of per-file deterministic gzip-9 bytes (`mtime=0`) under `dashboard/static/app/`, including `theme-init.js`, chunks and selected libraries. After `npm --prefix web run build`, `python -m unittest tests.test_frontend_assets` checks both ceilings and the above-ceiling failure boundary. The 140-character JS line guard preserves normal source formatting. [Progress](PROGRESS.md#accepted-reviews) owns measured totals and review receipts; these ceilings do not establish network latency.
+The user-facing budget is what one native page loads. Enforced ceilings are **64 KiB (65,536 bytes)** packaged gzip and **320 KiB (327,680 bytes)** authored JS+CSS; the user raised the authored ceiling from 280 KiB on 4 November 2026, accepting larger source while per-page loads stay reasonable. Count all recursive `.js`/`.css`: raw bytes under `web/src`, and the sum of per-file deterministic gzip-9 bytes (`mtime=0`) under `dashboard/static/app/`, including `theme-init.js`, chunks and selected libraries. After `npm --prefix web run build`, `python -m unittest tests.test_frontend_assets` checks both ceilings and the above-ceiling failure boundary. The 140-character JS line guard preserves normal source formatting. Each frontend milestone records its authored and packaged deltas. [Progress](PROGRESS.md#accepted-reviews) owns measured totals and review receipts; these ceilings do not establish network latency.
+
+The build is one entry bundle shared by overview, detail and History; hashed assets are cached as immutable, so moving between screens downloads nothing further. A 4 November probe split per screen: initial gzip loads became about 32 KB (overview), 36 KB (detail) and 26 KB (History), versus 49 KB unsplit, at the cost of more requests and about 4 KB more across all three. Do not split now. Introduce per-screen dynamic imports when a screen adds a heavy library or the shared bundle approaches the packaged ceiling, and then change the packaged check to each screen's initial closure (entry, static imports, CSS and `theme-init.js`) with lazy chunks counted separately.
 
 ## Later
 

@@ -1,6 +1,6 @@
 # Documentation
 
-Start with [current status and the three next actions](PROGRESS.md#next-actions). Use [the roadmap](roadmap.md#next-priorities) for priority/scope and the owning document below for detail.
+Start with [current status and the next actions](PROGRESS.md#next-actions). Use [the roadmap](roadmap.md#next-priorities) for priority/scope and the owning document below for detail.
 
 | Task | Canonical document |
 | --- | --- |
