@@ -1,4 +1,5 @@
 import { eventQuery } from './events.js';
+import { clippedText } from './observation-page.js';
 import { mountSectionTable } from './section-table.js';
 
 export function mountEvents(root, { metadata, actions, restoreView = null }) {
@@ -111,10 +112,10 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
     text(row.name, literal(item.event_name));
     row.node.dataset.severity = ['OnError',
       'OnTaskFailed'].includes(item.event_name) ? 'error' : item.event_name === 'OnWarning' ? 'warning' : 'none';
-    const characters = item.message === null ? [] : [...item.message];
-    text(row.preview, characters.length > 160 ? characters.slice(0, 160).join('') + '…' : literal(item.message));
+    const clipped = item.message === null ? null : clippedText(item.message, 160);
+    text(row.preview, clipped ?? literal(item.message));
     text(row.full, literal(item.message));
-    row.message.hidden = characters.length <= 160 && !item.truncated;
+    row.message.hidden = clipped === null && !item.truncated;
     if (row.message.hidden) row.message.open = false;
     row.truncated.hidden = !item.truncated;
     text(row.truncated,

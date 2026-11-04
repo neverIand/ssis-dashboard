@@ -1,4 +1,5 @@
 import { formatBoolean, formatCode, formatId } from './display.js';
+import { clippedText } from './observation-page.js';
 import { mountSectionTable } from './section-table.js';
 
 function mountValueTable(root, { metadata, actions, restoreView = null }, resource) {
@@ -98,18 +99,17 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
       text(row.noFlags, row.noFlags.hidden ? '' : '—');
     } else {
       text(row.identity, `ID: ${formatId(id)}`);
-      const path = [...item.property_path];
-      text(row.name, path.length > 160 ? path.slice(0, 160).join('') + '…' : item.property_path);
+      text(row.name, clippedText(item.property_path, 160) ?? item.property_path);
       text(row.fullPath, item.property_path);
       text(row.cells[2], formatBoolean(item.sensitive));
     }
     const value = item.redacted ? `Redacted (${item.redaction_reason})` : item.value === null ? 'NULL (unredacted)' : item.value === ''
       ? '(empty)' : item.value;
-    const characters = [...value];
-    text(row.preview, characters.length > 160 ? characters.slice(0, 160).join('') + '…' : value);
+    const clipped = clippedText(value, 160);
+    text(row.preview, clipped ?? value);
     // Clear old text when a value becomes redacted; hidden content is not a redaction boundary.
     text(row.full, item.redacted ? '' : item.value ?? '');
-    row.value.hidden = item.redacted || item.value === null || characters.length <= 160 && !item.truncated;
+    row.value.hidden = item.redacted || item.value === null || clipped === null && !item.truncated;
     if (row.value.hidden) row.value.open = false;
     row.truncated.hidden = !item.truncated;
     text(row.truncated, item.truncated ? `Truncated to ${metadata.limits.max_text_characters} characters.` : '');

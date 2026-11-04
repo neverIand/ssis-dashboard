@@ -18,6 +18,8 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
   };
   const reserveSpace = reserveLoadingSpace(panel);
   const reserveTableSpace = reserveLoadingSpace(scroll);
+  // Emptying the bucket options would shrink this content-sized control and rewrap the toolbar.
+  const reserveChoiceWidth = reserveLoadingSpace(choice.parentElement ?? choice, 'width');
   let grainChanged = false;
   let current = null, rendered = null, busy = true, selected = typeof restoreView?.selected === 'string' ? restoreView.selected : null,
     returning = restoreView, order = [];
@@ -194,6 +196,7 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
       busy = isBusy;
       reserveSpace(state.open && selection !== null && busy && state.page === null, rendered !== null);
       reserveTableSpace(state.open && selection !== null && busy && state.page === null, rendered !== null);
+      reserveChoiceWidth(state.open && selection !== null && busy && state.page === null, rendered !== null);
       const focused = document.activeElement, panelFocused = panel.contains(focused), plotFocused = svg.contains(focused), position = {
         left: scroll.scrollLeft,
         top: scroll.scrollTop
@@ -258,6 +261,7 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
     dispose() {
       reserveSpace(false);
       reserveTableSpace(false);
+      reserveChoiceWidth(false);
       disposeInteraction();
       for (const [node, event, handler] of listeners) node.removeEventListener(event, handler);
       clear();

@@ -606,6 +606,9 @@ tbody tr:hover { background: var(--sd-subtle); }
 [data-chart-status="5"]::before { background: var(--sd-status-pending); }
 .timeline-panel { padding: 0.6rem; border-bottom: 1px solid var(--sd-border); }
 .timeline-panel .table-toolbar { padding: 0 0 0.5rem; border: 0; }
+/* A replacement read clears the chart rows; keep the data-table row where it was. */
+.timeline-panel[data-loading]:not([hidden]) { display: flex; flex-direction: column; }
+.timeline-panel[data-loading] > details { margin-top: auto; }
 .timeline-choice { min-width: 5rem; max-width: 28rem; flex: 1 1 auto; }
 .timeline-choice select { width: 100%; }
 .timeline-panel .toolbar-meta { flex: 0 1 12rem; }

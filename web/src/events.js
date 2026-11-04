@@ -1,6 +1,6 @@
 import { ApiError } from './api.js';
 import { formatId } from './display.js';
-import { observationQuery, readObservationMeta, observationText } from './observation-page.js';
+import { codePointCount, observationQuery, readObservationMeta, observationText } from './observation-page.js';
 
 export function eventQuery(value, metadata) {
   const query = observationQuery(value, metadata, 'event_id', 'message_time');
@@ -35,7 +35,7 @@ export function readEventPage(response, executionId, query, metadata, display) {
       for (const field of ['package_path', 'execution_path']) observationText(row[field], 16384);
       observationText(row.message, metadata.limits.max_text_characters);
       if (typeof row.truncated !== 'boolean' || (row.truncated &&
-          (row.message === null || [...row.message].length !== metadata.limits.max_text_characters))) throw new TypeError();
+          (row.message === null || codePointCount(row.message) !== metadata.limits.max_text_characters))) throw new TypeError();
     }
     return response;
   } catch { throw new ApiError('invalid_response', { requestId: response?.meta?.request_id }); }

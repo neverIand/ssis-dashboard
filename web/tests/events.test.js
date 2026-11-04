@@ -4,6 +4,7 @@ import { ApiError } from '../src/api.js';
 import { createDetailLoader } from '../src/detail.js';
 import { createDisplay } from '../src/display.js';
 import { eventQuery, readEventPage } from '../src/events.js';
+import { clippedText, codePointCount, observationText } from '../src/observation-page.js';
 import { mountDetail } from '../src/render-detail.js';
 import { detailDOM, detailResponse, runningDetailResponse } from './detail-fixture.js';
 import { deferred, wireTime } from './fixtures.js';
@@ -32,6 +33,23 @@ test('event selection preserves literal queries, code points and exact whitespac
   for (const changes of [{ q: 'x'.repeat(513) }, { q: '😀'.repeat(513) }, { q: 'x\0y' }, { q: '\ud800' },
     { q: 1 }, { kind: 'unknown' }, { sort: 'started_at' }, { direction: 'sideways' }, { limit: 201 }]) {
     assert.throws(() => eventQuery({ ...query, ...changes }, metadata));
+  }
+});
+
+test('code-point counting and clipped previews match string iteration without building per-character arrays', () => {
+  const spread = value => [...value];
+  const lone = value => spread(value).some(character => character.codePointAt(0) >= 0xd800 && character.codePointAt(0) <= 0xdfff);
+  const samples = ['', 'a', '\ud800', '\udc00', 'x\ud800', '\udc00\ud800', '𐀀', 'a\ud83d', '😀'.repeat(160), '😀'.repeat(161),
+    'x'.repeat(159), 'x'.repeat(160), 'x'.repeat(161), 'x'.repeat(159) + '😀' + 'y', 'x'.repeat(160) + '\ud800', 'x'.repeat(160) + '…',
+    '影'.repeat(32768), '😀'.repeat(16384), 'x'.repeat(159) + '\udc00\ud800'];
+  for (const value of samples) {
+    const characters = spread(value);
+    assert.equal(codePointCount(value), lone(value) ? -1 : characters.length, JSON.stringify(value.slice(0, 12)));
+    assert.equal(clippedText(value, 160), characters.length > 160 ? characters.slice(0, 160).join('') + '…' : null);
+  }
+  for (const [value, max, units] of [['😀'.repeat(4), 4], ['😀'.repeat(5), 4], ['😀'.repeat(2), 4, true], ['😀'.repeat(3), 4, true]]) {
+    const ok = units ? value.length <= max : spread(value).length <= max;
+    assert.equal((() => { try { observationText(value, max, units); return true; } catch { return false; } })(), ok);
   }
 });
 

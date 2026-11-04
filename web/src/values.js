@@ -1,6 +1,6 @@
 import { ApiError } from './api.js';
 import { formatId } from './display.js';
-import { observationText, readObservationMeta } from './observation-page.js';
+import { codePointCount, observationText, readObservationMeta } from './observation-page.js';
 
 const identities = { parameters: 'execution_parameter_id', overrides: 'property_id' };
 function valueQuery(value, metadata, section) {
@@ -49,7 +49,8 @@ function readValuePage(response, query, metadata, display, section) {
       } else {
         if (row.redaction_reason !== null) throw new TypeError();
         observationText(row.value, metadata.limits.max_text_characters);
-        if (row.truncated && (row.value === null || [...row.value].length !== metadata.limits.max_text_characters)) throw new TypeError();
+        if (row.truncated && (row.value === null
+            || codePointCount(row.value) !== metadata.limits.max_text_characters)) throw new TypeError();
       }
     }
     return response;

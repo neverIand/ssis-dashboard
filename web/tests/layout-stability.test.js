@@ -148,6 +148,37 @@ test('overview refresh keeps keyed rows while announcing previous counts, then c
   assert.equal(dom.get('cohort-window').textContent, '');
 });
 
+test('rolling refresh with moved bounds clears old timeline counts inside a reserved panel whose data-table row stays put', async t => {
+  const dom = overviewDOM(), metadata = timelineMetadata(), timeline = deferred(), nextFrom = '2026-10-17T00:00:00.0000002Z';
+  let moved = false;
+  const view = mountOverview(dom.root, { metadata, appBase: '/app/', api: { async get(resource) {
+    if (resource === 'executions') return overviewPage(moved ? { from: nextFrom } : {});
+    if (resource === 'metrics/summary') return timelineSummary(moved ? { from: nextFrom } : {});
+    return moved ? timeline.promise : timelinePage();
+  } } });
+  t.after(view.dispose);
+  await view.apply(defaultSelection(metadata)); click(dom.get('timeline-toggle')); await flush();
+  const panel = dom.get('timeline-panel'), values = dom.get('timeline-values');
+  panel.layoutHeight = 299.2;
+  moved = true; const refresh = view.refresh(); await flush();
+  assert.equal(dom.get('timeline-chart').children.length, 0, 'Counts from the previous bounds are not shown as current');
+  assert.equal(dom.get('timeline-selected').textContent, '');
+  assert.equal(panel.style.minHeight, '300px');
+  assert.equal(panel.getAttribute('data-loading'), '');
+  assert.ok(panel.children.includes(values));
+  const choiceBox = dom.get('timeline-choice').parentElement;
+  assert.equal(dom.get('timeline-choice').children.length, 0);
+  assert.equal(choiceBox.style.minWidth, 'min(800px, 100%)', 'Emptied bucket options keep their former width, capped by the line');
+  timeline.resolve(timelinePage(undefined, { from: nextFrom })); await refresh;
+  assert.equal(panel.style.minHeight, '');
+  assert.equal(choiceBox.style.minWidth, '');
+  assert.equal(panel.getAttribute('data-loading'), null);
+  assert.notEqual(dom.get('timeline-chart').children.length, 0);
+  const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /\.timeline-panel\[data-loading\]:not\(\[hidden\]\) \{ display: flex; flex-direction: column; \}/);
+  assert.match(css, /\.timeline-panel\[data-loading\] > details \{ margin-top: auto; \}/);
+});
+
 for (const scenario of ['empty retained start', 'non-empty retained start', 'all zero']) {
   test(`timeline grain change: ${scenario} uses the correct fallback with one owned read`, async t => {
     const dom = overviewDOM(), metadata = timelineMetadata(), calls = [];

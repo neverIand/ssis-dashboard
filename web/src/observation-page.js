@@ -28,12 +28,33 @@ export function readObservationMeta({ data, meta }, query, metadata, display, { 
   else formatId(meta.upper_id);
 }
 
+// Code points in a string, or -1 for a lone surrogate. Scans in place: messages and
+// paths reach tens of thousands of characters, so no per-character array is built.
+export function codePointCount(value) {
+  let count = 0;
+  for (let index = 0; index < value.length; index++, count++) {
+    const unit = value.charCodeAt(index);
+    if (unit < 0xd800 || unit > 0xdfff) continue;
+    const next = value.charCodeAt(index + 1);
+    if (unit > 0xdbff || !(next >= 0xdc00 && next <= 0xdfff)) return -1;
+    index++;
+  }
+  return count;
+}
+
+// The first `limit` code points followed by an ellipsis, or null when the text already fits.
+export function clippedText(value, limit) {
+  for (let index = 0, count = 0; index < value.length; index++, count++) {
+    if (count === limit) return `${value.slice(0, index)}…`;
+    const unit = value.charCodeAt(index), next = value.charCodeAt(index + 1);
+    if (unit >= 0xd800 && unit <= 0xdbff && next >= 0xdc00 && next <= 0xdfff) index++;
+  }
+  return null;
+}
+
 export function observationText(value, max, units = false) {
   if (value === null) return;
   if (typeof value !== 'string' || value.length > max * (units ? 1 : 2)) throw new TypeError();
-  const characters = [...value];
-  if ((!units && characters.length > max) || characters.some(character => {
-    const point = character.codePointAt(0);
-    return point >= 0xd800 && point <= 0xdfff;
-  })) throw new TypeError();
+  const count = codePointCount(value);
+  if (count < 0 || (!units && count > max)) throw new TypeError();
 }
