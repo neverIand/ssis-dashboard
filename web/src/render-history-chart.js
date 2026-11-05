@@ -2,15 +2,24 @@ import { createDisplay, formatCode } from './display.js';
 import { chartAttribute as attribute, durationTick, mountChartInteraction, renderChartAxes } from './chart-view.js';
 import { reserveLoadingSpace } from './loading-space.js';
 
-export function mountHistoryChart(root, { metadata, restoreView = null }) {
+const chartKey = 'sd-history-chart';
+// Standalone History opens the chart by default and remembers the reader's last choice in this browser only.
+function storedOpen(window) {
+  try { const value = window?.localStorage?.getItem(chartKey); return value === 'open' ? true : value === 'closed' ? false : null; }
+  catch { return null; }
+}
+
+export function mountHistoryChart(root, { metadata, restoreView = null, remember = false, openExecution = null }) {
   const document = root.ownerDocument, get = (key) => root.querySelector(`[data-history-chart-${key}]`);
   const toggle = get('toggle'), panel = get('panel'), svg = get('plot'), selectedText = get('selected'), scale = get('scale'),
     empty = get('empty');
-  const xAxis = get('x-axis'), yAxis = get('y-axis');
+  const xAxis = get('x-axis'), yAxis = get('y-axis'), count = get('count'), mixed = get('mixed');
+  const window = document.defaultView;
   const display = createDisplay({ timeZone: metadata.display_timezone }), rows = new Map(), controls = { toggle };
   const initialFocus = document.activeElement;
   const reserveSpace = reserveLoadingSpace(panel);
-  let open = restoreView?.open === true, selected = restoreView?.selected ?? null, returning = restoreView, current = null,
+  let open = restoreView ? restoreView.open === true : remember ? storedOpen(window) ?? true : false;
+  let selected = restoreView?.selected ?? null, returning = restoreView, current = null,
     rendered = null, order = [];
   const shape = (tag) => document.createElementNS('http://www.w3.org/2000/svg', tag);
   const duration = (value) => value === null ? 'Unavailable' : display.duration(value);
@@ -27,8 +36,8 @@ export function mountHistoryChart(root, { metadata, restoreView = null }) {
     svg.replaceChildren();
     xAxis.replaceChildren();
     yAxis.replaceChildren();
-    selectedText.textContent = selectedText.title = scale.textContent = '';
-    empty.hidden = true;
+    selectedText.textContent = selectedText.title = scale.textContent = count.textContent = '';
+    empty.hidden = mixed.hidden = true;
     rendered = null;
   }
   function mark() {
@@ -47,6 +56,15 @@ export function mountHistoryChart(root, { metadata, restoreView = null }) {
       mark();
     }
   };
+  // Selecting stays a single click or arrow key; opening an execution is a separate, explicit Enter or double click.
+  const activate = event => {
+    if (!openExecution || (event.type === 'keydown' && event.key !== 'Enter')) return;
+    let id = null;
+    for (let node = event.target; node && node !== svg && id === null; node = node.parentElement) id = node.dataset?.executionId ?? null;
+    if (id !== null && rows.has(id)) openExecution(id);
+  };
+  svg.addEventListener('keydown', activate);
+  svg.addEventListener('dblclick', activate);
   const disposeInteraction = mountChartInteraction(svg, {
     field: 'executionId',
     keys: () => order,
@@ -121,6 +139,12 @@ export function mountHistoryChart(root, { metadata, restoreView = null }) {
       rows.delete(id);
     }
     scale.textContent = available ? 'Duration' : '';
+    count.textContent = `${display.count(data.length)} ${data.length === 1 ? 'run' : 'runs'} on this page`;
+    // Bars from different packages are not comparable; say so instead of implying one trend.
+    const identities = new Set(data.map(item => JSON.stringify([item.folder_name, item.project_name, item.package_name])));
+    mixed.hidden = identities.size < 2;
+    mixed.textContent = identities.size < 2 ? ''
+      : `${display.count(identities.size)} packages on this page; their durations are not comparable.`;
     // Below seven executions the 48 px groups leave no room for dates; the title and readout keep them.
     renderChartAxes(xAxis, yAxis, data.map((item) => ({
       text: data.length < 7 ? `#${item.execution_id}` : `${display.timestamp(item.created_at).slice(0, 10)}\n#${item.execution_id}`,
@@ -160,6 +184,7 @@ export function mountHistoryChart(root, { metadata, restoreView = null }) {
   const toggled = () => {
     if (!current?.visible) return;
     open = !open;
+    if (remember) try { window?.localStorage?.setItem(chartKey, open ? 'open' : 'closed'); } catch { /* preference only */ }
     render(current);
   };
   toggle.addEventListener('click', toggled);
@@ -174,6 +199,8 @@ export function mountHistoryChart(root, { metadata, restoreView = null }) {
     dispose() {
       reserveSpace(false);
       toggle.removeEventListener('click', toggled);
+      svg.removeEventListener('keydown', activate);
+      svg.removeEventListener('dblclick', activate);
       disposeInteraction();
       clear();
       panel.hidden = toggle.disabled = true;

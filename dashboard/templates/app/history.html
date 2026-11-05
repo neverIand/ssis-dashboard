@@ -19,13 +19,13 @@
             <label>Folder<input name="folder" required maxlength="512" autocomplete="off"></label>
             <label>Project<input name="project" required maxlength="512" autocomplete="off"></label>
             <label>Package<input name="package" required maxlength="512" autocomplete="off"></label>
-            <button type="submit">Load history</button>
+            <button type="submit" data-history-load>Load history</button>
         </fieldset>
-        <p class="detail-note">LIKE patterns: * or % matches any text, _ matches one character, [abc] matches a set. All creation dates.</p>
+        <p class="detail-note" data-history-mode-note>LIKE patterns: * or % matches any text, _ matches one character, [abc] matches a set. All creation dates.</p>
         <p class="inline-notice" data-history-scope-notice role="status"></p>
     </form>
 </section>
-<section class="panel detail-panel observation-section">
+<section class="panel detail-panel observation-section" data-history-results data-idle>
     <button type="button" data-history-toggle hidden>History</button>
     {% include "app/history-panel.html" %}
 </section>

@@ -5,7 +5,8 @@ import { allHistoryStatuses } from './history.js';
 import { historyExecutionHref } from './history-navigation.js';
 import { mountSectionTable } from './section-table.js';
 
-export function mountHistory(root, { metadata, actions, navigation, executionId, restoreView = null, showIdentity = false }) {
+export function mountHistory(root, { metadata, actions, navigation, executionId, restoreView = null, showIdentity = false,
+  notLoaded = 'No history loaded.', rememberChart = false }) {
   const view = mountSectionTable(root, { metadata, actions, restoreView }, {
     resource: 'history',
     columns: 6,
@@ -30,7 +31,8 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
   const { document, get, controls, rows, panel, notice, display, element, text, listen } = view;
   const { apply, custom, close } = controls;
   const form = get('filters'), presets = new Map(), choices = new Map(), statusOptions = get('status-options');
-  const chart = mountHistoryChart(root, { metadata, restoreView: restoreView?.chart });
+  const chart = mountHistoryChart(root, { metadata, restoreView: restoreView?.chart, remember: rememberChart,
+    openExecution: id => { const href = rows.get(id)?.link.getAttribute('href'); if (href) document.defaultView.location.assign(href); } });
   let appliedStatus = null;
   statusOptions.hidden = restoreView?.statusOptionsOpen !== true;
   for (const [key, label, status] of [
@@ -94,9 +96,10 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
       const duration = element('span'), elapsed = element('span');
       cells[4].append(duration, elapsed);
       const estimate = element('span'), end = element('span'), samples = element('span');
-      cells[5].append(estimate, end, samples);
+      const deviation = element('span', undefined, 'deviation');
+      cells[5].append(estimate, end, samples, deviation);
       node.append(...cells);
-      row = { node, link, badge, times, duration, elapsed, estimate, end, samples };
+      row = { node, link, badge, times, duration, elapsed, estimate, end, samples, deviation };
       rows.set(id, row);
     }
     text(row.badge, formatCode(item.status));
@@ -108,14 +111,29 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
     text(row.elapsed, row.elapsed.hidden ? '' : ` · elapsed ${display.duration(item.elapsed_seconds)}`);
     row.duration.parentElement.title = row.elapsed.hidden ? ''
       : `Running for ${display.duration(item.elapsed_seconds)} as of the last update`;
-    text(row.estimate, item.estimate === null ? 'Unavailable' : `${display.duration(item.estimate.duration_seconds)} · ends `);
-    row.end.hidden = row.samples.hidden = item.estimate === null;
-    time(row.end, item.estimate?.ended_at ?? null, item.created_at);
+    // Running rows need the expected end; ended rows need how far the actual run was from the estimate.
+    const ended = item.ended_at !== null;
+    const change = ended && item.estimate !== null && item.duration_seconds !== null && item.estimate.duration_seconds > 0
+      ? (item.duration_seconds - item.estimate.duration_seconds) / item.estimate.duration_seconds * 100 : null;
+    text(row.estimate, item.estimate === null ? 'Unavailable'
+      : `${display.duration(item.estimate.duration_seconds)}${ended ? '' : ' · ends '}`);
+    row.samples.hidden = item.estimate === null;
+    row.end.hidden = item.estimate === null || ended;
+    if (ended) { row.end.replaceChildren(); row.end.removeAttribute('data-time'); }
+    else time(row.end, item.estimate?.ended_at ?? null, item.created_at);
     text(row.samples, item.estimate === null ? '' : ` · avg of ${display.count(item.estimate.sample_count)}`);
+    const rounded = change === null ? null : Math.round(change);
+    text(row.deviation, rounded === null ? '' : ` · ${rounded > 0 ? '+' : rounded < 0 ? '−' : ''}${Math.abs(rounded)}%`);
+    row.deviation.hidden = rounded === null;
+    // Only a much slower run is flagged; a short failed run is not "better", so nothing is coloured for faster runs.
+    row.deviation.dataset.level = rounded !== null && rounded >= 50 ? 'warning' : 'quiet';
+    row.deviation.title = rounded === null ? '' : `Actual ${display.duration(item.duration_seconds)} is ${
+      rounded === 0 ? 'the same as' : `${Math.abs(rounded)}% ${rounded > 0 ? 'longer' : 'shorter'} than`} the estimate`;
     row.estimate.parentElement.title = item.estimate === null ? 'Estimate unavailable'
       : `Estimated duration: ${display.duration(item.estimate.duration_seconds)}`
         + ` · Estimated end: ${display.timestamp(item.estimate.ended_at)}`
-        + ` · Mean of ${display.count(item.estimate.sample_count)} prior successful runs`;
+        + ` · Mean of ${display.count(item.estimate.sample_count)} prior successful runs`
+      + (rounded === null ? '' : ` · Actual vs estimate: ${row.deviation.textContent.slice(3)}`);
     return row;
   }
   const restoreChoices = () => {
@@ -181,7 +199,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
   return view.mount({
     paintRow,
     loading: 'Loading package history…',
-    notLoaded: 'No history loaded.',
+    notLoaded,
     previousPage: 'Previous history page shown.',
     disabled: [
       apply,
@@ -218,7 +236,11 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
       visible: !panel.hidden,
       stale: state.stale
     }),
-    pageInfo: (page, state) => `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} executions on this page`,
+    pageInfo: (page, state) => {
+      const identities = new Set(page.data.map(item => JSON.stringify([item.folder_name, item.project_name, item.package_name]))).size;
+      return `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} executions on this page`
+        + (identities > 1 ? ` · ${display.count(identities)} packages` : '');
+    },
     afterStatus: positionStatuses,
     restore(returning) {
       statusOptions.hidden = returning.statusOptionsOpen !== true;

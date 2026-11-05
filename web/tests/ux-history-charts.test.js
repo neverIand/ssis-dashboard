@@ -54,7 +54,7 @@ test('history presets apply once, reset checkbox drafts, and leave estimates to 
     assert.equal(dom.calls.length,count+1);assert.equal(dom.calls.at(-1).params.status,status);
     assert.equal(preset(dom,key).getAttribute('aria-pressed'),'true');
     assert.deepEqual(choices.filter(input=>input.checked).map(input=>input.value),status.split(','));
-    if(key==='failed')assert.match(dom.historyBody.children[0].children[5].textContent,/12 s · ends .* · avg of 5$/);
+    if(key==='failed')assert.match(dom.historyBody.children[0].children[5].textContent,/^12 s · avg of 5 · [+−]?\d+%$/);
     click(preset(dom,key));await flush();assert.equal(dom.calls.length,count+1,'Reapplying the same preset adds no read');
   }
 });
@@ -113,7 +113,9 @@ test('history hover and keyboard expose values without requests; keyed plot focu
   assert.equal(dom.document.activeElement,last);assert.equal(selected(dom),'18');
   interaction(plot,'keydown',last,'Home');assert.equal(dom.document.activeElement,first);
   interaction(plot,'keydown',first,'End');assert.equal(dom.document.activeElement,last);
+  const opened=[];dom.window.location.assign=href=>opened.push(href);
   interaction(plot,'keydown',last,'Enter');assert.equal(dom.calls.length,count);
+  assert.deepEqual(opened,[dom.historyBody.children.find(row=>row.dataset.historyId==='18').firstChild.firstChild.getAttribute('href')]);
   click(dom.get('detail-refresh'));await flush();assert.equal(plot.children[1],last);assert.equal(dom.document.activeElement,last);
   rows=[rows[1]];click(dom.get('detail-refresh'));await flush();
   assert.equal(selected(dom),'17');assert.equal(dom.document.activeElement,plot.children[0]);

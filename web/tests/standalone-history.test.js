@@ -164,8 +164,8 @@ function screenDOM(t, search) {
   const form = node('history-scope-form', 'form'), inputs = {};
   for (const key of ['match', 'folder', 'project', 'package']) inputs[key] = new Node(dom.document, 'input');
   form.elements = { namedItem: key => inputs[key] };
-  for (const key of ['history-scope', 'history-scope-notice', 'history-poll-status']) node(key);
-  for (const key of ['history-refresh', 'history-poll-toggle']) node(key, 'button');
+  for (const key of ['history-scope', 'history-scope-notice', 'history-poll-status', 'history-results', 'history-mode-note']) node(key);
+  for (const key of ['history-refresh', 'history-poll-toggle', 'history-load']) node(key, 'button');
   const query = dom.root.querySelector;
   dom.root.querySelector = selector => extra.get(selector) ?? query(selector);
   Object.assign(dom.window.location, { pathname: '/ops/app/history', search });
@@ -176,20 +176,22 @@ function screenDOM(t, search) {
     if (url.pathname.endsWith('/server')) return jsonResponse(envelope({ server_name: 'Server' }));
     return jsonResponse(page(Object.fromEntries(url.searchParams)));
   });
-  return { ...dom, inputs, form, calls, notice: extra.get('[data-history-scope-notice]'),
+  return { ...dom, inputs, form, calls, notice: extra.get('[data-history-scope-notice]'), extra,
     history: () => calls.filter(call => call.startsWith('/ops/api/v1/history')) };
 }
 
-test('an unscoped History entry fills the default pattern but waits for Load history', async t => {
+test('an unscoped History entry offers an empty Exact form and waits for Load history', async t => {
   const dom = screenDOM(t, '');
   const screen = mountHistoryScreen(dom.root);
   t.after(screen.dispose);
   await settle();
   assert.deepEqual(dom.calls, ['/ops/api/v1/meta', '/ops/api/v1/server']);
   assert.deepEqual(Object.fromEntries(Object.entries(dom.inputs).map(([key, input]) => [key, input.value])),
-    { match: 'like', folder: '*', project: '*', package: '*' });
+    { match: 'exact', folder: '', project: '', package: '' });
   assert.equal(dom.notice.textContent, '');
-  assert.equal(dom.historyBody.textContent, 'No history loaded.');
+  assert.equal(dom.historyBody.textContent, 'Enter a package name and choose Load history, or open History from an execution.');
+  Object.assign(dom.inputs.match, { value: 'like' });
+  for (const key of ['folder', 'project']) dom.inputs[key].value = '*';
   dom.inputs.package.value = 'Main*';
   dom.form.dispatchEvent(new Event('submit', { cancelable: true }));
   await settle();
@@ -201,8 +203,9 @@ test('an unscoped History entry fills the default pattern but waits for Load his
   dom.window.dispatchEvent(new Event('popstate'));
   await settle();
   assert.equal(dom.history().length, 1);
-  assert.equal(dom.inputs.package.value, '*');
-  assert.equal(dom.historyBody.textContent, 'No history loaded.');
+  assert.equal(dom.inputs.match.value, 'exact');
+  assert.equal(dom.inputs.package.value, '');
+  assert.equal(dom.historyBody.textContent, 'Enter a package name and choose Load history, or open History from an execution.');
 });
 
 test('a scoped or invalid History URL loads or reports it on entry and on Back/Forward', async t => {
@@ -217,5 +220,5 @@ test('a scoped or invalid History URL loads or reports it on entry and on Back/F
   await settle();
   assert.equal(dom.history().length, 1);
   assert.match(dom.notice.textContent, /Invalid history filters/);
-  assert.equal(dom.historyBody.textContent, 'No history loaded.');
+  assert.equal(dom.historyBody.textContent, 'Enter a package name and choose Load history, or open History from an execution.');
 });

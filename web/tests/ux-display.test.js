@@ -55,7 +55,9 @@ test('detail observations use the execution date while history keeps creation an
         value === tomorrow ? '2026-10-18 17:00:00' : index === 0 ? '2026-10-17 17:00:00' : '17:00:00');
     }
   }
-  exact(dom.historyBody.children[0].children[5].children[1].firstChild, wireTime, '17:00:00');
+  // Ended rows compare with the estimate instead of repeating its end time (UX batch B2, H3).
+  assert.equal(dom.historyBody.children[0].children[5].children[1].hidden, true);
+  assert.equal(dom.historyBody.children[0].children[5].children[1].textContent, '');
   dom.get('detail-refresh').dispatchEvent(new Event('click')); await settle();
   assert.equal(calls.length, 7, 'Refresh reads base detail and the active history tab only');
 });

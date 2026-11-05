@@ -139,7 +139,7 @@ test('live estimate loss clears previous estimate text while keyed link focus, d
   let changed=false;const dom=screen(t,async(resource,options)=>resource==='history'?historyPage([historyRow('1',{estimate:changed?null:estimate()})]):response(resource,options));
   await flush();click(dom,'history-toggle');await flush();const row=dom.historyBody.children[0],link=row.children[0].children[0];dom.get('history-scroll').scrollLeft=120;
   changed=true;click(dom,'detail-refresh');link.focus();await flush();assert.equal(dom.historyBody.children[0],row);assert.equal(dom.document.activeElement,link);
-  assert.equal(dom.get('history-scroll').scrollLeft,120);assert.doesNotMatch(row.children[5].textContent,/Mean of|Estimated duration/);assert.equal(row.children[5].children[1].textContent,'—');
+  assert.equal(dom.get('history-scroll').scrollLeft,120);assert.doesNotMatch(row.children[5].textContent,/Mean of|Estimated duration/);assert.equal(row.children[5].children[1].textContent,'');assert.equal(row.children[5].children[1].hidden,true);
   const checkpoint=dom.mounted.checkpoint();assert.doesNotMatch(JSON.stringify(checkpoint),/Main\.dtsx|Folder|estimate|duration_seconds/);dom.mounted.dispose();
   const restored=screen(t,undefined,{restoreView:checkpoint});await flush();assert.equal(restored.calls.at(-1).resource,'history');assert.equal(restored.document.activeElement,restored.historyBody.children[0].children[0].children[0]);
 });
