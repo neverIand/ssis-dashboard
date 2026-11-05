@@ -54,7 +54,7 @@ test('history presets apply once, reset checkbox drafts, and leave estimates to 
     assert.equal(dom.calls.length,count+1);assert.equal(dom.calls.at(-1).params.status,status);
     assert.equal(preset(dom,key).getAttribute('aria-pressed'),'true');
     assert.deepEqual(choices.filter(input=>input.checked).map(input=>input.value),status.split(','));
-    if(key==='failed')assert.match(dom.historyBody.children[0].children[5].textContent,/12 s · ends .*\(5\)/);
+    if(key==='failed')assert.match(dom.historyBody.children[0].children[5].textContent,/12 s · ends .* · avg of 5$/);
     click(preset(dom,key));await flush();assert.equal(dom.calls.length,count+1,'Reapplying the same preset adds no read');
   }
 });

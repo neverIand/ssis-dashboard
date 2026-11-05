@@ -240,6 +240,14 @@ main {
 .number-cell[data-level="quiet"] { color: var(--sd-secondary); font-weight: 400; }
 .number-cell[data-level="warning"] { color: var(--sd-warning); font-weight: 600; }
 .number-cell[data-level="error"] { color: var(--sd-error); font-weight: 600; }
+/* Count links keep the level colour; underline on hover/focus still marks them as links. */
+.number-cell[data-level] a { color: inherit; }
+/* Failed rows carry an edge marker besides the status text. An inset shadow takes no table width;
+   forced-colors mode drops shadows, so it gets a real border instead. */
+[data-execution-table] tr:is([data-status="4"], [data-status="6"]) > td:first-child { box-shadow: inset 3px 0 var(--sd-status-failed); }
+@media (forced-colors: active) {
+  [data-execution-table] tr:is([data-status="4"], [data-status="6"]) > td:first-child { border-left: 3px solid CanvasText; }
+}
 
 .section-actions, .table-controls, .toolbar-filters, .pagination, [data-history-presets] { display: flex; align-items: center; gap: 0.4rem; }
 .table-toolbar { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.6rem; min-width: 0; border-bottom: 1px solid var(--sd-border); }
@@ -363,6 +371,7 @@ input:disabled, select:disabled, button:disabled, button[aria-disabled="true"] {
 
 .summary-card {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.6rem;
   min-height: 3.7333rem;
@@ -484,6 +493,7 @@ tbody tr:hover { background: var(--sd-subtle); }
 .detail-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.4rem 1rem; }
 .detail-fields dt, .detail-note { color: var(--sd-secondary); font-size: 0.8667rem; }
 .detail-fields dd { min-width: 0; overflow-wrap: anywhere; font-size: 0.9333rem; font-variant-numeric: tabular-nums; }
+.detail-fields time { white-space: nowrap; }
 .event-counts { display: flex; align-items: center; flex-wrap: wrap; gap: 0.3rem 0.8rem; margin-top: 0.5rem; font-size: 0.8667rem; }
 .event-counts a[data-level="quiet"] { color: var(--sd-secondary); }
 .event-counts a[data-level="error"] { color: var(--sd-error); }
@@ -687,6 +697,14 @@ tbody tr:hover { background: var(--sd-subtle); }
 [data-execution-table] .cell-detail { font-size: 0.8rem; line-height: 1.25; }
 [data-execution-table] .time-cell { white-space: nowrap; }
 @media (max-width: 66.6667rem) {
+  /* Keep Status/Duration/Warn/Err in view near 768-1000 px: dates wrap above times. */
+  [data-execution-table] { min-width: 44rem; }
+  [data-execution-table] .time-cell { min-width: 5.6rem; white-space: normal; }
+  [data-execution-table] .time-cell span { white-space: nowrap; }
+  [data-execution-table] .name-cell { min-width: 7rem; }
+  [data-execution-table] :is(th, td) { padding-inline: 0.4rem; }
+  /* Number above label in every card, so 4-5 digit counts never collide or wrap unevenly. */
+  .summary-card { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; }
   .page-heading { grid-template-columns: minmax(0, 1fr); }
   .table-toolbar, .toolbar-filters, .filter-bar { flex-wrap: wrap; }
   .toolbar-meta { flex-basis: 12rem; }
@@ -702,9 +720,16 @@ tbody tr:hover { background: var(--sd-subtle); }
   .toolbar-filters > label { max-width: 100%; }
   .history-presets, [data-history-presets] { flex-wrap: wrap; }
   .timeline-choice { max-width: 100%; }
+  /* The table scrolls on phones anyway; give names room to wrap at separators. */
+  [data-execution-table] .name-cell { min-width: 10rem; }
 }
 .history-scope { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; border: 0; padding: .75rem 0; }
 .history-scope label { display: flex; flex: 1; flex-direction: column; min-width: min(12rem, 100%); gap: .25rem; }
 .history-scope input, .history-scope select { width: 100%; }
 .history-identity { display: block; font-size: .8rem; overflow-wrap: anywhere; max-width: 24rem; }
 .server-label { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Connection context reads as one labelled group, separate from the navigation links. */
+.header-meta { display: flex; align-items: center; gap: 0.5rem; min-width: 0; padding: 0.1rem 0.5rem; border: 1px solid var(--sd-border); border-radius: 4px; color: var(--sd-secondary); font-size: 0.8667rem; }
+.header-meta:not(:has(> p:not([hidden]))) { display: none; }
+.server-label::before { content: "SQL "; color: var(--sd-secondary); }
+.header-meta .server-label { color: var(--sd-text); }

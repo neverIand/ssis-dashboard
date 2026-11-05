@@ -4,7 +4,7 @@ import { createOverview } from './overview.js';
 import { selectionParams, selectionSearch } from './selection.js';
 import { mountTimeline } from './render-timeline.js';
 import { reserveLoadingSpace } from './loading-space.js';
-import { inlineStatus, pollingButton } from './ui.js';
+import { breakableText, inlineStatus, pollingButton } from './ui.js';
 
 export function mountOverview(root, { api, metadata, appBase, retainedPaths, restoreView = null,
   serverTime = null, onSelect = () => {} }) {
@@ -61,7 +61,12 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
 
   function time(value) {
     if (value === null) return document.createTextNode('—');
-    const node = element('time', display.timestamp(value));
+    // Date and time wrap as whole parts in narrow columns, never inside the date.
+    const node = element('time');
+    for (const [index, part] of display.timestamp(value).split(' ').entries()) {
+      if (index) node.append(document.createTextNode(' '));
+      node.append(element('span', part));
+    }
     node.dateTime = value;
     node.title = value;
     return node;
@@ -139,13 +144,13 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       if (cells[0].firstChild.getAttribute('href') !== href) cells[0].firstChild.setAttribute('href', href);
       if (cells[2].firstChild.getAttribute('href') !== href) cells[2].firstChild.setAttribute('href', href);
       const text = (node, value) => { if (node.textContent !== value) node.textContent = value; };
-      text(cells[1].children[0], item.folder_name);
-      text(cells[1].children[1], item.project_name);
-      text(cells[2].firstChild, item.package_name);
+      breakableText(cells[1].children[0], item.folder_name);
+      breakableText(cells[1].children[1], item.project_name);
+      breakableText(cells[2].firstChild, item.package_name);
       linkSelection(cells[1].children[0], selection, { folder: item.folder_name, project: null });
       linkSelection(cells[1].children[1], selection, { folder: item.folder_name, project: item.project_name });
       text(cells[3].firstChild, formatCode(item.status));
-      cells[3].firstChild.dataset.status = String(item.status?.code ?? '');
+      row.dataset.status = cells[3].firstChild.dataset.status = String(item.status?.code ?? '');
       for (const [index, key] of [[4, 'created_at'], [5, 'started_at']]) {
         if (previous?.[key] !== item[key]) cells[index].replaceChildren(time(item[key]));
       }

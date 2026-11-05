@@ -113,7 +113,8 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
         : page.meta.availability === 'unknown' ? `No ${singular} observations. Recording coverage is unknown.`
           : `No ${singular} observations.`,
     pageInfo(page, state) {
-      const coverage = page.meta.availability === 'available' ? ' · recording: recorded'
+      // Normal coverage needs no note; only incomplete or unknown recording is called out.
+      const coverage = page.meta.availability === 'available' ? ''
         : page.meta.availability === 'not-recorded' ? ' · Not recorded' : ' · Recording coverage unknown';
       return `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} `
         + `${child ? 'calls on this page' : 'executables'}${coverage}`

@@ -19,6 +19,14 @@ export function pollingButton(button, paused, ended = false) {
   path.setAttribute('d', paths[name]); svg.append(path); button.replaceChildren(svg); button.dataset.icon = name;
 }
 
+// Long catalog names wrap after separators instead of mid-word; copied text is unchanged.
+export function breakableText(node, value) {
+  if (node.textContent === value) return;
+  const document = node.ownerDocument;
+  node.replaceChildren(...value.split(/(?<=[_.\\])/u).flatMap((part, index) =>
+    index ? [document.createElement('wbr'), document.createTextNode(part)] : [document.createTextNode(part)]));
+}
+
 const themeKey = 'sd-theme';
 const themes = ['light', 'dark'];
 

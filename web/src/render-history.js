@@ -106,11 +106,12 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
     text(row.duration, display.duration(item.duration_seconds));
     row.elapsed.hidden = item.ended_at !== null || item.elapsed_seconds === null;
     text(row.elapsed, row.elapsed.hidden ? '' : ` · elapsed ${display.duration(item.elapsed_seconds)}`);
-    row.duration.parentElement.title = row.elapsed.hidden ? '' : `Active elapsed (observed): ${display.duration(item.elapsed_seconds)}`;
+    row.duration.parentElement.title = row.elapsed.hidden ? ''
+      : `Running for ${display.duration(item.elapsed_seconds)} as of the last update`;
     text(row.estimate, item.estimate === null ? 'Unavailable' : `${display.duration(item.estimate.duration_seconds)} · ends `);
     row.end.hidden = row.samples.hidden = item.estimate === null;
     time(row.end, item.estimate?.ended_at ?? null, item.created_at);
-    text(row.samples, item.estimate === null ? '' : ` (${display.count(item.estimate.sample_count)})`);
+    text(row.samples, item.estimate === null ? '' : ` · avg of ${display.count(item.estimate.sample_count)}`);
     row.estimate.parentElement.title = item.estimate === null ? 'Estimate unavailable'
       : `Estimated duration: ${display.duration(item.estimate.duration_seconds)}`
         + ` · Estimated end: ${display.timestamp(item.estimate.ended_at)}`

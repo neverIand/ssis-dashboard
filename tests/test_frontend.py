@@ -216,7 +216,7 @@ class FrontendShellTests(unittest.TestCase):
                                    f'src="{prefix}/static/app/assets/main.js"',
                                    'aria-label="Execution summary"', 'class="detail-title"',
                                    'class="event-counts"', 'data-execution-detail hidden',
-                                   'Duration', 'Active elapsed (observed)', 'aria-label="Refresh"', '<noscript>']:
+                                   'Duration', '>Running for<', 'aria-label="Refresh"', '<noscript>']:
                         self.assertIn(markup, html)
                     for markup in ['data-detail-refresh disabled', 'data-detail-poll-toggle data-icon="pause" disabled',
                                    'data-overview-link', 'data-legacy-detail-link', 'data-overview-return-notice hidden',

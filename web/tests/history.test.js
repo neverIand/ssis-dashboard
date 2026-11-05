@@ -121,7 +121,7 @@ test('history UI keeps actual and estimated timing separate, preserves lexical i
   const rows=[historyRow('3',{status:{code:2,name:'running'},ended_at:null,duration_seconds:null,estimate:estimate()}),historyRow('2'),historyRow('1',{estimate:estimate({sample_count:1,duration_seconds:10,ended_at:'2026-10-17T16:00:10.1234567Z'})})];
   const dom=screen(t,async(resource,options)=>resource==='history'?historyPage(rows):response(resource,options));await flush();click(dom,'history-toggle');await flush();
   const first=dom.historyBody.children[0];assert.equal(first.children.length,6);assert.match(first.children[4].textContent,/— · elapsed/);
-  assert.equal(first.children[3].textContent,'—');assert.match(first.children[5].textContent,/ends .*\(5\)/);
+  assert.equal(first.children[3].textContent,'—');assert.match(first.children[5].textContent,/ends .* · avg of 5$/);
   assert.equal(first.children[5].children[1].children[0].getAttribute('datetime'),wireTime);assert.equal(first.children[0].children[0].href,'/ops/app/executions/3');
   assert.equal(dom.historyBody.children[1].children[5].children[0].textContent,'Unavailable');assert.equal(dom.get('history-custom').getAttribute('aria-pressed'),'false');
   assert.match(dom.get('history-status').textContent,/3 executions on this page/);
