@@ -211,12 +211,16 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
       // Let a selection action consume the Status draft once. Prevent mouse focus
       // from committing and removing the clicked row before its click is delivered.
       if (opened.key === 'status' &&
-        event.target.closest?.('[data-selection-link], [data-sort], [data-execution-link]')) event.preventDefault();
+        event.target.closest?.('[data-selection-link], [data-selection-action], [data-sort], [data-execution-link]')) {
+        event.preventDefault();
+      }
       else close();
     }
   });
   function outsideClick(event) {
     if (!opened || opened.panel.contains(event.target) || opened.trigger.contains(event.target)) return;
+    // A chart click may be the first half of a drill double click; keep the Status draft for that one merged commit.
+    if (opened.key === 'status' && event.target.closest?.('[data-selection-action]')) return;
     const link = event.target.closest?.('[data-execution-link]');
     if (opened.key === 'status' && link) {
       // The click has an activation target now. Update that exact anchor before

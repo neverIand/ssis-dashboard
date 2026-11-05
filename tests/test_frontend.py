@@ -275,7 +275,12 @@ class FrontendShellTests(unittest.TestCase):
                                       if 'data-event-count-label' in attrs}, {'errors', 'warnings'})
                 self.assertNotIn('resource-feedback', html)
                 self.assertNotIn('status-slot', html)
-                self.assertEqual(sum(tag == 'details' for tag, _ in nodes), 1 if path == '/app/' else 0)
+                # Overview: the timeline data table plus, inside the Created popover, Advanced exact timestamps (UX B3, O7).
+                details = [attrs for tag, attrs in nodes if tag == 'details']
+                self.assertEqual(len(details), 2 if path == '/app/' else 0)
+                if path == '/app/':
+                    self.assertEqual(sorted(attrs.get('class', '') or ('data-timeline-values' in attrs and 'timeline')
+                                            for attrs in details), ['exact-times', 'timeline'])
         self.connect.assert_not_called()
 
     def test_invalid_detail_ids_fail_before_build_loading_or_sql(self):

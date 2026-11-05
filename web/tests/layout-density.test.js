@@ -207,7 +207,11 @@ test('native templates retain only row/timeline disclosures and one pager per to
   const read = name => readFileSync(new URL(`../../dashboard/templates/app/${name}.html`, import.meta.url), 'utf8');
   const overview = read('index'), detail = read('execution').replace('{% include "app/history-panel.html" %}',
     read('history-panel')), controls = read('controls');
-  assert.equal((overview.match(/<details/g) ?? []).length, 1); assert.match(overview, /<details data-timeline-values>/);
+  assert.equal((overview.match(/<details/g) ?? []).length, 2); assert.match(overview, /<details data-timeline-values>/);
+  // UX batch B3 (O7): the only other disclosure is Advanced exact timestamps inside the Created popover.
+  assert.match(overview, /<details class="exact-times"><summary>Advanced: exact timestamps<\/summary>/);
+  assert.ok(overview.indexOf('<details class="exact-times"') > overview.indexOf('id="created-picker"')
+    && overview.indexOf('<details class="exact-times"') < overview.indexOf('data-use-range'));
   assert.doesNotMatch(detail, /<details|data-history-chart-choice|data-history-direction|data-events-scope/);
   assert.equal((detail.match(/{{ pager\(/g) ?? []).length, 6);
   assert.match(controls, /class="info-trigger" aria-label="{{ label }}" aria-describedby="{{ id }}"/);

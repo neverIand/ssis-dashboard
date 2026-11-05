@@ -14,7 +14,9 @@ export function mountRangeEditor(form, { metadata, listen, onChoose }) {
   const zone = metadata.display_timezone;
   for (const button of presets) {
     const value = button.dataset.createdPreset;
-    if (value === 'default') button.textContent = `Default window (${metadata.limits.default_range_hours} h)`;
+    const hours = metadata.limits.default_range_hours;
+    if (value === 'default') button.textContent = `Default window (${hours % 24 === 0
+      ? `${hours / 24} ${hours === 24 ? 'day' : 'days'}` : `${hours} h`})`;
     button.disabled = ({ '24h': 24, '7d': 168, '30d': 720 }[value] ?? 0) > metadata.limits.max_range_hours;
     listen(button, 'click', () => {
       mode = value; notice.textContent = '';

@@ -2,13 +2,20 @@ import { createDisplay, formatCode } from './display.js';
 import { timelineSeries } from './timeline.js';
 import { chartAttribute as attribute, mountChartInteraction, renderChartAxes } from './chart-view.js';
 import { reserveLoadingSpace } from './loading-space.js';
+import { timestampTicks } from './selection.js';
 
 export function mountTimeline(root, { metadata, actions, restoreView = null }) {
   const document = root.ownerDocument, get = (key) => root.querySelector(`[data-timeline-${key}]`);
   const controls = Object.fromEntries(['toggle', 'bucket', 'choice', 'retry', 'scroll'].map((key) => [key, get(key)]));
   const { toggle, bucket, choice, retry, scroll } = controls;
   const panel = get('panel'), status = get('status'), scope = get('scope'), svg = get('chart'), values = get('values');
-  const xAxis = get('x-axis'), yAxis = get('y-axis');
+  const xAxis = get('x-axis'), yAxis = get('y-axis'), drill = get('drill');
+  function hideDrill() {
+    if (!drill || drill.hidden) return;
+    const focused = document.activeElement === drill;
+    drill.hidden = true;
+    if (focused) (toggle.disabled ? root.querySelector('[data-execution-scroll]') : toggle)?.focus({ preventScroll: true });
+  }
   const body = get('table').querySelector('tbody'), rows = new Map(), listeners = [];
   const display = createDisplay({ timeZone: metadata.display_timezone });
   const label = (instant) => display.timestamp(instant);
@@ -47,6 +54,7 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
     yAxis.replaceChildren();
     get('selected').textContent = get('scale').textContent = '';
     get('zero').hidden = true;
+    hideDrill();
   }
   function mark() {
     if (!rows.has(selected)) selected = order.findLast((start) => rows.get(start).item.created_count > 0) ?? order.at(-1) ?? null;
@@ -59,6 +67,7 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
     }
     const row = rows.get(selected);
     get('selected').textContent = row ? describe(row) : '';
+    if (!row || !actions.drill) hideDrill(); else drill.hidden = false;
     get('selected').title = get('selected').textContent;
   }
   const select = (start) => {
@@ -176,6 +185,24 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
     node.addEventListener(event, handler);
     listeners.push([node, event, handler]);
   };
+  // Drill-down filters the list to the bucket, clamped to the applied window so edge buckets never widen it.
+  function showBucket(start) {
+    const row = rows.get(start), meta = current?.page?.meta;
+    if (!row || !actions.drill) return;
+    const bound = (value, edge, pick) => edge === null || edge === undefined ? value
+      : pick(timestampTicks(value), timestampTicks(edge)) ? value : edge;
+    actions.drill({ from: bound(row.item.start, meta?.from, (a, b) => a >= b),
+      to: bound(row.item.end, meta?.to, (a, b) => a <= b) });
+  }
+  const activate = event => {
+    if (event.type === 'keydown' && event.key !== 'Enter') return;
+    for (let node = event.target; node && node !== svg; node = node.parentElement) {
+      if (node.dataset?.bucketStart !== undefined) { showBucket(node.dataset.bucketStart); return; }
+    }
+  };
+  listen(svg, 'keydown', activate);
+  listen(svg, 'dblclick', activate);
+  listen(drill, 'click', () => showBucket(selected));
   listen(toggle, 'click', actions.toggle);
   listen(retry, 'click', actions.retry);
   listen(bucket, 'change', () => {

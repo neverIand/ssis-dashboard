@@ -21,7 +21,8 @@ class Control extends EventTarget {
   getAttribute(key) { return this.attributes.get(key); }
   closest(selector) {
     return selector.split(', ').some(part => {
-      const key = { '[data-selection-link]':'selectionLink', '[data-sort]':'sort', '[data-execution-link]':'executionLink' }[part];
+      const key = { '[data-selection-link]':'selectionLink', '[data-sort]':'sort', '[data-execution-link]':'executionLink',
+        '[data-selection-action]':'selectionAction' }[part];
       return key && key in this.dataset;
     }) ? this : null;
   }

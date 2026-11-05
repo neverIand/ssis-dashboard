@@ -20,6 +20,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   const previous = root.querySelector('[data-executions-previous]');
   const next = root.querySelector('[data-executions-next]');
   const latest = root.querySelector('[data-executions-latest]');
+  let changeMark = 0;
   const pageNotice = root.querySelector('[data-page-notice]');
   const refresh = root.querySelector('[data-overview-refresh]');
   const pollToggle = root.querySelector('[data-poll-toggle]');
@@ -40,7 +41,11 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   let phase = 'idle';
   const timelineView=mountTimeline(root,{metadata,restoreView:restoreView?.timeline,
     actions:{toggle:()=>{void owner.toggleTimeline();},retry:()=>{void owner.retryTimeline();},
-      bucket:value=>{void owner.setTimelineBucket(value);}}});
+      bucket:value=>{void owner.setTimelineBucket(value);},
+      // O6: a bucket becomes an explicit custom Created range through the normal selection path.
+      drill:range=>{if(!appliedSelection)return;
+        const fromTimeline=root.querySelector('[data-timeline-panel]')?.contains(document.activeElement);
+        onSelect({created:null,from:range.from,to:range.to});if(fromTimeline)scroll.focus({preventScroll:true});}}});
 
   function position() {
     return { x: window.scrollX, y: window.scrollY, left: scroll.scrollLeft, top: scroll.scrollTop };
@@ -99,7 +104,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     body.replaceChildren(row);
   }
 
-  function renderRows(page, pageNumber, selection) {
+  function renderRows(page, pageNumber, selection, refreshed = false) {
     if (!page.data.length) {
       empty(pageNumber > 1 ? 'No executions remain on this page. Use Previous or First page.'
         : 'No executions match these filters.');
@@ -107,6 +112,8 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     }
     if (!rows.size) body.replaceChildren();
     const wanted = new Set();
+    // O10: on a refresh of the same page, briefly mark rows that are new or changed status.
+    changeMark = 1 - changeMark;
     let cursor = body.firstChild;
     for (const item of page.data) {
       wanted.add(item.execution_id);
@@ -125,6 +132,8 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
         cells[1].append(folder, project);
         const packageLink = element('a');
         packageLink.dataset.executionLink = ''; packageLink.dataset.executionId = item.execution_id;
+        // K2: same destination as the ID link, so one Tab stop per row is enough; pointer users keep it.
+        packageLink.tabIndex = -1;
         cells[2].append(packageLink);
         cells[3].append(element('span', undefined, 'status-badge'));
         for (const index of [7, 8]) {
@@ -140,6 +149,8 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
         rows.set(item.execution_id, record);
       }
       const { row, cells, item: previous } = record;
+      const changed = refreshed && (!previous || previous.status?.code !== item.status?.code);
+      if (changed) row.dataset.changed = String(changeMark); else delete row.dataset.changed;
       const href = executionHref(item.execution_id, selection, { appBase, origin: window.location.origin, metadata });
       if (cells[0].firstChild.getAttribute('href') !== href) cells[0].firstChild.setAttribute('href', href);
       if (cells[2].firstChild.getAttribute('href') !== href) cells[2].firstChild.setAttribute('href', href);
@@ -216,7 +227,8 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     latest.setAttribute('aria-disabled', String(state.busy || state.selection === null));
     pageNotice.textContent = state.notice;
     if (page !== renderedPage) {
-      if (page) renderRows(page, state.pageNumber, state.selection);
+      if (page) renderRows(page, state.pageNumber, state.selection,
+        state.operation === 'refresh' && !state.pageStale && renderedPage !== null);
       else empty(state.phase === 'loading-list' ? 'Loading executions…' : 'No data loaded.');
       renderedPage = page;
     } else if (page === null) {
@@ -282,10 +294,19 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     otherNote.hidden = unknownCount === 0;
     otherNote.textContent = unknownCount
       ? `Other includes ${display.count(unknownCount)} executions with unknown status codes; its filter selects supported statuses.` : '';
-    cardLinks.other.title = 'Other supported statuses: ' + metadata.execution_statuses.filter(item =>
+    // O5: the Other card names its parts from the summary already loaded.
+    const otherParts = state.summary ? state.summary.data.by_status.filter(item => ![2, 4, 7].includes(item.code) && item.count > 0)
+      .map(item => `${formatCode(metadata.execution_statuses.find(status => status.code === item.code)
+        ?? { code: item.code, name: 'unknown' })} ${display.count(item.count)}`) : [];
+    cardLinks.other.title = (otherParts.length ? `Other: ${otherParts.join(', ')}. ` : '')
+      + 'Filter selects ' + metadata.execution_statuses.filter(item =>
       statusSets.other.includes(item.code)).map(formatCode).join(', ')
       + (unknownCount ? `. Counts include ${display.count(unknownCount)} unknown codes, which the API cannot filter.` : '');
+    if (values && otherParts.length) cardLinks.other.setAttribute('aria-label',
+      `${display.count(values.other)} Other: ${otherParts.join(', ')}`);
+    else cardLinks.other.removeAttribute('aria-label');
     timelineView.render(state.timeline,state.busy,state.selection,page);
+    fitStickyHeader();
     if (focused === listRetry && listRetry.hidden) refresh.focus({ preventScroll: true });
     if (rowFocus && document.activeElement !== focused) {
       (focused.isConnected ? focused : scroll).focus({ preventScroll: true });
@@ -301,6 +322,14 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       returning = null;
     }
   } });
+  // Sticky headers need a region that does not scroll sideways; only clip it when nothing would be hidden.
+  const toolbar = root.querySelector('.executions-toolbar');
+  function fitStickyHeader() {
+    const fits = table.getBoundingClientRect().width <= scroll.clientWidth + 0.5;
+    if (fits) scroll.dataset.fits = ''; else delete scroll.dataset.fits;
+    if (toolbar) scroll.style.setProperty?.('--sd-list-toolbar-height', `${toolbar.getBoundingClientRect().height}px`);
+  }
+  window.addEventListener?.('resize', fitStickyHeader);
   const retryList = () => { void owner.retryList(); };
   const previousPage = () => { void owner.previous(); };
   const nextPage = () => { void owner.next(); };
@@ -338,6 +367,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       next.removeEventListener('click', nextPage);
       latest.removeEventListener('click', latestPage);
       refresh.removeEventListener('click', refreshPage);
+      window.removeEventListener?.('resize', fitStickyHeader);
       for (const [node, action] of cardActions) node.removeEventListener('click', action);
     },
   };

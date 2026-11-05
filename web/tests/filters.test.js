@@ -342,6 +342,31 @@ test('clicking a card/header/scope with an open Status draft commits one merged 
   }
 });
 
+test('a timeline drill with an open Status draft commits status and bucket range once (UX B3, Codex R1-1)', t => {
+  const dom = setup(t); dom.open('status');
+  const status = dom.get('#status'); status.children[1].checked = true; status.dispatchEvent(new Event('change'));
+  const drill = dom.document.createElement('button'); drill.dataset.selectionAction = '';
+  const pointer = eventAt('pointerdown', drill); dom.document.dispatchEvent(pointer);
+  assert.equal(pointer.defaultPrevented, true, 'the draft is not committed before the drill');
+  assert.equal(dom.applied.length, 1);
+  const range = { created: null, from: '2026-10-17T00:00:00.0000000Z', to: '2026-10-17T05:00:00.0000000Z' };
+  dom.select(range); dom.document.dispatchEvent(eventAt('click', drill));
+  assert.equal(dom.applied.length, 2);
+  assert.deepEqual([dom.applied.at(-1).status, dom.applied.at(-1).from, dom.applied.at(-1).to], [[1], range.from, range.to]);
+});
+
+test('a timeline double click keeps an open Status draft through its first click (UX B3, Codex R2-1)', t => {
+  const dom = setup(t); dom.open('status');
+  const status = dom.get('#status'); status.children[1].checked = true; status.dispatchEvent(new Event('change'));
+  const bar = dom.document.createElement('g'); bar.dataset.selectionAction = '';
+  for (const type of ['pointerdown', 'click', 'pointerdown', 'click']) dom.document.dispatchEvent(eventAt(type, bar));
+  assert.equal(dom.applied.length, 1, 'no commit before the dblclick drill');
+  const range = { created: null, from: '2026-10-17T00:00:00.0000000Z', to: '2026-10-17T05:00:00.0000000Z' };
+  dom.select(range);
+  assert.equal(dom.applied.length, 2);
+  assert.deepEqual([dom.applied.at(-1).status, dom.applied.at(-1).from], [[1], range.from]);
+});
+
 test('a detail link consumes closing Status into its URL before rows can be cleared', t => {
   for (const activation of ['click','auxclick']) {
     for (const fragment of ['', '#events/errors', '#events/warnings']) {

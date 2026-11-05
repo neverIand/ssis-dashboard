@@ -749,3 +749,25 @@ tbody tr:hover { background: var(--sd-subtle); }
 .chart-count { margin-left: auto; color: var(--sd-secondary); font-size: 0.8667rem; white-space: nowrap; }
 .chart-mixed { display: block; margin: 0.3rem 0 0; color: var(--sd-warning); }
 [data-history-results][data-idle] :is(.table-toolbar, [data-history-chart-panel], [data-history-status-options]) { display: none; }
+/* Overview (UX batch B3): paging stays reachable on long pages without a second pager or footer: the list
+   toolbar sticks to the top of the viewport, and where the table never scrolls sideways its header sticks below it. */
+/* Phones wrap the toolbar to several rows, so it only sticks where it stays one or two rows. */
+@media (min-width: 49.4rem) {
+  .executions-toolbar { position: sticky; top: 0; z-index: 2; background: var(--sd-surface); border-radius: var(--sd-radius) var(--sd-radius) 0 0; }
+}
+@media (min-width: 49.4rem) {
+  [data-execution-scroll][data-fits] { overflow-x: clip; }
+  [data-execution-scroll][data-fits] [data-execution-table] thead th {
+    position: sticky; top: var(--sd-list-toolbar-height, 3.0667rem); z-index: 1;
+  }
+}
+@keyframes sd-row-change-a { from { background: var(--sd-action-soft); } to { background: transparent; } }
+@keyframes sd-row-change-b { from { background: var(--sd-action-soft); } to { background: transparent; } }
+[data-execution-table] tr[data-changed="0"] { animation: sd-row-change-a 2s ease-out; }
+[data-execution-table] tr[data-changed="1"] { animation: sd-row-change-b 2s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  [data-execution-table] tr[data-changed] { animation: none; background: var(--sd-action-soft); }
+}
+.chart-selection-row { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.chart-selection-row > .chart-selection { flex: 1 1 auto; min-width: 0; }
+.exact-times > summary { font-size: 0.8667rem; cursor: pointer; }
