@@ -34,7 +34,9 @@
                     <span><a data-detail-field="{{ key }}" data-event-count-link="{{ kind }}">—</a> <span{% if key in ['errors', 'warnings'] %} data-event-count-label="{{ key }}"{% endif %}>{{ label }}</span></span>
                     {% endfor %}
                     {{ tip('counts-tip', 'Event count definitions', 'Warnings include duplicate warnings. Memory warnings are separate.') }}
+                    <a class="legacy-errors" data-legacy-errors hidden>Error messages in legacy view</a>
                 </div>
+                <p class="first-error" data-first-error hidden><span>Earliest recorded error:</span> <a data-first-error-link></a> <span data-first-error-message></span></p>
             </section>
             <div class="detail-tabs">
                 <div class="detail-tab-list" role="tablist" aria-label="Execution sections">
@@ -58,6 +60,7 @@
                             <label class="event-search"><span class="visually-hidden">Search full messages</span><input type="search" data-events-q placeholder="Search messages…" autocomplete="off" spellcheck="false"></label>
                             <button type="submit" data-events-apply>Search</button><button type="button" class="button-quiet" data-events-reset hidden>Reset</button>
                         </form>
+                        <span class="visually-hidden" role="status" data-events-copy-status></span>
                         <div class="toolbar-meta"><span class="inline-notice" data-events-notice role="status"></span><p class="inline-status" data-events-status role="status"></p><button type="button" class="button-quiet" data-events-retry hidden>Retry</button></div>
                         <label>Sort<select data-events-sort></select></label>
                         {{ pager('events', 'Event') }}

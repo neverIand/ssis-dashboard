@@ -115,20 +115,23 @@ export function mountSectionTable(root, { metadata, actions, restoreView = null 
           const page = panel.hidden ? null : state.page;
           reserveSpace(!panel.hidden && state.phase === 'loading' && page === null, rendered !== null);
           view.beforePaint?.(page, state, busy);
+          const error = state.error;
+          const errorText = error ? `${error.message}${error.requestId ? ` Request ID: ${error.requestId}` : ''}` : '';
           if (page !== rendered || page === null || executionStart !== renderedStart) {
             if (page) paint(page, executionStart, view);
-            else empty(state.phase === 'loading' ? view.loading : view.notLoaded);
+            // With nothing to show, a failed read is stated in full where the rows would be.
+            else empty(state.phase === 'loading' ? view.loading : errorText || view.notLoaded);
             rendered = page;
             renderedStart = executionStart;
           }
           status.title = page ? `Observed ${display.timestamp(page.meta.generated_at)} · ${page.meta.generated_at}` : '';
           const info = page ? view.pageInfo(page, state) : '';
-          const error = state.error;
           status.textContent = panel.hidden ? '' : error
-            ? `${error.message}${error.requestId ? ` Request ID: ${error.requestId}` : ''}`
-              + `${state.stale ? ` ${view.previousPage} ` : ' '}${info}`
+            ? `${errorText}${state.stale ? ` ${view.previousPage} ` : ' '}${info}`
             : state.stale ? `Refreshing… ${view.previousPage} ${info}` : state.phase === 'loading' ? view.loading : info;
           status.title = [status.textContent, status.title].filter(Boolean).join(' · ');
+          // Errors wrap instead of truncating, so the request ID stays readable and selectable.
+          if (error && !panel.hidden) status.dataset.error = ''; else delete status.dataset.error;
           view.afterStatus?.();
           if (panel.hidden && panelFocused && permitted) toggle.focus({ preventScroll: true });
           else if (focused === retry && retry.hidden) (toggle.hidden ? scroll : toggle).focus({ preventScroll: true });

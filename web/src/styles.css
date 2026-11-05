@@ -257,6 +257,10 @@ main {
 .table-toolbar > label, .table-toolbar > button, .pagination { flex: 0 0 auto; }
 .toolbar-meta { display: flex; align-items: center; flex: 1 1 12rem; gap: 0.4rem; min-width: 5rem; overflow: hidden; }
 .toolbar-meta > .inline-status { flex: 0 1 auto; margin: 0; }
+/* A failed read gets its own full-width line under the controls instead of squeezing them. */
+.table-toolbar:has(> .toolbar-meta > .inline-status[data-error]) { flex-wrap: wrap; }
+.toolbar-meta:has(> .inline-status[data-error]) { order: 1; flex-basis: 100%; overflow: visible; }
+.inline-status[data-error] { white-space: normal; overflow-wrap: anywhere; color: var(--sd-error); user-select: text; }
 .toolbar-meta > .inline-notice { flex: 0 1 auto; max-width: 65%; }
 .inline-notice:empty { display: none; }
 .toolbar-meta > button { flex: 0 0 auto; min-height: 1.8rem; padding: 0.1rem 0.3rem; }
@@ -536,9 +540,16 @@ tbody tr:hover { background: var(--sd-subtle); }
 [data-children-table] th, [data-children-table] td { padding: 0.4rem 0.6rem; vertical-align: top; }
 .event-preview { margin: 0; }
 [data-events-table] { min-width: 34rem; }
-[data-events-table] col:nth-child(1) { width: 22%; }
-[data-events-table] col:nth-child(2) { width: 28%; }
-[data-events-table] col:nth-child(3) { width: 50%; }
+[data-events-table] col:nth-child(1) { width: 15%; }
+[data-events-table] col:nth-child(2) { width: 22%; }
+[data-events-table] col:nth-child(3) { width: 63%; }
+/* Failure triage: the failing component reads inline and error text is whole, bounded by its own scroll. */
+.event-source { display: block; color: var(--sd-secondary); font-size: 0.8667rem; font-weight: 400; white-space: normal; overflow-wrap: anywhere; }
+.event-preview[data-full="true"] { max-height: min(18rem, 50vh); overflow: auto; }
+.copy-message { min-height: 0; margin-top: 0.3rem; padding: 0.05rem 0.45rem; font-size: 0.8rem; }
+.legacy-errors { margin-left: 0.4rem; }
+.first-error { margin-top: 0.4rem; font-size: 0.8667rem; overflow-wrap: anywhere; }
+.first-error > span:first-child { color: var(--sd-secondary); }
 /* Started/Ended stay on one line even with a full cross-day date; narrow screens scroll the table instead. */
 [data-executables-table] { min-width: 58rem; }
 [data-executables-table] col:nth-child(1) { width: 7rem; }

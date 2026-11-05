@@ -1,11 +1,12 @@
 import { createDisplay, refreshStatus } from './display.js';
-import { createDetailLoader, detailFields } from './detail.js';
+import { createDetailLoader, detailFields, transient } from './detail.js';
 import { readOverviewReturn, readDetailFragment, detailFragment } from './detail-navigation.js';
 import { mountDetailTabs } from './detail-tabs.js';
 import { mountObservationTable } from './render-observations.js';
 import { mountEvents } from './render-events.js';
 import { mountParameters, mountOverrides } from './render-values.js';
 import { mountHistory } from './render-history.js';
+import { clippedText } from './observation-page.js';
 import { defaultSelection, selectionSearch } from './selection.js';
 import { inlineStatus, pollingButton } from './ui.js';
 import { readHistoryReturn } from './history-navigation.js';
@@ -57,9 +58,23 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   const countLinks = [...root.querySelectorAll('[data-event-count-link]')];
   const countLabels = Object.fromEntries(['errors', 'warnings'].map(key =>
     [key, root.querySelector(`[data-event-count-label="${key}"]`)]));
+  // Without the events capability, counts open the legacy event lists (L06) by an explicit click only.
+  const legacyBase = root.querySelector('[data-legacy-detail-link]')?.getAttribute('href') ?? null;
+  const legacyErrors = root.querySelector('[data-legacy-errors]');
+  const firstError = root.querySelector('[data-first-error]');
+  const firstErrorLink = root.querySelector('[data-first-error-link]');
+  const firstErrorMessage = root.querySelector('[data-first-error-message]');
+  let earliestError = null, earliestSource = null;
+  const followErrors = event => {
+    if ((event.button ?? 0) !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    tabView.follow({ tab: 'events', kind: 'errors' }, { focus: true });
+  };
+  firstErrorLink?.addEventListener('click', followErrors);
   const countActions = countLinks.map(link => {
     const kind = link.dataset.eventCountLink;
     const click = event => {
+      if (!metadata.capabilities.events) return;
       if ((event.button ?? 0) !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
       if (link.getAttribute('href') !== null) tabView.follow({ tab: 'events', kind }, { focus: true });
@@ -106,7 +121,37 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     title.textContent = `Execution ${executionId}`;
     badge.textContent = '';
     badge.hidden = titleId.hidden = true;
+    hideEarliestError();
+    if (legacyErrors) { legacyErrors.hidden = true; legacyErrors.removeAttribute('href'); }
   };
+  // Hidden is not enough after denial or clearing: remove the text and link as well (D06).
+  function hideEarliestError() {
+    earliestError = earliestSource = null;
+    if (!firstError) return;
+    firstError.hidden = true;
+    firstErrorLink.textContent = firstErrorMessage.textContent = '';
+    firstErrorLink.removeAttribute('href');
+  }
+  // Only a successfully read, unsearched, time-ascending first Errors page names the earliest recorded error.
+  // A page is judged once, when it arrives, so a stale page under a reset page number never qualifies.
+  function showEarliestError(events, counts) {
+    const query = events.query, page = events.page;
+    const denied = events.phase === 'error' && page === null && events.error !== null && !transient(events.error);
+    if (!counts?.errors || denied) { hideEarliestError(); return; }
+    if (page && page !== earliestSource && events.phase === 'ready' && events.error === null) {
+      earliestSource = page;
+      if (query.kind === 'errors' && query.q === null && query.sort === 'message_time' && query.direction === 'asc'
+          && events.pageNumber === 1) earliestError = page.data[0] ?? null;
+    }
+    if (!firstError) return;
+    if (earliestError === null) { firstError.hidden = true; return; }
+    firstError.hidden = false;
+    const source = [earliestError.source_name, earliestError.subcomponent_name].filter(Boolean).join(' › ');
+    firstErrorLink.textContent = source || earliestError.event_name || 'Error';
+    firstErrorLink.href = detailFragment({ tab: 'events', kind: 'errors' }, metadata);
+    firstErrorMessage.textContent = earliestError.message === null ? '' : `— ${clippedText(earliestError.message, 200)
+      ?? earliestError.message}`;
+  }
   const loader = createDetailLoader({ api, metadata, executionId, autoRefresh: !autoPaused,
     initialTab: readDetailFragment(window.location.hash, metadata) ?? returning?.activeTab ?? {},
     restoreExecutables: returning?.executables, restoreChildren: returning?.children, restoreEvents: returning?.events,
@@ -170,14 +215,24 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     parameterView.render(state.parameters, state.busy, state.response !== null);
     overrideView.render(state.overrides, state.busy, state.response !== null);
     historyView.render(state.history, state.busy, state.response !== null, state.response?.data);
+    const legacy = !metadata.capabilities.events && legacyBase !== null;
     for (const link of countLinks) {
       if (metadata.capabilities.events && state.response) link.href = detailFragment({ tab: 'events',
         kind: link.dataset.eventCountLink }, metadata);
+      else if (legacy && state.response) link.href = `${legacyBase}/events/${link.dataset.eventCountLink}`;
       else link.removeAttribute('href');
       const kind = link.dataset.eventCountLink === 'all' ? 'events' : link.dataset.eventCountLink.replaceAll('-', ' ');
       const label = state.response?.data.event_counts[link.dataset.detailField] === 1 ? kind.slice(0, -1) : kind;
-      link.setAttribute('aria-label', `${link.textContent} ${label} for this execution`);
+      link.setAttribute('aria-label', `${link.textContent} ${label} for this execution${legacy ? ', legacy view' : ''}`);
+      link.title = legacy && state.response ? 'Opens the legacy event list' : '';
     }
+    if (legacyErrors) {
+      legacyErrors.hidden = !legacy || !state.response?.data.event_counts.errors;
+      if (legacyErrors.hidden) legacyErrors.removeAttribute('href');
+      else legacyErrors.href = `${legacyBase}/events/errors`;
+    }
+    if (metadata.capabilities.events && state.response) showEarliestError(state.events, state.response.data.event_counts);
+    else hideEarliestError();
     tabView.render(state);
     activeTab = state.activeTab ? { tab: state.activeTab,
       ...(state.activeTab === 'events' ? { kind: state.events.query.kind } : {}) } : null;
@@ -222,6 +277,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     historyView.dispose();
     tabView.dispose();
     for (const [link, click] of countActions) link.removeEventListener('click', click);
+    firstErrorLink?.removeEventListener('click', followErrors);
     refresh.removeEventListener('click', load);
     toggle.removeEventListener('click', togglePolling);
     document.removeEventListener('visibilitychange', visibilityChanged);

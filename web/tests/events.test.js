@@ -209,7 +209,7 @@ test('keyed event rows keep literal text, expanded source/message and current fo
     ? Promise.resolve(eventPage([eventRow('1', { message: '😀'.repeat(16384), truncated: true }), eventRow('2', { message: '' })],
       { has_unidentified_events: true, availability: 'unknown' })) : pending.promise : Promise.resolve(response(resource)));
   await flush(); run.action('toggle'); await flush();
-  const row = run.dom.eventBody.firstChild, message = row.children[2].children[2], source = row.children[1].children[1];
+  const row = run.dom.eventBody.firstChild, message = row.children[2].children[2], source = row.children[1].children[2];
   assert.match(row.textContent, /Truncated to 16384/); assert.match(run.dom.get('events-status').textContent, /no public numeric ID/);
   assert.match(run.dom.eventBody.children[1].textContent, /\(empty\)/);
   message.open = source.open = true; source.firstChild.focus();
@@ -242,7 +242,7 @@ test('event denial clears row text with a connected focus fallback; 404 also cle
     return eventPage();
   });
   await flush(); run.action('toggle'); await flush();
-  run.dom.eventBody.firstChild.children[1].children[1].firstChild.focus();
+  run.dom.eventBody.firstChild.children[1].children[2].firstChild.focus();
   failure = new ApiError('http', { status: 403 }); run.dom.get('detail-refresh').dispatchEvent(new Event('click')); await flush();
   assert.doesNotMatch(run.dom.eventBody.textContent, /literal|影狼/);
   assert.equal(run.dom.document.activeElement, run.dom.get('events-scroll')); assert.equal(run.dom.field('package').textContent, 'Main.dtsx');
@@ -255,12 +255,12 @@ test('retained message/source expansion restores after a fresh read and missing 
   let long = true;
   const get = async resource => resource.endsWith('/events') ? eventPage([eventRow('1', { message: long ? 'x'.repeat(200) : 'short' })]) : response(resource);
   const first = mounted(t, get); await flush(); first.action('toggle'); await flush();
-  const row = first.dom.eventBody.firstChild, message = row.children[2].children[2], source = row.children[1].children[1];
+  const row = first.dom.eventBody.firstChild, message = row.children[2].children[2], source = row.children[1].children[2];
   message.open = source.open = true; message.firstChild.focus();
   const saved = first.screen.checkpoint(); first.screen.dispose();
   const next = mounted(t, get, { restoreView: saved }); await flush();
   assert.equal(next.dom.eventBody.firstChild.children[2].children[2].open, true);
-  assert.equal(next.dom.eventBody.firstChild.children[1].children[1].open, true);
+  assert.equal(next.dom.eventBody.firstChild.children[1].children[2].open, true);
   long = false;
   const short = mounted(t, get, { restoreView: saved }); await flush();
   assert.equal(short.dom.document.activeElement, short.dom.get('events-scroll'));

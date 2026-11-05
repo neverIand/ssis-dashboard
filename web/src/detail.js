@@ -55,7 +55,7 @@ export function readExecutionDetail(response, executionId, display) {
   } catch { throw new ApiError('invalid_response', { requestId: response?.meta?.request_id }); }
 }
 
-const transient = error => ['network', 'timeout'].includes(error.kind)
+export const transient = error => ['network', 'timeout'].includes(error.kind)
   || (error.kind === 'http' && (error.status >= 500 || [408, 429].includes(error.status)));
 
 export function createDetailLoader({ api, executionId, metadata, publish, timeoutMs = 30000, locale,
