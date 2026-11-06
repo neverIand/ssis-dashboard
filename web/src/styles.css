@@ -771,3 +771,13 @@ tbody tr:hover { background: var(--sd-subtle); }
 .chart-selection-row { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
 .chart-selection-row > .chart-selection { flex: 1 1 auto; min-width: 0; }
 .exact-times > summary { font-size: 0.8667rem; cursor: pointer; }
+/* Execution page (UX batch B4): an ended run has no Pause button; executable rows take two lines, with the
+   Paths disclosure beside the parent container instead of on its own line. */
+.page-heading > .section-actions:has(> [data-detail-poll-toggle][hidden]) { grid-template-columns: minmax(0, 1fr) 2.2rem; }
+[data-executables-table] .observation-name > .cell-detail { display: inline; }
+[data-executables-table] .observation-name > .cell-detail:not(:empty)::after { content: " "; }
+[data-executables-table] .observation-name > details { display: inline; margin-top: 0; }
+[data-executables-table] .observation-name > details[open] { display: block; }
+/* A closed summary stays on the parent line; 'inline list-item' keeps its disclosure marker. */
+[data-executables-table] .observation-name > details:not([open]) > summary { display: inline list-item; }
+[data-executables-table] .observation-name > span:first-child { display: block; }

@@ -1,5 +1,5 @@
 {% macro icon(name) -%}
-<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="{{ {'refresh': 'M20 7v5h-5 M20 12a8 8 0 1 0-2 5 M4 17v-5h5', 'pause': 'M8 5v14 M16 5v14', 'play': 'M8 5l11 7-11 7Z', 'previous': 'M15 5l-7 7 7 7', 'next': 'M9 5l7 7-7 7', 'first': 'M5 5v14 M18 5l-7 7 7 7'}[name] }}"/></svg>
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="{{ {'refresh': 'M20 12a8 8 0 1 1-2.34-5.66L20 8 M20 3v5h-5', 'pause': 'M8 5v14 M16 5v14', 'play': 'M8 5l11 7-11 7Z', 'previous': 'M15 5l-7 7 7 7', 'next': 'M9 5l7 7-7 7', 'first': 'M5 5v14 M18 5l-7 7 7 7'}[name] }}"/></svg>
 {%- endmacro %}
 
 {% macro tip(id, label, text) -%}

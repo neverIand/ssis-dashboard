@@ -64,16 +64,19 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     return node;
   }
 
-  function time(value) {
+  function time(value, created = null) {
     if (value === null) return document.createTextNode('—');
     // Date and time wrap as whole parts in narrow columns, never inside the date.
     const node = element('time');
-    for (const [index, part] of display.timestamp(value).split(' ').entries()) {
+    // G4: Started repeats Created's date almost always; show only its time then. The full value stays in title.
+    const full = display.timestamp(value);
+    const shown = created !== null && full.slice(0, 10) === display.timestamp(created).slice(0, 10) ? full.slice(11) : full;
+    for (const [index, part] of shown.split(' ').entries()) {
       if (index) node.append(document.createTextNode(' '));
       node.append(element('span', part));
     }
     node.dateTime = value;
-    node.title = value;
+    node.title = `${full} · ${value}`;
     return node;
   }
 
@@ -163,7 +166,9 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       text(cells[3].firstChild, formatCode(item.status));
       row.dataset.status = cells[3].firstChild.dataset.status = String(item.status?.code ?? '');
       for (const [index, key] of [[4, 'created_at'], [5, 'started_at']]) {
-        if (previous?.[key] !== item[key]) cells[index].replaceChildren(time(item[key]));
+        if (previous?.[key] !== item[key] || previous?.created_at !== item.created_at) {
+          cells[index].replaceChildren(time(item[key], key === 'started_at' ? item.created_at : null));
+        }
       }
       if (!previous || ['duration_seconds', 'elapsed_seconds', 'ended_at'].some((key) => previous[key] !== item[key])) {
         cells[6].replaceChildren(document.createTextNode(display.duration(item.duration_seconds)));

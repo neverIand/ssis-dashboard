@@ -39,6 +39,10 @@ export function mountHistoryScreen(root, saved = null) {
       notice.textContent = changed ? 'Scope changes are not applied yet. Choose Load history.'
         : literal ? 'Exact names treat * and % as literal characters.' : persistent;
     };
+    // The tab names the loaded package scope; idle and invalid pages use the plain title.
+    const showTitle = () => {
+      document.title = loaded ? `History · ${selection.package} · SSIS Dashboard` : 'History · SSIS Dashboard';
+    };
     const showIdle = idle => {
       if (idle) results.setAttribute('data-idle', ''); else results.removeAttribute('data-idle');
       status.hidden = refresh.hidden = toggle.hidden = idle;
@@ -50,7 +54,7 @@ export function mountHistoryScreen(root, saved = null) {
         selection = historySelection(value, metadata); navigation.historySelection = selection; show();
         notice.textContent = persistent = '';
         if (drafts) for (const [key, input] of Object.entries(controls)) input.value = drafts[key];
-        loaded = true; showIdle(false);
+        loaded = true; showIdle(false); showTitle();
         if (push) window.history.pushState(null, '', historyHref(selection, navigation));
         describeDraft();
         void owner.select(selection);
@@ -81,6 +85,7 @@ export function mountHistoryScreen(root, saved = null) {
       catch { selection = parseHistorySelection('', metadata); persistent = invalid; }
       navigation.historySelection = selection; show();
       loaded = search.length > 1 && !persistent;
+      showTitle();
       if (loaded) { showIdle(false); void owner.select(selection); }
       else {
         showIdle(true); owner.clear();

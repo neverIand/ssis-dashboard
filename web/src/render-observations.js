@@ -2,6 +2,7 @@ import { formatCode, formatId } from './display.js';
 import { mountSectionTable } from './section-table.js';
 
 export function mountObservationTable(root, { metadata, actions, restoreView = null, resource = 'executables' }) {
+  let entryPackage = null;
   const child = resource === 'children', singular = child ? 'package call' : 'executable';
   const idKey = child ? 'observation_id' : 'statistics_id';
   const columns = child ? { count: 5, name: 0, started_at: 1, ended_at: 2, duration: 3, state: 4 }
@@ -42,8 +43,10 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
       pathFields.setAttribute('role', 'region');
       pathFields.setAttribute('aria-label', child ? 'Package call details' : 'Executable paths');
       const packagePath = element('dd'), executionPath = element('dd');
+      const executableId = child ? null : element('dd'), packageField = child ? null : element('dd');
       if (child) pathFields.append(element('dt', 'Observation ID'), id, element('dt', 'Event source'), source,
         element('dt', 'Source type'), sourceType);
+      else pathFields.append(element('dt', 'Package'), packageField, element('dt', 'Executable ID'), executableId);
       pathFields.append(element('dt', 'Package path'), packagePath, element('dt', 'Execution path'), executionPath);
       paths.append(summary, pathFields);
       if (child) cells[0].append(callPath, paths);
@@ -60,6 +63,8 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
         id,
         source,
         sourceType,
+        executableId,
+        packageField,
         callPath,
         paths,
         summary,
@@ -79,7 +84,14 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
       text(record.sourceType, item.source_type === null ? '—' : String(item.source_type));
     } else {
       text(record.cells[0], formatId(item.statistics_id));
-      text(record.packageName, `Package: ${literal(item.package_name)} · Executable ID: ${formatId(item.executable_id)}`);
+      // D4: one secondary line naming where the step runs (its parent container), and the package only for
+      // a child package. IDs and full paths stay in Paths.
+      const segments = (item.execution_path ?? '').split('\\').filter(Boolean);
+      const parent = segments.length > 1 ? segments.at(-2) : '';
+      const other = entryPackage !== null && item.package_name !== entryPackage ? literal(item.package_name) : '';
+      text(record.packageName, [parent && `in ${parent}`, other && `package ${other}`].filter(Boolean).join(' · '));
+      text(record.packageField, literal(item.package_name));
+      text(record.executableId, formatId(item.executable_id));
     }
     text(record.packagePath, literal(item.package_path));
     text(record.executionPath, literal(item.execution_path));
@@ -103,7 +115,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
     record.executionStart = executionStart;
     return record;
   }
-  return view.mount({
+  const mounted = view.mount({
     paintRow,
     loading: `Loading ${singular} observations…`,
     notLoaded: 'No observations loaded.',
@@ -122,4 +134,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
           ? ' · Some starts have no public numeric ID and cannot be paged. Coverage is unknown.' : '');
     }
   });
+  // Lets rows say "package X" only for child packages; the detail screen knows the entry package.
+  mounted.setEntryPackage = name => { entryPackage = name ?? null; };
+  return mounted;
 }

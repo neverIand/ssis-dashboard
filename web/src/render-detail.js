@@ -119,6 +119,8 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     }
     // No placeholder dashes in the title: name the execution until its package is known.
     title.textContent = `Execution ${executionId}`;
+    // Denied, missing or disposed data must not linger in the browser tab either.
+    document.title = `Execution ${executionId} · SSIS Dashboard`;
     badge.textContent = '';
     badge.hidden = titleId.hidden = true;
     hideEarliestError();
@@ -163,6 +165,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     content.setAttribute('aria-busy', String(state.busy));
     refresh.disabled = false;
     toggle.disabled = state.terminal;
+    toggle.hidden = state.terminal;
     if (state.terminal && focused === toggle) refresh.focus({ preventScroll: true });
     focusTargets.toggle = state.terminal ? refresh : toggle;
     refresh.setAttribute('aria-disabled', String(state.busy));
@@ -205,10 +208,13 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
       }
       for (const node of Object.values(breadcrumb)) node.parentElement.hidden = false;
       badge.hidden = titleId.hidden = false;
+      // G2: tabs name the package, run and status, and follow status changes on refresh.
+      document.title = `${data.package_name} #${executionId} · ${values.status} · SSIS Dashboard`;
       elapsed.hidden = data.started_at === null || data.ended_at !== null;
       content.hidden = false;
     }
     rendered = state.response;
+    executableView.setEntryPackage(state.response?.data.package_name);
     executableView.render(state.executables, state.busy, state.response !== null, state.response?.data.started_at);
     childView.render(state.children, state.busy, state.response !== null, state.response?.data.started_at);
     eventView.render(state.events, state.busy, state.response !== null, state.response?.data.started_at);

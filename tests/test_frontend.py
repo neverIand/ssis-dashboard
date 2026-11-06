@@ -47,6 +47,7 @@ class FrontendShellTests(unittest.TestCase):
         (self.output / 'assets/main.js').write_text('// packaged entry', encoding='utf-8')
         (self.output / 'assets/main.css').write_text('body { margin: 0; }', encoding='utf-8')
         (self.output / 'theme-init.js').write_text('// theme', encoding='utf-8')
+        (self.output / 'favicon.svg').write_text('<svg/>', encoding='utf-8')
         self.app = create_app({'TESTING': True})
         self.app.static_folder = str(self.static)
         self.client = self.app.test_client()
@@ -138,7 +139,7 @@ class FrontendShellTests(unittest.TestCase):
         references = re.findall(r'(?:href|src)="([^"]+)"', html)
         self.assertEqual(set(references), {
             '#main-content', '/', '/app/', '/app/history', '/static/app/assets/main.js', '/static/app/assets/main.css',
-            '/static/app/theme-init.js',
+            '/static/app/theme-init.js', '/static/app/favicon.svg',
         })
         # The theme script is classic and render-blocking, ahead of the stylesheet it configures.
         self.assertLess(html.index('/static/app/theme-init.js'), html.index('/static/app/assets/main.css'))

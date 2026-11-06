@@ -168,3 +168,18 @@ test('R1 (Codex): while idle, header sort, an open Custom popover and an invalid
   assert.equal(invalid.history().length, 0);
   assert.match(invalid.get('history-scope-notice').textContent, /^Invalid history filters/);
 });
+
+test('B4 R1-3: the History tab title follows direct URLs, Back/Forward and the idle page', async t => {
+  const dom = screen(t, scoped);
+  await settle();
+  assert.equal(dom.document.title, 'History · Main.dtsx · SSIS Dashboard');
+  Object.assign(dom.window.location, { search: '' });
+  dom.window.dispatchEvent(new Event('popstate')); await settle();
+  assert.equal(dom.document.title, 'History · SSIS Dashboard');
+  Object.assign(dom.window.location, { search: '?match=exact&folder=F&project=P&package=Other.dtsx' });
+  dom.window.dispatchEvent(new Event('popstate')); await settle();
+  assert.equal(dom.document.title, 'History · Other.dtsx · SSIS Dashboard');
+  Object.assign(dom.window.location, { search: '?match=other' });
+  dom.window.dispatchEvent(new Event('popstate')); await settle();
+  assert.equal(dom.document.title, 'History · SSIS Dashboard');
+});

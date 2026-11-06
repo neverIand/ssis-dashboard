@@ -35,7 +35,7 @@ test('detail bootstrap needs no overview controls and requests metadata, detail 
   assert.equal(dom.get('active-elapsed').hidden, true);
   assert.equal(dom.field('created').textContent, '2026-10-17 17:00:00');
   assert.equal(dom.field('created').getAttribute('title'), response.data.created_at);
-  assert.equal(dom.get('detail-poll-status').textContent, 'Updated 17:00:00 · Execution ended · auto refresh off');
+  assert.equal(dom.get('detail-poll-status').textContent, 'Execution ended · updated 17:00:00');
   assert.ok(dom.get('detail-poll-status').title.includes(detailResponse('17').meta.generated_at));
   dispose();
   assert.equal(dom.get('execution-detail').hidden, true);
@@ -242,7 +242,7 @@ test('ended detail disables Pause with an explanation, ignores visible return an
   assert.equal(toggle.getAttribute('aria-label'), 'Automatic refresh is off for an ended execution');
   assert.equal(toggle.title, toggle.getAttribute('aria-label'));
   assert.equal(dom.get('detail-refresh').disabled, false);
-  assert.equal(dom.get('detail-poll-status').textContent, 'Updated 17:00:00 · Execution ended · auto refresh off');
+  assert.equal(dom.get('detail-poll-status').textContent, 'Execution ended · updated 17:00:00');
   toggle.dispatchEvent(new Event('click'));
   assert.equal(screen.checkpoint().autoPaused, false);
   for (const state of ['hidden', 'visible']) {

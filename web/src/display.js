@@ -88,13 +88,17 @@ export function createDisplay({ timeZone } = {}) {
     tableTimestamp(value, executionStart) {
       if (value === null) return missing;
       const p = parts(value), sameDay = executionStart != null && parts(executionStart).day === p.day;
-      return `${sameDay ? '' : p.day + ' '}${p.clock}.${p.milliseconds}${p.suffix}`;
+      // Whole seconds drop ".000"; any nonzero fraction, even below a millisecond, keeps the order-preserving digits.
+      const whole = /T\d\d:\d\d:\d\d(?:\.0+)?(?:Z|[+-])/.test(value);
+      return `${sameDay ? '' : p.day + ' '}${p.clock}${whole ? '' : `.${p.milliseconds}`}${p.suffix}`;
     },
   };
 }
 
 export function refreshStatus(display, generatedAt, poll, ended = false) {
-  const mode = ended ? 'Execution ended · auto refresh off' : { idle: '', scheduled: poll.failures ? 'retry scheduled' : 'auto refresh on',
+  // An ended execution has nothing to resume: say so first, then when it was last read.
+  if (ended) return ['Execution ended', generatedAt ? `updated ${display.clock(generatedAt)}` : ''].filter(Boolean).join(' · ');
+  const mode = { idle: '', scheduled: poll.failures ? 'retry scheduled' : 'auto refresh on',
     paused: 'auto refresh paused', hidden: 'auto refresh paused (tab hidden)',
     updating: 'refreshing…', blocked: 'auto refresh stopped' }[poll.mode];
   const text = [generatedAt ? `Updated ${display.clock(generatedAt)}` : '', mode].filter(Boolean).join(' · ');

@@ -27,9 +27,11 @@ test('default observations load once; keyed rows preserve literal paths, expansi
   assert.equal(dom.body.children.length, 2);
   assert.match(dom.body.textContent, /<b>Task 影狼<\/b>/);
   assert.match(dom.body.textContent, /\(empty\)/);
-  // Separate one-line Started and Ended cells; package and executable ID share one line.
+  // Separate one-line Started and Ended cells. The secondary line names the parent container; the entry
+  // package is not repeated, and package plus executable ID stay in Paths (UX batch B4, D4).
   assert.equal(row.children.length, 6);
-  assert.equal(row.children[1].children[1].textContent, 'Package: Main.dtsx · Executable ID: 2');
+  assert.equal(row.children[1].children[1].textContent, 'in Package');
+  assert.match(paths(row).textContent, /PackageMain\.dtsxExecutable ID2/);
   assert.equal(row.children[2].firstChild.attributes.get('datetime'), '2026-10-17T16:00:00.1234567Z');
   assert.equal(row.children[3].textContent, '—');
   paths(row).open = true; summary.focus();

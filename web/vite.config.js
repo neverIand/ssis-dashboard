@@ -23,6 +23,12 @@ export default defineConfig({
         fileName: 'theme-init.js',
         source: readFileSync(new URL('src/theme-init.js', import.meta.url), 'utf8'),
       });
+      // Served from 'self' (CSP img-src), so the browser stops requesting a missing /favicon.ico.
+      this.emitFile({
+        type: 'asset',
+        fileName: 'favicon.svg',
+        source: readFileSync(new URL('src/favicon.svg', import.meta.url), 'utf8'),
+      });
     },
   }],
   server: {
