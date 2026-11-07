@@ -13,7 +13,10 @@ an independent Python pairing, including distant, ambiguous, time-reversed and
 unidentified neighbors. `test_history_queries.py` pages the package-history SQL in several
 status scopes and both directions and compares every estimate with the five
 latest prior visible successes, including ties on the sampling floor.
-`test_resource_lifecycle.py` observes a real one-second driver timeout on a
+`test_change_queries.py` runs the P5.1 detector seed and poll SQL over a
+connection-local catalog and checks that a replica built from the emitted events
+equals the source after inserts, late lower IDs, status transitions, deletions
+and bursts. `test_resource_lifecycle.py` observes a real one-second driver timeout on a
 five-second connection-local wait, the query cleanup report and successful
 readiness recovery on a fresh connection. Explicit driver cancellation,
 server-request observations, HTTP disconnects and bounded concurrency remain

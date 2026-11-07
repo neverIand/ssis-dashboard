@@ -41,6 +41,11 @@ API_MAX_RANGE_HOURS = 744
 API_MAX_TIMELINE_BUCKETS = 1000
 API_READINESS_TIMEOUT_SECONDS = 2
 
+# Local SSISDB change detection (P5.1): one owned background poller per application, started only by
+# runserver.py. Disabled by default; no stream serves its events yet. Interval: 1-300 seconds.
+CHANGE_DETECTION_ENABLED = False
+CHANGE_DETECTION_INTERVAL_SECONDS = 5
+
 # Paging-cursor signing secret: None or at least 32 bytes (str or bytes), kept out
 # of Git like CONNECTION_STRING. None uses a random key per process, so cursors
 # fail across workers and after a restart. Set one shared value for multi-worker

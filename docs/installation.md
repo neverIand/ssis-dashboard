@@ -50,6 +50,8 @@ Set `CONNECTION_STRING['main']` to the approved SSISDB connection using an insta
 | `API_EVENTS_ENABLED` | `False` | Permit API event text/search for the configured SQL scope |
 | `API_VALUES_ENABLED` | `False` | Permit API nonsensitive parameters and override metadata |
 | `API_OVERRIDE_VALUES_ENABLED` | `False` | Permit nonsensitive override values; requires values enabled |
+| `CHANGE_DETECTION_ENABLED` | `False` | Local SSISDB change detection (P5.1): one background poller, started only by `runserver.py` and never in the debug reloader's watcher process. Nothing serves its events yet |
+| `CHANGE_DETECTION_INTERVAL_SECONDS` | `5` | Poll interval, 1–300 seconds; after failures the wait doubles, up to 60 seconds or the interval if longer |
 | `API_CURSOR_SECRET_KEY` | `None` | Paging-cursor signing secret, at least 32 bytes; keep it private like the connection string. `None` uses a random key per process, so cursors fail across workers and after restart |
 | `LOG_LEVEL` | `INFO` | Safe request/query events; validated Python logger level |
 

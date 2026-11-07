@@ -73,6 +73,10 @@ def create_app(config_overrides=None, *, config_path=None):
     register_legacy_navigation(app)
     register_api(app)
     register_error_handlers(app)
+
+    from dashboard.detector import attach as attach_change_detector
+
+    attach_change_detector(app)
     app.context_processor(processors.utility_processor)
     app.add_template_filter(filters.project, 'project')
     app.add_template_filter(filters.folder, 'folder')
