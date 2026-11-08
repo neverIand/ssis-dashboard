@@ -13,6 +13,7 @@ Start with [current status and the next actions](PROGRESS.md#next-actions). Use 
 | Build an API client | [API semantics](API_CONTRACT.md), [OpenAPI](openapi.yaml) |
 | Validate API correctness, query work and performance | [API validation](API_ACCEPTANCE.md) |
 | Repeat legacy/backend manual checks | [Backend checklist](BACKEND_CHECKLIST.md) |
+| Review the whole project with a newly released model | [Full-project review](PROJECT_REVIEW.md) |
 | Build controlled SSIS packages and reader fixtures | [Fixture guide](SSIS_FIXTURE_PROJECT_GUIDE.md) |
 | Consult old releases and the upstream container | [Legacy reference](legacy.md) |
 
