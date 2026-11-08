@@ -52,7 +52,7 @@ def serialize_execution(row, *, as_of):
     }
 
 
-def execution_page(values, config, *, fixed_to):
+def execution_page(values, config, *, fixed_to, estimate_cache):
     now = utc_now()
     try:
         selection, start, end = _selection(values, config, now=now, fixed_to=fixed_to)
@@ -101,6 +101,11 @@ def execution_page(values, config, *, fixed_to):
     has_more = len(rows) > selection['limit']
     page = rows[:selection['limit']]
     data = [serialize_execution(row, as_of=as_of) for row in page]
+    # Opt-in History estimates for active rows (UX batch C4): cache misses only, in one bounded read.
+    from dashboard.estimates import page_estimates
+    estimates = page_estimates(data, query, config, estimate_cache)
+    for item in data:
+        item['estimate'] = estimates.get(item['execution_id'])
     token = None
     if has_more:
         key, nulls = encode_key(page[-1], selection['sort'])

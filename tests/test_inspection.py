@@ -33,7 +33,7 @@ class ExecutionDetailTests(unittest.TestCase):
         self.counts = dict(COUNTS)
         # The estimate row repeats the target's identity and start unless a test overrides them; None = no row.
         self.estimate = {'estimate_sample_count':0,'estimate_total_ticks':None}
-        self.app = create_app({'TESTING':True,'LOG_LEVEL':'ERROR',
+        self.app = create_app({'TESTING':True,'LOG_LEVEL':'ERROR','API_ACTIVE_ESTIMATES_ENABLED':True,
                                'CONNECTION_STRING':{'main':'private-connection-canary'}})
         self.client = self.app.test_client()
 
@@ -42,6 +42,10 @@ class ExecutionDetailTests(unittest.TestCase):
                                                      'started_at':self.row.get('started_at'),**self.estimate}
         return deepcopy({'api-execution.sql':self.row,'api-execution-event-counts.sql':self.counts,
                          'api-execution-estimate.sql':estimate}[resource])
+
+    def clear_estimates(self):
+        from dashboard.estimates import EstimateCache
+        self.app.extensions['estimate_cache'] = EstimateCache(300)
 
     def get(self, identifier='42', **kwargs):
         return self.client.get('/api/v1/executions/'+quote(identifier,safe=''),**kwargs)
@@ -88,7 +92,7 @@ class ExecutionDetailTests(unittest.TestCase):
         response = app.test_client().get('/api/v1/executions/42')
         self.assertEqual(response.status_code,200)
         self.assertEqual(response.json['data']['elapsed_seconds'],30)
-        self.assertEqual([call.args[1] for call in self.query.call_args_list],[(42,),(42,),(42,)])
+        self.assertEqual([call.args[1] for call in self.query.call_args_list],[(42,),(42,)])  # estimates off by default
 
     def test_bigint_precision_wide_names_and_nullable_metadata_remain_typed(self):
         for identifier in (9007199254740993,9223372036854775807):
@@ -226,6 +230,7 @@ class ExecutionDetailTests(unittest.TestCase):
                     raise pyodbc.OperationalError(state,'private-diagnostic-canary')
                 return self.query_fixture(resource,*args,**kwargs)
             self.query.reset_mock()
+            self.clear_estimates()
             self.query.side_effect = failing
             with self.assertLogs(self.app.logger,level='ERROR') as logs:
                 response = self.get()
@@ -241,7 +246,13 @@ class ExecutionDetailTests(unittest.TestCase):
                                            'ended_at':'2026-10-15T12:00:10.6234567Z'})
         self.assertEqual(self.query.call_args.args,('api-execution-estimate.sql',(42,)))
         self.assertTrue(self.query.call_args.kwargs['one_row'])
+        # A cached estimate is not read again for the same execution and start.
+        self.query.reset_mock()
+        self.assertEqual(self.detail()['estimate']['sample_count'],3)
+        self.assertEqual([call.args[0] for call in self.query.call_args_list],
+                         ['api-execution.sql','api-execution-event-counts.sql'])
         # A third of a tick rounds the end half up while the duration keeps the exact mean.
+        self.clear_estimates()
         self.estimate.update(estimate_sample_count=3,estimate_total_ticks=Decimal(2))
         self.assertEqual(self.detail()['estimate']['ended_at'],'2026-10-15T11:59:30.1234568Z')
         for changes in ({'status':7,'ended_at':parse_timestamp('2026-10-15T11:59:40Z')},
@@ -256,11 +267,20 @@ class ExecutionDetailTests(unittest.TestCase):
 
     def test_no_sample_zero_mean_and_unrepresentable_end_return_null_estimates(self):
         for count,total in ((0,None),(2,Decimal(0))):
+            self.clear_estimates()
             self.estimate.update(estimate_sample_count=count,estimate_total_ticks=total)
             self.assertIsNone(self.detail()['estimate'])
         self.row['started_at'] = parse_timestamp('9999-12-31T23:59:59Z')
         self.estimate.update(estimate_sample_count=1,estimate_total_ticks=Decimal(10**8))
         self.assertIsNone(self.detail()['estimate'])
+
+    def test_disabled_estimates_return_null_without_a_read(self):
+        app = create_app({'TESTING':True,'LOG_LEVEL':'ERROR','CONNECTION_STRING':{'main':'private-connection-canary'}})
+        response = app.test_client().get('/api/v1/executions/42')
+        self.assertEqual(response.status_code,200)
+        self.assertIsNone(response.json['data']['estimate'])
+        self.assertEqual([call.args[0] for call in self.query.call_args_list],
+                         ['api-execution.sql','api-execution-event-counts.sql'])
 
     def test_estimate_read_rechecks_visibility_and_rejects_mismatched_or_impossible_rows(self):
         self.estimate = None

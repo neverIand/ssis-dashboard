@@ -169,9 +169,12 @@ paths:
   /api/v1/executions:
     get:
       operationId: listExecutions
-      summary: Bounded execution page with recorded event counts
+      summary: Bounded execution page with recorded event counts and active-row estimates
       description: Implemented in C2a/C2b with global allowlisted sorts, NULLs last and a same-direction ID tie-breaker.
         Use created_time bounds, an upper ID and authenticated filter/sort-bound keyset cursors; no database snapshot.
+        With active_estimates enabled, rows that have started and not ended carry the History estimate (UX batch C4);
+        uncached rows are read once for the page after it is selected. Other rows, and every row when disabled, carry
+        estimate NULL; a page with nothing to read makes no estimate query.
       x-implementation-status: implemented
       x-milestone: C2a/C2b
       parameters:
@@ -210,7 +213,8 @@ paths:
       summary: Visible execution identity, actual timings, event counts and an active-run estimate
       description: Implemented in C4a. Independent of overview filters. Absent and hidden IDs return indistinguishable
         safe 404 before event work; aggregation rechecks visibility and returns only recorded counts. While the execution
-        has started and not ended, estimate uses the History method (UX batch C3); otherwise it is NULL without a read.
+        has started and not ended and active_estimates is enabled, estimate uses the History method (UX batch C3);
+        otherwise it is NULL without a read. Enabled estimates are cached per process (API_ESTIMATE_CACHE_SECONDS).
       x-implementation-status: implemented
       x-milestone: C4a
       parameters:
@@ -592,11 +596,15 @@ components:
     Capabilities:
       type: object
       additionalProperties: false
-      required: [events, values, override_values]
+      required: [events, values, override_values, active_estimates]
       properties:
         events: {type: boolean}
         values: {type: boolean}
         override_values: {type: boolean}
+        active_estimates:
+          type: boolean
+          description: API_ACTIVE_ESTIMATES_ENABLED. When false, detail and list estimates are NULL and no estimate SQL
+            runs; History estimates are unaffected.
       allOf:
       - if:
           properties:
@@ -1069,7 +1077,7 @@ components:
       type: object
       additionalProperties: false
       required: [execution_id, folder_name, project_name, package_name, project_lsn, environment, status, logging_level,
-        created_at, started_at, ended_at, duration_seconds, elapsed_seconds, warning_count, error_count]
+        created_at, started_at, ended_at, duration_seconds, elapsed_seconds, warning_count, error_count, estimate]
       properties:
         execution_id: {$ref: '#/components/schemas/Id'}
         folder_name: {$ref: '#/components/schemas/Name128'}
@@ -1104,6 +1112,12 @@ components:
           - {type: 'null'}
         warning_count: {type: integer, minimum: 0, maximum: 9007199254740991}
         error_count: {type: integer, minimum: 0, maximum: 9007199254740991}
+        estimate:
+          description: History estimate while active_estimates is enabled and the row has started and not ended;
+            otherwise NULL.
+          anyOf:
+          - {$ref: '#/components/schemas/Estimate'}
+          - {type: 'null'}
       allOf:
       - if:
           properties:
@@ -1113,6 +1127,7 @@ components:
           properties:
             duration_seconds: {type: 'null'}
             elapsed_seconds: {type: 'null'}
+            estimate: {type: 'null'}
       - if:
           properties:
             ended_at: {const: null}
@@ -1120,10 +1135,18 @@ components:
         then:
           properties:
             duration_seconds: {type: 'null'}
+      - if:
+          properties:
+            ended_at: {type: string}
+          required: [ended_at]
+        then:
+          properties:
+            estimate: {type: 'null'}
     ExecutionDetail:
       description: Current visible execution, independent of overview filters. Active elapsed time uses this request's
         clock; warning_count and error_count agree with event_counts.warnings and event_counts.errors. estimate is NULL
-        unless the execution has started and not ended; then it is the History estimate, or NULL without a sample.
+        unless active_estimates is enabled and the execution has started and not ended; then it is the History
+        estimate, or NULL without a sample.
       type: object
       additionalProperties: false
       required: [execution_id, folder_name, project_name, package_name, project_lsn, environment, status, logging_level,
@@ -2249,7 +2272,7 @@ components:
           app_version: 0.6.8
           api_version: v1
           display_timezone: Europe/London
-          capabilities: {events: false, values: false, override_values: false}
+          capabilities: {events: false, values: false, override_values: false, active_estimates: false}
           limits: {default_limit: 50, max_limit: 200, default_range_hours: 360, max_range_hours: 744, max_timeline_buckets: 1000,
             cursor_ttl_seconds: 1800, max_cursor_characters: 8192, max_text_characters: 16384, max_search_characters: 512}
           execution_statuses:
@@ -2314,6 +2337,8 @@ components:
           elapsed_seconds: 30
           warning_count: 1
           error_count: 0
+          estimate: {method: mean_last_5_successful, sample_count: 3, duration_seconds: 40.5,
+            ended_at: '2026-10-15T11:00:10.6234567Z'}
         meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z', from: '2026-10-14T11:00:00Z',
           to: '2026-10-15T11:00:00Z', limit: 50, sort: execution_id, direction: desc, as_of: '2026-10-15T11:00:00.1234567Z',
           upper_id: '9007199254740993', next_cursor: null, has_more: false, consistency: live}

@@ -5,9 +5,9 @@ from werkzeug.exceptions import NotFound
 from dashboard import api_validation as inputs, serialization as wire
 from dashboard.db import execute_query
 from dashboard.executions import serialize_execution
-from dashboard.history import serialize_estimate
+from dashboard.estimates import MISSING, detail_estimate
 from dashboard.observability import record_query
-from dashboard.timestamps import as_timestamp, utc_now
+from dashboard.timestamps import utc_now
 
 
 def _query(resource, identifier, config):
@@ -30,7 +30,7 @@ def visible_execution(value, config, *, as_of):
     return serialize_execution({**row, 'warning_count': 0, 'error_count': 0}, as_of=as_of)
 
 
-def execution_detail(value, config):
+def execution_detail(value, config, *, estimate_cache):
     data = visible_execution(value, config, as_of=utc_now())
     recorded = _query('api-execution-event-counts.sql', int(data['execution_id']), config)
     if not recorded:
@@ -41,19 +41,11 @@ def execution_detail(value, config):
     if (counts['duplicate_warnings'] > counts['warnings']
             or counts['errors'] + counts['warnings'] + counts['memory_warnings'] > counts['all']):
         raise ValueError('Inconsistent recorded event counts.')
-    data.update(warning_count=counts['warnings'], error_count=counts['errors'], event_counts=counts,
-                estimate=active_estimate(data, config))
-    return data
-
-
-def active_estimate(data, config):
-    """History's estimate while started and not ended; finished or unstarted runs read nothing more."""
-    if data['started_at'] is None or data['ended_at'] is not None:
-        return None
-    row = _query('api-execution-estimate.sql', int(data['execution_id']), config)
-    if not row:
+    data.update(warning_count=counts['warnings'], error_count=counts['errors'], event_counts=counts)
+    # Opt-in History estimate while active (UX batch C3); the read rechecks visibility.
+    estimate = detail_estimate(data, lambda resource, identifier: _query(resource, identifier, config),
+                               config, estimate_cache)
+    if estimate is MISSING:
         raise NotFound()
-    if (wire.bigint(row['execution_id']) != data['execution_id'] or row['started_at'] is None
-            or as_timestamp(row['started_at']).isoformat() != data['started_at']):
-        raise ValueError('Unexpected execution estimate row.')
-    return serialize_estimate(row)
+    data['estimate'] = estimate
+    return data

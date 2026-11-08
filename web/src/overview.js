@@ -4,6 +4,7 @@ import { selectionParams, timestampTicks, validateSelection } from './selection.
 import { createRefreshLoop } from './refresh-loop.js';
 import { readTimeline, timelineParams, timelineScope } from './timeline.js';
 import { createServerClock, presetRange } from './time-range.js';
+import { readEstimate } from './history.js';
 
 const utc = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{7}Z$/;
 const badResponse = (response) => new ApiError('invalid_response', { requestId: response?.meta?.request_id });
@@ -73,6 +74,9 @@ export function readExecutionPage(response, selection, metadata, display) {
       requiredCount(row.error_count, display);
       if ((row.started_at === null && (row.duration_seconds !== null || row.elapsed_seconds !== null))
           || (row.ended_at === null && row.duration_seconds !== null)) throw new TypeError();
+      // The API estimates only a started row that has not ended (UX batch C4; NULL when the capability is off).
+      if (row.estimate === undefined || (row.estimate !== null && row.ended_at !== null)) throw new TypeError();
+      if (row.estimate !== null) readEstimate(row.estimate, row.started_at, display);
     }
     return response;
   } catch { throw badResponse(response); }

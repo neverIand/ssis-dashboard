@@ -63,6 +63,8 @@ class ExecutionSortingTests(unittest.TestCase):
     def query_fixture(self, resource, parameters, **settings):
         if resource=='api-executions-fence.sql':
             return {'upper_id':max((row['execution_id'] for row in self.rows),default=None)}
+        if resource=='api-executions-estimates.sql':
+            return []
         take, upper, last, descending = parameters[16:20]
         sort = parameters[20] if resource != 'api-executions-page.sql' else 'execution_id'
         boundary = None
@@ -138,7 +140,7 @@ class ExecutionSortingTests(unittest.TestCase):
             for direction, order in zip(('asc','desc'),orders):
                 with self.subTest(sort=sort,direction=direction):
                     self.assertEqual(self.chain(sort,direction),order)
-                    page_call=self.query.call_args
+                    page_call=[c for c in self.query.call_args_list if c.args[0]!='api-executions-estimates.sql'][-1]
                     resource = ('api-executions-page.sql' if sort == 'execution_id' else
                                 'api-executions-sort.sql' if sort in CALCULATED_SORTS else
                                 'api-executions-ordered-page.sql')

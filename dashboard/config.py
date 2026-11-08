@@ -37,6 +37,10 @@ DISPLAY_TIMEZONE = 'Europe/London'
 API_EVENTS_ENABLED = False
 API_VALUES_ENABLED = False
 API_OVERRIDE_VALUES_ENABLED = False
+# Opt-in History estimates for active executions on detail and list pages (UX batch C3/C4), cached per
+# process by execution ID and start time for API_ESTIMATE_CACHE_SECONDS (1-3600).
+API_ACTIVE_ESTIMATES_ENABLED = False
+API_ESTIMATE_CACHE_SECONDS = 300
 API_MAX_RANGE_HOURS = 744
 API_MAX_TIMELINE_BUCKETS = 1000
 API_READINESS_TIMEOUT_SECONDS = 2

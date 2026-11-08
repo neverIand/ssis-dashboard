@@ -13,7 +13,7 @@ const settings = metadata();
 const from = '2026-10-17T00:00:00.0000001Z', to = '2026-10-17T18:00:00.1234567Z';
 const item = (id, changes = {}) => ({ execution_id: id, folder_name: '<b>影狼</b>', project_name: 'Project',
   package_name: 'Probe.dtsx', status: { code: 2, name: 'running' }, created_at: wireTime, started_at: wireTime,
-  ended_at: null, duration_seconds: null, elapsed_seconds: 0, warning_count: 0, error_count: 0, ...changes });
+  ended_at: null, duration_seconds: null, elapsed_seconds: 0, estimate: null, warning_count: 0, error_count: 0, ...changes });
 const page = rows => ({ ...envelope(rows), meta: { ...envelope().meta, from, to, as_of: wireTime,
   upper_id: '99', consistency: 'live', sort: 'execution_id', direction: 'desc', limit: 50,
   has_more: false, next_cursor: null } });

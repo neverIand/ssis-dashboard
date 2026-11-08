@@ -18,7 +18,7 @@ const metadata = timelineMetadata();
 const selection = () => validateSelection(defaultSelection(metadata), metadata);
 const row = (id, code) => ({ execution_id: id, folder_name: 'Folder', project_name: 'Project', package_name: 'Main.dtsx',
   status: { code, name: { 1: 'created', 2: 'running', 4: 'failed', 7: 'succeeded' }[code] }, created_at: timelineFrom,
-  started_at: null, ended_at: null, duration_seconds: null, elapsed_seconds: null, warning_count: 0, error_count: 0 });
+  started_at: null, ended_at: null, duration_seconds: null, elapsed_seconds: null, estimate: null, warning_count: 0, error_count: 0 });
 const listPage = rows => ({ ...overviewPage(), data: rows });
 function screen(t, { list = () => overviewPage(), summary = () => timelineSummary(), timeline = () => timelinePage() } = {}) {
   const dom = overviewDOM(), selected = [], calls = [];

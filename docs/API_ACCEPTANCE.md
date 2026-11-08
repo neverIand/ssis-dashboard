@@ -194,6 +194,27 @@ Record revision/source hashes, interpreter/driver/catalog scope, timestamps, exa
 
 ## Recorded results
 
+### C4 list-page estimate SQL work: 8 November 2026
+
+UX review item O11 adds `estimate` to `/executions` rows. On 8 November the user made active estimates opt-in (`API_ACTIVE_ESTIMATES_ENABLED`, default `False`, advertised as `capabilities.active_estimates`) and chose a per-process cache over recomputing on every refresh. With the flag off, detail and list estimates are NULL and no estimate SQL runs. With it on, `dashboard/estimates.py` caches each estimate by execution ID and start time for `API_ESTIMATE_CACHE_SECONDS` (default 300; at most 4,096 entries). A list page reads only its uncached, started, unfinished rows, in one `api-executions-estimates.sql` call after the page is selected; the detail page (C3) uses the same cache. History is unchanged.
+
+`api-executions-estimates.sql` takes the target IDs as integer XML (at most the page limit), reads them through the public view (rechecking visibility) into a temporary table created by `SELECT INTO`, so its name columns keep the catalog collation, and estimates all their identities in one read of the catalog. It reuses the pattern history page's ranking: per identity, it keeps successes ending after the earliest target start plus the six latest ending by then, then takes each target's own TOP (5).
+
+Same fixture shape as C1/C3, with the newest 200 executions made active (110 identities). Each case took one actual-plan diagnostic and 10 warm samples. Harness and raw results: `.local/reports/backend/20261108-c4-list-estimates/` (`measure_c4.py`, `results.json`, and `results-r2.json` after the collation fix from review; `profile_c4.py`, `real_api_c4.py`, `real-api.json`).
+
+| Executions | Targets | `#det` rows read / logical reads | Warm median (ms, two runs) | Spills |
+| --- | --- | --- | --- | --- |
+| 2,000 | 1 / 50 / 200 | 2,002 / 28 · 2,051 / 126 · 2,201 / 426 | 26–33 / 34–43 / 57–68 | 0 |
+| 20,000 | 1 / 50 / 200 | 20,002 / 242 · 20,051 / 340 · 20,201 / 640 | 52–70 / 94–112 / 109–139 | 1 sort (50, 200) |
+| 100,000 | 1 / 50 / 200 | 100,002 / 1,198 · 100,051 / 1,345 · 100,201 / 1,795 | 216–265 / 362–606 / 423–624 | 1 sort (50, 200) |
+| 100,000 | 200 of one identity | 100,201 / 1,795 | 199–225 | 0 |
+
+Reads and spills were identical in both runs; only timings varied. For comparison, the 200-row ID page itself takes 43–70 ms at every size. Every estimate matched the Python oracle. The read covers every visible execution once at any target count, because no index covers names or end times. At 100,000 rows the ranking statement dominates (actual plan, 200 targets: 705 ms CPU). That is the hash join of about 95,000 visible successes to the page's identities on three names (about 220 ms) and the sort of the 54,907 candidates for the window ranking (about 255 ms). The optimizer estimated 3,150 rows for that sort, so its grant was too small and it spilled once. No `RECOMPILE` was added.
+
+The cache is what makes this acceptable on the overview. A running execution gains no new samples; only retention or a permission change can remove, hide or reveal earlier successes, and the cache accepts lagging such a change by its lifetime. Each running execution is therefore read once per cache lifetime instead of on every 30-second refresh. A refresh with only cached or no active rows makes no estimate query. The trade-offs are recorded in the contract: one cross-request cache per process, scoped by the configured SQL identity, and an estimate that can lag a retention or permission change by up to the cache lifetime.
+
+Read-only against the real local views (18 visible executions as one target set): `internal.operations` 85 rows / 40 reads, `internal.executions` 33 / 131, median 32 ms, first compile about 380 ms across two statements. Every estimate equals the oracle (12 with samples). Through Flask with the flag on, the finished list makes no estimate query. With every started row forced active, one estimate read follows the page, each row equals History's estimate for the same execution, and an immediate second request makes no estimate query. No local execution was running, so that check used the forced path. Reader identity and representative volume remain NOT RUN.
+
 ### C3 detail estimate SQL work: 8 November 2026
 
 UX review item D3 adds `estimate` to `GET /executions/{id}`. The new `api-execution-estimate.sql` runs only while the execution has started and not ended, so finished and unstarted executions keep the existing two reads, and the executables, events, values and children reads are unchanged. It reads the target through the public view (a seek, rechecking visibility) and averages its exact identity's five latest visible successes that ended by its start, excluding itself, as History does. History pages keep their own SQL.
@@ -206,7 +227,7 @@ Connection-local `#det`, `#ev` and `#par` replaced the views, as in C1 (same fix
 | 20,000 | 20,001 / 246 | 7.8–16.4 | 198–241 ms |
 | 100,000 | 100,001 / 1,203 | 51–69 | 389–469 ms |
 
-The read is the same for every target, whether it finds five samples or none: no catalog index covers names or end times, so the TOP (5) reads every visible execution once and its sort keeps five rows. No diagnostic spilled, and no `RECOMPILE` was added. The existing detail reads seek one row each. The estimate is therefore the only catalog-size read of the detail page, and it repeats on each refresh of an active execution (every 30 seconds by default, with the existing back-off). History's first page already reads the identity's source twice. A server-side cache keyed by execution and start time could remove the repeat, because a running execution's sample cannot change except through retention or visibility; it is not added.
+The read is the same for every target, whether it finds five samples or none: no catalog index covers names or end times, so the TOP (5) reads every visible execution once and its sort keeps five rows. No diagnostic spilled, and no `RECOMPILE` was added. The existing detail reads seek one row each. The estimate is therefore the only catalog-size read of the detail page. History's first page already reads the identity's source twice. Since C4, the estimate is opt-in and cached by execution and start time ([C4](#c4-list-page-estimate-sql-work-8-november-2026)), so an active detail page reads it once per cache lifetime rather than on every refresh.
 
 Read-only against the real local views (18 executions): `internal.operations` 68 rows / 6 reads, `internal.executions` 15 / 122, median 1.5–2.9 ms, first compile 216 ms. For every execution, the SQL estimate equals an independent Python oracle (12 with samples, no mismatches). Through Flask, all 18 finished executions return `estimate: null` with two queries. With the active path forced, each detail estimate equals History's estimate for the same execution, with three queries. No local execution was running, so the active path on the real catalog used that forced path. Reader identity and representative volume remain NOT RUN.
 

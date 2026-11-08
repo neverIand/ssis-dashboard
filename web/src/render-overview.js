@@ -170,10 +170,22 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
           cells[index].replaceChildren(time(item[key], key === 'started_at' ? item.created_at : null));
         }
       }
-      if (!previous || ['duration_seconds', 'elapsed_seconds', 'ended_at'].some((key) => previous[key] !== item[key])) {
+      if (!previous || ['duration_seconds', 'elapsed_seconds', 'ended_at'].some((key) => previous[key] !== item[key])
+          || JSON.stringify(previous.estimate) !== JSON.stringify(item.estimate)) {
         cells[6].replaceChildren(document.createTextNode(display.duration(item.duration_seconds)));
         if (item.ended_at === null && item.elapsed_seconds !== null) {
-          cells[6].append(element('span', `Elapsed: ${display.duration(item.elapsed_seconds)}`, 'cell-detail'));
+          // UX batch C4: elapsed beside the typical duration of earlier successful runs, never a percentage.
+          // No-break spaces keep each part whole, so a narrow column wraps only between them.
+          const estimate = item.estimate, whole = part => part.replaceAll(' ', '\u00a0');
+          const detail = element('span', [`Elapsed: ${display.duration(item.elapsed_seconds)}`,
+            ...(estimate ? [`typical ${display.duration(estimate.duration_seconds)}`] : [])].map(whole).join(' · '),
+          'cell-detail');
+          if (estimate) {
+            detail.dataset.estimate = item.elapsed_seconds > estimate.duration_seconds ? 'over' : 'within';
+            detail.title = `Typical: mean of ${display.count(estimate.sample_count)} earlier successful runs`
+              + ` · expected end ${display.timestamp(estimate.ended_at)}`;
+          }
+          cells[6].append(detail);
         }
       }
       for (const [index, kind, count] of [[7, 'warnings', item.warning_count], [8, 'errors', item.error_count]]) {

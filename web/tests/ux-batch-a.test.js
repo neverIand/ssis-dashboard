@@ -13,7 +13,7 @@ const settings = metadata();
 const from = '2026-10-17T00:00:00.0000001Z', to = '2026-10-17T18:00:00.1234567Z';
 const item = (id, code, packageName) => ({ execution_id: id, folder_name: 'Sales', project_name: 'Orders',
   package_name: packageName, status: { code, name: code === 4 ? 'failed' : 'succeeded' }, created_at: wireTime,
-  started_at: wireTime, ended_at: wireTime, duration_seconds: 1, elapsed_seconds: null, warning_count: 0,
+  started_at: wireTime, ended_at: wireTime, duration_seconds: 1, elapsed_seconds: null, estimate: null, warning_count: 0,
   error_count: code === 4 ? 2 : 0 });
 const page = rows => ({ ...envelope(rows), meta: { ...envelope().meta, from, to, as_of: wireTime, upper_id: '9',
   consistency: 'live', sort: 'execution_id', direction: 'desc', limit: 50, has_more: false, next_cursor: null } });

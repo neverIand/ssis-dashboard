@@ -113,7 +113,8 @@ class APIHTTPTests(unittest.TestCase):
         data = self.client.get('/api/v1/meta').json['data']
         self.assertEqual(len(data['execution_sorts']), 12)
         self.assertEqual(data['execution_sorts'], self.contract.spec['components']['parameters']['ExecutionSort']['schema']['enum'])
-        self.assertEqual(data['capabilities'], {'events': False, 'values': False, 'override_values': False})
+        self.assertEqual(data['capabilities'], {'events': False, 'values': False, 'override_values': False,
+                                                'active_estimates': False})
         self.assertEqual(data['limits']['default_range_hours'], 360)
         self.assertEqual([row['code'] for row in data['execution_statuses']], list(range(1, 10)))
         self.connect.assert_not_called()
@@ -326,6 +327,9 @@ class APIConfigurationTests(unittest.TestCase):
             {'HOUR_SPAN': 0}, {'API_MAX_TIMELINE_BUCKETS': 1001},
             {'API_READINESS_TIMEOUT_SECONDS': 0}, {'API_READINESS_TIMEOUT_SECONDS': 3},
             {'API_READINESS_TIMEOUT_SECONDS': True},
+            {'API_ACTIVE_ESTIMATES_ENABLED': 1}, {'API_ACTIVE_ESTIMATES_ENABLED': 'true'},
+            {'API_ESTIMATE_CACHE_SECONDS': 0}, {'API_ESTIMATE_CACHE_SECONDS': 3601},
+            {'API_ESTIMATE_CACHE_SECONDS': True}, {'API_ESTIMATE_CACHE_SECONDS': 30.0},
         ]
         with patch('pyodbc.connect') as connect:
             for config in cases:
@@ -335,11 +339,13 @@ class APIConfigurationTests(unittest.TestCase):
 
     def test_metadata_reports_effective_settings_per_app(self):
         first = create_app({'LOG_LEVEL': 'ERROR', 'API_EVENTS_ENABLED': True, 'API_VALUES_ENABLED': True,
-                            'API_OVERRIDE_VALUES_ENABLED': True, 'DISPLAY_TIMEZONE': 'UTC',
+                            'API_OVERRIDE_VALUES_ENABLED': True, 'API_ACTIVE_ESTIMATES_ENABLED': True, 'DISPLAY_TIMEZONE': 'UTC',
                             'HOUR_SPAN': 24, 'API_MAX_RANGE_HOURS': 48, 'API_MAX_TIMELINE_BUCKETS': 100})
         second = create_app({'LOG_LEVEL': 'ERROR'})
         data = first.test_client().get('/api/v1/meta').json['data']
-        self.assertEqual(data['capabilities'], {'events': True, 'values': True, 'override_values': True})
+        self.assertEqual(data['capabilities'], {'events': True, 'values': True, 'override_values': True,
+                                                'active_estimates': True})
+        self.assertFalse(second.test_client().get('/api/v1/meta').json['data']['capabilities']['active_estimates'])
         self.assertEqual(data['display_timezone'], 'UTC')
         self.assertEqual(data['limits']['default_range_hours'], 24)
         self.assertEqual(data['limits']['max_range_hours'], 48)

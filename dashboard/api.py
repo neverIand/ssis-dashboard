@@ -7,6 +7,7 @@ import json
 from flask import Blueprint, current_app, g, request
 from werkzeug.exceptions import Forbidden, ServiceUnavailable
 
+from dashboard import estimates
 from dashboard.api_validation import COHORT_PARAMETERS, fixed_as_of, query_arguments
 from dashboard.executions import EXECUTION_SORTS, QUERY_PARAMETERS, execution_page
 from dashboard.executables import QUERY_PARAMETERS as EXECUTABLE_PARAMETERS, executable_page
@@ -28,7 +29,7 @@ from dashboard.version import APP_VERSION
 
 blueprint = Blueprint('api', __name__, url_prefix='/api/v1')
 _CAPABILITIES = {'events': 'API_EVENTS_ENABLED', 'values': 'API_VALUES_ENABLED',
-                 'override_values': 'API_OVERRIDE_VALUES_ENABLED'}
+                 'override_values': 'API_OVERRIDE_VALUES_ENABLED', 'active_estimates': 'API_ACTIVE_ESTIMATES_ENABLED'}
 _PROBLEMS = {
     400: ('invalid_input', 'The request contains an unsupported or invalid value.'),
     401: ('unauthenticated', 'Authentication is required to access this resource.'),
@@ -61,6 +62,7 @@ def validate_config(config):
         raise ValueError('HOUR_SPAN must fit API_MAX_RANGE_HOURS.')
     if config['API_CURSOR_SECRET_KEY'] is not None:
         cursors.signing_key(config['API_CURSOR_SECRET_KEY'])
+    estimates.validate_config(config)
 
 
 def capabilities():
@@ -159,7 +161,8 @@ def metadata():
 @query_parameters(*QUERY_PARAMETERS)
 def executions():
     data, meta = execution_page(g.api_query, current_app.config,
-                                fixed_to=current_app.extensions['api_fixed_as_of'])
+                                fixed_to=current_app.extensions['api_fixed_as_of'],
+                                estimate_cache=current_app.extensions['estimate_cache'])
     return resource_response(data, meta=meta)
 
 
@@ -181,7 +184,8 @@ def folders():
 
 @blueprint.get('/executions/<id>', merge_slashes=False)
 def execution(id):
-    return resource_response(execution_detail(id, current_app.config))
+    return resource_response(execution_detail(id, current_app.config,
+                                              estimate_cache=current_app.extensions['estimate_cache']))
 
 
 @blueprint.get('/executions/<id>/executables', merge_slashes=False)
@@ -262,6 +266,7 @@ def readiness():
 def register_api(app):
     cursors.configure(app)
     app.extensions['api_fixed_as_of'] = fixed_as_of(app.config['AS_OF_DATE'], app.config['DISPLAY_TIMEZONE'])
+    estimates.register(app)
     app.register_blueprint(blueprint)
     app.add_url_rule('/healthz', 'healthz', liveness, methods=['GET'], merge_slashes=False)
     app.add_url_rule('/readyz', 'readyz', readiness, methods=['GET'], merge_slashes=False)

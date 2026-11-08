@@ -144,6 +144,7 @@ class APIAcceptanceTests(unittest.TestCase):
                             self.verify(response, 'Problem', 403)
             meta = self.client.get('/api/v1/meta', headers=CLAIMED_IDENTITY)
             self.verify(meta, 'MetaResponse', 200)
-            self.assertEqual(meta.json['data']['capabilities'], {'events':False,'values':False,'override_values':False})
+            self.assertEqual(meta.json['data']['capabilities'], {'events':False,'values':False,'override_values':False,
+                                                                  'active_estimates':False})
         self.connect.assert_not_called()
         self.assertNotIn('private-', '\n'.join(logged.output))

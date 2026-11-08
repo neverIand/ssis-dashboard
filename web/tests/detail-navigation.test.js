@@ -51,7 +51,7 @@ function overviewRun(retainedPaths = [], { expired = false } = {}) {
     return { ...envelope([{ execution_id: params.cursor ? '8' : '9', folder_name: selection.folder,
       project_name: selection.project, package_name: 'Probe.dtsx', status: { code: 2, name: 'running' },
       created_at: wireTime, started_at: null, ended_at: null, duration_seconds: null,
-      elapsed_seconds: null, warning_count: 0, error_count: 0 }]),
+      elapsed_seconds: null, estimate: null, warning_count: 0, error_count: 0 }]),
     meta: { ...envelope().meta, from: selection.from, to: selection.to, as_of: wireTime, upper_id: '9',
       consistency: 'live', sort: 'execution_id', direction: 'desc', limit: 1,
       has_more: !params.cursor, next_cursor: params.cursor ? null : 'retained-entry' } };

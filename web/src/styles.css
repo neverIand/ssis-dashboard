@@ -748,6 +748,8 @@ tbody tr:hover { background: var(--sd-subtle); }
 .header-meta .server-label { color: var(--sd-text); }
 /* History: deviation from the estimate, chart scope and mixed-package note. */
 .deviation[data-level="warning"] { color: var(--sd-warning); font-weight: 600; }
+/* UX batch C4: a running row that has passed its typical duration. */
+[data-execution-table] .cell-detail[data-estimate="over"] { color: var(--sd-warning); font-weight: 600; }
 .chart-count { margin-left: auto; color: var(--sd-secondary); font-size: 0.8667rem; white-space: nowrap; }
 .chart-mixed { display: block; margin: 0.3rem 0 0; color: var(--sd-warning); }
 [data-history-results][data-idle] :is(.table-toolbar, [data-history-chart-panel], [data-history-status-options]) { display: none; }

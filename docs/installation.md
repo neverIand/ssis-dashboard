@@ -50,6 +50,8 @@ Set `CONNECTION_STRING['main']` to the approved SSISDB connection using an insta
 | `API_EVENTS_ENABLED` | `False` | Permit API event text/search for the configured SQL scope |
 | `API_VALUES_ENABLED` | `False` | Permit API nonsensitive parameters and override metadata |
 | `API_OVERRIDE_VALUES_ENABLED` | `False` | Permit nonsensitive override values; requires values enabled |
+| `API_ACTIVE_ESTIMATES_ENABLED` | `False` | Show a typical duration and expected end for running executions on the detail page and overview rows. Each new running execution costs one read of every visible execution (no catalog index covers names or end times) |
+| `API_ESTIMATE_CACHE_SECONDS` | `300` | 1–3600; how long the process keeps each running execution's estimate before reading it again |
 | `CHANGE_DETECTION_ENABLED` | `False` | Local SSISDB change detection (P5.1): one background poller, started only by `runserver.py` and never in the debug reloader's watcher process. Nothing serves its events yet |
 | `CHANGE_DETECTION_INTERVAL_SECONDS` | `5` | Poll interval, 1–300 seconds; after failures the wait doubles, up to 60 seconds or the interval if longer |
 | `API_CURSOR_SECRET_KEY` | `None` | Paging-cursor signing secret, at least 32 bytes; keep it private like the connection string. `None` uses a random key per process, so cursors fail across workers and after restart |

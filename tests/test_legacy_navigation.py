@@ -377,7 +377,8 @@ class LegacyBookmarkTests(unittest.TestCase):
             self.app.config.update(API_VALUES_ENABLED=True, API_OVERRIDE_VALUES_ENABLED=False)
             self.assert_redirect('/execution/42/values?native=1', '/app/executions/42#parameters', prefix)
             metadata = self.clients[prefix].get(prefix + '/api/v1/meta').json['data']['capabilities']
-            self.assertEqual(metadata, {'events': False, 'values': True, 'override_values': False})
+            self.assertEqual(metadata, {'events': False, 'values': True, 'override_values': False,
+                                        'active_estimates': False})
             with patch('dashboard.values.visible_execution'), patch('dashboard.values.execute_query',
                     side_effect=lambda resource, *args, **kwargs: {'upper_id': 1}
                     if resource.endswith('fence.sql') else [row('overrides', value='private-value-canary')]) as query:

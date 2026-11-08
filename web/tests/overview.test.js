@@ -15,7 +15,7 @@ const from = '2026-10-17T00:00:00.0000001Z', to = '2026-10-17T18:00:00.1234567Z'
 const row = (changes = {}) => ({ execution_id: '9007199254740993', folder_name: '<b>影狼 + /</b>',
   project_name: 'all', package_name: 'Probe.dtsx', status: { code: 2, name: 'running' },
   created_at: '2026-10-17T12:00:00.1234567Z', started_at: '2026-10-17T12:00:01.1234567Z',
-  ended_at: null, duration_seconds: null, elapsed_seconds: 0.0000001, warning_count: 0, error_count: 1, ...changes });
+  ended_at: null, duration_seconds: null, elapsed_seconds: 0.0000001, estimate: null, warning_count: 0, error_count: 1, ...changes });
 function page(rows = [row()], changes = {}) {
   return { ...envelope(rows), meta: { ...envelope().meta, from, to, as_of: wireTime,
     upper_id: '9223372036854775807', consistency: 'live',
@@ -65,7 +65,7 @@ test('typed rows retain BIGINT, literal text, unknown codes, NULL observations a
   const rows = [row({ execution_id: '9223372036854775807', folder_name: '😀'.repeat(64),
     package_name: 'a'.repeat(260), status: { code: 42, name: 'unknown' } }),
   row({ execution_id: '2', started_at: null, ended_at: null, elapsed_seconds: null,
-    status: { code: 1, name: 'created' }, warning_count: 0, error_count: 0 }),
+    status: { code: 1, name: 'created' }, estimate: null, warning_count: 0, error_count: 0 }),
   row({ execution_id: '3', ended_at: '2026-10-17T12:00:01.1234567Z', duration_seconds: 0, elapsed_seconds: 0 })];
   const result = page(rows);
   assert.equal(readExecutionPage(result, selection(), settings, display), result);

@@ -5,7 +5,7 @@ from pathlib import Path
 import unittest
 
 import yaml
-from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 from openapi_spec_validator import OpenAPIV31SpecValidator
 
 
@@ -182,7 +182,17 @@ class APIContractTests(unittest.TestCase):
     def test_pending_rows_and_cursor_continuation_metadata_are_valid(self):
         pending = self.example_row('ExecutionsResponse')
         pending.update(status={'code': 5, 'name': 'pending'}, started_at=None, elapsed_seconds=None)
+        # Batch C4: only a started, unfinished row carries an estimate.
+        with self.assertRaises(ValidationError):
+            self.validator('Execution').validate(pending)
+        pending['estimate'] = None
         self.validator('Execution').validate(pending)
+        ended = self.example_row('ExecutionsResponse')
+        ended.update(status={'code': 7, 'name': 'succeeded'}, ended_at='2026-10-15T11:00:00Z', duration_seconds=29.8765433)
+        with self.assertRaises(ValidationError):
+            self.validator('Execution').validate(ended)
+        ended['estimate'] = None
+        self.validator('Execution').validate(ended)
         page = deepcopy(self.examples['ExecutionsResponse']['value']['meta'])
         page.update(has_more=True, next_cursor='synthetic.cursor.signature')
         self.validator('WindowPageMeta').validate(page)

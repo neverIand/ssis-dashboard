@@ -2,7 +2,9 @@
 
 import base64
 from copy import deepcopy
+from decimal import Decimal
 import json
+import re
 import unittest
 from unittest.mock import Mock, patch
 
@@ -42,6 +44,7 @@ class ExecutionAPITests(unittest.TestCase):
         self.clock = self.enterContext(patch('dashboard.executions.utc_now', return_value=NOW))
         self.query = self.enterContext(patch('dashboard.executions.execute_query', side_effect=self.query_fixture))
         self.rows = [execution(i) for i in range(1, 252)]
+        self.estimates = []  # rows returned by api-executions-estimates.sql
         self.app = create_app({'TESTING': True, 'LOG_LEVEL': 'ERROR', 'EXECUTION_COUNT': 1,
                                'CONNECTION_STRING': {'main': 'private-connection-canary'}})
         self.client = self.app.test_client()
@@ -50,10 +53,25 @@ class ExecutionAPITests(unittest.TestCase):
         # A paging oracle for HTTP/session tests, not an emulation of SQL filters.
         if resource == 'api-executions-fence.sql':
             return {'upper_id': max((r['execution_id'] for r in self.rows), default=None)}
+        if resource == 'api-executions-estimates.sql':
+            # Like the SQL, answer only requested IDs; tests inject unrequested rows with execution_id overrides.
+            requested = {int(i) for i in re.findall(r'<i>(\d+)</i>', parameters[0])}
+            return deepcopy([row for row in self.estimates if row.get('_force') or row['execution_id'] in requested])
         take, upper, last, descending = parameters[-4:]
         candidates = [r for r in self.rows if r['execution_id'] <= upper and (
             last is None or (r['execution_id'] < last if descending else r['execution_id'] > last))]
         return sorted(candidates, key=lambda r: r['execution_id'], reverse=bool(descending))[:take]
+
+    def enable_estimates(self, seconds=300, clock=None):
+        from dashboard.estimates import EstimateCache
+        self.app.config['API_ACTIVE_ESTIMATES_ENABLED'] = True
+        self.app.extensions['estimate_cache'] = (EstimateCache(seconds) if clock is None
+                                                 else EstimateCache(seconds, clock=clock))
+
+    @property
+    def page_call(self):
+        # The last cohort read; a page with active rows is followed by its estimate read (batch C4).
+        return [call for call in self.query.call_args_list if call.args[0] != 'api-executions-estimates.sql'][-1]
 
     def get(self, **values):
         return self.client.get('/api/v1/executions', query_string=values)
@@ -89,7 +107,7 @@ class ExecutionAPITests(unittest.TestCase):
         self.assertEqual(page['meta']['to'], NOW.isoformat())
         expected_start = Timestamp(NOW.utc_ticks - 360 * 3600 * TICKS_PER_SECOND)
         self.assertEqual(page['meta']['from'], expected_start.isoformat())
-        self.assertEqual(self.query.call_args.args[1][-4:], (51, 251, None, 1))
+        self.assertEqual(self.page_call.args[1][-4:], (51, 251, None, 1))
         for call in self.query.call_args_list:
             self.assertTrue(call.kwargs['typed_timestamps'])
             self.assertEqual(call.kwargs['login_timeout'], 10)
@@ -108,7 +126,10 @@ class ExecutionAPITests(unittest.TestCase):
                 self.assertEqual(len(second['data']), 51)
                 self.assertFalse(second['meta']['has_more'])
                 self.assertIsNone(second['meta']['next_cursor'])
-                self.assertEqual(self.query.call_count, 3)  # fence once, then one query per page
+                # Fence once, then one page read per page; active estimates are off by default.
+                self.assertEqual([call.args[0] for call in self.query.call_args_list],
+                                 ['api-executions-fence.sql', 'api-executions-page.sql', 'api-executions-page.sql'])
+                self.assertTrue(all(row['estimate'] is None for page in (first, second) for row in page['data']))
 
     def test_ceiling_excludes_later_inserts_and_empty_exhaustion_is_valid(self):
         self.rows = [execution(1), execution(2), execution(3)]
@@ -156,20 +177,117 @@ class ExecutionAPITests(unittest.TestCase):
         for name in ('all', '*', '%_[~', ' 東京/+#\\ ', 'a' * 128, '😀' * 64):
             with self.subTest(name=name):
                 self.page(**WINDOW, folder=name, project=name)
-                parameters = self.query.call_args.args[1]
+                parameters = self.page_call.args[1]
                 self.assertEqual(parameters[2:7], (name, name, None, None, None))
         self.page(**WINDOW, folder_pattern=r'*東京%_[~\*\\', project_pattern='%' * 512)
-        parameters = self.query.call_args.args[1]
+        parameters = self.page_call.args[1]
         self.assertEqual(parameters[5], '%東京~%~_~[~~*\\')
         self.assertEqual(parameters[6], '~%' * 512)
+
+    def estimate_row(self, identifier, count=3, total=Decimal(1215000000), **changes):
+        row = next(r for r in self.rows if r['execution_id'] == identifier)
+        return {'execution_id': identifier, 'started_at': row['started_at'], 'estimate_sample_count': count,
+                'estimate_total_ticks': total, **changes}
+
+    def test_active_rows_get_history_estimates_from_one_read_and_other_rows_get_null(self):
+        ended = parse_timestamp('2026-10-15T11:59:40Z')
+        self.rows = [execution(1, status=7, ended_at=ended), execution(2), execution(3, status=5, started_at=None),
+                     execution(4), execution(5, status=4, ended_at=ended), execution(6)]
+        self.estimates = [self.estimate_row(2), self.estimate_row(4, 0, None)]
+        self.enable_estimates()
+        page = self.page(**WINDOW)
+        estimates = {row['execution_id']: row['estimate'] for row in page['data']}
+        self.assertEqual(estimates, {'6': None, '5': None, '4': None, '3': None, '2': {
+            'method': 'mean_last_5_successful', 'sample_count': 3, 'duration_seconds': 40.5,
+            'ended_at': '2026-10-15T12:00:10.6234567Z'}, '1': None})
+        calls = [call for call in self.query.call_args_list if call.args[0] == 'api-executions-estimates.sql']
+        self.assertEqual(len(calls), 1)
+        # Only started, unfinished rows of this page are sent, as integer XML in ID order.
+        self.assertEqual(calls[0].args[1], ('<t><i>2</i><i>4</i><i>6</i></t>',))
+        self.assertTrue(calls[0].kwargs['typed_timestamps'])
+        self.assertTrue(calls[0].kwargs['declared_parameters'])
+
+    def test_pages_without_active_rows_read_no_estimates(self):
+        self.enable_estimates()
+        ended = parse_timestamp('2026-10-15T11:59:40Z')
+        self.rows = [execution(1, status=7, ended_at=ended), execution(2, status=5, started_at=None)]
+        page = self.page(**WINDOW)
+        self.assertEqual([row['estimate'] for row in page['data']], [None, None])
+        self.assertEqual([call.args[0] for call in self.query.call_args_list],
+                         ['api-executions-fence.sql', 'api-executions-page.sql'])
+        self.rows = []
+        self.query.reset_mock()
+        self.assertEqual(self.page(**WINDOW)['data'], [])
+        self.assertEqual([call.args[0] for call in self.query.call_args_list], ['api-executions-fence.sql'])
+
+    def test_a_full_page_of_active_rows_reads_its_estimates_once(self):
+        self.enable_estimates()
+        page = self.page(**WINDOW, limit='200')
+        self.assertEqual(len(page['data']), 200)
+        calls = [call for call in self.query.call_args_list if call.args[0] == 'api-executions-estimates.sql']
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0].args[1][0].count('<i>'), 200)
+        self.assertTrue(all(row['estimate'] is None for row in page['data']))
+
+    def test_estimate_rows_that_vanish_keep_null_and_unexpected_rows_are_safe_errors(self):
+        self.rows = [execution(1), execution(2)]
+        self.estimates = [self.estimate_row(2)]
+        self.enable_estimates()
+        self.assertEqual([row['estimate'] is None for row in self.page(**WINDOW)['data']], [False, True])
+        for estimates in ([self.estimate_row(1), self.estimate_row(1)], [self.estimate_row(1, execution_id=3, _force=True)],
+                          [self.estimate_row(1, started_at=parse_timestamp('2026-10-15T11:59:30.1234568Z'))],
+                          [self.estimate_row(1, started_at=None)], [self.estimate_row(1, count=6, total=Decimal(6))],
+                          [self.estimate_row(1, count=0, total=Decimal(1))], [self.estimate_row(1, total=1)]):
+            with self.subTest(estimates=estimates):
+                self.estimates = estimates
+                self.enable_estimates()
+                with self.assertLogs(self.app.logger, level='ERROR'):
+                    response = self.get(**WINDOW)
+                self.assertEqual(response.status_code, 500)
+                self.contract.validator('Problem').validate(response.json)
+
+    def test_disabled_estimates_read_nothing_and_return_null(self):
+        self.estimates = [self.estimate_row(251)]
+        page = self.page(**WINDOW)
+        self.assertTrue(all(row['estimate'] is None for row in page['data']))
+        self.assertNotIn('api-executions-estimates.sql', [call.args[0] for call in self.query.call_args_list])
+
+    def test_cached_estimates_are_read_once_per_execution_and_start_until_they_expire(self):
+        now = [0.0]
+        self.rows = [execution(1), execution(2), execution(3)]
+        self.estimates = [self.estimate_row(i) for i in (1, 2, 3)]
+        self.enable_estimates(seconds=60, clock=lambda: now[0])
+        reads = lambda: [call.args[1][0] for call in self.query.call_args_list
+                         if call.args[0] == 'api-executions-estimates.sql']
+        first = self.page(**WINDOW)
+        self.assertEqual(reads(), ['<t><i>1</i><i>2</i><i>3</i></t>'])
+        # A refresh within the lifetime reads nothing, even if the source changed, and returns the same estimates.
+        self.estimates = []
+        self.assertEqual(self.page(**WINDOW)['data'], first['data'])
+        self.assertEqual(len(reads()), 1)
+        # A new active row reads only itself; a restarted row (new start time) is a new key.
+        self.rows.append(execution(4))
+        self.rows[0] = execution(1, started_at=parse_timestamp('2026-10-15T11:59:40Z'))
+        self.estimates = [self.estimate_row(1), self.estimate_row(4)]
+        page = self.page(**WINDOW)
+        self.assertEqual(reads()[-1], '<t><i>1</i><i>4</i></t>')
+        self.assertEqual({row['execution_id'] for row in page['data'] if row['estimate']}, {'1', '2', '3', '4'})
+        # Vanished rows and failures are not cached; expiry reads again.
+        now[0] = 61
+        self.estimates = [self.estimate_row(2)]
+        page = self.page(**WINDOW)
+        self.assertEqual(reads()[-1], '<t><i>1</i><i>2</i><i>3</i><i>4</i></t>')
+        self.assertEqual({row['execution_id'] for row in page['data'] if row['estimate']}, {'2'})
+        self.page(**WINDOW)
+        self.assertEqual(reads()[-1], '<t><i>1</i><i>3</i><i>4</i></t>')
 
     def test_exact_package_names_are_bound_at_full_width_beside_folder_and_project(self):
         for name in ('all', '*', '%_[~', ' 東京/+# ', 'p' * 260, '😀' * 130):
             with self.subTest(name=name):
                 self.page(**WINDOW, package=name)
-                self.assertEqual(self.query.call_args.args[1][2:7], (None, None, name, None, None))
+                self.assertEqual(self.page_call.args[1][2:7], (None, None, name, None, None))
         self.page(**WINDOW, folder='F', project='P', package='Pkg.dtsx')
-        self.assertEqual(self.query.call_args.args[1][2:7], ('F', 'P', 'Pkg.dtsx', None, None))
+        self.assertEqual(self.page_call.args[1][2:7], ('F', 'P', 'Pkg.dtsx', None, None))
 
     def test_invalid_selectors_fail_before_sql(self):
         cases = [{'limit': value} for value in ('0', '201', '-1', '1.0', 'all', '١')]
@@ -190,7 +308,7 @@ class ExecutionAPITests(unittest.TestCase):
 
     def test_status_and_timestamp_selectors_are_canonical_for_cursor_binding(self):
         first = self.page(**WINDOW, status='7,2', limit='1')
-        parameters = self.query.call_args.args[1]
+        parameters = self.page_call.args[1]
         self.assertEqual(parameters[:2], ('2026-10-14T00:00:00.0000000+00:00', '2026-10-16T00:00:00.0000000+00:00'))
         self.assertEqual(parameters[7:16], (2, 7, *([None] * 7)))
         self.page(**{**self.continuation(first, status='2,7', limit='01'),
@@ -303,10 +421,14 @@ class ExecutionAPITests(unittest.TestCase):
         self.query.side_effect = None
         from dashboard.db import execute_query
         self.query.side_effect = execute_query
+        self.enable_estimates()
         row = execution(42)
         connections = []
         sql_cursors = []
-        for names, values in ((['upper_id'], [(42,)]), (list(row), [tuple(row.values())])):
+        estimate = {'execution_id': 42, 'started_at': row['started_at'], 'estimate_sample_count': 0,
+                    'estimate_total_ticks': None}
+        for names, values in ((['upper_id'], [(42,)]), (list(row), [tuple(row.values())]),
+                              (list(estimate), [tuple(estimate.values())])):
             cursor = Mock()
             cursor.description = [(name,) for name in names]
             cursor.fetchone.return_value = values[0]
@@ -322,9 +444,14 @@ class ExecutionAPITests(unittest.TestCase):
             sql, parameters = cursor.execute.call_args.args
             self.assertEqual(sql.count('?'), len(parameters))
             self.assertNotIn('private-', sql)
-            self.assertIn('datetimeoffset(7)', sql)
+            if cursor is not sql_cursors[2]:  # the cohort queries bind typed window bounds
+                self.assertIn('datetimeoffset(7)', sql)
         page_sql = sql_cursors[1].execute.call_args.args[0]
         self.assertLess(page_sql.index('INTO #execution_page'), page_sql.index('catalog.event_messages'))
+        estimate_sql, estimate_parameters = sql_cursors[2].execute.call_args.args
+        self.assertEqual(estimate_parameters, ('<t><i>42</i></t>',))
+        self.assertIn('CONVERT(xml, ?)', estimate_sql)
+        self.assertNotIn('event_messages', estimate_sql)
 
     def test_database_timeout_is_safe_and_never_falls_back_to_unbounded_legacy_query(self):
         self.query.side_effect = pyodbc.OperationalError('HYT00', 'private-canary')

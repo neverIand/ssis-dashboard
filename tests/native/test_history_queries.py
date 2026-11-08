@@ -107,7 +107,8 @@ class HistorySQLTests(unittest.TestCase):
                 return rows
 
     def query(self, resource, parameters):
-        self.run_batch('DROP TABLE IF EXISTS #history_page, #history_counts, #history_rows, #history_successes, #history_scopes;')
+        self.run_batch('DROP TABLE IF EXISTS #history_page, #history_counts, #history_rows, #history_successes, #history_scopes,'
+                       ' #estimate_targets, #estimate_scopes, #estimate_successes;')
         sql = load_query(resource)
         for source, target in (('catalog.executions', '#h_executions'), ('catalog.event_messages', '#h_events'),
                                ('catalog.execution_parameter_values', '#h_parameters')):
@@ -185,3 +186,41 @@ class HistorySQLTests(unittest.TestCase):
                 started = result[0]['started_at']
                 self.assertEqual(None if started is None else started.utc_ticks, row['start_time'])
         self.assertEqual(self.query('api-execution-estimate.sql', (len(self.rows) + 1,)), [])
+
+    def test_list_page_estimates_match_the_history_oracle_across_identities(self):
+        # Batch C4: one read estimates a page's targets of several identities; the floor must not skip samples.
+        started = [r for r in self.rows if r['start_time'] is not None]
+        self.assertGreater(len({(r['folder_name'], r['package_name']) for r in started}), 2)
+        for size in (1, 7, 200):
+            for offset in range(0, len(started), size * 3 if size < 200 else size):
+                chunk = started[offset:offset + size]
+                with self.subTest(size=size, offset=offset):
+                    xml = '<t>' + ''.join(f"<i>{r['execution_id']}</i>" for r in chunk) + '<i>999999</i></t>'
+                    result = self.query('api-executions-estimates.sql', (xml,))
+                    actual = [(r['execution_id'], r['estimate_sample_count'],
+                               None if r['estimate_total_ticks'] is None else int(r['estimate_total_ticks']),
+                               r['started_at'].utc_ticks) for r in result]
+                    expected = [(r['execution_id'], *estimate(self.rows, r), r['start_time'])
+                                for r in sorted(chunk, key=lambda r: r['execution_id'])]
+                    self.assertEqual(actual, expected)
+        unstarted = next(r for r in self.rows if r['start_time'] is None)
+        self.assertEqual(self.query('api-executions-estimates.sql', (f"<t><i>{unstarted['execution_id']}</i></t>",)), [])
+
+    def test_list_page_estimates_keep_the_catalog_name_collation(self):
+        # Codex C4 round 1: declared temporary name columns took tempdb's collation and failed with error 468.
+        tempdb = self.run_batch("SELECT CONVERT(nvarchar(128), DATABASEPROPERTYEX('tempdb', 'Collation')) AS c")[0]['c']
+        collation = next(c for c in ('Latin1_General_BIN2', 'Japanese_CI_AS') if c != tempdb)
+        self.run_batch(f"""DROP TABLE IF EXISTS #c_executions;
+            SELECT execution_id, CONVERT(nvarchar(128), folder_name) COLLATE {collation} AS folder_name,
+                   CONVERT(nvarchar(128), project_name) COLLATE {collation} AS project_name,
+                   CONVERT(nvarchar(260), package_name) COLLATE {collation} AS package_name,
+                   status, start_time, end_time
+            INTO #c_executions FROM #h_executions;""")
+        self.run_batch('DROP TABLE IF EXISTS #estimate_targets, #estimate_scopes, #estimate_successes;')
+        sql = load_query('api-executions-estimates.sql').replace('catalog.executions', '#c_executions')
+        chunk = [r for r in self.rows if r['start_time'] is not None][:40]
+        xml = '<t>' + ''.join(f"<i>{r['execution_id']}</i>" for r in chunk) + '</t>'
+        result = self.run_batch(sql, (xml,))
+        self.assertEqual([(r['execution_id'], r['estimate_sample_count'],
+                           None if r['estimate_total_ticks'] is None else int(r['estimate_total_ticks'])) for r in result],
+                         [(r['execution_id'], *estimate(self.rows, r)) for r in sorted(chunk, key=lambda r: r['execution_id'])])
