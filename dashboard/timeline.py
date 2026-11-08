@@ -110,7 +110,8 @@ def execution_timeline(values, config, *, fixed_to):
     status = selection['status']
     rows = execute_query('api-metrics-timeline.sql', (
         ET.tostring(intervals, encoding='unicode'), sql_timestamp(start), sql_timestamp(end),
-        selection['folder'], selection['project'], selection['folder_pattern'], selection['project_pattern'],
+        selection['folder'], selection['project'], selection['package'],
+        selection['folder_pattern'], selection['project_pattern'],
         *status, *([None] * (9 - len(status)))),
         connection_string=config['CONNECTION_STRING']['main'],
         login_timeout=config['DB_LOGIN_TIMEOUT_SECONDS'], query_timeout=config['DB_QUERY_TIMEOUT_SECONDS'],

@@ -59,7 +59,7 @@ class SummaryTests(unittest.TestCase):
         resource, parameters = self.query.call_args.args
         self.assertEqual(resource, 'api-metrics-summary.sql')
         self.assertEqual(parameters, ('2026-10-01T12:00:00.1234567+00:00',
-                                     '2026-10-16T12:00:00.1234567+00:00', None, None, None, None))
+                                     '2026-10-16T12:00:00.1234567+00:00', None, None, None, None, None))
         self.assertTrue(self.query.call_args.kwargs['typed_timestamps'])
         self.connect.assert_not_called()
 
@@ -81,6 +81,7 @@ class SummaryTests(unittest.TestCase):
 
     def test_execution_page_effective_bounds_and_selectors_can_be_reused_exactly(self):
         for selectors in ({'folder': ' Literal%_[/+# ', 'project': 'P'*128},
+                          {'folder': 'F', 'project': 'P', 'package': '😀' * 130},
                           {'folder_pattern': r'A*\*%_', 'project_pattern': r'P\\*'}):
             with self.subTest(selectors=selectors):
                 with patch('dashboard.executions.utc_now', return_value=NOW), patch(
@@ -90,7 +91,7 @@ class SummaryTests(unittest.TestCase):
                 bounds = {name: response.json['meta'][name] for name in ('from', 'to')}
                 result = self.summary(**selectors, **bounds, status='7')
                 self.assertEqual({k: result['meta'][k] for k in bounds}, bounds)
-                self.assertEqual(self.query.call_args.args[1], execution_query.call_args.args[1][:6])
+                self.assertEqual(self.query.call_args.args[1], execution_query.call_args.args[1][:7])
 
     def test_fixed_configuration_and_seven_digit_offset_bounds_are_preserved(self):
         app = create_app({'TESTING':True, 'LOG_LEVEL':'ERROR', 'AS_OF_DATE':'2026-10-15T01:02:03.0000001+03:00',
@@ -114,8 +115,8 @@ class SummaryTests(unittest.TestCase):
     def test_explicit_patterns_escape_sql_wildcards_without_becoming_exact_names(self):
         self.summary(folder_pattern=r"A*\*%_[~", project_pattern=r'P\\*')
         parameters = self.query.call_args.args[1]
-        self.assertEqual(parameters[2:4], (None, None))
-        self.assertEqual(parameters[4:], ('A%*~%~_~[~~', 'P\\%'))
+        self.assertEqual(parameters[2:5], (None, None, None))
+        self.assertEqual(parameters[5:], ('A%*~%~_~[~~', 'P\\%'))
 
     def test_invalid_inputs_and_unsupported_page_parameters_fail_before_sql(self):
         values = ({'status':'0'}, {'status':'10'}, {'status':'2,2'}, {'status':'2, 7'}, {'status':''},
@@ -175,7 +176,7 @@ class SummaryTests(unittest.TestCase):
         result = self.summary(folder="x' OR 1=1 --", **WINDOW)
         self.assertEqual(result['data']['total'], 6)
         sql, parameters = cursor.execute.call_args.args
-        self.assertEqual(sql.count('?'), 6)
+        self.assertEqual(sql.count('?'), 7)
         self.assertEqual(parameters[2], "x' OR 1=1 --")
         self.assertNotIn(parameters[2], sql)
         self.assertIn('COUNT_BIG(*)', sql)

@@ -10,7 +10,7 @@ def execution_summary(values, config, *, fixed_to):
     selection, start, end = inputs.execution_cohort(values, config, now=utc_now(), fixed_to=fixed_to)
     # A selected table status is validated above, but cards always count all statuses.
     rows = execute_query('api-metrics-summary.sql', (
-        sql_timestamp(start), sql_timestamp(end), selection['folder'], selection['project'],
+        sql_timestamp(start), sql_timestamp(end), selection['folder'], selection['project'], selection['package'],
         selection['folder_pattern'], selection['project_pattern']),
         connection_string=config['CONNECTION_STRING']['main'],
         login_timeout=config['DB_LOGIN_TIMEOUT_SECONDS'], query_timeout=config['DB_QUERY_TIMEOUT_SECONDS'],

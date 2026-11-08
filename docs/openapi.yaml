@@ -107,6 +107,7 @@ paths:
       parameters:
       - {$ref: '#/components/parameters/Folder'}
       - {$ref: '#/components/parameters/Project'}
+      - {$ref: '#/components/parameters/Package'}
       - {$ref: '#/components/parameters/FolderPattern'}
       - {$ref: '#/components/parameters/ProjectPattern'}
       - {$ref: '#/components/parameters/From'}
@@ -141,6 +142,7 @@ paths:
       parameters:
       - {$ref: '#/components/parameters/Folder'}
       - {$ref: '#/components/parameters/Project'}
+      - {$ref: '#/components/parameters/Package'}
       - {$ref: '#/components/parameters/FolderPattern'}
       - {$ref: '#/components/parameters/ProjectPattern'}
       - {$ref: '#/components/parameters/From'}
@@ -175,6 +177,7 @@ paths:
       parameters:
       - {$ref: '#/components/parameters/Folder'}
       - {$ref: '#/components/parameters/Project'}
+      - {$ref: '#/components/parameters/Package'}
       - {$ref: '#/components/parameters/FolderPattern'}
       - {$ref: '#/components/parameters/ProjectPattern'}
       - {$ref: '#/components/parameters/From'}
@@ -1925,6 +1928,12 @@ components:
       in: query
       required: true
       description: Exact package name, required.
+      schema: {$ref: '#/components/schemas/PackageName'}
+    Package:
+      name: package
+      in: query
+      required: false
+      description: Exact package name, combined with any folder/project selector; no package pattern is offered.
       schema: {$ref: '#/components/schemas/PackageName'}
     FolderPattern:
       name: folder_pattern

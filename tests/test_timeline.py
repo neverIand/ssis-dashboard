@@ -116,7 +116,8 @@ class TimelineTests(unittest.TestCase):
         self.assertEqual(self.query.call_args.args[1][-9:],(4,5,7,None,None,None,None,None,None))
 
     def test_summary_effective_bounds_and_exact_pattern_names_are_shared(self):
-        for selectors in ({'folder':"O'Brien/+#\\東京",'project':'😀'*64},
+        for selectors in ({'folder':'F','package':'Pkg 東京.dtsx'},
+                          {'folder':"O'Brien/+#\\東京",'project':'😀'*64},
                           {'folder_pattern':r'A*\*%_[','project_pattern':'P*'}):
             with self.subTest(selectors=selectors):
                 with patch('dashboard.metrics.utc_now',return_value=NOW), patch('dashboard.metrics.execute_query',return_value=[]) as summary_query:
@@ -124,7 +125,7 @@ class TimelineTests(unittest.TestCase):
                 self.assertEqual(response.status_code,200)
                 effective = {k:response.json['meta'][k] for k in ('from','to')}
                 result = self.page(**selectors,**effective,status='7')
-                self.assertEqual(self.query.call_args.args[1][1:7],summary_query.call_args.args[1])
+                self.assertEqual(self.query.call_args.args[1][1:8],summary_query.call_args.args[1])
                 self.assertEqual(result['meta']['selected_statuses'],[7])
 
     def test_fixed_as_of_and_default_elapsed_range_survive_dst(self):
@@ -219,8 +220,8 @@ class TimelineTests(unittest.TestCase):
         result = self.page(**WINDOW,bucket='hour',folder="x' OR 1=1 --",status='7,5')
         self.assertEqual(result['data'][0]['created_count'],2)
         sql,parameters = cursor.execute.call_args.args
-        self.assertEqual(sql.count('?'),16)
-        self.assertEqual(len(parameters),16)
+        self.assertEqual(sql.count('?'),17)
+        self.assertEqual(len(parameters),17)
         self.assertEqual(len(ET.fromstring(parameters[0])),2)
         self.assertEqual(parameters[3],"x' OR 1=1 --")
         self.assertNotIn(parameters[3],sql)

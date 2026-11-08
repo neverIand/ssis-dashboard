@@ -9,7 +9,7 @@ from dashboard.timestamps import Timestamp, TICKS_PER_SECOND, parse_timestamp
 from dashboard.validation import InvalidInput
 
 
-COHORT_PARAMETERS = ('folder', 'project', 'folder_pattern', 'project_pattern', 'from', 'to', 'status')
+COHORT_PARAMETERS = ('folder', 'project', 'package', 'folder_pattern', 'project_pattern', 'from', 'to', 'status')
 
 
 def query_arguments(raw, allowed):
@@ -147,6 +147,8 @@ def execution_cohort(values, config, *, now, fixed_to):
             raise InvalidInput('Exact and pattern selectors are mutually exclusive.')
         selection[name] = catalog_name(values[name]) if name in values else None
         selection[pattern] = catalog_pattern(values[pattern]) if pattern in values else None
+    # Exact package name only (UX O3); a package pattern is not offered.
+    selection['package'] = catalog_name(values['package'], utf16_units=260) if 'package' in values else None
     selection['status'] = statuses(values['status']) if 'status' in values else ()
     start, end = time_window(values, now=now, fixed_to=fixed_to,
                              hours=config['HOUR_SPAN'], max_hours=config['API_MAX_RANGE_HOURS'])

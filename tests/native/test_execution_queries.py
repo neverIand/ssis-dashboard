@@ -69,7 +69,7 @@ class ExecutionSQLTests(unittest.TestCase):
         self.cursor.execute('DROP TABLE IF EXISTS #execution_page, #execution_cohort, #page_counts, #execution_counts;')
         while self.cursor.nextset():
             pass
-        parameters = ['2026-10-01T00:00:00Z', '2026-10-02T00:00:00Z', *([None]*13)]
+        parameters = ['2026-10-01T00:00:00Z', '2026-10-02T00:00:00Z', *([None]*14)]
         for index, value in (selection or {}).items():
             parameters[index] = value
         parameters += [51, 9007199254740993, last, int(direction == 'desc')]
@@ -116,10 +116,15 @@ class ExecutionSQLTests(unittest.TestCase):
                     self.compare_chain(sort, direction)
 
     def test_selective_and_empty_cohorts(self):
+        package = '界' * 253 + '05.dtsx'   # a full-width 260-unit package name
         cases = [({2: 'F1'}, "AND e.folder_name=N'F1'"),
-                 ({3: 'P2', 6: 7}, "AND e.project_name=N'P2' AND e.status=7"),
-                 ({4: 'F%'}, "AND e.folder_name LIKE N'F%'"),
-                 ({2: 'absent'}, "AND e.folder_name=N'absent'")]
+                 ({3: 'P2', 7: 7}, "AND e.project_name=N'P2' AND e.status=7"),
+                 ({5: 'F%'}, "AND e.folder_name LIKE N'F%'"),
+                 ({2: 'absent'}, "AND e.folder_name=N'absent'"),
+                 ({4: package}, f"AND e.package_name=N'{package}'"),
+                 ({2: 'F1', 4: package, 7: 7}, f"AND e.folder_name=N'F1' AND e.package_name=N'{package}' AND e.status=7"),
+                 ({4: package[:-5] + '.DTSX'}, f"AND e.package_name=N'{package[:-5]}.DTSX'"),
+                 ({4: 'absent.dtsx'}, "AND e.package_name=N'absent.dtsx'")]
         for sort in ('execution_id', 'created_at', *sorted(CALCULATED_SORTS)):
             for selection, where in cases:
                 with self.subTest(sort=sort, selection=selection):

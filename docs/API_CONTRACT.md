@@ -33,7 +33,7 @@ Folder/project/environment names allow 128 UTF-16 units and packages 260. OpenAP
 | `/meta` | No query parameters |
 | `/folders` | `limit,cursor,sort,direction`; visible folders with at least one visible project; default name/ascending |
 | `/projects` | Required exact `folder`, plus navigation paging; default name/ascending |
-| `/executions` | Optional `folder,project,folder_pattern,project_pattern,from,to,status`, plus paging; default execution ID/descending |
+| `/executions` | Optional `folder,project,package,folder_pattern,project_pattern,from,to,status`, plus paging; default execution ID/descending. `package` is an exact name only (no package pattern) and combines with any folder/project selector |
 | `/metrics/summary` | Same cohort inputs; validates status but counts all statuses; no paging |
 | `/metrics/timeline` | Same cohort inputs plus `bucket=day|hour` (default day); selected statuses apply |
 | `/executions/{id}` | Positive BIGINT path ID; no query parameters or overview time filter |

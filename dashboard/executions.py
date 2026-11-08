@@ -83,7 +83,7 @@ def execution_page(values, config, *, fixed_to):
                              typed_timestamps=True, declared_parameters=True, on_complete=record_query)
 
     status = selection['status']
-    parameters = (sql_timestamp(start), sql_timestamp(end), selection['folder'], selection['project'],
+    parameters = (sql_timestamp(start), sql_timestamp(end), selection['folder'], selection['project'], selection['package'],
                   selection['folder_pattern'], selection['project_pattern'], *status, *([None] * (9 - len(status))))
     as_of = parse_timestamp(state['as_of']) if state is not None else now
     if state is None:

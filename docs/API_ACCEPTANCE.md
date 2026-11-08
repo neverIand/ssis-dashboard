@@ -194,6 +194,26 @@ Record revision/source hashes, interpreter/driver/catalog scope, timestamps, exa
 
 ## Recorded results
 
+### C1 package filter SQL work: 8 November 2026
+
+UX review item O3 adds an exact `package` cohort parameter to `/executions`, `/metrics/summary` and `/metrics/timeline`. Each of the six cohort resources (fence, ID page, ordered page, calculated-sort page, summary, timeline) gains one parameter, `@package nvarchar(260)`, and one predicate, `(@package IS NULL OR e.package_name = @package)`, beside the existing folder/project predicates. Equality follows the catalog collation, as for folder and project. On the local catalog `probe.dtsx` therefore matches `Probe.dtsx`.
+
+Connection-local `#det`, `#ev` and `#par` replaced the three views, clustered on execution or operation ID with no name or `created_time` index, like the internal tables. The data covered 15 days, 4 folders, 5 projects and 50 packages (one package on every second row; `Rare.dtsx` on 0.1%). A narrow-window case selects only the last 1.5 days (10,000 of 100,000 rows). Each case took one actual-plan diagnostic and 10 warm samples. Harness and raw results: `.local/reports/backend/20261108-c1-package-filter/` (`measure_c1.py`, `results-r2.json`; the first run, `results.json`, measured the real timeline over the wrong buckets and is superseded).
+
+| Selection | Fence `#det` rows / reads at 2,000 · 20,000 · 100,000 | ID page rows read (rows returned) | Summary and timeline |
+| --- | --- | --- | --- |
+| None | 2 / 2 · 2 / 2 · 2 / 3 | 51 at every size | every row: 2,000 / 26 · 20,000 / 240 · 100,000 / 1,195 |
+| Folder (25%, existing) | 4 rows | 201 | every row |
+| Common package (50%) | 3 rows | 101 | every row |
+| Rare package (0.1%) | 994 rows | 1,007 (2) · 19,007 (20) · 50,001 (51) | every row |
+| Absent package | every row (no page query runs) | — | every row |
+| Rare package, narrow window, 100,000 | 994 rows | 99,007 (10) | every row |
+| Absent package, narrow window, 100,000 | 100,000 / 1,196 | — | every row |
+
+The filter cannot seek: no catalog index covers package names or creation times, and the dashboard adds no SSISDB objects. A selective package therefore reads in descending ID order until the page is full, past the selected window if the window holds too few matches. An absent name reads every visible execution once in the fence. The bound is the catalog, not the window. Summary and timeline already read every visible execution for any selection, so the filter adds no new worst case, but a rare or absent package makes the list as costly as the summary. The ordered and calculated-sort pages read every row with or without the filter, as before. Plans kept their shape and no `RECOMPILE` was added (the ID page's event-count statement keeps its existing one). Most statements (290 of 309) compiled in under 30 ms. The first compiles after each fixture rebuild took up to 103 ms at 2,000 and 20,000 rows and up to 901 ms at 100,000 rows.
+
+Read-only against the real local views, 1 October to 9 November 2026 (18 visible executions) with daily buckets over the same window: a package filter left base reads unchanged. `internal.operations` read 67 rows / 4 reads, the whole table, with or without the filter, and `executions` 18 / 134 for fence, summary and timeline. Only the enrichment of the smaller page changed. Summary and timeline totals agreed for no filter (18), an existing package (12) and an absent one (0). Through the API, list, summary and timeline agreed for every package (4, 2 and 12 rows, and 0 for an absent name). A cursor rejected a changed package, and a 261-unit name or `package_pattern` returned 400. Reader identity and representative volume remain NOT RUN.
+
 ### P5.1b change-detection SQL work: 7 November 2026
 
 Round 4 (after three independent reviews). The detector anchors to operation IDs: `catalog.operations` supplies the high-water mark and each poll's window of at most 201 new IDs, and executions are looked up per listed ID (`CROSS APPLY ... TOP (1)`). Every seed read is bounded by the mark it took, so rows committed above it while the seed runs are left to the first poll. The committed IDs below the mark (the newest 256, and the replaced state's unexpired ID gaps, at most 256, one keyed lookup each) are read into a table variable before the active executions, so an execution that commits during the seed is either active or a gap. Connection-local `#ops` and `#det` replaced the two views, with 2,000 / 20,000 / 100,000 executions, every third operation ID a deployment, the newest 256 executions active and 256 uncommitted IDs (gaps) near the top. The harness asserts every case's actual inputs before measuring (512 distinct tracked IDs, a full 201-ID burst window, one new execution, 256 carried IDs below the seed's lookback), then takes one actual-plan diagnostic and 30 warm samples after two warmups. Earlier rounds are superseded (round 1 mislabelled some inputs; round 2's seed was not bounded by its mark; round 3 read actives and committed IDs in one statement). Harness and raw results: `.local/reports/backend/20261107-p51-change-detection/p51-review-02/measure3.py`, `results-r4.json`.

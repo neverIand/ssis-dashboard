@@ -63,14 +63,14 @@ class ExecutionSortingTests(unittest.TestCase):
     def query_fixture(self, resource, parameters, **settings):
         if resource=='api-executions-fence.sql':
             return {'upper_id':max((row['execution_id'] for row in self.rows),default=None)}
-        take, upper, last, descending = parameters[15:19]
-        sort = parameters[19] if resource != 'api-executions-page.sql' else 'execution_id'
+        take, upper, last, descending = parameters[16:20]
+        sort = parameters[20] if resource != 'api-executions-page.sql' else 'execution_id'
         boundary = None
         if last is not None:
             if sort=='execution_id':
                 boundary=[last,last]
             else:
-                null1, number, stamp, text1, null2, text2=parameters[20:26]
+                null1, number, stamp, text1, null2, text2=parameters[21:27]
                 if sort in ('created_at','started_at','ended_at'):
                     key=[None if null1 else parse_timestamp(stamp)]
                 elif sort in ('status','logging_level','duration_seconds','warning_count','error_count'):
@@ -143,7 +143,7 @@ class ExecutionSortingTests(unittest.TestCase):
                                 'api-executions-sort.sql' if sort in CALCULATED_SORTS else
                                 'api-executions-ordered-page.sql')
                     self.assertEqual(page_call.args[0], resource)
-                    self.assertEqual(page_call.args[1][15],3)
+                    self.assertEqual(page_call.args[1][16],3)
                     self.assertTrue(page_call.kwargs['typed_timestamps'])
         self.connect.assert_not_called()
 
@@ -190,7 +190,7 @@ class ExecutionSortingTests(unittest.TestCase):
                     cursor.close.assert_called_once()
                     connection.close.assert_called_once()
                 self.assertEqual(len(sql_cursors[-1].execute.call_args.args[1]),
-                                 19 if sort == 'execution_id' else 26)
+                                 20 if sort == 'execution_id' else 27)
 
     def test_null_cursor_can_continue_inside_terminal_null_group(self):
         for sort in ('started_at','ended_at','duration_seconds','logging_level','environment'):

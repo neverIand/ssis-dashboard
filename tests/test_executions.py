@@ -157,11 +157,19 @@ class ExecutionAPITests(unittest.TestCase):
             with self.subTest(name=name):
                 self.page(**WINDOW, folder=name, project=name)
                 parameters = self.query.call_args.args[1]
-                self.assertEqual(parameters[2:6], (name, name, None, None))
+                self.assertEqual(parameters[2:7], (name, name, None, None, None))
         self.page(**WINDOW, folder_pattern=r'*東京%_[~\*\\', project_pattern='%' * 512)
         parameters = self.query.call_args.args[1]
-        self.assertEqual(parameters[4], '%東京~%~_~[~~*\\')
-        self.assertEqual(parameters[5], '~%' * 512)
+        self.assertEqual(parameters[5], '%東京~%~_~[~~*\\')
+        self.assertEqual(parameters[6], '~%' * 512)
+
+    def test_exact_package_names_are_bound_at_full_width_beside_folder_and_project(self):
+        for name in ('all', '*', '%_[~', ' 東京/+# ', 'p' * 260, '😀' * 130):
+            with self.subTest(name=name):
+                self.page(**WINDOW, package=name)
+                self.assertEqual(self.query.call_args.args[1][2:7], (None, None, name, None, None))
+        self.page(**WINDOW, folder='F', project='P', package='Pkg.dtsx')
+        self.assertEqual(self.query.call_args.args[1][2:7], ('F', 'P', 'Pkg.dtsx', None, None))
 
     def test_invalid_selectors_fail_before_sql(self):
         cases = [{'limit': value} for value in ('0', '201', '-1', '1.0', 'all', '١')]
@@ -170,6 +178,7 @@ class ExecutionAPITests(unittest.TestCase):
                   {'folder': 'x', 'folder_pattern': '*'}, {'project': 'x', 'project_pattern': '*'},
                   {'folder': 'x' * 129}, {'project': '😀' * 65}, {'folder_pattern': '*' * 513},
                   {'project_pattern': '\\a'}, {'project_pattern': 'x\\'},
+                  {'package': 'p' * 261}, {'package': '😀' * 131}, {'package_pattern': '*'},
                   {'from': WINDOW['to']}, {'from': '2020-01-01T00:00:00Z'},
                   {'from': '2026-10-14 00:00:00Z'}, {'to': '2026-10-16T00:00:00-00:00'}]
         for case in cases:
@@ -183,26 +192,27 @@ class ExecutionAPITests(unittest.TestCase):
         first = self.page(**WINDOW, status='7,2', limit='1')
         parameters = self.query.call_args.args[1]
         self.assertEqual(parameters[:2], ('2026-10-14T00:00:00.0000000+00:00', '2026-10-16T00:00:00.0000000+00:00'))
-        self.assertEqual(parameters[6:15], (2, 7, *([None] * 7)))
+        self.assertEqual(parameters[7:16], (2, 7, *([None] * 7)))
         self.page(**{**self.continuation(first, status='2,7', limit='01'),
                      'from': '2026-10-14T01:00:00+01:00'})
 
     def test_cursor_requires_all_selection_and_explicit_window_bounds(self):
-        values = {**WINDOW, 'folder': 'private-name-canary', 'project_pattern': '*Project',
+        values = {**WINDOW, 'folder': 'private-name-canary', 'project_pattern': '*Project', 'package': 'Pkg-canary.dtsx',
                   'status': '2,7', 'limit': '1', 'direction': 'asc'}
         first = self.page(**values)
         continuation = self.continuation(first, **values)
-        for field in ('folder', 'project_pattern', 'status', 'limit', 'direction', 'from', 'to'):
+        for field in ('folder', 'project_pattern', 'package', 'status', 'limit', 'direction', 'from', 'to'):
             changed = dict(continuation)
             del changed[field]
             self.assert_invalid_cursor(changed)
-        for changed in ({'folder': 'other'}, {'project_pattern': '*Other'}, {'status': '2'},
+        for changed in ({'folder': 'other'}, {'project_pattern': '*Other'}, {'package': 'Other.dtsx'}, {'status': '2'},
                         {'limit': '2'}, {'direction': 'desc'}, {'sort': 'status'},
                         {'to': '2026-10-16T00:00:00.0000001Z'}):
             self.assert_invalid_cursor({**continuation, **changed})
         body = base64.urlsafe_b64decode(first['meta']['next_cursor'].split('.')[0] + '==').decode()
         self.assertNotIn('private-', body)
         self.assertNotIn('Project', body)
+        self.assertNotIn('Pkg-canary', body)
         self.assertLess(len(first['meta']['next_cursor']), 8192)
 
     def test_cursor_rejects_malformed_tampered_wrong_resource_scope_and_restart(self):
@@ -279,7 +289,7 @@ class ExecutionAPITests(unittest.TestCase):
         response = self.client.head('/api/v1/executions', query_string=WINDOW)
         self.assertEqual((response.status_code, response.data), (200, b''))
         calls = self.query.call_count
-        for suffix in ('?limit=1&limit=2', '?package=bad', '?folder=%FF', '?cursor=', '?unknown=x'):
+        for suffix in ('?limit=1&limit=2', '?package_pattern=bad', '?package=%FF', '?folder=%FF', '?cursor=', '?unknown=x'):
             self.assertEqual(self.client.get('/api/v1/executions' + suffix).status_code, 400)
         self.assertEqual(self.client.get('/api/v1/executions', data='private-canary').status_code, 400)
         self.assertEqual(self.query.call_count, calls)
