@@ -36,7 +36,7 @@ Folder/project/environment names allow 128 UTF-16 units and packages 260. OpenAP
 | `/executions` | Optional `folder,project,package,folder_pattern,project_pattern,from,to,status`, plus paging; default execution ID/descending. `package` is an exact name only (no package pattern) and combines with any folder/project selector |
 | `/metrics/summary` | Same cohort inputs; validates status but counts all statuses; no paging |
 | `/metrics/timeline` | Same cohort inputs plus `bucket=day|hour` (default day); selected statuses apply |
-| `/executions/{id}` | Positive BIGINT path ID; no query parameters or overview time filter |
+| `/executions/{id}` | Positive BIGINT path ID; no query parameters or overview time filter. `estimate` uses the History method while the execution has started and not ended, and is NULL otherwise |
 | `/executions/{id}/executables` | `limit,cursor,sort,direction`; default started time/ascending |
 | `/executions/{id}/children` | `limit,cursor,sort,direction`; default started time/ascending |
 | `/executions/{id}/events` | `limit,cursor,sort,direction,kind,q`; default message time/ascending, kind all |
@@ -114,7 +114,7 @@ History requires folder/project/package, has no implicit time window, and defaul
 
 An estimate uses at most five visible successful runs of the same exact identity, excluding the target, with non-NULL start/end, nonnegative duration and end at or before the target start. Choose by end time descending, then ID descending; sample eligibility is independent of page status/ID fences. Include zero-duration samples. Return NULL if there is no sample/start, the mean is zero or the estimated end exceeds the supported UTC range.
 
-Otherwise return `mean_last_5_successful`, sample count, arithmetic mean duration and target start+mean as a separate estimated end. Keep exact integer 100-ns totals until division; round only the end to nearest tick, half up. A positive mean below half a tick can share the start timestamp. Never replace NULL actual end/duration or imply prediction accuracy. Current visibility/retention/status can change estimates; there is no historical visibility snapshot. The indexed prior-success timestamp source may grow with history and must be measured separately from page/sample bounds.
+Execution detail applies the same method to one execution, only while it has started and not ended; a finished or unstarted execution returns `estimate: null` without the extra read. Otherwise return `mean_last_5_successful`, sample count, arithmetic mean duration and target start+mean as a separate estimated end. Keep exact integer 100-ns totals until division; round only the end to nearest tick, half up. A positive mean below half a tick can share the start timestamp. Never replace NULL actual end/duration or imply prediction accuracy. Current visibility/retention/status can change estimates; there is no historical visibility snapshot. The indexed prior-success timestamp source may grow with history and must be measured separately from page/sample bounds.
 
 ## Errors and health
 

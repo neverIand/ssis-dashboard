@@ -8,7 +8,7 @@ export function detailResponse(executionId = '9223372036854775807') {
     status: { code: 7, name: 'succeeded' }, logging_level: { code: 0, name: 'none' },
     created_at: wireTime, started_at: wireTime, ended_at: wireTime,
     duration_seconds: 0, elapsed_seconds: 0, warning_count: 1, error_count: 0,
-    event_counts: { all: 3, warnings: 1, errors: 0, duplicate_warnings: 1, memory_warnings: 1 },
+    event_counts: { all: 3, warnings: 1, errors: 0, duplicate_warnings: 1, memory_warnings: 1 }, estimate: null,
   });
 }
 
@@ -37,7 +37,7 @@ export function detailDOM() {
   document.activeElement = document.body;
   const nodes = new Map();
   for (const key of ['app-status', 'retry', 'request-id', 'display-timezone', 'server-name', 'execution-detail',
-    'active-elapsed', 'detail-id', 'tab-notes', 'legacy-errors', 'first-error', 'first-error-link', 'first-error-message',
+    'active-elapsed', 'active-estimate', 'detail-id', 'tab-notes', 'legacy-errors', 'first-error', 'first-error-link', 'first-error-message',
     'detail-refresh', 'detail-poll-toggle', 'detail-poll-status', 'overview-link', 'legacy-detail-link',
     'overview-return-notice', 'history-return', 'parameters-unavailable', 'overrides-unavailable', 'overrides-policy', ...['toggle','panel','plot','selected','scale','empty','x-axis','y-axis','count','mixed'].map(key=>`history-chart-${key}`), ...['filters','choices','apply','custom','close','presets','status-options'].map(key => `history-${key}`), ...['unavailable','filters','apply','reset','kind','q','copy-status'].map(key => `events-${key}`), ...['toggle', 'panel', 'status', 'notice', 'retry', 'sort',
       'limit', 'previous', 'next', 'latest', 'scroll', 'table', 'order-label'].flatMap(name => ['executables', 'children', 'events', 'parameters', 'overrides', 'history'].map(section => `${section}-${name}`))]) {
@@ -49,7 +49,7 @@ export function detailDOM() {
   const get = key => nodes.get(`[data-${key}]`);
   nodes.set('[data-detail-status]', get('detail-poll-status'));
   const fields = ['folder', 'project', 'package', 'lsn', 'environment-folder', 'environment', 'status', 'logging',
-    'created', 'started', 'ended', 'duration', 'elapsed', 'all', 'warnings', 'errors', 'duplicate_warnings', 'memory_warnings']
+    'created', 'started', 'ended', 'duration', 'elapsed', 'estimate', 'all', 'warnings', 'errors', 'duplicate_warnings', 'memory_warnings']
     .map(key => Object.assign(new Node(document, 'dd'), { dataset: { detailField: key } }));
   // Package/status live in the visible page heading, outside the hideable detail body.
   root.append(...fields.filter(node => ['package', 'status'].includes(node.dataset.detailField)));

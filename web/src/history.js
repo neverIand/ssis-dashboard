@@ -3,6 +3,15 @@ import { formatCode, formatId } from './display.js';
 import { observationText, readObservationMeta } from './observation-page.js';
 import { timestampTicks } from './selection.js';
 
+// History method estimate (API Estimate schema); shared by History rows and execution detail.
+export function readEstimate(estimate, startedAt, display) {
+  if (startedAt === null || estimate.method !== 'mean_last_5_successful'
+      || !Number.isSafeInteger(estimate.sample_count) || estimate.sample_count < 1 || estimate.sample_count > 5
+      || !(estimate.duration_seconds > 0) || estimate.ended_at === null) throw new TypeError();
+  display.duration(estimate.duration_seconds); display.timestamp(estimate.ended_at);
+  if (timestampTicks(estimate.ended_at) < timestampTicks(startedAt)) throw new TypeError();
+}
+
 export const allHistoryStatuses = metadata => metadata.execution_statuses.map(item => item.code).sort((a,b) => a-b).join(',');
 
 export function historyQuery(value, metadata) {
@@ -41,14 +50,7 @@ export function readHistoryPage(response, _executionId, query, metadata, display
       display.duration(row.duration_seconds); display.duration(row.elapsed_seconds);
       if ((row.started_at === null && (row.duration_seconds !== null || row.elapsed_seconds !== null))
           || (row.ended_at === null && row.duration_seconds !== null)) throw new TypeError();
-      if (row.estimate !== null) {
-        const estimate = row.estimate;
-        if (row.started_at === null || estimate.method !== 'mean_last_5_successful'
-            || !Number.isSafeInteger(estimate.sample_count) || estimate.sample_count < 1 || estimate.sample_count > 5
-            || !(estimate.duration_seconds > 0) || estimate.ended_at === null) throw new TypeError();
-        display.duration(estimate.duration_seconds); display.timestamp(estimate.ended_at);
-        if (timestampTicks(estimate.ended_at) < timestampTicks(row.started_at)) throw new TypeError();
-      }
+      if (row.estimate !== null) readEstimate(row.estimate, row.started_at, display);
     }
     return response;
   } catch { throw new ApiError('invalid_response', { requestId: response?.meta?.request_id }); }

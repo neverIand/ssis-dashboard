@@ -194,6 +194,22 @@ Record revision/source hashes, interpreter/driver/catalog scope, timestamps, exa
 
 ## Recorded results
 
+### C3 detail estimate SQL work: 8 November 2026
+
+UX review item D3 adds `estimate` to `GET /executions/{id}`. The new `api-execution-estimate.sql` runs only while the execution has started and not ended, so finished and unstarted executions keep the existing two reads, and the executables, events, values and children reads are unchanged. It reads the target through the public view (a seek, rechecking visibility) and averages its exact identity's five latest visible successes that ended by its start, excluding itself, as History does. History pages keep their own SQL.
+
+Connection-local `#det`, `#ev` and `#par` replaced the views, as in C1 (same fixture shape, no name or end-time index). Targets were active executions of a common identity, a rare identity and a new identity with no earlier success. Each case took one actual-plan diagnostic and 10 warm samples. Harness and raw results: `.local/reports/backend/20261108-c3-detail-estimate/` (`measure_c3.py`, `results-r2.json`; the first run, `results.json`, picked a common target whose identity had only failures and is superseded).
+
+| Executions | `#det` rows read / logical reads | Warm median (ms, two runs) | First compile after the fixture build |
+| --- | --- | --- | --- |
+| 2,000 | 2,001 / 31 | 0.8–1.5 | 29–40 ms |
+| 20,000 | 20,001 / 246 | 7.8–16.4 | 198–241 ms |
+| 100,000 | 100,001 / 1,203 | 51–69 | 389–469 ms |
+
+The read is the same for every target, whether it finds five samples or none: no catalog index covers names or end times, so the TOP (5) reads every visible execution once and its sort keeps five rows. No diagnostic spilled, and no `RECOMPILE` was added. The existing detail reads seek one row each. The estimate is therefore the only catalog-size read of the detail page, and it repeats on each refresh of an active execution (every 30 seconds by default, with the existing back-off). History's first page already reads the identity's source twice. A server-side cache keyed by execution and start time could remove the repeat, because a running execution's sample cannot change except through retention or visibility; it is not added.
+
+Read-only against the real local views (18 executions): `internal.operations` 68 rows / 6 reads, `internal.executions` 15 / 122, median 1.5–2.9 ms, first compile 216 ms. For every execution, the SQL estimate equals an independent Python oracle (12 with samples, no mismatches). Through Flask, all 18 finished executions return `estimate: null` with two queries. With the active path forced, each detail estimate equals History's estimate for the same execution, with three queries. No local execution was running, so the active path on the real catalog used that forced path. Reader identity and representative volume remain NOT RUN.
+
 ### C1 package filter SQL work: 8 November 2026
 
 UX review item O3 adds an exact `package` cohort parameter to `/executions`, `/metrics/summary` and `/metrics/timeline`. Each of the six cohort resources (fence, ID page, ordered page, calculated-sort page, summary, timeline) gains one parameter, `@package nvarchar(260)`, and one predicate, `(@package IS NULL OR e.package_name = @package)`, beside the existing folder/project predicates. Equality follows the catalog collation, as for folder and project. On the local catalog `probe.dtsx` therefore matches `Probe.dtsx`.

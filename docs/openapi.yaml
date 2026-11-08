@@ -207,9 +207,10 @@ paths:
   /api/v1/executions/{id}:
     get:
       operationId: getExecution
-      summary: Visible execution identity, actual timings and event counts
+      summary: Visible execution identity, actual timings, event counts and an active-run estimate
       description: Implemented in C4a. Independent of overview filters. Absent and hidden IDs return indistinguishable
-        safe 404 before event work; aggregation rechecks visibility and returns only recorded counts.
+        safe 404 before event work; aggregation rechecks visibility and returns only recorded counts. While the execution
+        has started and not ended, estimate uses the History method (UX batch C3); otherwise it is NULL without a read.
       x-implementation-status: implemented
       x-milestone: C4a
       parameters:
@@ -1121,11 +1122,13 @@ components:
             duration_seconds: {type: 'null'}
     ExecutionDetail:
       description: Current visible execution, independent of overview filters. Active elapsed time uses this request's
-        clock; warning_count and error_count agree with event_counts.warnings and event_counts.errors.
+        clock; warning_count and error_count agree with event_counts.warnings and event_counts.errors. estimate is NULL
+        unless the execution has started and not ended; then it is the History estimate, or NULL without a sample.
       type: object
       additionalProperties: false
       required: [execution_id, folder_name, project_name, package_name, project_lsn, environment, status, logging_level,
-        created_at, started_at, ended_at, duration_seconds, elapsed_seconds, warning_count, error_count, event_counts]
+        created_at, started_at, ended_at, duration_seconds, elapsed_seconds, warning_count, error_count, event_counts,
+        estimate]
       properties:
         execution_id: {$ref: '#/components/schemas/Id'}
         folder_name: {$ref: '#/components/schemas/Name128'}
@@ -1161,6 +1164,10 @@ components:
         warning_count: {type: integer, minimum: 0, maximum: 9007199254740991}
         error_count: {type: integer, minimum: 0, maximum: 9007199254740991}
         event_counts: {$ref: '#/components/schemas/EventCounts'}
+        estimate:
+          anyOf:
+          - {$ref: '#/components/schemas/Estimate'}
+          - {type: 'null'}
       allOf:
       - if:
           properties:
@@ -1170,6 +1177,7 @@ components:
           properties:
             duration_seconds: {type: 'null'}
             elapsed_seconds: {type: 'null'}
+            estimate: {type: 'null'}
       - if:
           properties:
             ended_at: {const: null}
@@ -1177,6 +1185,13 @@ components:
         then:
           properties:
             duration_seconds: {type: 'null'}
+      - if:
+          properties:
+            ended_at: {type: string}
+          required: [ended_at]
+        then:
+          properties:
+            estimate: {type: 'null'}
     Folder:
       type: object
       additionalProperties: false
@@ -2322,6 +2337,8 @@ components:
           warning_count: 1
           error_count: 0
           event_counts: {all: 8, errors: 0, warnings: 1, duplicate_warnings: 1, memory_warnings: 1}
+          estimate: {method: mean_last_5_successful, sample_count: 3, duration_seconds: 40.5,
+            ended_at: '2026-10-15T11:00:10.6234567Z'}
         meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z'}
     SummaryResponse:
       summary: Synthetic target response; not live output

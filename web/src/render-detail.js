@@ -16,7 +16,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   const window = document.defaultView;
   const display = createDisplay({ timeZone: metadata.display_timezone });
   const content = root.querySelector('[data-execution-detail]');
-  const elapsed = root.querySelector('[data-active-elapsed]');
+  const elapsed = root.querySelector('[data-active-elapsed]'), estimate = root.querySelector('[data-active-estimate]');
   const refresh = root.querySelector('[data-detail-refresh]');
   const toggle = root.querySelector('[data-detail-poll-toggle]');
   const pollStatus = root.querySelector('[data-detail-poll-status]');
@@ -105,7 +105,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     actions: actionsFor('history') });
   const clear = () => {
     content.hidden = true;
-    elapsed.hidden = true;
+    elapsed.hidden = true; estimate.hidden = true;
     for (const node of Object.values(breadcrumb)) {
       node.textContent = ''; node.removeAttribute('href'); node.parentElement.hidden = true;
     }
@@ -199,6 +199,8 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
         const time = { created: data.created_at, started: data.started_at, ended: data.ended_at }[key];
         if (time) { field.setAttribute('datetime', time); field.setAttribute('title', time); }
         else { field.removeAttribute('datetime'); field.removeAttribute('title'); }
+        if (key === 'estimate') field.title = data.estimate === null ? '' : `Mean of ${display.count(
+          data.estimate.sample_count)} earlier successful runs · expected end ${data.estimate.ended_at}`;
         if (key === 'status') field.dataset.status = data.status.name === 'unknown' ? 'unknown' : String(data.status.code);
         if (key in data.event_counts) field.dataset.level =
           data.event_counts[key] === 0 ? 'quiet' : key === 'errors' ? 'error' : key === 'all' ? 'normal' : 'warning';
@@ -211,6 +213,8 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
       // G2: tabs name the package, run and status, and follow status changes on refresh.
       document.title = `${data.package_name} #${executionId} · ${values.status} · SSIS Dashboard`;
       elapsed.hidden = data.started_at === null || data.ended_at !== null;
+      // C3: the typical duration and expected end of an active run; never a completion percentage.
+      estimate.hidden = elapsed.hidden || data.estimate === null;
       content.hidden = false;
     }
     rendered = state.response;

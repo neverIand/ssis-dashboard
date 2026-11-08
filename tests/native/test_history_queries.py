@@ -170,3 +170,18 @@ class HistorySQLTests(unittest.TestCase):
                 for take in (7, 50):
                     with self.subTest(statuses=statuses, descending=descending, take=take):
                         self.assertEqual(self.chain(statuses, descending, take), self.expected(statuses, descending))
+
+    def test_detail_estimate_matches_the_history_oracle_for_every_execution(self):
+        # Batch C3: execution detail reads one target's estimate with the History method.
+        targets = [r for r in self.rows if r['package_name'] == 'Target.dtsx'] + self.rows[-2:]
+        self.assertTrue({0, 1, 4, 5} <= {estimate(self.rows, r)[0] for r in targets})
+        for row in targets:
+            with self.subTest(execution_id=row['execution_id']):
+                result = self.query('api-execution-estimate.sql', (row['execution_id'],))
+                self.assertEqual(len(result), 1)
+                total = result[0]['estimate_total_ticks']
+                self.assertEqual((result[0]['execution_id'], result[0]['estimate_sample_count'],
+                                  None if total is None else int(total)), (row['execution_id'], *estimate(self.rows, row)))
+                started = result[0]['started_at']
+                self.assertEqual(None if started is None else started.utc_ticks, row['start_time'])
+        self.assertEqual(self.query('api-execution-estimate.sql', (len(self.rows) + 1,)), [])

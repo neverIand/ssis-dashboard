@@ -5,7 +5,8 @@ import { executableQuery, readExecutablePage } from './executables.js';
 import { childQuery, readChildPage } from './children.js';
 import { eventQuery, readEventPage } from './events.js';
 import { parameterQuery, readParameterPage, overrideQuery, readOverridePage } from './values.js';
-import { historyQuery, readHistoryPage, historyIdentity, sameHistoryIdentity, allHistoryStatuses } from './history.js';
+import { historyQuery, readHistoryPage, historyIdentity, sameHistoryIdentity, allHistoryStatuses, readEstimate }
+  from './history.js';
 import { defaultDetailTab, detailFragment, tabAllowed } from './detail-navigation.js';
 
 export function readExecutionDetail(response, executionId, display) {
@@ -51,6 +52,9 @@ export function readExecutionDetail(response, executionId, display) {
         || BigInt(counts.errors) + BigInt(counts.warnings) + BigInt(counts.memory_warnings) > BigInt(counts.all)) {
       throw new TypeError();
     }
+    // The API estimates only a started execution that has not ended.
+    if (data.estimate === undefined || (data.estimate !== null && data.ended_at !== null)) throw new TypeError();
+    if (data.estimate !== null) readEstimate(data.estimate, data.started_at, display);
     return response;
   } catch { throw new ApiError('invalid_response', { requestId: response?.meta?.request_id }); }
 }
@@ -352,6 +356,16 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
   };
 }
 
+// "25 min 00 s · ends 19:03:37 · avg of 5": the date appears only when the end falls on another day than the start.
+// No-break spaces keep each part whole, so a narrow summary cell wraps only between parts.
+function estimateText(data, display) {
+  if (data.estimate === null) return '—';
+  const end = display.timestamp(data.estimate.ended_at);
+  const sameDay = end.split(' ')[0] === display.timestamp(data.started_at).split(' ')[0];
+  return [display.duration(data.estimate.duration_seconds), `ends ${sameDay ? display.clock(data.estimate.ended_at) : end}`,
+    `avg of ${display.count(data.estimate.sample_count)}`].map(part => part.replaceAll(' ', ' ')).join(' · ');
+}
+
 export function detailFields(response, display) {
   const data = response.data;
   return {
@@ -362,6 +376,7 @@ export function detailFields(response, display) {
     created: display.timestamp(data.created_at), started: display.timestamp(data.started_at),
     ended: display.timestamp(data.ended_at), duration: display.duration(data.duration_seconds),
     elapsed: display.duration(data.elapsed_seconds),
+    estimate: estimateText(data, display),
     ...Object.fromEntries(Object.entries(data.event_counts).map(([field, count]) => [field, display.count(count)])),
   };
 }

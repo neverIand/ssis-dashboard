@@ -1,6 +1,7 @@
 """Execution detail visibility, exact DTO and safe query-boundary contracts."""
 
 from copy import deepcopy
+from decimal import Decimal
 from unittest.mock import Mock, patch
 from urllib.parse import quote
 import unittest
@@ -30,12 +31,17 @@ class ExecutionDetailTests(unittest.TestCase):
         self.query = self.enterContext(patch('dashboard.inspection.execute_query',side_effect=self.query_fixture))
         self.row = execution(42,logging_rows=1)
         self.counts = dict(COUNTS)
+        # The estimate row repeats the target's identity and start unless a test overrides them; None = no row.
+        self.estimate = {'estimate_sample_count':0,'estimate_total_ticks':None}
         self.app = create_app({'TESTING':True,'LOG_LEVEL':'ERROR',
                                'CONNECTION_STRING':{'main':'private-connection-canary'}})
         self.client = self.app.test_client()
 
     def query_fixture(self, resource, parameters, **settings):
-        return deepcopy(self.row if resource=='api-execution.sql' else self.counts)
+        estimate = {} if self.estimate is None else {'execution_id':self.row.get('execution_id'),
+                                                     'started_at':self.row.get('started_at'),**self.estimate}
+        return deepcopy({'api-execution.sql':self.row,'api-execution-event-counts.sql':self.counts,
+                         'api-execution-estimate.sql':estimate}[resource])
 
     def get(self, identifier='42', **kwargs):
         return self.client.get('/api/v1/executions/'+quote(identifier,safe=''),**kwargs)
@@ -68,8 +74,9 @@ class ExecutionDetailTests(unittest.TestCase):
         self.assertIsNone(data['duration_seconds'])
         self.assertEqual(data['elapsed_seconds'],30)
         self.assertEqual(data['event_counts'],COUNTS)
+        self.assertIsNone(data['estimate'])
         self.assertEqual([call.args[0] for call in self.query.call_args_list],
-                         ['api-execution.sql','api-execution-event-counts.sql'])
+                         ['api-execution.sql','api-execution-event-counts.sql','api-execution-estimate.sql'])
         for call in self.query.call_args_list:
             self.assertEqual(call.args[1],(42,))
             self.assertTrue(call.kwargs['one_row'])
@@ -81,7 +88,7 @@ class ExecutionDetailTests(unittest.TestCase):
         response = app.test_client().get('/api/v1/executions/42')
         self.assertEqual(response.status_code,200)
         self.assertEqual(response.json['data']['elapsed_seconds'],30)
-        self.assertEqual([call.args[1] for call in self.query.call_args_list],[(42,),(42,)])
+        self.assertEqual([call.args[1] for call in self.query.call_args_list],[(42,),(42,),(42,)])
 
     def test_bigint_precision_wide_names_and_nullable_metadata_remain_typed(self):
         for identifier in (9007199254740993,9223372036854775807):
@@ -156,7 +163,7 @@ class ExecutionDetailTests(unittest.TestCase):
         self.query.assert_not_called()
         response = self.client.head('/api/v1/executions/42')
         self.assertEqual((response.status_code,response.data),(200,b''))
-        self.assertEqual(self.query.call_count,2)
+        self.assertEqual(self.query.call_count,3)
 
     def test_inconsistent_or_malformed_execution_rows_fail_before_events(self):
         original = dict(self.row)
@@ -184,7 +191,7 @@ class ExecutionDetailTests(unittest.TestCase):
         from dashboard.db import execute_query
         self.query.side_effect = execute_query
         connections,cursors = [],[]
-        for record in (self.row,self.counts):
+        for record in (self.row,self.counts,self.query_fixture('api-execution-estimate.sql',(42,))):
             cursor = Mock()
             cursor.description = [(key,) for key in record]
             cursor.fetchone.return_value = tuple(record.values())
@@ -202,6 +209,8 @@ class ExecutionDetailTests(unittest.TestCase):
             cursor.close.assert_called_once()
         self.assertNotIn('event_messages',cursors[0].execute.call_args.args[0])
         self.assertNotIn('execution_parameter_values',cursors[1].execute.call_args.args[0])
+        self.assertNotIn('event_messages',cursors[2].execute.call_args.args[0])
+        self.assertNotIn('execution_parameter_values',cursors[2].execute.call_args.args[0])
 
     def test_inputs_extra_rows_and_diagnostics_do_not_leak_into_response_or_logs(self):
         self.row['message'] = 'private-message-canary'
@@ -210,7 +219,8 @@ class ExecutionDetailTests(unittest.TestCase):
         with self.assertLogs(self.app.logger,level='INFO') as logs:
             data = self.detail()
         self.assertNotIn('private-',str(data)+'\n'.join(logs.output))
-        for fail_resource,status,state in (('api-execution.sql',503,'08001'),('api-execution-event-counts.sql',504,'HYT00')):
+        for fail_resource,status,state in (('api-execution.sql',503,'08001'),('api-execution-event-counts.sql',504,'HYT00'),
+                                           ('api-execution-estimate.sql',504,'HYT00')):
             def failing(resource,*args,**kwargs):
                 if resource==fail_resource:
                     raise pyodbc.OperationalError(state,'private-diagnostic-canary')
@@ -221,4 +231,53 @@ class ExecutionDetailTests(unittest.TestCase):
                 response = self.get()
             self.assertEqual(response.status_code,status)
             self.assertNotIn('private-',response.get_data(as_text=True)+'\n'.join(logs.output))
-            self.assertEqual(self.query.call_count,1 if fail_resource=='api-execution.sql' else 2)
+            self.assertEqual(self.query.call_count,{'api-execution.sql':1,'api-execution-event-counts.sql':2}.get(fail_resource,3))
+
+    def test_active_detail_uses_the_history_estimate_and_finished_or_unstarted_runs_skip_its_read(self):
+        # Three samples totalling 121.5 s: the mean keeps 40.5 s; the end is start + mean.
+        self.estimate.update(estimate_sample_count=3,estimate_total_ticks=Decimal(1215000000))
+        data = self.detail()
+        self.assertEqual(data['estimate'],{'method':'mean_last_5_successful','sample_count':3,'duration_seconds':40.5,
+                                           'ended_at':'2026-10-15T12:00:10.6234567Z'})
+        self.assertEqual(self.query.call_args.args,('api-execution-estimate.sql',(42,)))
+        self.assertTrue(self.query.call_args.kwargs['one_row'])
+        # A third of a tick rounds the end half up while the duration keeps the exact mean.
+        self.estimate.update(estimate_sample_count=3,estimate_total_ticks=Decimal(2))
+        self.assertEqual(self.detail()['estimate']['ended_at'],'2026-10-15T11:59:30.1234568Z')
+        for changes in ({'status':7,'ended_at':parse_timestamp('2026-10-15T11:59:40Z')},
+                        {'status':5,'started_at':None,'ended_at':None},
+                        {'status':4,'ended_at':parse_timestamp('2026-10-15T11:59:31Z')}):
+            with self.subTest(changes=changes):
+                self.query.reset_mock()
+                self.row.update(changes)
+                self.assertIsNone(self.detail()['estimate'])
+                self.assertEqual([call.args[0] for call in self.query.call_args_list],
+                                 ['api-execution.sql','api-execution-event-counts.sql'])
+
+    def test_no_sample_zero_mean_and_unrepresentable_end_return_null_estimates(self):
+        for count,total in ((0,None),(2,Decimal(0))):
+            self.estimate.update(estimate_sample_count=count,estimate_total_ticks=total)
+            self.assertIsNone(self.detail()['estimate'])
+        self.row['started_at'] = parse_timestamp('9999-12-31T23:59:59Z')
+        self.estimate.update(estimate_sample_count=1,estimate_total_ticks=Decimal(10**8))
+        self.assertIsNone(self.detail()['estimate'])
+
+    def test_estimate_read_rechecks_visibility_and_rejects_mismatched_or_impossible_rows(self):
+        self.estimate = None
+        revoked = self.problem('42')
+        self.assertEqual(self.query.call_count,3)
+        self.row = {}
+        self.assertEqual(self.problem('42'),revoked)
+        self.setUp()
+        original = dict(self.estimate)
+        for changes in ({'execution_id':43},{'execution_id':True},{'started_at':None},
+                        {'started_at':parse_timestamp('2026-10-15T11:59:30.1234568Z')},
+                        {'estimate_sample_count':6,'estimate_total_ticks':Decimal(6)},
+                        {'estimate_sample_count':0,'estimate_total_ticks':Decimal(1)},
+                        {'estimate_sample_count':1,'estimate_total_ticks':Decimal(-1)},
+                        {'estimate_sample_count':1,'estimate_total_ticks':1},
+                        {'estimate_sample_count':True,'estimate_total_ticks':Decimal(1)}):
+            with self.subTest(changes=changes):
+                self.estimate = {**original,**changes}
+                with self.assertLogs(self.app.logger,level='ERROR'):
+                    self.problem('42',500)
