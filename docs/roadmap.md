@@ -28,6 +28,8 @@ The [task queue](PROGRESS.md#next-actions) owns checkbox status, bounded submile
 2. **Recorded observations:** reproduce or measure the open frontend follow-ups (timeline refresh shift, maximum-text disclosure cost, P4.5 focus) before fixing them.
 3. **P5.1 change detection:** a local, owned, bounded SSISDB detector for new executions and active-state transitions, with measured SQL work. SSE transport and production stream acceptance stay under the hosting hold.
 
+All three, plus the inserted UX review batches A and B, are complete locally as of 8 November 2026, and the P5.2 decision record is written. The next priority needs the user's decision: UX review batch C (API-backed O3/D3/O11), a loopback-only P5.2 stream prototype (the SSE transport is currently under the hosting hold), or another item.
+
 Environment-blocked gates (C8.3, reader SHOWPLAN, real active/Scale Out, actual browser conditions, hosting) keep their holds. The later feature ideas below still need their own priority decision.
 
 ## Delivery phases
