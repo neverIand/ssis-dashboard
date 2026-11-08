@@ -6,12 +6,12 @@ export const timelineSeries = { created_count: 'Created', started_count: 'With a
 
 export function timelineParams(selection, page, bucket) {
   if (!['day', 'hour'].includes(bucket)) throw new TypeError('Choose Day or Hour.');
-  return { folder: selection.folder, project: selection.project, from: page.meta.from, to: page.meta.to,
+  return { folder: selection.folder, project: selection.project, package: selection.package, from: page.meta.from, to: page.meta.to,
     ...(selection.status.length ? { status: selection.status.join(',') } : {}), bucket };
 }
 
 export const timelineScope = (selection, page) => JSON.stringify([
-  selection.folder, selection.project, selection.status, page.meta.from, page.meta.to]);
+  selection.folder, selection.project, selection.package, selection.status, page.meta.from, page.meta.to]);
 
 export function readTimeline(response, selection, page, bucket, metadata, display) {
   try {

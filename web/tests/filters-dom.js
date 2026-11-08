@@ -63,7 +63,7 @@ export function filtersDOM(metadata, search = '') {
     }
   }
   const triggers = [], closes = [];
-  for (const key of ['folder', 'project', 'status', 'created']) {
+  for (const key of ['folder', 'project', 'package', 'status', 'created']) {
     const trigger = add(`[data-open-filter="${key}"]`, 'button'); trigger.dataset.openFilter = key; triggers.push(trigger);
     const panel = add(`[data-filter-panel="${key}"]`); panel.hidden = true;
     const close = new Control(document, 'button'); closes.push(close); panel.children.push(close);
@@ -78,6 +78,8 @@ export function filtersDOM(metadata, search = '') {
     add(`#${key}-search`, 'input');
     for (const prefix of ['catalog-choices', 'catalog-status', 'catalog-more', 'catalog-retry', 'exact-scope', 'all-scope']) add(`[data-${prefix}="${key}"]`);
   }
+  add('#package-name', 'input'); add('[data-package-status]', 'p');
+  add('[data-apply-package]', 'button'); add('[data-all-scope="package"]', 'button');
   for (const key of ['sort', 'direction', 'limit']) add(`[data-order="${key}"]`, 'select', root);
   add('[data-order-notice]', 'p', root);
   add('[data-order-label]', 'p', root);

@@ -19,7 +19,7 @@ function screen(t,get=async(...args)=>response(...args),options={}){const dom=ov
 
 test('timeline uses exact effective bounds and selected statuses without list sort/limit/cursor',()=>{
   const value=selection({folder:'all + /\r\n影狼',status:[7,2]});
-  assert.deepEqual(timelineParams(value,overviewPage(),'hour'),{folder:value.folder,project:null,from:timelineFrom,to:timelineTo,status:'2,7',bucket:'hour'});
+  assert.deepEqual(timelineParams(value,overviewPage(),'hour'),{folder:value.folder,project:null,package:null,from:timelineFrom,to:timelineTo,status:'2,7',bucket:'hour'});
   assert.equal('status' in timelineParams(selection(),overviewPage(),'day'),false);
   assert.throws(()=>timelineParams(value,overviewPage(),'week'));
   for(const max of [undefined,0,1001,1.5]){const settings=timelineMetadata();settings.limits.max_timeline_buckets=max;assert.throws(()=>readMetadata(settings));}

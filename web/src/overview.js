@@ -181,7 +181,7 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
     let afterPhase = 'ready';
     emit({ phase: 'loading-summary', page, pageStale: false, summary: previous, summaryStale: previous !== null, error: null });
     try {
-      const response = await request('metrics/summary', { folder: selection.folder, project: selection.project,
+      const response = await request('metrics/summary', { folder: selection.folder, project: selection.project, package: selection.package,
         from: page.meta.from, to: page.meta.to });
       if (disposed || current !== generation) return;
       emit({ phase: state.timeline.open ? 'loading-summary' : 'ready', summary: readSummary(response, page, metadata, display),

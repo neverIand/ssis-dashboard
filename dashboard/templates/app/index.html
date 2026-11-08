@@ -9,8 +9,8 @@
                     <legend class="visually-hidden">Execution filters</legend>
                     <div class="page-heading">
                         <div class="scope-path" aria-label="Execution scope and current page">
-                            {% for kind in ['folder', 'project'] %}
-                            {% if kind == 'project' %}<span class="scope-separator" aria-hidden="true">/</span>{% endif %}
+                            {% for kind in ['folder', 'project', 'package'] %}
+                            {% if kind != 'folder' %}<span class="scope-separator" aria-hidden="true">/</span>{% endif %}
                             <button type="button" class="scope-trigger" data-open-filter="{{ kind }}" aria-haspopup="dialog" aria-controls="{{ kind }}-picker" aria-expanded="false">
                                 <span data-filter-label="{{ kind }}">All {{ kind }}s</span><span class="chevron" aria-hidden="true">⌄</span>
                             </button>
@@ -56,6 +56,14 @@
                         </div>
                     </div>
                     {% endfor %}
+                    <div id="package-picker" class="filter-popover" data-filter-panel="package" role="dialog" aria-labelledby="package-heading" hidden>
+                        <div class="popover-heading"><h2 id="package-heading">Package</h2><button type="button" class="button-quiet" data-close-filter aria-label="Close package picker">×</button></div>
+                        <label for="package-name" class="visually-hidden">Exact package name</label>
+                        <input id="package-name" type="text" placeholder="Exact package name" autocomplete="off" spellcheck="false" maxlength="260" aria-describedby="package-status">
+                        <button type="button" class="catalog-choice" data-all-scope="package">All packages</button>
+                        <p id="package-status" class="resource-status" data-package-status role="status"></p>
+                        <div class="popover-actions"><button type="button" data-apply-package>Apply</button></div>
+                    </div>
                     <div id="status-picker" class="filter-popover status-popover" data-filter-panel="status" role="dialog" aria-labelledby="status-heading" hidden>
                         <div class="popover-heading"><h2 id="status-heading">Status</h2><button type="button" class="button-quiet" data-close-filter aria-label="Close status picker">×</button></div>
                         <fieldset id="status" class="status-options"><legend class="visually-hidden">Execution statuses</legend>

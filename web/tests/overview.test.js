@@ -42,7 +42,7 @@ test('list establishes exact bounds before all-status summary, without changing 
   await owner.apply(selection({ status: [2], folder: 'all + / 影狼' }));
   assert.deepEqual(calls.map((call) => call.resource), ['executions', 'metrics/summary']);
   assert.equal(calls[0].params.status, '2');
-  assert.deepEqual(calls[1].params, { folder: 'all + / 影狼', project: null, from, to });
+  assert.deepEqual(calls[1].params, { folder: 'all + / 影狼', project: null, package: null, from, to });
   assert.equal('status' in calls[1].params, false);
   assert.equal(JSON.stringify(response), before);
   assert.deepEqual(states.map((state) => state.phase), ['loading-list', 'loading-summary', 'ready']);
@@ -452,7 +452,7 @@ test('first-page refresh retains data while pending and resolves a new default w
   assert.equal(states.at(-1).pageStale, false);
   assert.equal(states.at(-1).summaryStale, false);
   assert.equal(states.at(-1).page.meta.from, nextFrom);
-  assert.deepEqual(calls.at(-1).params, { folder: null, project: null, from: nextFrom, to: nextTo });
+  assert.deepEqual(calls.at(-1).params, { folder: null, project: null, package: null, from: nextFrom, to: nextTo });
   assert.equal(owner.checkpoint()[0][1].entries[1], 'new-fence');
   owner.dispose();
 });

@@ -2,10 +2,14 @@ import { formatCode } from './display.js';
 import { createCatalogSearch } from './catalog-search.js';
 import { executionHref, readDetailFragment } from './detail-navigation.js';
 import { mountRangeEditor } from './range-editor.js';
-import { catalogName, createSelectionSession, SelectionError, selectionSearch, validateSelection } from './selection.js';
+import { catalogName, createSelectionSession, packageNameUnits, SelectionError, selectionSearch, validateSelection }
+  from './selection.js';
 import { rangeLabel } from './time-range.js';
 
-export function mountFilters(root, { metadata, api, appBase, onApplied = () => {}, effectiveWindow = () => null }) {
+// Enter that confirms an input-method candidate (isComposing, or keyCode 229) is not a submit.
+const submitKey = event => event.key === 'Enter' && !event.isComposing && event.keyCode !== 229;
+
+export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}, effectiveWindow = () => null }) {
   const document = root.ownerDocument, window = document.defaultView;
   const form = root.querySelector('#overview-filters');
   const get = selector => form.querySelector(selector);
@@ -61,6 +65,7 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
     const draft = session.draft;
     label('folder', draft.folder ?? 'All folders');
     label('project', draft.project ?? 'All projects');
+    label('package', draft.package ?? 'All packages');
     for (const checkbox of status.querySelectorAll('input')) {
       checkbox.checked = checkbox.value === '' ? !draft.status.length : draft.status.includes(Number(checkbox.value));
     }
@@ -111,12 +116,26 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
   }
   function chooseScope(key, name) {
     try {
-      if (name !== null) catalogName(name);
+      if (name !== null) catalogName(name, key === 'package' ? packageNameUnits : undefined);
       const trigger = opened?.trigger;
       select({ [key]: name });
       trigger?.focus();
-    } catch (error) { notice.textContent = error instanceof SelectionError ? error.message : 'Scope could not be changed.'; }
+    } catch (error) {
+      const message = error instanceof SelectionError ? error.message : 'Scope could not be changed.';
+      if (key === 'package') packageStatus.textContent = message; else notice.textContent = message;
+    }
   }
+
+  // Package has no catalog list operation, so its panel takes an exact name only.
+  // Folder and project changes keep it: the same name may need narrowing to one project.
+  const packageName = get('#package-name'), packageStatus = get('[data-package-status]');
+  // A single-line box drops CR/LF, so an unedited Apply keeps the applied name exactly.
+  let packageEdited = false;
+  const applyPackage = () => chooseScope('package', packageEdited ? packageName.value || null : session.applied.package);
+  listen(get('[data-apply-package]'), 'click', applyPackage);
+  listen(get('[data-all-scope="package"]'), 'click', () => chooseScope('package', null));
+  listen(packageName, 'keydown', event => { if (submitKey(event)) { event.preventDefault(); applyPackage(); } });
+  listen(packageName, 'input', () => { packageEdited = true; packageStatus.textContent = ''; });
 
   for (const key of ['folder', 'project']) {
     const search = get(`#${key}-search`), choices = get(`[data-catalog-choices="${key}"]`);
@@ -167,7 +186,7 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
       searchTimer = setTimeout(searchNow, 250);
     });
     listen(search, 'keydown', event => {
-      if (event.key === 'Enter') { event.preventDefault(); clearTimeout(searchTimer); searchNow(); }
+      if (submitKey(event)) { event.preventDefault(); clearTimeout(searchTimer); searchNow(); }
       else if (event.key === 'ArrowDown' && choices.children.length) { event.preventDefault(); choices.children[0].focus(); }
     });
     // ArrowDown/ArrowUp move through the choices; ArrowUp from the first returns to the search box.
@@ -201,6 +220,10 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
       get(`[data-all-scope="${key}"]`).setAttribute('aria-pressed', String(session.applied[key] === null));
       void pickers.get(key).search('', key === 'project' ? session.applied.folder : null);
       search.focus();
+    } else if (key === 'package') {
+      packageName.value = session.applied.package ?? ''; packageStatus.textContent = ''; packageEdited = false;
+      get('[data-all-scope="package"]').setAttribute('aria-pressed', String(session.applied.package === null));
+      packageName.focus(); packageName.select?.();
     } else if (key === 'created') { range.open(session.draft, effectiveWindow()); get('[data-created-preset]').focus(); }
     else status.querySelector('input').focus();
     position();
@@ -239,7 +262,7 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
       if (opened.key === 'status') { session.update({ status: session.applied.status }); showDraft(); }
       close({ focus: true, commitStatus: false });
     }
-    else if (event.key === 'Enter' && opened && event.target.tagName === 'INPUT') event.preventDefault();
+    else if (submitKey(event) && opened && event.target.tagName === 'INPUT') event.preventDefault();
   });
   listen(document, 'focusin', event => {
     if (opened && !opened.panel.contains(event.target) && !opened.trigger.contains(event.target)) {

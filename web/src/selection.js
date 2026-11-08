@@ -1,4 +1,4 @@
-const keys = new Set(['folder', 'project', 'status', 'created', 'from', 'to', 'sort', 'direction', 'limit']);
+const keys = new Set(['folder', 'project', 'package', 'status', 'created', 'from', 'to', 'sort', 'direction', 'limit']);
 export const createdPresets = Object.freeze({ today: 'Today', '24h': 'Last 24 hours',
   '7d': 'Last 7 days', '30d': 'Last 30 days' });
 const ticksPerSecond = 10000000n;
@@ -7,12 +7,15 @@ export class SelectionError extends Error {}
 
 function invalid(message) { throw new SelectionError(message); }
 
-export function catalogName(value) {
-  if (typeof value !== 'string' || !value || value.length > 128 || value.includes('\0')
+// Folder and project names hold up to 128 UTF-16 units; package names up to 260.
+export const packageNameUnits = 260;
+
+export function catalogName(value, units = 128) {
+  if (typeof value !== 'string' || !value || value.length > units || value.includes('\0')
       || [...value].some((character) => {
         const code = character.codePointAt(0);
         return code >= 0xd800 && code <= 0xdfff;
-      })) invalid('Names must contain 1–128 UTF-16 units without invalid characters.');
+      })) invalid(`Names must contain 1–${units} UTF-16 units without invalid characters.`);
   return value;
 }
 
@@ -44,13 +47,14 @@ export function timestampTicks(value) {
 }
 
 export function defaultSelection(metadata) {
-  return { folder: null, project: null, status: [], created: null, from: null, to: null,
+  return { folder: null, project: null, package: null, status: [], created: null, from: null, to: null,
     sort: 'execution_id', direction: 'desc', limit: metadata.limits.default_limit };
 }
 
 export function validateSelection(value, metadata) {
-  const result = { ...value, created: value.created ?? null, status: [...value.status] };
+  const result = { ...value, package: value.package ?? null, created: value.created ?? null, status: [...value.status] };
   for (const key of ['folder', 'project']) if (result[key] !== null) catalogName(result[key]);
+  if (result.package !== null) catalogName(result.package, packageNameUnits);
   const codes = new Set(metadata.execution_statuses.map((item) => item.code));
   if (result.status.some((code) => !codes.has(code)) || new Set(result.status).size !== result.status.length) {
     invalid('Choose valid statuses without duplicates.');
@@ -111,7 +115,8 @@ export function parseSelection(search, metadata) {
 }
 
 export function selectionParams(value) {
-  return { folder: value.folder, project: value.project, status: value.status.length ? value.status.join(',') : null,
+  return { folder: value.folder, project: value.project, package: value.package ?? null,
+    status: value.status.length ? value.status.join(',') : null,
     from: value.from, to: value.to, sort: value.sort, direction: value.direction, limit: value.limit };
 }
 
