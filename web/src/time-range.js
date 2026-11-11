@@ -1,4 +1,4 @@
-import { createdPresets, SelectionError, timestampTicks } from './selection.js';
+import { createdPresets, presetHours, SelectionError, timestampTicks } from './selection.js';
 
 const epochTicks = timestampTicks('1970-01-01T00:00:00Z');
 const pad = value => String(value).padStart(2, '0');
@@ -99,7 +99,7 @@ export function presetRange(preset, serverTime, timeZone) {
     if (!candidates.length) throw new SelectionError('The start of today is unavailable. Choose a custom range.');
     return { from: candidates[0].value, to: serverTime };
   }
-  const hours = { '24h': 24, '7d': 168, '30d': 720 }[preset];
+  const hours = presetHours[preset];
   if (!hours) throw new SelectionError('Choose a creation window.');
   const from = now - BigInt(hours) * 36000000000n;
   const fraction = from % 10000000n;

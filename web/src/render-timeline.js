@@ -1,5 +1,5 @@
 import { createDisplay, formatCode } from './display.js';
-import { timelineSeries } from './timeline.js';
+import { hourBucketsFit, timelineSeries } from './timeline.js';
 import { chartAttribute as attribute, mountChartInteraction, renderChartAxes } from './chart-view.js';
 import { reserveLoadingSpace } from './loading-space.js';
 import { timestampTicks } from './selection.js';
@@ -233,6 +233,9 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
       toggle.title = state.open ? 'Hide timeline' : 'Show timeline';
       panel.hidden = !state.open || selection === null || !page && !busy;
       toggle.setAttribute('aria-expanded', String(!panel.hidden));
+      const hour = bucket.querySelector('option[value="hour"]'), hourFits = !page || hourBucketsFit(page, metadata);
+      hour.disabled = !hourFits;
+      hour.title = hourFits ? '' : `Hour needs a creation range of ${display.count(metadata.limits.max_timeline_buckets)} hours or less.`;
       bucket.value = state.bucket;
       bucket.disabled = retry.disabled = panel.hidden;
       bucket.setAttribute('aria-disabled', String(busy));

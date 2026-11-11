@@ -105,7 +105,7 @@ class ExecutionAPITests(unittest.TestCase):
         self.assertTrue(page['meta']['has_more'])
         self.assertEqual(page['meta']['as_of'], NOW.isoformat())
         self.assertEqual(page['meta']['to'], NOW.isoformat())
-        expected_start = Timestamp(NOW.utc_ticks - 360 * 3600 * TICKS_PER_SECOND)
+        expected_start = Timestamp(NOW.utc_ticks - 24 * 3600 * TICKS_PER_SECOND)
         self.assertEqual(page['meta']['from'], expected_start.isoformat())
         self.assertEqual(self.page_call.args[1][-4:], (51, 251, None, 1))
         for call in self.query.call_args_list:

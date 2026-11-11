@@ -31,6 +31,8 @@ test('preset tokens are validated, shareable and retained by detail-return links
   }
   const small = { ...metadata, limits: { ...metadata.limits, max_range_hours: 24 } };
   assert.throws(() => parseSelection('?created=7d', small));
+  assert.throws(() => parseSelection('?created=180d', metadata));
+  assert.equal(parseSelection('?created=180d', { ...metadata, limits: { ...metadata.limits, max_range_hours: 4320 } }).created, '180d');
   assert.equal(parseSelection('?created=today', small).created, 'today');
 });
 

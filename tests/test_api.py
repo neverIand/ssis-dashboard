@@ -115,7 +115,7 @@ class APIHTTPTests(unittest.TestCase):
         self.assertEqual(data['execution_sorts'], self.contract.spec['components']['parameters']['ExecutionSort']['schema']['enum'])
         self.assertEqual(data['capabilities'], {'events': False, 'values': False, 'override_values': False,
                                                 'active_estimates': False})
-        self.assertEqual(data['limits']['default_range_hours'], 360)
+        self.assertEqual(data['limits']['default_range_hours'], 24)
         self.assertEqual([row['code'] for row in data['execution_statuses']], list(range(1, 10)))
         self.connect.assert_not_called()
 
@@ -323,7 +323,7 @@ class APIConfigurationTests(unittest.TestCase):
         cases = [
             {'API_EVENTS_ENABLED': 'false'}, {'API_VALUES_ENABLED': 1},
             {'API_OVERRIDE_VALUES_ENABLED': None}, {'API_OVERRIDE_VALUES_ENABLED': True},
-            {'API_MAX_RANGE_HOURS': 0}, {'API_MAX_RANGE_HOURS': True}, {'API_MAX_RANGE_HOURS': 24},
+            {'API_MAX_RANGE_HOURS': 0}, {'API_MAX_RANGE_HOURS': True}, {'API_MAX_RANGE_HOURS': 23},
             {'HOUR_SPAN': 0}, {'API_MAX_TIMELINE_BUCKETS': 1001},
             {'API_READINESS_TIMEOUT_SECONDS': 0}, {'API_READINESS_TIMEOUT_SECONDS': 3},
             {'API_READINESS_TIMEOUT_SECONDS': True},

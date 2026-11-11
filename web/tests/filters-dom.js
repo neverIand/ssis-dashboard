@@ -47,7 +47,7 @@ export function filtersDOM(metadata, search = '') {
   for (const key of ['filter-notice', 'reset-filters', 'apply-filters', 'recover-filters', 'time-notice', 'use-range', 'custom-window', 'time-fields', 'time-help']) add(`[data-${key}]`);
   add('.exact-times'); add('#include-time', 'input');
   const presets = [];
-  for (const value of ['default', 'today', '24h', '7d', '30d', 'custom']) {
+  for (const value of ['default', 'today', '24h', '7d', '30d', '180d', 'custom']) {
     const button = add(`[data-created-preset="${value}"]`, 'button'); button.dataset.createdPreset = value; presets.push(button);
   }
   form.queries.set('[data-created-preset]', presets[0]);

@@ -2,7 +2,7 @@ import { ApiError } from './api.js';
 import { createDisplay, formatCode, formatId, formatText } from './display.js';
 import { selectionParams, timestampTicks, validateSelection } from './selection.js';
 import { createRefreshLoop } from './refresh-loop.js';
-import { readTimeline, timelineParams, timelineScope } from './timeline.js';
+import { hourBucketsFit, readTimeline, timelineParams, timelineScope } from './timeline.js';
 import { createServerClock, presetRange } from './time-range.js';
 import { readEstimate } from './history.js';
 
@@ -207,6 +207,8 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
   }
 
   async function timeline(current,selection,page,afterPhase = state.phase === 'summary-error' ? 'summary-error' : 'ready') {
+    // A window longer than the hour-bucket cap falls back to Day instead of requesting a certain 400.
+    if (state.timeline.bucket === 'hour' && !hourBucketsFit(page,metadata)) state = {...state,timeline:{...state.timeline,bucket:'day'}};
     const {bucket} = state.timeline, scope = timelineScope(selection,page);
     const previous = state.timeline.scope === scope && state.timeline.page?.meta.bucket === bucket ? state.timeline.page : null;
     timelineAfter = afterPhase;
@@ -320,7 +322,8 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
     toggleTimeline, retryTimeline,
     setTimelineBucket(bucket) {
       if (!['day','hour'].includes(bucket)) throw new TypeError('Choose Day or Hour.');
-      if (disposed || busy() || !state.timeline.open || !state.page || state.timeline.bucket === bucket) return;
+      if (disposed || busy() || !state.timeline.open || !state.page || state.timeline.bucket === bucket
+        || bucket === 'hour' && !hourBucketsFit(state.page,metadata)) return;
       state = {...state,timeline:{...state.timeline,bucket,page:null,error:null,stale:false}};
       return retryTimeline();
     },

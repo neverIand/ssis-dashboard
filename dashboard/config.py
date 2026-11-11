@@ -57,7 +57,7 @@ CHANGE_DETECTION_INTERVAL_SECONDS = 5
 API_CURSOR_SECRET_KEY = None
 
 # Time range to display. Data will be shown from AS_OF_DATE - HOUR_SPAN value to AS_OF_DATE.
-HOUR_SPAN = 360
+HOUR_SPAN = 24
 
 # How many of the past executions should we show on the dashboard?
 EXECUTION_COUNT=1000

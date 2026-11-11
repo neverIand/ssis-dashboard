@@ -38,7 +38,7 @@ class ApplicationFactoryTests(unittest.TestCase):
     def test_factory_starts_without_database_access_and_debug_is_off(self):
         app = create_app({})
         self.assertFalse(app.debug)
-        self.assertEqual(app.config['HOUR_SPAN'], 360)
+        self.assertEqual(app.config['HOUR_SPAN'], 24)
         self.connect.assert_not_called()
 
     def test_apps_do_not_share_mutable_default_configuration(self):
@@ -110,7 +110,7 @@ class ApplicationFactoryTests(unittest.TestCase):
     def test_missing_optional_project_file_uses_defaults(self):
         with patch('dashboard._PROJECT_ROOT', self.temporary):
             app = create_app()
-        self.assertEqual(app.config['HOUR_SPAN'], 360)
+        self.assertEqual(app.config['HOUR_SPAN'], 24)
         self.assertNotIn('DASHBOARD_CONFIG', os.environ)
 
     def test_missing_explicit_or_environment_file_fails(self):

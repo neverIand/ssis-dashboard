@@ -47,6 +47,7 @@ test('projection handles precise instants before 1970 and year boundaries withou
 test('relative presets use the supplied server instant, keep 100ns precision and respect local today', () => {
   const now = '2026-10-25T10:00:00.1234567Z';
   assert.deepEqual(presetRange('24h', now, 'Europe/London'), { from: '2026-10-24T10:00:00.1234567Z', to: now });
+  assert.deepEqual(presetRange('180d', now, 'Europe/London'), { from: '2026-04-28T10:00:00.1234567Z', to: now });
   assert.equal(presetRange('today', now, 'Europe/London').from, '2026-10-24T23:00:00Z');
   assert.equal(presetRange('7d', '1969-12-31T23:59:59.1234567Z', 'UTC').from, '1969-12-24T23:59:59.1234567Z');
   assert.throws(() => presetRange('bad', now, 'UTC'));

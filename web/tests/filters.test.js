@@ -163,6 +163,20 @@ test('each relative preset applies in one click without another metadata request
   assert.equal(dom.calls.length, 0);
 });
 
+test('presets longer than the configured maximum are hidden; Last 180 days applies once allowed', t => {
+  const hidden = setup(t);
+  for (const [token, off] of [['30d', false], ['180d', true]]) {
+    const button = hidden.get(`[data-created-preset="${token}"]`);
+    assert.equal(button.hidden, off); assert.equal(button.disabled, off);
+  }
+  const roomy = { ...settings, limits: { ...settings.limits, max_range_hours: 4320 } };
+  const dom = setup(t, '', () => null, roomy);
+  assert.equal(dom.get('[data-created-preset="180d"]').hidden, false);
+  dom.open('created'); dom.click('[data-created-preset="180d"]');
+  assert.equal(dom.applied.at(-1).created, '180d'); assert.equal(dom.window.location.searchParams.get('created'), '180d');
+  assert.equal(dom.get('[data-filter-label="created"]').textContent, 'Last 180 days');
+});
+
 test('mixing calendar and exact edits preserves each bound independently, including clearing a date', t => {
   const dom = setup(t, '?' + new URLSearchParams({ from: '2026-10-17T00:00:00Z', to: '2026-10-18T00:00:00Z' }));
   dom.open('created');

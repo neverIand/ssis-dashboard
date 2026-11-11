@@ -10,6 +10,11 @@ export function timelineParams(selection, page, bucket) {
     ...(selection.status.length ? { status: selection.status.join(',') } : {}), bucket };
 }
 
+// Each hour bucket covers at most one elapsed hour, so a longer window always exceeds the bucket cap.
+// Partial edges or half-hour offsets near the cap still fall back to the server's 400.
+export const hourBucketsFit = (page, metadata) => timestampTicks(page.meta.to) - timestampTicks(page.meta.from)
+  <= BigInt(metadata.limits.max_timeline_buckets) * 36000000000n;
+
 export const timelineScope = (selection, page) => JSON.stringify([
   selection.folder, selection.project, selection.package, selection.status, page.meta.from, page.meta.to]);
 

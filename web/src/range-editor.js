@@ -1,4 +1,4 @@
-import { SelectionError, validateSelection } from './selection.js';
+import { presetHours, SelectionError, validateSelection } from './selection.js';
 import { calendarBound, localCandidates, nextDate, projectTime } from './time-range.js';
 
 export function mountRangeEditor(form, { metadata, listen, onChoose }) {
@@ -17,7 +17,8 @@ export function mountRangeEditor(form, { metadata, listen, onChoose }) {
     const hours = metadata.limits.default_range_hours;
     if (value === 'default') button.textContent = `Default window (${hours % 24 === 0
       ? `${hours / 24} ${hours === 24 ? 'day' : 'days'}` : `${hours} h`})`;
-    button.disabled = ({ '24h': 24, '7d': 168, '30d': 720 }[value] ?? 0) > metadata.limits.max_range_hours;
+    // Hide presets longer than the configured maximum instead of leaving dead buttons.
+    button.hidden = button.disabled = (presetHours[value] ?? 0) > metadata.limits.max_range_hours;
     listen(button, 'click', () => {
       mode = value; notice.textContent = '';
       if (mode === 'custom') { show(); fields.from.date.focus(); }

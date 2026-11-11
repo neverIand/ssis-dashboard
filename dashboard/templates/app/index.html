@@ -74,7 +74,7 @@
                     <div id="created-picker" class="filter-popover created-popover" data-filter-panel="created" role="dialog" aria-labelledby="created-heading" hidden>
                         <div class="popover-heading"><h2 id="created-heading">Created</h2><button type="button" class="button-quiet" data-close-filter aria-label="Close time picker">×</button></div>
                         <div class="creation-presets" role="group" aria-label="Creation window">
-                            {% for value, label in [('default', 'Default window'), ('today', 'Today'), ('24h', 'Last 24 hours'), ('7d', 'Last 7 days'), ('30d', 'Last 30 days'), ('custom', 'Custom range')] %}
+                            {% for value, label in [('default', 'Default window'), ('today', 'Today'), ('24h', 'Last 24 hours'), ('7d', 'Last 7 days'), ('30d', 'Last 30 days'), ('180d', 'Last 180 days'), ('custom', 'Custom range')] %}
                             <button type="button" class="catalog-choice" data-created-preset="{{ value }}" aria-pressed="false">{{ label }}</button>
                             {% endfor %}
                         </div>

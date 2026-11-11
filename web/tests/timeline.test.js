@@ -106,6 +106,21 @@ test('one completion-based timer coalesces refresh and visible return behind tim
   t.mock.timers.tick(99);await flush();assert.equal(run.calls.length,6);t.mock.timers.tick(1);await flush();assert.equal(run.calls.length,9);
 });
 
+test('a window longer than the hour-bucket cap disables Hour and reads Day instead of a certain 400',async t=>{
+  // The fixture window is 18 hours plus a fraction, so 18 hour buckets cannot hold it and 19 can.
+  const capped=max=>({...metadata,limits:{...metadata.limits,max_timeline_buckets:max}});
+  const run=setup(t,undefined,{metadata:capped(18),restoreTimeline:{open:true,bucket:'hour'}});await run.owner.apply(selection());
+  assert.equal(run.calls.at(-1).params.bucket,'day');assert.equal(run.state.timeline.bucket,'day');
+  const reads=run.calls.length;await run.owner.setTimelineBucket('hour');assert.equal(run.calls.length,reads);assert.equal(run.state.timeline.bucket,'day');
+  const roomy=setup(t,undefined,{metadata:capped(19)});await roomy.owner.apply(selection());await roomy.owner.toggleTimeline();
+  await roomy.owner.setTimelineBucket('hour');assert.equal(roomy.calls.at(-1).params.bucket,'hour');
+  for(const [max,disabled] of [[18,true],[19,false]]){
+    const dom=screen(t,undefined,{metadata:capped(max)});await dom.view.apply(selection());click(dom,'timeline-toggle');await flush();
+    const hour=dom.get('timeline-bucket').querySelector('option[value="hour"]');assert.equal(hour.disabled,disabled);
+    assert.equal(hour.title,disabled ? 'Hour needs a creation range of 18 hours or less.' : '');
+  }
+});
+
 test('zero buckets have a chart, keyboard selector and complete data table without inventing missing data',async t=>{
   const zero=timelinePage([timelineBucket(undefined,undefined,{created_count:0,started_count:0,succeeded_count:0,failed_count:0})]);
   const dom=screen(t,async(resource,options)=>resource==='metrics/timeline'?zero:response(resource,options));await dom.view.apply(selection());

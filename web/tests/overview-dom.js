@@ -101,6 +101,9 @@ export function overviewDOM() {
   elements.get('[data-timeline-scroll]').append(timelineTable);
   const timelinePanel=elements.get('[data-timeline-panel]');
   timelinePanel.append(...['bucket','choice','retry','scroll','status','scope','chart','values','selected','scale','zero','x-axis','y-axis','drill'].map(key=>elements.get(`[data-timeline-${key}]`)));
+  const bucket=elements.get('[data-timeline-bucket]'),bucketOptions=['day','hour'].map(value=>Object.assign(new Node(document,'option'),{value}));
+  bucket.append(...bucketOptions);
+  bucket.querySelector=selector=>bucketOptions.find(option=>selector===`option[value="${option.value}"]`)??null;
   root.querySelector = selector => elements.get(selector) ?? null;
   return { root, document, window, scroll, body, timelineBody, get: key => elements.get(`[data-${key}]`) };
 }

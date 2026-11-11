@@ -58,7 +58,7 @@ class SummaryTests(unittest.TestCase):
         self.query.assert_called_once()
         resource, parameters = self.query.call_args.args
         self.assertEqual(resource, 'api-metrics-summary.sql')
-        self.assertEqual(parameters, ('2026-10-01T12:00:00.1234567+00:00',
+        self.assertEqual(parameters, ('2026-10-15T12:00:00.1234567+00:00',
                                      '2026-10-16T12:00:00.1234567+00:00', None, None, None, None, None))
         self.assertTrue(self.query.call_args.kwargs['typed_timestamps'])
         self.connect.assert_not_called()

@@ -1,6 +1,8 @@
 const keys = new Set(['folder', 'project', 'package', 'status', 'created', 'from', 'to', 'sort', 'direction', 'limit']);
 export const createdPresets = Object.freeze({ today: 'Today', '24h': 'Last 24 hours',
-  '7d': 'Last 7 days', '30d': 'Last 30 days' });
+  '7d': 'Last 7 days', '30d': 'Last 30 days', '180d': 'Last 180 days' });
+// Elapsed hours per rolling preset; Today runs from local midnight instead.
+export const presetHours = Object.freeze({ '24h': 24, '7d': 168, '30d': 720, '180d': 4320 });
 const ticksPerSecond = 10000000n;
 
 export class SelectionError extends Error {}
@@ -67,7 +69,7 @@ export function validateSelection(value, metadata) {
     invalid(`Page size must be between 1 and ${metadata.limits.max_limit}.`);
   }
   if (result.created !== null) {
-    const hours = { today: 0, '24h': 24, '7d': 168, '30d': 720 }[result.created];
+    const hours = presetHours[result.created] ?? 0;
     if (!Object.hasOwn(createdPresets, result.created) || hours > metadata.limits.max_range_hours
         || result.from !== null || result.to !== null) {
       invalid('Choose a supported relative creation window or explicit bounds, not both.');

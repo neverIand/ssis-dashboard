@@ -1991,7 +1991,7 @@ components:
       name: from
       in: query
       required: false
-      description: Inclusive created_time lower bound; default effective to minus HOUR_SPAN (360 hours). Required
+      description: Inclusive created_time lower bound; default effective to minus HOUR_SPAN (24 hours). Required
         explicitly when continuing a windowed cursor.
       schema: {$ref: '#/components/schemas/InputTimestamp'}
     To:
@@ -2273,7 +2273,7 @@ components:
           api_version: v1
           display_timezone: Europe/London
           capabilities: {events: false, values: false, override_values: false, active_estimates: false}
-          limits: {default_limit: 50, max_limit: 200, default_range_hours: 360, max_range_hours: 744, max_timeline_buckets: 1000,
+          limits: {default_limit: 50, max_limit: 200, default_range_hours: 24, max_range_hours: 744, max_timeline_buckets: 1000,
             cursor_ttl_seconds: 1800, max_cursor_characters: 8192, max_text_characters: 16384, max_search_characters: 512}
           execution_statuses:
           - {code: 1, name: created}
