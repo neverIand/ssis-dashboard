@@ -27,7 +27,7 @@ export function historyQuery(value, metadata) {
 export const historyIdentity = value => Object.fromEntries(['folder', 'project', 'package'].map(key => [key, value[`${key}_name`]]));
 export const sameHistoryIdentity = (left, right) => ['folder_name', 'project_name', 'package_name'].every(key => left[key] === right[key]);
 
-export function readHistoryPage(response, _executionId, query, metadata, display, identity) {
+export function readHistoryPage(response, _executionId, query, metadata, display) {
   try {
     readObservationMeta(response, query, metadata, display, { availability: false });
     let previous = null;
@@ -40,11 +40,14 @@ export function readHistoryPage(response, _executionId, query, metadata, display
       previous = id;
       for (const [key, width] of [['folder_name',128], ['project_name',128], ['package_name',260]]) {
         observationText(row[key], width, true);
-        if (!row[key] || row[key].includes('\0') || (!identity.collection && row[key] !== identity[key])) throw new TypeError();
+        // The server matches names under the catalog collation (case, accents, trailing spaces): no equality test here.
+        if (!row[key] || row[key].includes('\0')) throw new TypeError();
       }
-      if (!query.status.split(',').includes(String(row.status?.code))
-          || row.status.name !== metadata.execution_statuses.find(item => item.code === row.status.code)?.name) throw new TypeError();
+      // Status is live: a row can leave the requested statuses while its page is being read.
       formatCode(row.status);
+      const known = metadata.execution_statuses.find(item => item.code === row.status.code);
+      if (row.status.code < -2147483648 || row.status.code > 2147483647
+          || row.status.name !== (known?.name ?? 'unknown')) throw new TypeError();
       if (row.created_at === null) throw new TypeError();
       for (const key of ['created_at', 'started_at', 'ended_at']) display.timestamp(row[key]);
       display.duration(row.duration_seconds); display.duration(row.elapsed_seconds);

@@ -53,10 +53,25 @@ test('history DTO preserves ordered high IDs, exact identity/timestamps and esti
   assert.equal(readHistoryPage(historyPage([],{upper_id:null}),'17',query,metadata,display,identity).data.length,0);
 });
 
-test('history rejects wrong identity/order/status, inherited bounds and malformed estimate semantics',()=>{
-  const mutations=[p=>{p.meta.from=wireTime;},p=>{p.meta.sort='created_at';},p=>{p.data[0].folder_name='Other';},
-    p=>{p.data[0].package_name='MainXdtsx';},p=>{p.data[0].execution_id='0';},p=>{p.meta.upper_id='0';},
-    p=>{p.data.push(p.data[0]);},p=>{p.data[0].status={code:7,name:'failed'};},p=>{p.data[0].status={code:4,name:'failed'};},
+// Review N-01/N-02: the source is live and names match under the catalog collation, so neither is a malformed response.
+test('history accepts a row whose status left the requested set or whose names differ from the base execution',()=>{
+  const moved=historyPage();moved.data[0].status={code:4,name:'failed'};
+  assert.equal(readHistoryPage(moved,'17',query,metadata,display),moved);
+  const renamed=historyPage();renamed.data[0].folder_name=renamed.data[0].folder_name.toUpperCase();
+  renamed.data[0].package_name=renamed.data[0].package_name.toLowerCase()+' ';
+  assert.equal(readHistoryPage(renamed,'17',query,metadata,display),renamed);
+  const unknown=historyPage();unknown.data[0].status={code:40,name:'unknown'};
+  assert.equal(readHistoryPage(unknown,'17',query,metadata,display),unknown);
+  for(const code of [-2147483648,2147483647]){const edge=historyPage();edge.data[0].status={code,name:'unknown'};
+    assert.equal(readHistoryPage(edge,'17',query,metadata,display),edge);}
+  for(const code of [-2147483649,2147483648,1.5]){const outside=historyPage();outside.data[0].status={code,name:'unknown'};
+    assert.throws(()=>readHistoryPage(outside,'17',query,metadata,display),e=>e.kind==='invalid_response');}
+});
+
+test('history rejects empty names, wrong order/status names, inherited bounds and malformed estimate semantics',()=>{
+  const mutations=[p=>{p.meta.from=wireTime;},p=>{p.meta.sort='created_at';},p=>{p.data[0].folder_name='';},
+    p=>{p.data[0].package_name='Main\0.dtsx';},p=>{p.data[0].execution_id='0';},p=>{p.meta.upper_id='0';},
+    p=>{p.data.push(p.data[0]);},p=>{p.data[0].status={code:7,name:'failed'};},p=>{p.data[0].status={code:40,name:'failed'};},
     p=>{p.data[0].started_at=null;},p=>{p.data[0].estimate=undefined;},p=>{p.data[0].estimate=estimate({sample_count:0});},
     p=>{p.data[0].estimate=estimate({sample_count:6});},p=>{p.data[0].estimate=estimate({duration_seconds:0});},
     p=>{p.data[0].estimate=estimate({duration_seconds:Infinity});},p=>{p.data[0].estimate=estimate({method:'median'});},

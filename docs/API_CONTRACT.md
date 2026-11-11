@@ -86,7 +86,7 @@ Opaque cursor v2 tokens are HMAC-authenticated with a server key: random per pro
 
 Continue by repeating the original selection and cursor; windowed collections must send the returned explicit `from`/`to`. Defaults are valid only when they equal the original effective selection. Changed selection/direction/policy/scope, altered/malformed tokens or old formats return 400 `invalid_cursor`; expiration returns `cursor_expired`. With the default random key, restart invalidates all cursors. Refresh from page one after these errors.
 
-An initial visible maximum numeric ID fences later inserts; initially empty collections have NULL upper ID and no cursor. SQL visibility remains live. Retention/revocation, status changes or mutable sort keys can alter membership and cause duplicates/skips; no snapshot is promised. Consumers refresh/reset paging and deduplicate by identity when appropriate. A signature grants no access.
+An initial visible maximum numeric ID fences later inserts; initially empty collections have NULL upper ID and no cursor. SQL visibility remains live. Retention/revocation, status changes or mutable sort keys can alter membership and cause duplicates/skips; no snapshot is promised. Consumers refresh/reset paging and deduplicate by identity when appropriate. A returned row can therefore carry a status outside the requested set (calculated execution sorts and History read status after selecting the page), and exact-name selectors can return names that differ from the request by case, accents or trailing spaces; clients must not treat either as a malformed response. A signature grants no access.
 
 ## Execution inspection and observations
 

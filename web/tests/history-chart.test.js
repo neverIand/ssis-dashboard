@@ -82,7 +82,7 @@ test('paging plots only the returned bounded page and chooses a valid execution 
 test('transient history errors label a retained chart; denial and malformed data remove plot values and selected anchors',async t=>{
   for(const failure of ['transient','denied','invalid']){
     let failed=false;const dom=screen(t,async()=>{if(failed&&failure!=='invalid')throw new ApiError('http',{status:failure==='denied'?403:503});
-      return historyPage([historyRow('1',{estimate:estimate(),...(failed?{package_name:'Wrong.dtsx'}:{})})]);});await open(dom);
+      return historyPage([historyRow('1',{estimate:estimate(),...(failed?{package_name:''}:{})})]);});await open(dom);
     failed=true;group(dom,selected(dom)).focus();click(dom,'detail-refresh');await flush();
     if(failure==='transient'){assert.equal(groups(dom).length,1);assert.match(dom.get('history-status').textContent,/Previous history page shown/);}
     else {assert.equal(groups(dom).length,0);assert.equal(groups(dom).length,0);assert.equal(dom.view.checkpoint().historyView.chart.selected,null);assert.equal(dom.document.activeElement,dom.get('history-chart-toggle'));}

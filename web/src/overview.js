@@ -64,8 +64,8 @@ export function readExecutionPage(response, selection, metadata, display) {
       code(row.status);
       wireTime(row.created_at, display, false);
       const created = timestampTicks(row.created_at);
-      if (created < timestampTicks(meta.from) || created >= timestampTicks(meta.to)
-          || (selection.status.length && !selection.status.includes(row.status.code))) throw new TypeError();
+      // Status is live: a row can leave the selected statuses while its page is being read (API contract, paging).
+      if (created < timestampTicks(meta.from) || created >= timestampTicks(meta.to)) throw new TypeError();
       wireTime(row.started_at, display);
       wireTime(row.ended_at, display);
       display.duration(row.duration_seconds);

@@ -49,7 +49,7 @@ export function createHistoryLoader({ api, metadata, selection, publish, paused 
       }
       if (disposed || current !== generation) return;
       if (timedOut) throw new ApiError('timeout');
-      const page = readHistoryPage(response, null, query, metadata, display, { collection: true });
+      const page = readHistoryPage(response, null, query, metadata, display);
       if (path[target] && (page.meta.as_of !== cohort?.as_of || page.meta.upper_id !== cohort?.upper_id)) {
         throw new ApiError('invalid_response', { requestId: page.meta.request_id });
       }

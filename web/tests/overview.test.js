@@ -88,7 +88,8 @@ test('malformed rows and mismatched cohort/order metadata fail with a safe reque
     assert.throws(() => readExecutionPage(response, selection(), settings, display), (error) =>
       error.kind === 'invalid_response' && error.requestId === requestId);
   }
-  assert.throws(() => readExecutionPage(page(), selection({ status: [7] }), settings, display), ApiError);
+  // Review N-01: status is live, so a row outside the selected statuses is a valid page, not a malformed response.
+  assert.equal(readExecutionPage(page(), selection({ status: [7] }), settings, display).data.length, page().data.length);
   assert.throws(() => readExecutionPage(page(), selection({ from: '2026-10-17T00:00:00.0000002Z' }), settings, display), ApiError);
   assert.equal(readExecutionPage(page(), selection({ from: '2026-10-17T01:00:00.0000001+01:00' }), settings, display).meta.from, from);
 });
