@@ -288,7 +288,7 @@ class HistoryTests(unittest.TestCase):
         second = self.page({**values, 'cursor':first['meta']['next_cursor']})
         self.assertEqual([r['execution_id'] for r in second['data']], ['3', '4'])
         self.assertEqual((second['meta']['upper_id'], second['meta']['as_of']), ('251', NOW.isoformat()))
-        self.assertEqual(second['data'][0]['elapsed_seconds'], first['data'][0]['elapsed_seconds'])
+        self.assertEqual(second['data'][0]['elapsed_seconds'], first['data'][0]['elapsed_seconds'] + 10)
         self.rows = []
         empty = self.page({**values, 'cursor':second['meta']['next_cursor']})
         self.assertEqual(empty['data'], [])

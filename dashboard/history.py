@@ -101,7 +101,7 @@ def history_page(values, config):
                 or type(row['logging_rows']) is not int or row['logging_rows'] not in (0, 1)
                 or (row['logging_rows'] == 0 and row['logging_level'] is not None)):
             raise ValueError('Unexpected history metadata.')
-        serialized.append({**serialize_execution(row, as_of=as_of), 'estimate': serialize_estimate(row)})
+        serialized.append({**serialize_execution(row, as_of=now), 'estimate': serialize_estimate(row)})
     if len({row['execution_id'] for row in serialized}) != len(serialized):
         raise ValueError('Duplicate history execution ID.')
     has_more = len(serialized) > selection['limit']

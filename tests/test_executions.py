@@ -352,12 +352,20 @@ class ExecutionAPITests(unittest.TestCase):
         with patch('dashboard.cursors._KEY', b'x' * 32):
             self.assert_invalid_cursor(values)
 
+    def test_duplicate_execution_rows_fail_safely_instead_of_repeating_an_execution(self):
+        # Two system LOGGING_LEVEL rows would repeat an execution through the list's logging lookup.
+        self.rows = [*self.rows, dict(max(self.rows, key=lambda row: row['execution_id']))]
+        response = self.get(**WINDOW, limit='5')
+        self.assertEqual(response.status_code, 500, response.json)
+        self.contract.validator('Problem').validate(response.json)
+
     def test_cursor_expiry_does_not_slide_and_as_of_stays_fixed(self):
         first = self.page(**WINDOW, limit='1')
         self.clock.return_value = Timestamp(NOW.utc_ticks + 1799 * TICKS_PER_SECOND)
         second = self.page(**self.continuation(first, limit='1'))
         self.assertEqual(second['meta']['as_of'], first['meta']['as_of'])
-        self.assertEqual(second['data'][0]['elapsed_seconds'], 30)
+        # A running row's elapsed time follows the request clock, not the first page's as_of.
+        self.assertEqual(second['data'][0]['elapsed_seconds'], 1829)
         self.clock.return_value = Timestamp(NOW.utc_ticks + 1800 * TICKS_PER_SECOND)
         self.assert_invalid_cursor(self.continuation(second, limit='1'))
         self.clock.return_value = Timestamp(NOW.utc_ticks - 1)

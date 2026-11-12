@@ -100,7 +100,11 @@ def execution_page(values, config, *, fixed_to, estimate_cache):
     rows = [] if upper is None else query(resource, page_parameters)
     has_more = len(rows) > selection['limit']
     page = rows[:selection['limit']]
-    data = [serialize_execution(row, as_of=as_of) for row in page]
+    # Elapsed time follows this request's clock; the cursor's first-page as_of only fences and expires the chain.
+    data = [serialize_execution(row, as_of=now) for row in page]
+    if len({item['execution_id'] for item in data}) != len(data):
+        # For example two system LOGGING_LEVEL rows joined to one execution.
+        raise ValueError('Duplicate execution ID.')
     # Opt-in History estimates for active rows (UX batch C4): cache misses only, in one bounded read.
     from dashboard.estimates import page_estimates
     estimates = page_estimates(data, query, config, estimate_cache)
