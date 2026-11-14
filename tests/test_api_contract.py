@@ -1,6 +1,7 @@
 """Validate the tracked API draft without importing the app or querying SQL."""
 
 from copy import deepcopy
+import json
 from pathlib import Path
 import unittest
 
@@ -78,6 +79,17 @@ class APIContractTests(unittest.TestCase):
                 self.assertEqual(len(keys), len(set(keys)))
         self.assertEqual(len(operations), len(set(operations)))
 
+    def test_the_browser_test_copy_of_the_examples_is_current(self):
+        # web/tests/openapi-examples.test.js runs this copy through the browser readers.
+        from tests.export_openapi_examples import TARGET, examples
+        # Compare as canonical JSON text: Python's == treats false as 0 and true as 1, JavaScript does not.
+        canonical = lambda value: json.dumps(value, sort_keys=True, ensure_ascii=False)  # noqa: E731
+        self.assertNotEqual(canonical({'flag': False}), canonical({'flag': 0}))
+        self.assertEqual(canonical(examples()),
+                         canonical({name: example['value'] for name, example in self.examples.items()}))
+        self.assertEqual(canonical(json.loads(TARGET.read_text(encoding='utf-8'))), canonical(examples()),
+                         'Stale copy: run python -m tests.export_openapi_examples')
+
     def test_response_examples_and_shared_headers_match_the_contract(self):
         for name, example in self.examples.items():
             with self.subTest(example=name):
@@ -104,7 +116,10 @@ class APIContractTests(unittest.TestCase):
             ('Id', '9223372036854775808'), ('Lsn', '9223372036854775808'),
             ('UtcTimestamp', '2026-10-15T11:00:00'),
             ('UtcTimestamp', '2026-10-15T11:00:00+01:00'),
-            ('UtcTimestamp', '2026-02-30T11:00:00Z'),
+            ('UtcTimestamp', '2026-02-30T11:00:00.0000000Z'),
+            # Responses always carry seven fractional digits; the browser readers accept nothing else.
+            ('UtcTimestamp', '2026-10-15T11:00:00Z'), ('UtcTimestamp', '2026-10-15T11:00:00.123Z'),
+            ('UtcTimestamp', '2026-10-15T11:00:00.12345678Z'),
             ('InputTimestamp', '2026-10-15T11:00:00+14:01'),
             ('InputTimestamp', '2026-10-15T11:00:00-00:00'),
             ('StatusSelection', [2, 2]), ('StatusSelection', [0]),
@@ -159,7 +174,7 @@ class APIContractTests(unittest.TestCase):
         cases.append(('WindowPageMeta', {**page, 'has_more': True}))
         cases.append(('WindowPageMeta', {**page, 'next_cursor': 'unusable.example.token'}))
         child = self.example_row('ChildrenResponse')
-        child['ended_at'] = '2026-10-15T11:00:00Z'
+        child['ended_at'] = '2026-10-15T11:00:00.0000000Z'
         cases.append(('ChildObservation', child))
         execution = self.example_row('ExecutionsResponse')
         execution.update(status={'code': 5, 'name': 'pending'}, started_at=None,
@@ -173,7 +188,7 @@ class APIContractTests(unittest.TestCase):
         cases.append(('HistoryExecution', history))
         for count in (0,6):
             cases.append(('Estimate', {'method':'mean_last_5_successful', 'sample_count':count,
-                                      'duration_seconds':1, 'ended_at':'2026-10-15T11:00:00Z'}))
+                                      'duration_seconds':1, 'ended_at':'2026-10-15T11:00:00.0000000Z'}))
         cases.append(('Capabilities', {'events': False, 'values': False, 'override_values': True}))
         for number, (name, value) in enumerate(cases):
             with self.subTest(case=number, schema=name):
@@ -188,7 +203,7 @@ class APIContractTests(unittest.TestCase):
         pending['estimate'] = None
         self.validator('Execution').validate(pending)
         ended = self.example_row('ExecutionsResponse')
-        ended.update(status={'code': 7, 'name': 'succeeded'}, ended_at='2026-10-15T11:00:00Z', duration_seconds=29.8765433)
+        ended.update(status={'code': 7, 'name': 'succeeded'}, ended_at='2026-10-15T11:00:00.0000000Z', duration_seconds=29.8765433)
         with self.assertRaises(ValidationError):
             self.validator('Execution').validate(ended)
         ended['estimate'] = None

@@ -1,0 +1,607 @@
+{
+ "ServerResponse": {
+  "data": {
+   "server_name": "Synthetic SQL Server"
+  },
+  "meta": {
+   "request_id": "0123456789abcdef0123456789abcdef",
+   "generated_at": "2026-10-15T11:00:00.1234567Z"
+  }
+ },
+ "MetaResponse": {
+  "data": {
+   "app_version": "0.6.8",
+   "api_version": "v1",
+   "display_timezone": "Europe/London",
+   "capabilities": {
+    "events": false,
+    "values": false,
+    "override_values": false,
+    "active_estimates": false
+   },
+   "limits": {
+    "default_limit": 50,
+    "max_limit": 200,
+    "default_range_hours": 24,
+    "max_range_hours": 744,
+    "max_timeline_buckets": 1000,
+    "cursor_ttl_seconds": 1800,
+    "max_cursor_characters": 8192,
+    "max_text_characters": 16384,
+    "max_search_characters": 512
+   },
+   "execution_statuses": [
+    {
+     "code": 1,
+     "name": "created"
+    },
+    {
+     "code": 2,
+     "name": "running"
+    },
+    {
+     "code": 3,
+     "name": "cancelled"
+    },
+    {
+     "code": 4,
+     "name": "failed"
+    },
+    {
+     "code": 5,
+     "name": "pending"
+    },
+    {
+     "code": 6,
+     "name": "halted"
+    },
+    {
+     "code": 7,
+     "name": "succeeded"
+    },
+    {
+     "code": 8,
+     "name": "stopping"
+    },
+    {
+     "code": 9,
+     "name": "completed"
+    }
+   ],
+   "executable_results": [
+    {
+     "code": 0,
+     "name": "success"
+    },
+    {
+     "code": 1,
+     "name": "failure"
+    },
+    {
+     "code": 2,
+     "name": "completion"
+    },
+    {
+     "code": 3,
+     "name": "cancelled"
+    }
+   ],
+   "logging_levels": [
+    {
+     "code": 0,
+     "name": "none"
+    },
+    {
+     "code": 1,
+     "name": "basic"
+    },
+    {
+     "code": 2,
+     "name": "performance"
+    },
+    {
+     "code": 3,
+     "name": "verbose"
+    },
+    {
+     "code": 4,
+     "name": "runtime-lineage"
+    },
+    {
+     "code": 100,
+     "name": "custom"
+    }
+   ],
+   "event_kinds": [
+    "all",
+    "errors",
+    "warnings",
+    "duplicate-warnings",
+    "memory-warnings"
+   ],
+   "execution_sorts": [
+    "execution_id",
+    "created_at",
+    "started_at",
+    "ended_at",
+    "project_name",
+    "package_name",
+    "environment",
+    "status",
+    "logging_level",
+    "duration_seconds",
+    "warning_count",
+    "error_count"
+   ]
+  },
+  "meta": {
+   "request_id": "0123456789abcdef0123456789abcdef",
+   "generated_at": "2026-10-15T11:00:00.1234567Z"
+  }
+ },
+ "FoldersResponse": {
+  "data": [
+   {
+    "folder_id": "1",
+    "name": "Sample % folder",
+    "description": null
+   }
+  ],
+  "meta": {
+   "request_id": "0123456789abcdef0123456789abcdef",
+   "generated_at": "2026-10-15T11:00:00.1234567Z",
+   "from": null,
+   "to": null,
+   "limit": 50,
+   "sort": "name",
+   "direction": "asc",
+   "as_of": "2026-10-15T11:00:00.1234567Z",
+   "upper_id": "9007199254740993",
+   "next_cursor": null,
+   "has_more": false,
+   "consistency": "live"
+  }
+ },
+ "ProjectsResponse": {
+  "data": [
+   {
+    "project_id": "2",
+    "folder_id": "1",
+    "folder_name": "Sample % folder",
+    "name": "Sample project",
+    "description": "Synthetic project"
+   }
+  ],
+  "meta": {
+   "request_id": "0123456789abcdef0123456789abcdef",
+   "generated_at": "2026-10-15T11:00:00.1234567Z",
+   "from": null,
+   "to": null,
+   "limit": 50,
+   "sort": "name",
+   "direction": "asc",
+   "as_of": "2026-10-15T11:00:00.1234567Z",
+   "upper_id": "9007199254740993",
+   "next_cursor": null,
+   "has_more": false,
+   "consistency": "live"
+  }
+ },
+ "ExecutionsResponse": {
+  "data": [
+   {
+    "execution_id": "9007199254740993",
+    "folder_name": "Sample % folder",
+    "project_name": "Sample project",
+    "package_name": "Probe.dtsx",
+    "project_lsn": "123",
+    "environment": {
+     "folder_name": null,
+     "name": null
+    },
+    "status": {
+     "code": 2,
+     "name": "running"
+    },
+    "logging_level": {
+     "code": 1,
+     "name": "basic"
+    },
+    "created_at": "2026-10-15T10:59:00.0000000Z",
+    "started_at": "2026-10-15T10:59:30.1234567Z",
+    "ended_at": null,
+    "duration_seconds": null,
+    "elapsed_seconds": 30,
+    "warning_count": 1,
+    "error_count": 0,
+    "estimate": {
+     "method": "mean_last_5_successful",
+     "sample_count": 3,
+     "duration_seconds": 40.5,
+     "ended_at": "2026-10-15T11:00:10.6234567Z"
+    }
+   }
+  ],
+  "meta": {
+   "request_id": "0123456789abcdef0123456789abcdef",
+   "generated_at": "2026-10-15T11:00:00.1234567Z",
+   "from": "2026-10-14T11:00:00.0000000Z",
+   "to": "2026-10-15T11:00:00.0000000Z",
+   "limit": 50,
+   "sort": "execution_id",
+   "direction": "desc",
+   "as_of": "2026-10-15T11:00:00.1234567Z",
+   "upper_id": "9007199254740993",
+   "next_cursor": null,
+   "has_more": false,
+   "consistency": "live"
+  }
+ },
+ "ExecutionResponse": {
+  "data": {
+   "execution_id": "9007199254740993",
+   "folder_name": "Sample % folder",
+   "project_name": "Sample project",
+   "package_name": "Probe.dtsx",
+   "project_lsn": "123",
+   "environment": {
+    "folder_name": null,
+    "name": null
+   },
+   "status": {
+    "code": 2,
+    "name": "running"
+   },
+   "logging_level": {
+    "code": 1,
+    "name": "basic"
+   },
+   "created_at": "2026-10-15T10:59:00.0000000Z",
+   "started_at": "2026-10-15T10:59:30.1234567Z",
+   "ended_at": null,
+   "duration_seconds": null,
+   "elapsed_seconds": 30,
+   "warning_count": 1,
+   "error_count": 0,
+   "event_counts": {
+    "all": 8,
+    "errors": 0,
+    "warnings": 1,
+    "duplicate_warnings": 1,
+    "memory_warnings": 1
+   },
+   "estimate": {
+    "method": "mean_last_5_successful",
+    "sample_count": 3,
+    "duration_seconds": 40.5,
+    "ended_at": "2026-10-15T11:00:10.6234567Z"
+   }
+  },
+  "meta": {
+   "request_id": "0123456789abcdef0123456789abcdef",
+   "generated_at": "2026-10-15T11:00:00.1234567Z"
+  }
+ },
+ "SummaryResponse": {
+  "data": {
+   "total": 1,
+   "by_status": [
+    {
+     "code": 1,
+     "name": "created",
+     "count": 0
+    },
+    {
+     "code": 2,
+     "name": "running",
+     "count": 1
+    },
+    {
+     "code": 3,
+     "name": "cancelled",
+     "count": 0
+    },
+    {
+     "code": 4,
+     "name": "failed",
+     "count": 0
+    },
+    {
+     "code": 5,
+     "name": "pending",
+     "count": 0
+    },
+    {
+     "code": 6,
+     "name": "halted",
+     "count": 0
+    },
+    {
+     "code": 7,
+     "name": "succeeded",
+     "count": 0
+    },
+    {
+     "code": 8,
+     "name": "stopping",
+     "count": 0
+    },
+    {
+     "code": 9,
+     "name": "completed",
+     "count": 0
+    }
+   ]
+  },
+  "meta": {
+   "request_id": "0123456789abcdef0123456789abcdef",
+   "generated_at": "2026-10-15T11:00:00.1234567Z",
+   "from": "2026-10-14T11:00:00.0000000Z",
+   "to": "2026-10-15T11:00:00.0000000Z",
+   "status_scope": "all"
+  }
+ },
+ "TimelineResponse": {
+  "data": [
+   {
+    "start": "2026-10-13T23:00:00.0000000Z",
+    "end": "2026-10-14T23:00:00.0000000Z",
+    "created_count": 0,
+    "started_count": 0,
+    "succeeded_count": 0,
+    "failed_count": 0
+   },
+   {
+    "start": "2026-10-14T23:00:00.0000000Z",
+    "end": "2026-10-15T23:00:00.0000000Z",
+    "created_count": 1,
+    "started_count": 1,
+    "succeeded_count": 0,
+    "failed_count": 0
+   }
+  ],
+  "meta": {
+   "request_id": "0123456789abcdef0123456789abcdef",
+   "generated_at": "2026-10-15T11:00:00.1234567Z",
+   "from": "2026-10-14T11:00:00.0000000Z",
+   "to": "2026-10-15T11:00:00.0000000Z",
+   "timezone": "Europe/London",
+   "bucket": "day",
+   "selected_statuses": [
+    2
+   ]
+  }
+ },
+ "ExecutablesResponse": {
+  "data": [
+   {
+    "statistics_id": "5",
+    "execution_id": "9007199254740993",
+    "executable_id": "6",
+    "package_name": "Probe.dtsx",
+    "package_path": "\\Package\\Delay",
+    "execution_path": "\\Probe\\Delay",
+    "name": "Delay",
+    "started_at": "2026-10-15T10:59:30.0000000Z",
+    "ended_at": null,
+    "duration_seconds": null,
+    "result": null
+   }
+  ],
+  "meta": {
+   "request_id": "0123456789abcdef0123456789abcdef",
+   "generated_at": "2026-10-15T11:00:00.1234567Z",
+   "from": null,
+   "to": null,
+   "limit": 50,
+   "sort": "started_at",
+   "direction": "asc",
+   "as_of": "2026-10-15T11:00:00.1234567Z",
+   "upper_id": "9007199254740993",
+   "next_cursor": null,
+   "has_more": false,
+   "consistency": "live",
+   "availability": "available"
+  }
+ },
+ "ChildrenResponse": {
+  "data": [
+   {
+    "observation_id": "7",
+    "execution_id": "9007199254740993",
+    "package_name": "Probe.dtsx",
+    "package_path": "\\Package",
+    "execution_path": "\\Parent\\Run child[1]\\Probe",
+    "source_name": "Probe",
+    "source_type": 30,
+    "started_at": "2026-10-15T10:59:30.0000000Z",
+    "ended_at": null,
+    "duration_seconds": null,
+    "state": "incomplete"
+   }
+  ],
+  "meta": {
+   "request_id": "0123456789abcdef0123456789abcdef",
+   "generated_at": "2026-10-15T11:00:00.1234567Z",
+   "from": null,
+   "to": null,
+   "limit": 50,
+   "sort": "started_at",
+   "direction": "asc",
+   "as_of": "2026-10-15T11:00:00.1234567Z",
+   "upper_id": "9007199254740993",
+   "next_cursor": null,
+   "has_more": false,
+   "consistency": "live",
+   "availability": "available",
+   "has_unidentified_starts": false
+  }
+ },
+ "EventsResponse": {
+  "data": [
+   {
+    "event_id": "8",
+    "execution_id": "9007199254740993",
+    "message_time": "2026-10-15T10:59:31.0000001Z",
+    "event_name": "OnWarning",
+    "message_type": 110,
+    "source_type": 30,
+    "message": "<b>Synthetic duplicate warning</b>",
+    "truncated": false,
+    "package_name": "Probe.dtsx",
+    "package_path": "\\Package",
+    "execution_path": "\\Probe",
+    "source_name": "Probe",
+    "subcomponent_name": null
+   }
+  ],
+  "meta": {
+   "request_id": "0123456789abcdef0123456789abcdef",
+   "generated_at": "2026-10-15T11:00:00.1234567Z",
+   "from": null,
+   "to": null,
+   "limit": 50,
+   "sort": "message_time",
+   "direction": "asc",
+   "as_of": "2026-10-15T11:00:00.1234567Z",
+   "upper_id": "9007199254740993",
+   "next_cursor": null,
+   "has_more": false,
+   "consistency": "live",
+   "availability": "available",
+   "has_unidentified_events": false
+  }
+ },
+ "ParametersResponse": {
+  "data": [
+   {
+    "execution_parameter_id": "9",
+    "object_type": {
+     "code": 30,
+     "name": "package"
+    },
+    "name": "DummySecret",
+    "sql_type": "String",
+    "sensitive": true,
+    "required": false,
+    "value_set": true,
+    "runtime_override": true,
+    "value": null,
+    "truncated": false,
+    "redacted": true,
+    "redaction_reason": "sensitive"
+   }
+  ],
+  "meta": {
+   "request_id": "0123456789abcdef0123456789abcdef",
+   "generated_at": "2026-10-15T11:00:00.1234567Z",
+   "from": null,
+   "to": null,
+   "limit": 50,
+   "sort": "execution_parameter_id",
+   "direction": "asc",
+   "as_of": "2026-10-15T11:00:00.1234567Z",
+   "upper_id": "9007199254740993",
+   "next_cursor": null,
+   "has_more": false,
+   "consistency": "live",
+   "section": "parameters"
+  }
+ },
+ "OverridesResponse": {
+  "data": [
+   {
+    "property_id": "10",
+    "property_path": "\\Package.Properties[Description]",
+    "sensitive": false,
+    "value": null,
+    "truncated": false,
+    "redacted": true,
+    "redaction_reason": "policy"
+   }
+  ],
+  "meta": {
+   "request_id": "0123456789abcdef0123456789abcdef",
+   "generated_at": "2026-10-15T11:00:00.1234567Z",
+   "from": null,
+   "to": null,
+   "limit": 50,
+   "sort": "property_id",
+   "direction": "asc",
+   "as_of": "2026-10-15T11:00:00.1234567Z",
+   "upper_id": "9007199254740993",
+   "next_cursor": null,
+   "has_more": false,
+   "consistency": "live",
+   "section": "overrides"
+  }
+ },
+ "HistoryResponse": {
+  "data": [
+   {
+    "execution_id": "9007199254740993",
+    "folder_name": "Sample % folder",
+    "project_name": "Sample project",
+    "package_name": "Probe.dtsx",
+    "project_lsn": "123",
+    "environment": {
+     "folder_name": null,
+     "name": null
+    },
+    "status": {
+     "code": 2,
+     "name": "running"
+    },
+    "logging_level": {
+     "code": 1,
+     "name": "basic"
+    },
+    "created_at": "2026-10-15T10:59:00.0000000Z",
+    "started_at": "2026-10-15T10:59:30.1234567Z",
+    "ended_at": null,
+    "duration_seconds": null,
+    "elapsed_seconds": 30,
+    "warning_count": 1,
+    "error_count": 0,
+    "estimate": {
+     "method": "mean_last_5_successful",
+     "sample_count": 5,
+     "duration_seconds": 40.5,
+     "ended_at": "2026-10-15T11:00:10.6234567Z"
+    }
+   }
+  ],
+  "meta": {
+   "request_id": "0123456789abcdef0123456789abcdef",
+   "generated_at": "2026-10-15T11:00:00.1234567Z",
+   "from": null,
+   "to": null,
+   "limit": 50,
+   "sort": "execution_id",
+   "direction": "desc",
+   "as_of": "2026-10-15T11:00:00.1234567Z",
+   "upper_id": "9007199254740993",
+   "next_cursor": null,
+   "has_more": false,
+   "consistency": "live"
+  }
+ },
+ "LivenessResponse": {
+  "data": {
+   "status": "ok"
+  },
+  "meta": {
+   "request_id": "0123456789abcdef0123456789abcdef",
+   "generated_at": "2026-10-15T11:00:00.1234567Z"
+  }
+ },
+ "ReadinessResponse": {
+  "data": {
+   "status": "ready"
+  },
+  "meta": {
+   "request_id": "0123456789abcdef0123456789abcdef",
+   "generated_at": "2026-10-15T11:00:00.1234567Z"
+  }
+ }
+}
