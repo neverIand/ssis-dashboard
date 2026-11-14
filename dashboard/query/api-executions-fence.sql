@@ -14,5 +14,4 @@ WHERE e.created_time >= @from AND e.created_time < @to
   AND (@package IS NULL OR e.package_name = @package)
   AND (@folder_pattern IS NULL OR e.folder_name LIKE @folder_pattern ESCAPE N'~')
   AND (@project_pattern IS NULL OR e.project_name LIKE @project_pattern ESCAPE N'~')
-  AND (@s1 IS NULL OR e.status IN (@s1, @s2, @s3, @s4, @s5, @s6, @s7, @s8, @s9))
-OPTION (RECOMPILE);
+  AND (@s1 IS NULL OR e.status IN (@s1, @s2, @s3, @s4, @s5, @s6, @s7, @s8, @s9));

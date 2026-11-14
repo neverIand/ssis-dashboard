@@ -29,15 +29,13 @@ WHERE e.created_time >= @from AND e.created_time < @to
   AND (@folder_pattern IS NULL OR e.folder_name LIKE @folder_pattern ESCAPE N'~')
   AND (@project_pattern IS NULL OR e.project_name LIKE @project_pattern ESCAPE N'~')
   AND (@s1 IS NULL OR e.status IN (@s1, @s2, @s3, @s4, @s5, @s6, @s7, @s8, @s9))
-  AND e.execution_id <= @upper
-OPTION (RECOMPILE);
+  AND e.execution_id <= @upper;
 
 IF @sort = N'logging_level'
     UPDATE c SET logging_level = CONVERT(int, CASE WHEN v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL' THEN v.parameter_value END)
     FROM #execution_cohort AS c
     INNER JOIN catalog.execution_parameter_values AS v ON v.execution_id = c.execution_id
-    WHERE v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL'
-    OPTION (RECOMPILE);
+    WHERE v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL';
 
 IF @sort IN (N'warning_count', N'error_count')
 BEGIN
@@ -77,6 +75,7 @@ WHERE @last IS NULL OR sort_null1 > @last_null1
 ORDER BY sort_null1 ASC,
          CASE WHEN @descending = 0 THEN sort_number END ASC, CASE WHEN @descending = 1 THEN sort_number END DESC,
          CASE WHEN @descending = 0 THEN execution_id END ASC, CASE WHEN @descending = 1 THEN execution_id END DESC
+-- RECOMPILE stays, as in the ordinary page: the CASE order keys simplify (3 sort columns, not 5) when @descending is known.
 OPTION (RECOMPILE);
 
 -- Fetch remaining metrics only for the bounded page. FORCE ORDER keeps the
@@ -100,8 +99,7 @@ IF @sort <> N'logging_level'
     UPDATE p SET logging_level = CONVERT(int, CASE WHEN v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL' THEN v.parameter_value END)
     FROM #execution_page AS p
     INNER JOIN catalog.execution_parameter_values AS v ON v.execution_id = p.execution_id
-    WHERE v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL'
-    OPTION (RECOMPILE);
+    WHERE v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL';
 
 -- Recheck public execution visibility when fetching page metadata.
 SELECT p.*, e.folder_name, e.project_name, e.package_name, e.project_lsn,

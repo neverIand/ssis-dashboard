@@ -194,6 +194,56 @@ Record revision/source hashes, interpreter/driver/catalog scope, timestamps, exa
 
 ## Recorded results
 
+### Batch H execution-list RECOMPILE narrowing: 14 November 2026
+
+The 10 November full-project review (N-03) found ten `OPTION (RECOMPILE)` hints in the execution list SQL and proposed removing six. Measurement supported four. This supersedes the C8.2b.3 note that the fence retains its recompilation.
+
+| Statement | Hint | Result |
+| --- | --- | --- |
+| `api-executions-fence.sql`, upper ID | `RECOMPILE` | Removed |
+| `api-executions-sort.sql`, cohort materialization | `RECOMPILE` | Removed |
+| `api-executions-sort.sql`, logging level for the cohort and for the page | `RECOMPILE` (2) | Removed |
+| `api-executions-ordered-page.sql` and `api-executions-sort.sql`, page selection | `RECOMPILE` (2) | Kept |
+| Event aggregation in all three page files | `RECOMPILE, FORCE ORDER` (4) | Kept, not retested |
+
+Each case compared the committed SQL (`c0d3dc0`) with the candidate, alternating the two: one warm-up, one run with `STATISTICS IO` for logical reads and source scan counts, then 7 or 9 timed runs without it (median). Real-catalog runs open a new connection each time; temporary-source runs share one connection per size. Real catalog: 19 executions, as administrator, `dashboard_reader` and `dashboard_limited` (session `EXECUTE AS USER`), with all statuses and with status 7, for the fence, two ordinary sorts and three calculated sorts (36 cases). Temporary sources: 2,000 and 20,000 executions, six selections, first and second pages (112 cases). **100,000 executions NOT RUN** (user decision, 14 November: beyond the expected use).
+
+Returned IDs were identical in all 148 cases. Work-table logical reads and source scan counts were equal in every case (work-table scan counts were not kept). Source logical reads were equal in 141 cases: four temporary fence cases read 3 pages instead of 2, and three temporary logging-level sorts read 48–54 pages fewer (of 2,603–8,385).
+
+| Median ms, before → after | Fence | Ordinary sort | Calculated sort |
+| --- | ---: | ---: | ---: |
+| Real, administrator | 120 → 2 | 497 → 489 | 528 → 413 |
+| Real, `dashboard_reader` | 92 → 2 | 459 → 448 | 485 → 371 |
+| Real, `dashboard_limited` | 71 → 3 | 442 → 433 | 511 → 396 |
+| 2,000 temporary | 4 → 0 | 74 → 74 | 110 → 99 |
+| 20,000 temporary | 4 → 1 | 85 → 83 | 166 → 157 |
+
+A separate `STATISTICS TIME` run on the real catalog (administrator and `dashboard_limited`, new connection per run, median of 7) summed the parse-and-compile messages of each batch:
+
+| Compile CPU ms, before → after | Administrator | `dashboard_limited` |
+| --- | ---: | ---: |
+| Fence | 158 → 0 | 102 → 0 |
+| Ordinary sort (`created_at`) | 712 → 688 | 690 → 688 |
+| Calculated sort, duration | 788 → 646 | 756 → 578 |
+| Calculated sort, logging level | 820 → 500 | 844 → 480 |
+| Calculated sort, error count | 712 → 592 | 848 → 660 |
+
+The messages overlap (their sum exceeds the wall time), so they show direction, not an exact saving. The fence no longer compiles; the calculated sorts compile less; the ordinary page, whose hints are unchanged, compiles as before. Temporary sources compile cheaply, so they show little change. Cases slower by more than 10 % plus 5 ms: 1 of 36 real (`dashboard_limited`, status 7, ordinary status sort, 445 → 531 ms with equal reads; 24 were faster) and 9 of 112 temporary (18–45 ms, equal reads; 11 were faster). These are treated as timing variation.
+
+A first candidate also removed the two page-selection hints. Work-table reads and source scan counts were again equal in every case and source reads were equal in 98 of 148 (50 temporary cases differed: 14 read 1–2 pages more, 36 read 8–63 pages fewer), but 21 of 112 temporary cases were slower, mostly at 20,000: ordinary `package_name` second page 353 → 775 ms, `created_at` second page 146 → 434 ms, calculated `error_count` second page 941 → 1,207 ms. Actual plans of the selection statement at 20,000 (all executions, first page) show one Sort either way, but its key list differs: with `RECOMPILE` the paired `CASE` keys simplify to 3 sort columns; a cached plan sorts on all 12 (ordinary page) or 5 (calculated).
+
+| Selection statement, elapsed ms | With `RECOMPILE` | Cached plan |
+| --- | ---: | ---: |
+| Ordinary, `package_name` ascending | 100 | 254 |
+| Ordinary, `created_at` descending | 74 | 195 |
+| Calculated, `error_count` descending | 55 | 137 |
+
+These are single plans, not repeated samples; the wider key list is the visible difference, and no other cause was isolated. Both hints were restored with a comment giving this reason.
+
+The filters compare columns with local variables, so a cached fence or cohort plan is built from unknown-value estimates, not from the first caller's values. To check reuse, the fence and three calculated sorts ran at 20,000 temporary executions on one connection over four selections (one package of 200, failed, a six-hour window, all) in both orders, each order with its own cached plans, before and after: 64 runs returned the same IDs. Each calculated sort read the same source and work-table pages in all four variants; the fence read the same in either order (2 → 3 pages for all executions, as above). Timings varied in both directions without a pattern.
+
+Raw results: `.local/reports/backend/20261114-batch-h-recompile/` (`measure.py`, `measure.json` for the final candidate, `measure-all-six-removed.json` for the first; `diagnose.py`, `diagnose.json`, `diagnose.out`, `diagnose-c.out` for compile time, reuse and plans). Not checked: reuse on the real catalog views with selective filters (19 executions cannot show it), cached plans across pooled connections over time, 100,000 executions, and an office catalog.
+
 ### C4 list-page estimate SQL work: 8 November 2026
 
 UX review item O11 adds `estimate` to `/executions` rows. On 8 November the user made active estimates opt-in (`API_ACTIVE_ESTIMATES_ENABLED`, default `False`, advertised as `capabilities.active_estimates`) and chose a per-process cache over recomputing on every refresh. With the flag off, detail and list estimates are NULL and no estimate SQL runs. With it on, `dashboard/estimates.py` caches each estimate by execution ID and start time for `API_ESTIMATE_CACHE_SECONDS` (default 300; at most 4,096 entries). A list page reads only its uncached, started, unfinished rows, in one `api-executions-estimates.sql` call after the page is selected; the detail page (C3) uses the same cache. History is unchanged.
