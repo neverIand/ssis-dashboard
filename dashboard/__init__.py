@@ -19,6 +19,17 @@ def validate_trusted_hosts(value):
         raise ValueError('TRUSTED_HOSTS must be a non-empty list of host names.')
 
 
+def validate_runtime(config):
+    """Fail at startup, not on the first query: every SQL route needs CONNECTION_STRING['main']; a
+    non-Boolean DEBUG such as 'false' is truthy and would enable the debugger and reloader."""
+    if type(config['DEBUG']) is not bool:
+        raise ValueError('DEBUG must be a Boolean.')
+    connections = config['CONNECTION_STRING']
+    if (not isinstance(connections, dict) or not isinstance(connections.get('main'), str)
+            or not connections['main'].strip()):
+        raise ValueError("CONNECTION_STRING must be a mapping with a non-empty string 'main'.")
+
+
 def create_app(config_overrides=None, *, config_path=None):
     """Create an independent app with retained HTML and versioned API routes.
 
@@ -52,6 +63,7 @@ def create_app(config_overrides=None, *, config_path=None):
     from dashboard.timezones import validate_display_timezone
     from dashboard.api import register_api, validate_config
 
+    validate_runtime(app.config)
     validate_trusted_hosts(app.config['TRUSTED_HOSTS'])
     validate_timeouts(app.config['DB_LOGIN_TIMEOUT_SECONDS'], app.config['DB_QUERY_TIMEOUT_SECONDS'])
     validate_display_timezone(app.config['DISPLAY_TIMEZONE'])

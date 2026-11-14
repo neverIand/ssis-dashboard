@@ -227,3 +227,19 @@ test('a timed-out automatic request cannot overlap a retry and keeps its old obs
   assert.equal(run.state.phase, 'ready');
   assert.equal(run.state.poll.delayMs, 1000);
 });
+
+for (const [code, mode, kept] of [['database_configuration', 'blocked', false], ['database_unavailable', 'scheduled', true]]) {
+  test(`a 503 with code ${code} leaves automatic refresh ${mode}`, async t => {
+    let fail = false;
+    const run = setup(t, async resource => {
+      if (fail) throw new ApiError('http', { status: 503, code });
+      return resource === 'executions' ? page() : summary();
+    });
+    await run.owner.apply(run.selection);
+    fail = true;
+    await run.owner.refresh();
+    assert.equal(run.state.phase, 'list-error');
+    assert.equal(run.state.poll.mode, mode);
+    assert.equal(run.state.page !== null, kept, 'previous rows are kept only for an outage');
+  });
+}

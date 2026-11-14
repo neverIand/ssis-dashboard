@@ -132,7 +132,8 @@ Errors use RFC 9457 `application/problem+json`: `type: about:blank`, standard ti
 | 500 | `internal_error`, including unexpected types, unsupported data shapes and SQL permission/conversion failures |
 | 503 | `database_unavailable`, connection/login/driver unavailable |
 | 504 | `database_timeout`, native HYT00/HYT01 |
+| 500 / 503 | `database_configuration` replaces the code above when the driver is not installed or loadable (IM002/IM003, 503) or a catalog object is missing because the connection names another database (42S02, 500). The status is unchanged; clients must not retry it automatically. Permission failures cannot be told apart without reading driver text and stay `internal_error` |
 
-`/healthz` uses no database. `/readyz` performs a zero-row read in SSISDB, with login/query limits individually capped at 1–2 seconds; this is not a total HTTP deadline. Empty visibility may be ready. Successful cleanup or readiness does not establish workload, reader-login, host or stream acceptance.
+`/healthz` uses no database. `/readyz` performs a zero-row read in SSISDB, answering 503 without that read when the connection is not in SSISDB or the catalog view is absent, with login/query limits individually capped at 1–2 seconds; this is not a total HTTP deadline. Empty visibility may be ready. Successful cleanup or readiness does not establish workload, reader-login, host or stream acceptance.
 
 Contract/schema tests run with `python -m unittest discover -s tests -v` after installing development requirements. Native comparisons and open gates are maintained in [acceptance](API_ACCEPTANCE.md) and [progress](PROGRESS.md), without repeating their status here.

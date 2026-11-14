@@ -1,8 +1,12 @@
 const requestIdPattern = /^[a-f0-9]{32}$/;
 const problemCodes = new Set([
   'invalid_input', 'invalid_cursor', 'cursor_expired', 'unauthenticated', 'forbidden',
-  'not_found', 'method_not_allowed', 'internal_error', 'database_unavailable', 'database_timeout',
+  'not_found', 'method_not_allowed', 'internal_error', 'database_unavailable', 'database_timeout', 'database_configuration',
 ]);
+
+// One rule for every refresh owner: retry what can pass by itself, never a server configuration problem.
+export const transient = error => ['network', 'timeout'].includes(error.kind)
+  || (error.kind === 'http' && error.code !== 'database_configuration' && (error.status >= 500 || [408, 429].includes(error.status)));
 
 export class ApiError extends Error {
   constructor(kind, { status = null, requestId = null, code = null } = {}) {
@@ -20,7 +24,8 @@ export class ApiError extends Error {
       503: 'The service is unavailable. Try again.',
       504: 'The service did not respond in time. Try again.',
     };
-    super(messages[kind] ?? httpMessages[status] ?? 'The request failed. Try again.');
+    super(code === 'database_configuration' ? 'The server database connection is not configured correctly. Contact the administrator.'
+      : messages[kind] ?? httpMessages[status] ?? 'The request failed. Try again.');
     this.name = 'ApiError';
     Object.assign(this, { kind, status, requestId: safeRequestId(requestId), code });
   }

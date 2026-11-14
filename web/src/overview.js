@@ -1,4 +1,4 @@
-import { ApiError } from './api.js';
+import { ApiError, transient } from './api.js';
 import { createDisplay, formatCode, formatId, formatText } from './display.js';
 import { selectionParams, timestampTicks, validateSelection } from './selection.js';
 import { createRefreshLoop } from './refresh-loop.js';
@@ -8,8 +8,6 @@ import { readEstimate } from './history.js';
 
 const utc = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{7}Z$/;
 const badResponse = (response) => new ApiError('invalid_response', { requestId: response?.meta?.request_id });
-const transient = (error) => ['network', 'timeout'].includes(error.kind)
-  || (error.kind === 'http' && (error.status >= 500 || [408, 429].includes(error.status)));
 const copyPath = (path) => ({ ...path, entries: [...path.entries] });
 
 function wireTime(value, display, nullable = true) {

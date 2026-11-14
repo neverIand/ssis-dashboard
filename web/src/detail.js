@@ -1,4 +1,4 @@
-import { ApiError, safeRequestId } from './api.js';
+import { ApiError, safeRequestId, transient } from './api.js';
 import { createDisplay, formatCode, formatId, formatText } from './display.js';
 import { createRefreshLoop } from './refresh-loop.js';
 import { executableQuery, readExecutablePage } from './executables.js';
@@ -58,9 +58,6 @@ export function readExecutionDetail(response, executionId, display) {
     return response;
   } catch { throw new ApiError('invalid_response', { requestId: response?.meta?.request_id }); }
 }
-
-export const transient = error => ['network', 'timeout'].includes(error.kind)
-  || (error.kind === 'http' && (error.status >= 500 || [408, 429].includes(error.status)));
 
 export function createDetailLoader({ api, executionId, metadata, publish, timeoutMs = 30000, locale,
   autoRefresh = true, visible = true, pollIntervalMs = 30000, maxPollIntervalMs = 300000,

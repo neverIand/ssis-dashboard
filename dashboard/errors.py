@@ -76,9 +76,9 @@ def _home_url():
     return url_for('packages')
 
 
-def _error_response(status, *, response=None):
+def _error_response(status, *, response=None, configuration=False):
     if is_api_request():
-        return problem_response(status, response=response)
+        return problem_response(status, response=response, configuration=configuration)
     if response is None:
         response = current_app.response_class(status=status)
     response.set_data(render_template(
@@ -125,7 +125,8 @@ def _database_error(error):
     )
     if _propagate_errors():
         raise
-    return _error_response(status)
+    # Driver not installed or not loadable; catalog object missing (wrong database).
+    return _error_response(status, configuration=state in ('IM002', 'IM003', '42S02'))
 
 
 def _unexpected_error(error):

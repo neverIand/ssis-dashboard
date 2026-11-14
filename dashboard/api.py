@@ -104,7 +104,7 @@ def resource_response(data, *, meta=None):
     }})
 
 
-def problem_response(status, *, response=None, cursor_error=None):
+def problem_response(status, *, response=None, cursor_error=None, configuration=False):
     if status not in _PROBLEMS:
         # The contract fixes the status/code set. Keep an unlisted HTTP error in its
         # class rather than reporting (and logging) a client error as a server fault.
@@ -113,6 +113,10 @@ def problem_response(status, *, response=None, cursor_error=None):
     if status == 400 and cursor_error in ('invalid_cursor', 'cursor_expired'):
         code = cursor_error
         detail = 'The paging cursor is invalid or expired. Start a new first page.'
+    if configuration and status >= 500:
+        # A missing driver or catalog will not fix itself: clients must not retry it as an outage.
+        code = 'database_configuration'
+        detail = 'The monitoring database connection is not configured correctly. Check the server configuration.'
     return _json({'type': 'about:blank', 'title': HTTPStatus(status).phrase, 'status': status,
                   'detail': detail, 'code': code, 'request_id': request_id()},
                  status=status, response=response, mimetype='application/problem+json')

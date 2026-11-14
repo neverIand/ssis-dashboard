@@ -1,5 +1,6 @@
 import { createDisplay, refreshStatus } from './display.js';
-import { createDetailLoader, detailFields, transient } from './detail.js';
+import { transient } from './api.js';
+import { createDetailLoader, detailFields } from './detail.js';
 import { readOverviewReturn, readDetailFragment, detailFragment } from './detail-navigation.js';
 import { mountDetailTabs } from './detail-tabs.js';
 import { mountObservationTable } from './render-observations.js';

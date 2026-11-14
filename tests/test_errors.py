@@ -228,6 +228,30 @@ class HttpErrorTests(unittest.TestCase):
         self.assertNotIn('PWD=', html)
         self.connect.assert_not_called()
 
+    def test_configuration_states_keep_their_status_and_get_a_nonretryable_api_code(self):
+        from dashboard.api import resource_response
+
+        states = {}
+
+        def failing():
+            raise pyodbc.Error(states['state'], 'private diagnostic PWD=secret')
+
+        self.app.add_url_rule('/api/v1/_configuration', view_func=failing)
+        self.app.add_url_rule('/synthetic-configuration', view_func=failing)
+        self.assertTrue(callable(resource_response))
+        for state, status, code in (('IM002', 503, 'database_configuration'), ('IM003', 503, 'database_configuration'),
+                                    ('42S02', 500, 'database_configuration'), ('08001', 503, 'database_unavailable'),
+                                    ('28000', 503, 'database_unavailable'), ('42000', 500, 'internal_error'),
+                                    ('HYT00', 504, 'database_timeout')):
+            with self.subTest(state=state):
+                states['state'] = state
+                response = self.client.get('/api/v1/_configuration')
+                self.assertEqual((response.status_code, response.json['code'], response.json['status']), (status, code, status))
+                self.assertEqual('configured' in response.json['detail'], code == 'database_configuration')
+                self.assertNotIn('secret', response.get_data(as_text=True))
+                # Legacy pages keep their status and wording.
+                self.assertEqual(self.client.get('/synthetic-configuration').status_code, status)
+
     def test_driver_states_map_to_safe_http_errors_and_safe_logs(self):
         cases = [
             (pyodbc.OperationalError, 'HYT00', 504),

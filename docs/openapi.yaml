@@ -1648,7 +1648,7 @@ components:
         code:
           type: string
           enum: [invalid_input, invalid_cursor, cursor_expired, unauthenticated, forbidden, not_found, method_not_allowed,
-            internal_error, database_unavailable, database_timeout]
+            internal_error, database_unavailable, database_timeout, database_configuration]
         request_id: {$ref: '#/components/schemas/RequestId'}
       description: Fixed safe details; no instance URL, rejected values, SQL or exception diagnostic.
     Liveness:

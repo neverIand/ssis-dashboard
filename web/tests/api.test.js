@@ -132,3 +132,22 @@ test('native fetch blocks redirects and cancels an outstanding request', async (
   await assert.rejects(pending, { name: 'AbortError' });
   assert.deepEqual(paths, ['/api/v1/meta', '/api/v1/pending']);
 });
+
+test('one retry rule: outages and overload are transient; denial, bad input and server configuration are not', async () => {
+  const { transient } = await import('../src/api.js');
+  const http = (status, code = null) => new ApiError('http', { status, code });
+  for (const error of [new ApiError('network'), new ApiError('timeout'), http(500, 'internal_error'), http(502), http(503, 'database_unavailable'),
+    http(504, 'database_timeout'), http(408), http(429)]) assert.equal(transient(error), true, `${error.kind} ${error.status}`);
+  for (const error of [http(400, 'invalid_input'), http(401), http(403, 'forbidden'), http(404, 'not_found'),
+    http(503, 'database_configuration'), http(500, 'database_configuration'), new ApiError('invalid_response'),
+    new ApiError('invalid_metadata')]) assert.equal(transient(error), false, `${error.kind} ${error.status} ${error.code}`);
+  assert.match(http(503, 'database_configuration').message, /not configured correctly/);
+  assert.match(http(503, 'database_unavailable').message, /Try again/);
+});
+
+test('the configuration problem code survives the envelope check; unknown codes are still dropped', async () => {
+  const problem = code => createApi('/api/v1/', { origin, fetchImpl: async () => jsonResponse(
+    { type: 'about:blank', title: 'Service Unavailable', status: 503, detail: 'x', code, request_id: requestId }, { status: 503 }) });
+  await assert.rejects(problem('database_configuration').get('executions'), error => error.code === 'database_configuration');
+  await assert.rejects(problem('database_private').get('executions'), error => error.code === null);
+});

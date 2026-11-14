@@ -160,6 +160,25 @@ class ApplicationFactoryTests(unittest.TestCase):
         self.assertEqual(result.stdout.strip(), 'entrypoints OK')
 
 
+class RuntimeConfigurationTests(unittest.TestCase):
+    def test_connection_string_and_debug_are_validated_at_startup(self):
+        for value in (None, 'DRIVER=x;SERVER=y', {}, {'other': 'x'}, {'main': None}, {'main': 5}, {'main': '  '},
+                      [('main', 'x')]):
+            with self.subTest(connection=value), self.assertRaisesRegex(ValueError, 'CONNECTION_STRING'):
+                create_app({'CONNECTION_STRING': value})
+        for value in ('false', 'no', 0, 1, None):
+            with self.subTest(debug=value), self.assertRaisesRegex(ValueError, 'DEBUG'):
+                create_app({'DEBUG': value})
+        app = create_app({'CONNECTION_STRING': {'main': 'synthetic', 'other': 'kept'}, 'DEBUG': True})
+        self.assertIs(app.debug, True)
+        self.assertEqual(app.config['CONNECTION_STRING']['other'], 'kept')
+
+    def test_validation_messages_never_echo_the_configured_value(self):
+        with self.assertRaises(ValueError) as caught:
+            create_app({'CONNECTION_STRING': 'DRIVER=x;PWD=private-canary'})
+        self.assertNotIn('private-canary', str(caught.exception))
+
+
 class LegacyPresentationTests(unittest.TestCase):
     def setUp(self):
         connection_guard = patch('pyodbc.connect', side_effect=AssertionError('Tests must not connect to SQL Server'))

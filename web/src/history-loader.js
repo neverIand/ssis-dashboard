@@ -1,11 +1,9 @@
-import { ApiError } from './api.js';
+import { ApiError, transient as retryable } from './api.js';
 import { createDisplay } from './display.js';
 import { createRefreshLoop } from './refresh-loop.js';
 import { readHistoryPage } from './history.js';
 import { historySelection } from './history-navigation.js';
 
-const retryable = error => ['network', 'timeout'].includes(error.kind)
-  || (error.kind === 'http' && (error.status >= 500 || [408, 429].includes(error.status)));
 const empty = () => ({ open: true, phase: 'idle', page: null, error: null, stale: false, notice: '' });
 
 export function createHistoryLoader({ api, metadata, selection, publish, paused = false, visible = true, timeoutMs = 30000 }) {
