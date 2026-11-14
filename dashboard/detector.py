@@ -62,6 +62,7 @@ class Detector:
         self._stop = threading.Event()
         self._thread = None
         self._failures = 0
+        self._bad_polls = 0
         self._last_success = None
         self._lifecycle = threading.Lock()
 
@@ -70,7 +71,12 @@ class Detector:
         """Start the polling thread once. Returns False if it is already running."""
         with self._lifecycle:
             if self._thread is not None and self._thread.is_alive():
-                return False
+                if not self._stop.is_set():
+                    return False
+                # A stop timed out while a read was in flight: let that thread finish before a new one starts.
+                self._thread.join(self._join_seconds())
+                if self._thread.is_alive():
+                    return False
             self._stop.clear()
             self._thread = threading.Thread(target=self._run, name='ssis-change-detector', daemon=True)
             self._thread.start()
@@ -85,11 +91,13 @@ class Detector:
                 self._changed.notify_all()
             if thread is None:
                 return True
-            thread.join(self.config['DB_QUERY_TIMEOUT_SECONDS'] + self.config['DB_LOGIN_TIMEOUT_SECONDS'] + 1
-                        if timeout is None else timeout)
+            thread.join(self._join_seconds() if timeout is None else timeout)
             if not thread.is_alive():
                 self._thread = None
             return self._thread is None
+
+    def _join_seconds(self):
+        return self.config['DB_QUERY_TIMEOUT_SECONDS'] + self.config['DB_LOGIN_TIMEOUT_SECONDS'] + 1
 
     @property
     def running(self):
@@ -129,14 +137,19 @@ class Detector:
                         break
         except Exception as error:
             self._failures += 1
-            if isinstance(error, ValueError) and not reseed:
-                # Unexpected rows: restart from a seed rather than trust the state, keeping its gaps.
+            if isinstance(error, (ValueError, TypeError, LookupError)) and not reseed:
+                # Unexpected rows, whatever their shape: restart from a seed rather than trust the state, keeping its gaps.
                 self._previous = state
                 self._state = changes.ChangeState(self.limits)
+                # The reseed that follows proves nothing about the next poll. Count bad polls until one succeeds, so
+                # the wait after each one doubles and a persistent fault cannot reseed (a catalog scan) every cycle.
+                self._bad_polls += 1
             log_event('change_detection_failed', level=logging.ERROR, failures=self._failures,
                       error=type(error).__name__)
             raise
         self._failures = 0
+        if not reseed:
+            self._bad_polls = 0
         self._last_success = now
         return published, more
 
@@ -151,9 +164,11 @@ class Detector:
         while not self._stop.is_set():
             try:
                 _, more = self.poll_once()
+                # After a reseed the next poll runs at the normal interval: waiting longer would look like an
+                # outage and reseed again, so a cleared fault could never be confirmed by a poll.
                 delay = 0 if more else self.interval
             except Exception:
-                delay = backoff_delay(self.interval, self._failures, self.max_interval)
+                delay = backoff_delay(self.interval, max(self._failures, self._bad_polls), self.max_interval)
             self._stop.wait(delay)
 
     # --- subscribers -----------------------------------------------------------------------------

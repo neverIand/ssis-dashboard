@@ -215,6 +215,16 @@ class ChangeStateScenarios(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             ChangeState(self.limits).apply([], [], 0)
 
+    def test_a_window_execution_without_a_status_fails_closed_and_bindings_have_one_owner(self):
+        from dashboard.changes import poll_parameters, seed_parameters
+        state = ChangeState(Limits())
+        state.seed([{'source': 0, 'execution_id': 5, 'status': None, 'end_time': None}], 0)
+        with self.assertRaises(ValueError):
+            state.apply([{'source': 2, 'execution_id': 6, 'status': None, 'end_time': None},
+                         {'source': 0, 'execution_id': 6, 'status': None, 'end_time': None}], [], 1)
+        self.assertEqual(seed_parameters(Limits(), {9: 1.0, 3: 2.0}), (256, 256, '<t><i>3</i><i>9</i></t>'))
+        self.assertEqual(poll_parameters(state, Limits(), [4, 5]), (5, 200, '<t><i>4</i><i>5</i></t>'))
+
     def test_tracked_xml_accepts_only_bigint_ids_and_limits_validate(self):
         self.assertEqual(tracked_xml([1, 22]), '<t><i>1</i><i>22</i></t>')
         for ids in ([0], ['1'], [True], [2 ** 63]):

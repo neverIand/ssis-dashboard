@@ -18,7 +18,7 @@ import unittest
 import pyodbc
 
 from dashboard import create_app
-from dashboard.changes import ACTIVE_STATUSES, ChangeState, Limits, tracked_xml
+from dashboard.changes import ACTIVE_STATUSES, ChangeState, Limits, poll_parameters, seed_parameters, tracked_xml
 from dashboard.db import load_query
 from dashboard.timestamps import SQL_SS_TIMESTAMPOFFSET, as_timestamp, decode_datetimeoffset
 
@@ -77,14 +77,14 @@ class ChangeDetectionSQLTests(unittest.TestCase):
     def start(self, limits, now=0, previous=None):
         state = ChangeState(limits)
         carry = sorted(previous.carry(now)) if previous is not None else []
-        events = state.seed(self.run_sql('seed', (limits.tracked, limits.gaps, tracked_xml(carry))), now, previous)
+        events = state.seed(self.run_sql('seed', seed_parameters(limits, carry)), now, previous)
         return state, events, self.snapshot()
 
     def poll(self, state, limits, now, replica):
         events = []
         while True:
             requested = state.tracked()
-            rows = self.run_sql('poll', (state.high, limits.new_rows, tracked_xml(requested)))
+            rows = self.run_sql('poll', poll_parameters(state, limits, requested))
             page, more = state.apply(rows, requested, now)
             for event in page:
                 if event['kind'] == 'resync':

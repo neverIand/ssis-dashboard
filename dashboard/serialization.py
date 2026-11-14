@@ -1,8 +1,5 @@
 """Explicit SQL-to-JSON primitives; no Flask defaults or stringifying fallbacks."""
 
-from decimal import Decimal
-import math
-
 from dashboard.timestamps import TICKS_PER_SECOND, as_timestamp
 from dashboard.validation import PACKAGE_STATUS_CODES
 
@@ -52,20 +49,6 @@ def boolean(value):
     if type(value) is int and value in (0, 1):
         return bool(value)
     raise ValueError('Invalid SQL Boolean flag.')
-
-
-def seconds(value):
-    if value is None:
-        return None
-    if type(value) not in (int, float, Decimal):
-        raise ValueError('Invalid numeric duration.')
-    try:
-        result = float(value)
-    except (ValueError, OverflowError):
-        raise ValueError('Invalid numeric duration.') from None
-    if not math.isfinite(result) or result < 0:
-        raise ValueError('Invalid numeric duration.')
-    return result
 
 
 def utc_timestamp(value):

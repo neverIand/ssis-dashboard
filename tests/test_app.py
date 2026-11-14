@@ -160,6 +160,35 @@ class ApplicationFactoryTests(unittest.TestCase):
         self.assertEqual(result.stdout.strip(), 'entrypoints OK')
 
 
+class WSGIEntryTests(unittest.TestCase):
+    def test_the_wsgi_module_builds_one_application_and_starts_no_detector(self):
+        # A separate process: the module creates its application at import, from the environment's configuration.
+        import os
+        import subprocess
+        import sys
+        import tempfile
+
+        script = (
+            "import threading\n"
+            "from unittest.mock import patch\n"
+            "with patch('pyodbc.connect', side_effect=AssertionError('no SQL at import')):\n"
+            "    import dashboard.wsgi as wsgi\n"
+            "    detector = wsgi.app.extensions['change_detector']\n"
+            "    assert wsgi.app.config['HOUR_SPAN'] == 7, wsgi.app.config['HOUR_SPAN']\n"
+            "    assert not detector.running\n"
+            "    assert not any(t.name == 'ssis-change-detector' for t in threading.enumerate())\n"
+            "    assert wsgi.app.test_client().get('/healthz').status_code == 200\n"
+            "print('wsgi-ok')\n")
+        with tempfile.TemporaryDirectory() as folder:
+            config = os.path.join(folder, 'wsgi-test.cfg')
+            with open(config, 'w', encoding='utf-8') as handle:
+                handle.write("CHANGE_DETECTION_ENABLED = True\nHOUR_SPAN = 7\nLOG_LEVEL = 'CRITICAL'\n")
+            environment = {**os.environ, 'DASHBOARD_CONFIG': config}
+            result = subprocess.run([sys.executable, '-B', '-c', script], cwd=os.path.dirname(os.path.dirname(__file__)),
+                                    env=environment, capture_output=True, text=True, timeout=60)
+        self.assertEqual((result.returncode, result.stdout.strip()), (0, 'wsgi-ok'), result.stderr[-2000:])
+
+
 class RuntimeConfigurationTests(unittest.TestCase):
     def test_connection_string_and_debug_are_validated_at_startup(self):
         for value in (None, 'DRIVER=x;SERVER=y', {}, {'other': 'x'}, {'main': None}, {'main': 5}, {'main': '  '},

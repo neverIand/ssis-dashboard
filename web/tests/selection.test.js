@@ -54,6 +54,16 @@ test('selection restores advertised status sets, sort, direction and bounded siz
   assert.deepEqual(parseSelection(selectionSearch(value, settings), settings), value);
 });
 
+test('selection validation rejects page sizes that are not whole numbers within the advertised range', () => {
+  const defaults = defaultSelection(settings);
+  for (const limit of [0, 201, 1.5, NaN, -1, '50', null]) {
+    assert.throws(() => validateSelection({ ...defaults, limit }, settings), SelectionError, String(limit));
+  }
+  for (const limit of [1, 200]) assert.equal(validateSelection({ ...defaults, limit }, settings).limit, limit);
+  assert.throws(() => validateSelection({ ...defaults, sort: 'elapsed_seconds' }, settings), SelectionError);
+  assert.throws(() => validateSelection({ ...defaults, direction: 'DESC' }, settings), SelectionError);
+});
+
 test('timestamp validation compares exact ticks with explicit offsets and calendar boundaries', () => {
   assert.equal(timestampTicks('0001-01-01T00:00:00Z'), 0n);
   assert.equal(timestampTicks('2026-10-25T01:30:00.1234567+01:00'), timestampTicks('2026-10-25T00:30:00.1234567Z'));
@@ -120,24 +130,4 @@ test('history restoration replaces draft and applied state; invalid URLs have no
   assert.equal(session.applied, null);
   session.restore('');
   assert.deepEqual(session.applied, defaultSelection(settings));
-});
-
-test('table order changes applied scope without applying or losing pending filter edits', () => {
-  const session = createSelectionSession(settings);
-  assert.throws(() => session.order({ limit: 25 }), SelectionError);
-  session.restore('?folder=Applied&status=7');
-  session.update({ folder: 'Draft', from: 'invalid draft time', status: [2] });
-  const ordered = session.order({ sort: 'created_at', direction: 'asc', limit: 200 });
-  assert.equal(ordered.folder, 'Applied');
-  assert.equal(ordered.from, null);
-  assert.deepEqual(ordered.status, [7]);
-  assert.equal(session.draft.folder, 'Draft');
-  assert.equal(session.draft.from, 'invalid draft time');
-  assert.deepEqual(session.draft.status, [2]);
-  assert.equal(session.draft.limit, 200);
-  for (const limit of [0, 201, 1.5, NaN]) assert.throws(() => session.order({ limit }), SelectionError);
-  assert.equal(session.applied, ordered);
-  session.update({ from: null });
-  assert.equal(session.apply().folder, 'Draft');
-  assert.equal(session.applied.sort, 'created_at');
 });

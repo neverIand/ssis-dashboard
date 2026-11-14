@@ -223,6 +223,100 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual([backoff_delay(5, f, 60) for f in range(6)], [5, 10, 20, 40, 60, 60])
         self.assertEqual(backoff_delay(1, 10_000, 60), 60)
 
+    def test_malformed_rows_of_any_shape_reseed_instead_of_repeating_the_same_poll(self):
+        seeds, polls = [], []
+
+        def seed(config, limits, carry=()):
+            seeds.append(1)
+            return [{'source': 0, 'execution_id': 5, 'status': None, 'end_time': None}]
+
+        bad = {
+            'no status': [{'source': 2, 'execution_id': 6, 'status': None, 'end_time': None},
+                          {'source': 0, 'execution_id': 6, 'status': None, 'end_time': None}],
+            'missing column': [{'source': 0, 'execution_id': 6}],
+            'not a row': [None],
+        }
+        for name, rows in bad.items():
+            with self.subTest(rows=name):
+                seeds.clear()
+                d = Detector(CONFIG, read_seed=seed, read_poll=lambda config, state, limits: (rows, state.tracked()))
+                d.poll_once()
+                with self.assertRaises((ValueError, TypeError, LookupError)):
+                    d.poll_once()
+                self.assertFalse(d.status()['seeded'], 'the state is discarded')
+                d.poll_once()
+                self.assertEqual(len(seeds), 2, 'the next cycle reseeds')
+
+    def test_persistent_bad_polls_back_off_and_a_cleared_fault_recovers_after_the_cap(self):
+        clock, calls, bad = Clock(), [], {'left': 6}
+
+        def seed(config, limits, carry=()):
+            clock.now += 0.5  # the read takes time
+            calls.append(('seed', clock.now))
+            return [{'source': 0, 'execution_id': 5, 'status': None, 'end_time': None}]
+
+        def poll(config, state, limits):
+            clock.now += 0.5
+            calls.append(('poll', clock.now))
+            if bad['left']:
+                bad['left'] -= 1
+                return [None], state.tracked()
+            return [], state.tracked()
+
+        d = Detector(CONFIG, interval=5, max_interval=60, read_seed=seed, read_poll=poll, clock=clock)
+        waits = []
+
+        def wait(delay):
+            waits.append(delay)
+            clock.now += delay
+            return False
+
+        d._stop.wait = wait
+        d._stop.is_set = lambda: len(waits) >= 16
+        d._loop()
+        # seed, bad poll, seed, bad poll, ...: the wait after each bad poll doubles to the cap; each reseed is
+        # followed by a poll at the normal interval, so the reseed never looks like an outage.
+        self.assertEqual(waits[:12], [5, 10, 5, 20, 5, 40, 5, 60, 5, 60, 5, 60])
+        self.assertEqual([kind for kind, _ in calls[:14]], ['seed', 'poll'] * 7)
+        # The fault is gone after six bad polls: the seventh poll succeeds and polling continues without a reseed.
+        self.assertEqual([kind for kind, _ in calls[12:]], ['seed', 'poll', 'poll', 'poll'])
+        self.assertEqual(waits[12:], [5, 5, 5, 5])
+        self.assertEqual((d._bad_polls, d.status()['failures'], d.status()['seeded']), (0, 0, True))
+
+    def test_a_clean_poll_ends_the_failure_streak(self):
+        fake = Fake({1: (2, None)})
+        d = Detector(CONFIG, read_seed=fake.read_seed, read_poll=fake.read_poll)
+        d.poll_once()
+        fake.fail = ValueError('bad row')
+        with self.assertRaises(ValueError):
+            d.poll_once()
+        fake.fail = None
+        d.poll_once()
+        self.assertEqual((d.status()['failures'], d._bad_polls), (0, 1), 'the reseed keeps the bad-poll streak')
+        d.poll_once()
+        self.assertEqual(d._bad_polls, 0)
+        fake.fail = OSError('network')
+        with self.assertRaises(OSError):
+            d.poll_once()
+        self.assertEqual(d._bad_polls, 0, 'an outage is not a bad poll')
+
+    def test_start_after_a_timed_out_stop_waits_for_the_old_thread_and_runs_again(self):
+        release, entered = threading.Event(), threading.Event()
+
+        def slow_seed(config, limits, carry=()):
+            entered.set()
+            release.wait(10)
+            return [{'source': 0, 'execution_id': 5, 'status': None, 'end_time': None}]
+
+        d = Detector(CONFIG, interval=1, read_seed=slow_seed, read_poll=lambda config, state, limits: ([], state.tracked()))
+        self.assertTrue(d.start())
+        self.assertTrue(entered.wait(5))
+        self.assertFalse(d.stop(timeout=0.05), 'the read is still in flight')
+        threading.Timer(0.2, release.set).start()
+        self.assertTrue(d.start(), 'start waits for the stopping thread, then starts a new one')
+        self.assertTrue(d.running)
+        self.assertTrue(d.stop(timeout=5))
+
     def test_start_is_idempotent_and_stop_joins(self):
         fake = Fake({1: (2, None)})
         fake.fail = OSError('down')

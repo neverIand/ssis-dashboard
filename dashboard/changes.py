@@ -131,7 +131,9 @@ class ChangeState:
         high = 0 if high is None else _identifier(high)
         window = {_identifier(i) for i in split[2]}
         actives = split[1]
-        if any(value[0] not in ACTIVE_STATUSES or i > high for i, value in actives)                 or len({i for i, _ in actives}) != len(actives)                 or any(i > high or not (i > high - self.limits.gaps or i in carry) for i in window):
+        if (any(value[0] not in ACTIVE_STATUSES or i > high for i, value in actives)
+                or len({i for i, _ in actives}) != len(actives)
+                or any(i > high or not (i > high - self.limits.gaps or i in carry) for i in window)):
             raise ValueError('Inconsistent change-detection seed.')
         actives.sort(reverse=True)
         self.high = high
@@ -173,6 +175,9 @@ class ChangeState:
             raise RuntimeError('Seed the change state before applying a poll.')
         requested = set(requested)
         split = _rows(rows)
+        if any(type(item) is not tuple for item in split[0]):
+            # Only the seed's high-water row may lack a status.
+            raise ValueError('A window execution has no status.')
         window = sorted(_identifier(i) for i in split[2])
         if len(set(window)) != len(window) or (window and window[0] <= self.high):
             raise ValueError('Invalid operation window.')
@@ -234,10 +239,20 @@ class ChangeState:
         return events, more
 
 
+def seed_parameters(limits, carry=()):
+    """Bindings of detector-seed.sql, shared with the native SQL test."""
+    return (limits.tracked, limits.gaps, tracked_xml(sorted(carry)))
+
+
+def poll_parameters(state, limits, requested):
+    """Bindings of detector-poll.sql, shared with the native SQL test."""
+    return (state.high, limits.new_rows, tracked_xml(requested))
+
+
 def read_seed(config, limits, carry=()):
     """The seed query; `carry` is the replaced state's unexpired gap IDs (at most limits.gaps)."""
     return execute_query(
-        'detector-seed.sql', (limits.tracked, limits.gaps, tracked_xml(sorted(carry))), connection_string=config['CONNECTION_STRING']['main'],
+        'detector-seed.sql', seed_parameters(limits, carry), connection_string=config['CONNECTION_STRING']['main'],
         login_timeout=config['DB_LOGIN_TIMEOUT_SECONDS'], query_timeout=config['DB_QUERY_TIMEOUT_SECONDS'],
         typed_timestamps=True, declared_parameters=True, on_complete=record_query)
 
@@ -253,7 +268,7 @@ def read_poll(config, state, limits):
     """One bounded poll query. Returns (rows, requested IDs)."""
     requested = state.tracked()
     rows = execute_query(
-        'detector-poll.sql', (state.high, limits.new_rows, tracked_xml(requested)),
+        'detector-poll.sql', poll_parameters(state, limits, requested),
         connection_string=config['CONNECTION_STRING']['main'],
         login_timeout=config['DB_LOGIN_TIMEOUT_SECONDS'], query_timeout=config['DB_QUERY_TIMEOUT_SECONDS'],
         typed_timestamps=True, declared_parameters=True, on_complete=record_query)

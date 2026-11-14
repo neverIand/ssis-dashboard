@@ -28,14 +28,6 @@ class TypedSerializationTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 wire.boolean(value)
 
-    def test_durations_are_finite_numeric_seconds(self):
-        self.assertIsNone(wire.seconds(None))
-        self.assertEqual(wire.seconds(Decimal('1.250')), 1.25)
-        self.assertEqual(wire.seconds(0), 0)
-        for value in (True, -1, '1.25', float('nan'), float('inf'), Decimal('sNaN'), Decimal('1e10000')):
-            with self.subTest(value=value), self.assertRaises(ValueError):
-                wire.seconds(value)
-
     def test_actual_and_elapsed_times_handle_null_and_fixed_as_of(self):
         start = parse_timestamp('2026-10-15T12:00:00.1234567Z')
         end = parse_timestamp('2026-10-15T12:00:01.1234568Z')
@@ -74,7 +66,7 @@ class TypedSerializationTests(unittest.TestCase):
         value = {
             'id': wire.bigint(9007199254740993), 'lsn': wire.lsn(None),
             'time': wire.utc_timestamp(parse_timestamp('2026-10-15T12:00:00.1234567+01:00')),
-            'duration': wire.seconds(Decimal('1.25')), 'count': wire.count(0),
+            'count': wire.count(0),
             'flag': wire.boolean(1), 'status': wire.execution_status(40000),
         }
         decoded = json.loads(json.dumps(value, allow_nan=False))
@@ -82,7 +74,6 @@ class TypedSerializationTests(unittest.TestCase):
         self.assertEqual(decoded['time'], '2026-10-15T11:00:00.1234567Z')
         self.assertIsNone(decoded['lsn'])
         self.assertIs(decoded['flag'], True)
-        self.assertEqual(decoded['duration'], 1.25)
 
     def test_serialized_values_match_checked_in_schemas(self):
         contract_tests.APIContractTests.setUpClass()
