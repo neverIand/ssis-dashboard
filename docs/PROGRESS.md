@@ -1,6 +1,6 @@
 # Implementation progress
 
-Updated 5 November 2026. Development base: `dev-next`; previous-queue task 3 review base: `131fece`, including task 1 at `d350af8`. [Roadmap](roadmap.md) owns scope and priorities; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns current status, the work queue and open acceptance gates.
+Updated 14 November 2026. Development base: `dev-next`; previous-queue task 3 review base: `131fece`, including task 1 at `d350af8`. [Roadmap](roadmap.md) owns scope and priorities; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns current status, the work queue and open acceptance gates.
 
 ## Current status
 
@@ -304,6 +304,43 @@ The refactor reduced authored JS+CSS from 282,180 to 271,258 bytes and packaged 
 | Batch 2 R1-F001: focused Pause/Resume becomes natively disabled at execution end | Closed locally by task 3: reproduced focus loss, enabled Refresh fallback, retained-focus and unrelated-focus tests, clean packaged synthetic terminal-poll replay. Actual cached-document/live-execution acceptance remains separate. |
 | Refactor O-1: timeline status shifts transiently by about 254 px on refresh | Fixed 4 November for rolling-preset refreshes: inner rows pinned and Bucket width held, now at most 2 px at 1280/800/375 px. The exact 254 px case did not reproduce. |
 | P4.5 focus observation | Attributed 4 November to a pointer click inside the `tabindex="-1"` `main` region; app load/refresh/History paths keep focus. No change. |
+
+### Full-project reviews
+
+Layered reviews under [the review process](PROJECT_REVIEW.md), both of `72e673a`. Nothing changed in the repository between them. Neither found a P1 or P2.
+
+| Date | Model | P3 | P4 | Tags | Refuted | Report |
+| --- | --- | ---: | ---: | --- | --- | --- |
+| 9 November 2026 | Claude Opus 5.5 | 6 | 18 | 20 NEW, 2 KNOWN, 1 REGRESSION, 1 PREVIOUSLY-DECLINED | 2 of 33 suspicions | `.local/reports/reviews/20261109-full-review-claude-opus-5-5/` |
+| 10 November 2026 | Claude Fable 5.2 | 4 | 8 | 10 NEW, 2 KNOWN | 8 of 53 observations | `.local/reports/reviews/20261110-full-review-claude-fable-5-2/` |
+
+The second review missed 12 of the first review's 24 findings and added 10 of its own, two of them P3 behaviour bugs at the API/browser boundary. Four of its items had been seen in a memory note opened before the process was read; they are counted as KNOWN, not as found.
+
+Disposition on 14 November (R = 9 November, N = 10 November). Each fix was reviewed by Codex before commit; see Next actions 6 to 14.
+
+| Findings | Disposition |
+| --- | --- |
+| N-01, N-02 | Fixed, `2c6fe68` |
+| R-01 | Fixed, `f56df01` |
+| R-07 | Partly fixed, `f56df01`: a page that repeats an execution ID now fails safely. Open: the calculated-sort batch still picks one of two system `LOGGING_LEVEL` rows arbitrarily; that needs a measured SQL task |
+| R-02 | Fixed, `3771a1c` |
+| R-09 | Fixed, `3edda46` |
+| R-08 | Partly fixed, `3edda46`: a missing driver or object (IM002, IM003, 42S02) is marked as a configuration error. Open: permission errors are not distinguished (42000 is still retried), and a permission-denied login was not run |
+| R-12, R-16, R-17, N-05, N-06, N-12 | Fixed, `c0d3dc0` |
+| R-04, N-03 | Fixed, `a44ef35`: four of ten `RECOMPILE` hints removed, not the six proposed |
+| R-03, N-04 | Fixed, `34bfe8e` (decision D4, option A) |
+| R-10 | Fixed, `2581a9c`; it also tightened the OpenAPI output timestamp to seven fractional digits |
+| R-18, N-08 | Fixed, `7caf427` |
+| N-10 | Deferred on the user's instruction in the 14 November working session: the fix needs a screen reader to verify |
+| R-06, R-13 | Open: shared paging helper and the estimate import cycle, await the user's decision (D1) |
+| N-11 | Open: Fetch Metadata tightening for API routes, awaits the user's decision |
+| R-21, R-22, R-23 (documenting the two time-zone sources) | Open: documentation pass and Progress compaction, await the user's decision (D3). N-08 corrected five statements; the rest of R-21 remains |
+| R-05 | Open: plan eviction on the local instance, an environment question first |
+| R-11, R-19, R-23 (pin refresh) | Open: no decision needed, not started |
+| R-14 | Open: with the paging helper (D1) or at cutover |
+| R-15 | Open: four estimate SQL implementations; the review recommends keeping them for now |
+| R-20, N-07, N-09 | No dedicated task: fold into the next change of the affected tests or stylesheet |
+| R-24 | Previously declined (5 November UX review O8); no action |
 
 ## Evidence and documentation maintenance
 
