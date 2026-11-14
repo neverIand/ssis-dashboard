@@ -7,7 +7,7 @@ DECLARE @bounds xml = CONVERT(xml, ?),
         @s1 int = ?, @s2 int = ?, @s3 int = ?, @s4 int = ?, @s5 int = ?,
         @s6 int = ?, @s7 int = ?, @s8 int = ?, @s9 int = ?;
 
--- At most 1000 server-generated UTC intervals; XML also works before SQL 2016.
+-- At most 1000 server-generated UTC intervals, as XML in one bound parameter.
 CREATE TABLE #timeline_buckets (
     bucket_id int NOT NULL UNIQUE,
     bucket_start datetimeoffset(7) NOT NULL PRIMARY KEY,

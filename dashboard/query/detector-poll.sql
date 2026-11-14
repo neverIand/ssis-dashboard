@@ -3,8 +3,7 @@ DECLARE @after bigint = CONVERT(bigint, ?),
         @limit int = CONVERT(int, ?),
         @tracked xml = CONVERT(xml, ?);
 
--- Tracked IDs: active executions and unresolved ID gaps, capped by the caller. XML also works
--- before SQL 2016.
+-- Tracked IDs: active executions and unresolved ID gaps, capped by the caller, as XML in one bound parameter.
 DECLARE @ids TABLE (execution_id bigint NOT NULL PRIMARY KEY);
 INSERT @ids (execution_id)
 SELECT DISTINCT ids.i.value('.', 'bigint')

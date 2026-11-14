@@ -4,7 +4,7 @@ jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
 info:
   title: ssis-dashboard read-only API
   version: 1.0.0-draft.1
-  description: Stage C DRAFT. C1-C7b implement fourteen GET operations and prior-success history estimates. API_CONTRACT.md defines local access, semantic
+  description: Stage C DRAFT. C1-C7b implement fifteen GET operations and prior-success history estimates. API_CONTRACT.md defines local access, semantic
     validation, cursor and cross-field rules. No production/shared authentication or stream implementation is claimed.
   license: {name: Apache-2.0, identifier: Apache-2.0}
 servers:
