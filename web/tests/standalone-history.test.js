@@ -215,6 +215,11 @@ test('a scoped or invalid History URL loads or reports it on entry and on Back/F
   await settle();
   assert.equal(dom.history().length, 1);
   assert.equal(dom.inputs.match.value, 'exact');
+  // A fragment-only history entry (same query) is not navigation: no second read.
+  dom.window.dispatchEvent(new Event('popstate'));
+  await settle();
+  assert.equal(dom.history().length, 1);
+  assert.equal(dom.inputs.match.value, 'exact');
   Object.assign(dom.window.location, { search: '?match=other' });
   dom.window.dispatchEvent(new Event('popstate'));
   await settle();

@@ -27,6 +27,18 @@ export function breakableText(node, value) {
     index ? [document.createElement('wbr'), document.createTextNode(part)] : [document.createTextNode(part)]));
 }
 
+// Move focus to the main region without changing the fragment, which the screens read as navigation state.
+export function mountSkipLink(root) {
+  const link = root.querySelector('.skip-link'), target = root.ownerDocument.getElementById('main-content');
+  if (!link || !target) return () => {};
+  const skip = event => {
+    if ((event.button ?? 0) !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault(); target.focus();
+  };
+  link.addEventListener('click', skip);
+  return () => link.removeEventListener('click', skip);
+}
+
 const themeKey = 'sd-theme';
 const themes = ['light', 'dark'];
 

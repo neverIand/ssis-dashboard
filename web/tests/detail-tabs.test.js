@@ -262,18 +262,30 @@ test('event rows visibly distinguish error/task-failure/warning while keyed refr
   assert.equal(dom.eventBody.firstChild, first); assert.equal(first.dataset.severity, 'none');
 });
 
-test('fragment changes select a single section, normalize invalid input and preserve Overview return query', async t => {
+test('a fragment that names no tab keeps the active tab and its data and restores the tab fragment', async t => {
+  const dom = mounted(t, { hash: '#children' }); await flush();
+  const count = dom.calls.length, replaced = dom.window.history.replacements.length;
+  for (const hash of ['#main-content', '#unknown/private', '']) {
+    dom.window.location.hash = hash; dom.window.dispatchEvent(new Event('hashchange')); await flush();
+    assert.equal(dom.window.location.hash, '#children', hash);
+  }
+  assert.equal(dom.calls.length, count, 'no base or section read');
+  assert.equal(dom.window.history.replacements.length, replaced + 3, 'the fragment is restored without a Back entry');
+});
+
+test('fragment changes select a single section, keep the tab on invalid input and preserve Overview return query', async t => {
   const dom = mounted(t); await flush();
   dom.window.location.search = '?overview=%3Fcreated%3D24h';
   dom.window.location.hash = '#events/warnings'; dom.window.dispatchEvent(new Event('hashchange')); await flush();
   assert.equal(dom.calls.at(-1).params.kind, 'warnings');
   assert.match(dom.window.history.replacements.at(-1), /#executables$/);
+  const active = '#events/warnings';
   dom.window.location.hash = '#unknown/private'; dom.window.dispatchEvent(new Event('hashchange')); await flush();
-  assert.equal(dom.window.location.hash, '#executables');
+  assert.equal(dom.window.location.hash, active);
   assert.equal(dom.window.location.search, '?overview=%3Fcreated%3D24h');
   const count = dom.calls.length;
   dom.window.location.hash = '#invalid'; dom.window.dispatchEvent(new Event('hashchange')); await flush();
-  assert.equal(dom.window.location.hash, '#executables'); assert.equal(dom.calls.length, count);
+  assert.equal(dom.window.location.hash, active); assert.equal(dom.calls.length, count);
 });
 
 test('switching a pending section aborts it and late denial cannot clear the new tab or execution', async t => {

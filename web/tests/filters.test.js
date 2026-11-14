@@ -401,3 +401,16 @@ test('a detail link consumes closing Status into its URL before rows can be clea
     }
   }
 });
+
+test('a fragment-only history entry keeps the applied selection; a changed query still restores', t => {
+  const dom = setup(t, search(folder, project));
+  const applied = dom.applied.length;
+  dom.window.dispatchEvent(new Event('popstate'));
+  assert.equal(dom.applied.length, applied, 'same query: nothing is re-applied');
+  dom.restore('?status=2');
+  assert.equal(dom.applied.length, applied + 1);
+  assert.deepEqual([...dom.applied.at(-1).status], [2]);
+  dom.restore('?status=bad'); assert.equal(dom.applied.at(-1), null);
+  dom.window.dispatchEvent(new Event('popstate'));
+  assert.equal(dom.applied.at(-1), null, 'an invalid URL is still reported on every entry');
+});

@@ -4,12 +4,13 @@ import { mountBootstrap } from './bootstrap.js';
 import { mountDetail } from './render-detail.js';
 import { mountOverviewScreen } from './overview-screen.js';
 import { mountHistoryScreen } from './history-screen.js';
-import { mountInfoTips, mountThemeChoice } from './ui.js';
+import { mountInfoTips, mountSkipLink, mountThemeChoice } from './ui.js';
 
 const root = document.querySelector('[data-dashboard-app]');
 if (root) {
   // Presentation only and independent of settings: mounted once, kept across cache restores.
   mountThemeChoice(root);
+  mountSkipLink(root);
   let dispose;
   let disposeTips;
   let checkpoint = () => null;

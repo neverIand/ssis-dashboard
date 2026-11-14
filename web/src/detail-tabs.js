@@ -56,8 +56,8 @@ export function mountDetailTabs(root, { metadata, select, revealInitial = true }
     if (canFollow(requested)) follow(requested);
     else {
       cancelReveal();
-      if (current) select(defaultDetailTab(requested, current.response.data.status, metadata));
-      else if (requested) select(defaultDetailTab(requested, { code: 0 }, metadata));
+      // A fragment that names no tab (a page anchor, a typo) is not navigation: keep the tab; render restores the fragment.
+      if (requested) select(defaultDetailTab(requested, current?.response.data.status ?? { code: 0 }, metadata));
     }
     if (current) render(current);
   };

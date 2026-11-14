@@ -27,7 +27,7 @@ export function mountHistoryScreen(root, saved = null) {
     let selection = parseHistorySelection('', metadata), paused = saved?.paused === true;
     const controls = Object.fromEntries(['match', 'folder', 'project', 'package'].map(key => [key, form.elements.namedItem(key)]));
     const show = () => { for (const [key, input] of Object.entries(controls)) input.value = selection[key]; };
-    let loaded = false, persistent = '';
+    let loaded = false, persistent = '', shown = null;
     // Scope edits stay drafts until Load history; other actions apply to the loaded scope and say so.
     const draftChanged = () => loaded && Object.entries(controls).some(([key, input]) => input.value !== selection[key]);
     const describeDraft = () => {
@@ -56,6 +56,7 @@ export function mountHistoryScreen(root, saved = null) {
         if (drafts) for (const [key, input] of Object.entries(controls)) input.value = drafts[key];
         loaded = true; showIdle(false); showTitle();
         if (push) window.history.pushState(null, '', historyHref(selection, navigation));
+        shown = window.location.search;
         describeDraft();
         void owner.select(selection);
       } catch { notice.textContent = 'Enter valid history names or patterns and choose a supported row limit.'; }
@@ -78,8 +79,11 @@ export function mountHistoryScreen(root, saved = null) {
         [key, input.value])) });
     };
     // Without a scope, offer an empty Exact form and wait for Load history. URLs without match= keep meaning LIKE.
-    const pop = () => {
+    const pop = event => {
       const search = window.location.search;
+      // A fragment-only history entry keeps the same query: nothing to reload.
+      if (event && search === shown) return;
+      shown = search;
       persistent = '';
       try { selection = parseHistorySelection(search, metadata); }
       catch { selection = parseHistorySelection('', metadata); persistent = invalid; }

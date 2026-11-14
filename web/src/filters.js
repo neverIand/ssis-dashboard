@@ -320,7 +320,10 @@ export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}
     }
   }
   listen(recover, 'click', () => { window.history.replaceState(null, '', appBase); restore({ reusePage: false }); });
-  listen(window, 'popstate', restore);
+  // A fragment-only history entry leaves the applied selection in place: nothing to restore or reload.
+  listen(window, 'popstate', () => {
+    if (session.applied === null || window.location.search !== selectionSearch(session.applied, metadata)) restore();
+  });
   restore();
   return { select, dispose() {
     close({ commitStatus: false }); clearTimeout(searchTimer); range.cancel();
