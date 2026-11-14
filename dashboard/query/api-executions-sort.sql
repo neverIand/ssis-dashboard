@@ -11,9 +11,10 @@ DECLARE @from datetimeoffset(7) = CONVERT(datetimeoffset(7), ?),
         @last_text1 nvarchar(260) = ?, @last_null2 bit = ?, @last_text2 nvarchar(128) = ?;
 -- Only global sort keys and reusable counts cross the cohort boundary.
 -- UTC seconds plus fractional ticks preserve 100-ns precision without the
--- nanosecond BIGINT overflow of long durations. Missing times keep a NULL key.
+-- nanosecond BIGINT overflow of long durations. Missing times keep a NULL key, and so does an end before its
+-- start: the API reports that duration as NULL, and the row sorts with the other NULLs.
 SELECT e.execution_id, CAST(NULL AS int) AS logging_level,
-       CASE WHEN @sort = N'duration_seconds' THEN
+       CASE WHEN @sort = N'duration_seconds' AND t.ended >= t.started THEN
            DATEDIFF_BIG(second, t.started, t.ended) * CONVERT(bigint, 10000000)
            + (DATEPART(nanosecond, t.ended) - DATEPART(nanosecond, t.started)) / 100
        END AS duration_ticks,

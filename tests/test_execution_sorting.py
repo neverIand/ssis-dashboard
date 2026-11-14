@@ -223,6 +223,12 @@ class ExecutionSortingTests(unittest.TestCase):
             with self.subTest(sort=sort), self.assertRaises(cursors.InvalidCursor):
                 seek_values({'sort_key':key,'sort_nulls':nulls},sort)
 
+    def test_a_reversed_duration_row_pages_with_a_null_key(self):
+        row = {'execution_id': 7, 'sort_number': None}
+        self.assertEqual(encode_key(row, 'duration_seconds'), ([None], [True]))
+        with self.assertRaises(ValueError):
+            encode_key({'execution_id': 7, 'sort_number': -1}, 'duration_seconds')
+
     def test_sort_and_direction_changes_cannot_reuse_a_cursor(self):
         response=self.get({**pages.WINDOW,'sort':'status','direction':'asc','limit':'1'})
         token=response.json['meta']['next_cursor']

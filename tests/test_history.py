@@ -349,11 +349,19 @@ class HistoryTests(unittest.TestCase):
         response = self.client.head('/api/v1/history', query_string=IDENTITY)
         self.assertEqual((response.status_code, response.data), (200, b''))
 
+    def test_an_end_before_its_start_keeps_the_row_with_a_null_duration(self):
+        self.query.side_effect = lambda r, *a, **kw:({'upper_id':251} if r.endswith('fence.sql') else
+                                                     [history(started_at=NOW, ended_at=Timestamp(NOW.utc_ticks-1))])
+        with self.assertLogs(self.app.logger, level='WARNING') as logged:
+            item, = self.page()['data']
+        self.assertEqual((item['duration_seconds'], item['elapsed_seconds']), (None, 0))
+        self.assertLess(item['ended_at'], item['started_at'])
+        self.assertEqual(json.loads(logged.records[0].getMessage())['reversed_timings'], 1)
+
     def test_bad_rows_duplicates_and_sentinel_fail_safely(self):
         changes = ({'execution_id':True}, {'execution_id':252}, {'created_at':None}, {'folder_name':None},
                    {'package_name':'x'*261}, {'project_lsn':-1}, {'logging_rows':2}, {'logging_rows':True},
-                   {'logging_rows':0, 'logging_level':1}, {'warning_count':2**53}, {'error_count':-1},
-                   {'started_at':NOW, 'ended_at':Timestamp(NOW.utc_ticks-1)})
+                   {'logging_rows':0, 'logging_level':1}, {'warning_count':2**53}, {'error_count':-1})
         for change in changes:
             self.query.side_effect = lambda r, *a, **kw:({'upper_id':251} if r.endswith('fence.sql') else [history(**change)])
             with self.assertLogs(self.app.logger, level='ERROR'):

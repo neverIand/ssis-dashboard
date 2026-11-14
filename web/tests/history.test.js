@@ -170,3 +170,9 @@ test('history navigation preserves only the validated overview selection, and bu
   dom.get('legacy-detail-link').focus();wait.resolve(historyPage());await flush();assert.equal(dom.document.activeElement,dom.get('legacy-detail-link'));
   mounted.dispose();const closed=calls.length;click(dom,'history-toggle');assert.equal(calls.length,closed);assert.equal(dom.historyBody.textContent,'');
 });
+
+test('an end before its start is accepted with a NULL duration',()=>{
+  const page=historyPage([historyRow('9',{ended_at:'2026-01-01T00:00:00.0000000Z',duration_seconds:null,elapsed_seconds:0})]);
+  assert.equal(readHistoryPage(page,'17',query,metadata,display,identity),page);
+  assert.ok(page.data[0].ended_at<page.data[0].started_at);
+});

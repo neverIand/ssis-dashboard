@@ -56,12 +56,12 @@ def utc_timestamp(value):
 
 
 def duration_seconds(start, end):
+    """Actual duration; None without both observations or when the end precedes the start (a clock step or
+    skewed workers), so one such row cannot fail its page."""
     if start is None or end is None:
         return None
     ticks = as_timestamp(end).utc_ticks - as_timestamp(start).utc_ticks
-    if ticks < 0:
-        raise ValueError('Invalid observed duration.')
-    return ticks / TICKS_PER_SECOND
+    return None if ticks < 0 else ticks / TICKS_PER_SECOND
 
 
 def elapsed_seconds(start, end, *, as_of):

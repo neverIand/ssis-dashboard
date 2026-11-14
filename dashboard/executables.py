@@ -5,7 +5,7 @@ from werkzeug.exceptions import NotFound
 from dashboard import api_validation as inputs, cursors, serialization as wire
 from dashboard.db import execute_query
 from dashboard.inspection import visible_execution
-from dashboard.observability import record_query
+from dashboard.observability import observed_duration, record_query
 from dashboard.timestamps import parse_timestamp, sql_timestamp, utc_now
 from dashboard.validation import InvalidInput
 
@@ -38,7 +38,7 @@ def _serialize(row, identifier, upper):
         'execution_path': wire.catalog_text(row['execution_path'], 16384),
         'name': wire.catalog_text(row['name'], 4000, units=True),
         'started_at': wire.utc_timestamp(row['started_at']), 'ended_at': wire.utc_timestamp(row['ended_at']),
-        'duration_seconds': wire.duration_seconds(row['started_at'], row['ended_at']),
+        'duration_seconds': observed_duration(row['started_at'], row['ended_at']),
         'result': wire.executable_result(row['execution_result']),
     }
 

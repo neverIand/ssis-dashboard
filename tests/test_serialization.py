@@ -40,8 +40,9 @@ class TypedSerializationTests(unittest.TestCase):
         self.assertEqual(wire.elapsed_seconds(end, None, as_of=start), 0)
         self.assertIsNone(wire.elapsed_seconds(None, None, as_of=as_of))
         self.assertIsNone(wire.utc_timestamp(None))
-        with self.assertRaises(ValueError):
-            wire.duration_seconds(end, start)
+        self.assertIsNone(wire.duration_seconds(end, start), 'an end before its start has no duration')
+        self.assertEqual(wire.duration_seconds(start, start), 0)
+        self.assertEqual(wire.elapsed_seconds(end, start, as_of=as_of), 0)
         with self.assertRaises(ValueError):
             wire.elapsed_seconds(start, None, as_of=None)
 

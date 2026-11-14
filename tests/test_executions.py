@@ -399,9 +399,29 @@ class ExecutionAPITests(unittest.TestCase):
         self.assertIsNone(pending['elapsed_seconds'])
         self.assertIsNone(pending['duration_seconds'])
 
+    def test_an_end_before_its_start_keeps_the_row_with_a_null_duration_and_one_warning(self):
+        start = parse_timestamp('2026-10-15T11:59:30.1234567Z')
+        self.rows = [execution(3, status=7, ended_at=Timestamp(start.utc_ticks - 1)),
+                     execution(2, status=4, ended_at=parse_timestamp('2026-10-01T00:00:00Z')),
+                     execution(1, status=7, ended_at=start)]
+        with self.assertLogs(self.app.logger, level='WARNING') as logs:
+            page = self.page(**WINDOW)
+        rows = {row['execution_id']: row for row in page['data']}
+        self.assertEqual([rows[key]['duration_seconds'] for key in '321'], [None, None, 0])
+        self.assertEqual([rows[key]['elapsed_seconds'] for key in '321'], [0, 0, 0])
+        self.assertEqual(rows['2']['ended_at'], '2026-10-01T00:00:00.0000000Z')
+        record, = [json.loads(item.getMessage()) for item in logs.records]
+        self.assertEqual((record['event'], record['status'], record['reversed_timings'], logs.records[0].levelname),
+                         ('request_completed', 200, 2, 'WARNING'))
+        with self.assertLogs(self.app.logger, level='INFO') as logs:
+            self.rows = [execution(1, status=7, ended_at=start)]
+            self.page(**WINDOW)
+        record, = [json.loads(item.getMessage()) for item in logs.records if 'request_completed' in item.getMessage()]
+        self.assertNotIn('reversed_timings', record)
+
     def test_invalid_catalog_shapes_are_safe_server_errors(self):
         for changes in ({'folder_name': 'x' * 129}, {'created_at': None}, {'warning_count': 2**53},
-                        {'execution_id': 0}, {'ended_at': parse_timestamp('2026-10-01T00:00:00Z')}):
+                        {'execution_id': 0}):
             with self.subTest(changes=changes):
                 self.rows = [execution(42, **changes)] if 'execution_id' not in changes else [execution(0)]
                 with self.assertLogs(self.app.logger, level='ERROR'):

@@ -194,6 +194,20 @@ Record revision/source hashes, interpreter/driver/catalog scope, timestamps, exa
 
 ## Recorded results
 
+### Reversed-duration sort key: 14 November 2026
+
+`api-executions-sort.sql` gives the duration sort a NULL key when the end precedes the start (`AND t.ended >= t.started` in the existing `CASE`), matching the NULL `duration_seconds` the API now reports. Before, such a row had a negative key, which the cursor encoder rejects.
+
+Before (`a44ef35`) and after were alternated as in batch H: one warm-up, one `STATISTICS IO` run, then the median of 7 or 9 timed runs. Duration sort, both directions.
+
+| Source | Cases | Same IDs | Reads and scans |
+| --- | ---: | ---: | --- |
+| Real catalog, three contexts (19 executions, none reversed) | 6 | 6 | Equal |
+| 2,000 and 20,000 temporary, no reversed rows, three selections | 12 | 12 | Equal |
+| 2,000 and 20,000 temporary, 1 in 500 reversed | 12 | 10 | Equal in 11; one read 4 pages fewer of 4,704 |
+
+The two cases with different IDs are the ascending unfiltered pages, where the reversed rows used to come first with negative keys and now sort last with the NULLs; the returned page has no negative key. Timings varied in both directions (real catalog 367–498 ms after, 400–505 ms before). The native test fixture now has two reversed rows; with the old SQL the duration sort fails there with `Invalid database sort key`. Raw results: `.local/reports/backend/20261114-reversed-duration/`. Not checked: 100,000 executions and an office catalog.
+
 ### Batch H execution-list RECOMPILE narrowing: 14 November 2026
 
 The 10 November full-project review (N-03) found ten `OPTION (RECOMPILE)` hints in the execution list SQL and proposed removing six. Measurement supported four. This supersedes the C8.2b.3 note that the fence retains its recompilation.

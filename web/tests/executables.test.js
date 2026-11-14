@@ -226,3 +226,9 @@ test('retained section checkpoints contain paths/query only and revalidate base 
   assert.equal(returned.calls[1].params.cursor, 'entry-A');
   assert.equal(returned.state.executables.pageNumber, 2);
 });
+
+test('an end before its start is accepted with a NULL duration', () => {
+  const page = executablePage([executable('1', { ended_at: '2026-01-01T00:00:00.0000000Z', duration_seconds: null })]);
+  assert.equal(readExecutablePage(page, '17', query, metadata(), display), page);
+  assert.ok(page.data[0].ended_at < page.data[0].started_at);
+});

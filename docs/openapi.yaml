@@ -1103,6 +1103,7 @@ components:
           - {$ref: '#/components/schemas/UtcTimestamp'}
           - {type: 'null'}
         duration_seconds:
+          description: NULL without both a start and an end, and when the end precedes the start.
           anyOf:
           - {type: number, minimum: 0}
           - {type: 'null'}
@@ -1177,6 +1178,7 @@ components:
           - {$ref: '#/components/schemas/UtcTimestamp'}
           - {type: 'null'}
         duration_seconds:
+          description: NULL without both a start and an end, and when the end precedes the start.
           anyOf:
           - {type: number, minimum: 0}
           - {type: 'null'}
@@ -1309,6 +1311,7 @@ components:
           - {$ref: '#/components/schemas/UtcTimestamp'}
           - {type: 'null'}
         duration_seconds:
+          description: NULL without both a start and an end, and when the end precedes the start.
           anyOf:
           - {type: number, minimum: 0}
           - {type: 'null'}
@@ -1560,6 +1563,7 @@ components:
           - {$ref: '#/components/schemas/UtcTimestamp'}
           - {type: 'null'}
         duration_seconds:
+          description: NULL without both a start and an end, and when the end precedes the start.
           anyOf:
           - {type: number, minimum: 0}
           - {type: 'null'}

@@ -36,8 +36,9 @@ WITH expected AS (
         (SELECT CONVERT(int,CASE WHEN p.object_type=50 THEN p.parameter_value END)
          FROM #sample_parameters p WHERE p.execution_id=e.execution_id
            AND p.object_type=50 AND p.parameter_name=N'LOGGING_LEVEL') logging_level,
+        CASE WHEN e.end_time>=e.start_time THEN
         DATEDIFF_BIG(microsecond,e.start_time,e.end_time)*CONVERT(bigint,10)
-        +(DATEPART(nanosecond,e.end_time)%1000-DATEPART(nanosecond,e.start_time)%1000)/100 duration_ticks
+        +(DATEPART(nanosecond,e.end_time)%1000-DATEPART(nanosecond,e.start_time)%1000)/100 END duration_ticks
  FROM #sample_executions e WHERE e.created_time>='2026-10-01T00:00:00Z'
    AND e.created_time<'2026-10-02T00:00:00Z' {where}
 )

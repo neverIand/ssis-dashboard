@@ -36,13 +36,17 @@ def _serialize(row, identifier, upper):
     source_type = row['source_type']
     if source_type is not None and (type(source_type) is not int or not -32768 <= source_type <= 32767):
         raise ValueError('Invalid child source type.')
+    duration = wire.duration_seconds(row['started_at'], row['ended_at'])
+    if row['ended_at'] is not None and duration is None:
+        # SQL pairs an end only at or after its start; a reversed pair here is an unexpected shape.
+        raise ValueError('Invalid child timing.')
     return {
         'observation_id': wire.bigint(row['observation_id']), 'execution_id': identifier,
         'package_name': wire.catalog_text(row['package_name'], 260, units=True, name=True),
         'package_path': row['package_path'], 'execution_path': path,
         'source_name': wire.catalog_text(row['source_name'], 4000, units=True), 'source_type': source_type,
         'started_at': wire.utc_timestamp(row['started_at']), 'ended_at': wire.utc_timestamp(row['ended_at']),
-        'duration_seconds': wire.duration_seconds(row['started_at'], row['ended_at']),
+        'duration_seconds': duration,
         'state': 'incomplete' if row['ended_at'] is None else 'complete',
     }
 

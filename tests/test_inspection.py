@@ -126,6 +126,15 @@ class ExecutionDetailTests(unittest.TestCase):
         self.row.update(started_at=parse_timestamp('2026-10-16T00:00:00Z'),ended_at=None,status=2)
         self.assertEqual(self.detail()['elapsed_seconds'],0)
 
+    def test_an_end_before_its_start_keeps_the_detail_with_a_null_duration(self):
+        self.row.update(started_at=parse_timestamp('2026-10-15T11:59:30Z'),
+                        ended_at=parse_timestamp('2026-10-15T11:59:29.9999999Z'),status=7)
+        with self.assertLogs(self.app.logger,level='WARNING') as logged:
+            data = self.detail()
+        self.assertEqual((data['duration_seconds'],data['elapsed_seconds'],data['ended_at']),
+                         (None,0,'2026-10-15T11:59:29.9999999Z'))
+        self.assertEqual(logged.records[0].dashboard_event['reversed_timings'],1)
+
     def test_absent_and_hidden_ids_have_identical_404_and_no_event_query(self):
         self.row = {}
         missing = self.problem('42')

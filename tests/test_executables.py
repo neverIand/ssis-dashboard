@@ -140,6 +140,19 @@ class ExecutableTests(unittest.TestCase):
         self.assertTrue(all(row[k] is None for k in ('package_name','package_path','execution_path','name','started_at',
                          'ended_at','duration_seconds','result')))
 
+    def test_an_end_before_its_start_keeps_the_row_with_a_null_duration_and_one_warning(self):
+        start = Timestamp(NOW.utc_ticks-60*TICKS_PER_SECOND)
+        self.rows = [observation(1,started_at=start,ended_at=Timestamp(start.utc_ticks-1)),
+                     observation(2,started_at=start,ended_at=Timestamp(start.utc_ticks-100*TICKS_PER_SECOND)),
+                     observation(3)]
+        with self.assertLogs(self.app.logger,level='WARNING') as logged:
+            rows = {row['statistics_id']:row for row in self.page()['data']}
+        self.assertEqual([rows[key]['duration_seconds'] for key in '123'],[None,None,0.0000001])
+        self.assertTrue(all(rows[key]['ended_at'] < rows[key]['started_at'] for key in '12'))
+        record, = [json.loads(item.getMessage()) for item in logged.records]
+        self.assertEqual((record['event'],record['status'],record['reversed_timings'],logged.records[0].levelname),
+                         ('request_completed',200,2,'WARNING'))
+
     def test_wide_unicode_paths_names_and_bigint_ids_remain_exact(self):
         identifier = 9223372036854775807
         self.rows = [observation(identifier,execution_id=9007199254740993,executable_id=identifier,
@@ -241,8 +254,7 @@ class ExecutableTests(unittest.TestCase):
         self.query.side_effect = lambda resource,*a,**kw:({'upper_id':1} if resource.endswith('fence.sql') else deepcopy(self.rows))
         for changes in ({'statistics_id':True},{'executable_id':0},{'execution_id':43},{'execution_result':True},
                         {'execution_result':32768},{'name':'x'*4001},{'name':'😀'*2001},{'package_name':''},
-                        {'package_path':'x'*16385},{'execution_path':'😀'*16385},{'name':'\ud800'},
-                        {'ended_at':Timestamp(NOW.utc_ticks-100*TICKS_PER_SECOND)},{'page_empty':2}):
+                        {'package_path':'x'*16385},{'execution_path':'😀'*16385},{'name':'\ud800'},{'page_empty':2}):
             with self.subTest(changes=list(changes)):
                 self.rows = [observation(**changes)]
                 with self.assertLogs(self.app.logger,level='ERROR'):

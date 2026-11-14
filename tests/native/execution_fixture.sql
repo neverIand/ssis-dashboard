@@ -25,6 +25,9 @@ UPDATE #sample_executions SET start_time='0001-01-01T00:00:00Z',
     end_time=CASE execution_id WHEN 255 THEN '9000-01-01T00:00:00.0000000Z'
                              ELSE '9000-01-01T00:00:00.0000001Z' END
 WHERE execution_id IN(255,256);
+-- Ends before their starts (one tick and one day): NULL duration keys, sorted with the other NULLs.
+UPDATE #sample_executions SET start_time='2026-10-01T00:00:00.0000001Z', end_time='2026-10-01T00:00:00Z' WHERE execution_id=250;
+UPDATE #sample_executions SET end_time=DATEADD(day,-1,start_time) WHERE execution_id=251;
 INSERT #sample_events
 SELECT execution_id,N'OnWarning' FROM #sample_executions
 CROSS JOIN (VALUES(1),(2),(3),(4),(5)) n(n) WHERE execution_id%6>=n.n;

@@ -3,7 +3,7 @@
 from dashboard import api_validation as inputs, cursors, serialization as wire
 from dashboard.db import execute_query
 from dashboard.execution_order import CALCULATED_SORTS, EXECUTION_SORTS, encode_key, seek_values
-from dashboard.observability import record_query
+from dashboard.observability import observed_duration, record_query
 from dashboard.timestamps import parse_timestamp, sql_timestamp, utc_now
 from dashboard.validation import InvalidInput
 
@@ -46,7 +46,7 @@ def serialize_execution(row, *, as_of):
         'status': wire.execution_status(row['status']), 'logging_level': wire.logging_level(row['logging_level']),
         'created_at': created, 'started_at': wire.utc_timestamp(row['started_at']),
         'ended_at': wire.utc_timestamp(row['ended_at']),
-        'duration_seconds': wire.duration_seconds(row['started_at'], row['ended_at']),
+        'duration_seconds': observed_duration(row['started_at'], row['ended_at']),
         'elapsed_seconds': wire.elapsed_seconds(row['started_at'], row['ended_at'], as_of=as_of),
         'warning_count': wire.count(row['warning_count']), 'error_count': wire.count(row['error_count']),
     }

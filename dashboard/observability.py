@@ -7,6 +7,8 @@ from uuid import uuid4
 
 from flask import current_app, g, has_request_context, request
 
+from dashboard import serialization as wire
+
 
 _METHODS = {'GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'TRACE', 'CONNECT'}
 _LEVELS = {'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'}
@@ -47,6 +49,14 @@ def record_query(report):
     )
 
 
+def observed_duration(start, end):
+    """Serialize an actual duration and count a reversed pair for the request summary."""
+    value = wire.duration_seconds(start, end)
+    if value is None and start is not None and end is not None and has_request_context() and 'request_started' in g:
+        g.reversed_timings += 1
+    return value
+
+
 def _start_request():
     # g may survive across requests under a manually retained app context.
     g.request_id = uuid4().hex
@@ -55,15 +65,19 @@ def _start_request():
     g.query_count = 0
     g.query_failures = 0
     g.query_duration_ms = 0.0
+    g.reversed_timings = 0
 
 
 def _finish_request(status):
     if 'request_started' not in g or g.request_timing_logged:
         return
     g.request_timing_logged = True
+    reversed_timings = g.get('reversed_timings', 0)
     log_event(
         'request_completed',
-        level=logging.ERROR if status is None or status >= 500 else logging.INFO,
+        # Rows whose end precedes their start were read and given a NULL duration: worth a warning, not a failure.
+        level=(logging.ERROR if status is None or status >= 500 else
+               logging.WARNING if reversed_timings else logging.INFO),
         request_id=request_id(),
         endpoint=request.endpoint or 'unmatched',
         method=request.method if request.method in _METHODS else 'OTHER',
@@ -73,6 +87,7 @@ def _finish_request(status):
         query_count=g.query_count,
         query_failures=g.query_failures,
         query_duration_ms=round(g.query_duration_ms, 3),
+        **({'reversed_timings': reversed_timings} if reversed_timings else {}),
     )
 
 
