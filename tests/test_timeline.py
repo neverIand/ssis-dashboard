@@ -175,7 +175,7 @@ class TimelineTests(unittest.TestCase):
 
     def test_midnight_gaps_repeated_midnights_and_skipped_dates_use_real_day_starts(self):
         cases = (('America/Sao_Paulo','2018-11-04T03:00:00Z','2018-11-05T02:00:00Z',1,23),
-                 ('America/Havana','2026-11-01T04:00:00Z','2026-11-02T05:00:00Z',1,25),
+                 ('America/Havana','2025-11-02T04:00:00Z','2025-11-03T05:00:00Z',1,25),  # a past year: tzdata 2026.6 drops Cuba's November 2026 change
                  ('Pacific/Apia','2011-12-29T10:00:00Z','2011-12-31T10:00:00Z',2,48))
         for zone,start,end,count,hours in cases:
             with self.subTest(zone=zone):

@@ -39,7 +39,7 @@ Set `CONNECTION_STRING['main']` to the approved SSISDB connection using an insta
 | --- | --- | --- |
 | `DEBUG` | `False` | Local debugging only |
 | `TRUSTED_HOSTS` | `['localhost', '127.0.0.1']` | Non-empty list of accepted Host names (ports ignored; IPv6 literals unsupported). Other hosts get 400, blocking DNS rebinding. Add a name only for a reviewed proxy/host that serves it |
-| `DISPLAY_TIMEZONE` | `Europe/London` | Loadable IANA zone for API buckets and offset-free fixed dates; pinned `tzdata` supplies a fallback |
+| `DISPLAY_TIMEZONE` | `Europe/London` | Loadable IANA zone for API buckets and offset-free fixed dates; Python looks in its zone search path first (`PYTHONTZPATH`, empty by default on Windows) and then in the pinned `tzdata` package, which a default Windows environment therefore relies on. The browser formats times with its own zone data, so the two can disagree for a zone whose rules changed between their releases |
 | `AS_OF_DATE` | `NOW` | Default API upper creation bound; a fixed date/time must resolve to one instant |
 | `HOUR_SPAN` | `24` | Default elapsed-hour window for the API and legacy pages; positive and no larger than `API_MAX_RANGE_HOURS` |
 | `EXECUTION_COUNT` | `1000` | Legacy list limit; API pages use their own 50/200 limits |
