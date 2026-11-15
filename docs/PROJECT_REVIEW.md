@@ -104,12 +104,13 @@ Read unit by unit and write one note per unit. Regenerate the units from the led
 
 | Unit | Files |
 | --- | --- |
-| B1 construction and operations | `__init__`, `config`, `wsgi`, `runserver.py`, `observability`, `browser_policy`, `errors` |
-| B2 API and representation | `api`, `api_validation`, `validation`, `serialization`, `timestamps`, `timezones`, `cursors` |
-| B3 resource coordination | `executions`, `execution_order`, `navigation`, `metrics`, `timeline`, `inspection`, `events`, `executables`, `children`, `values`, `history`, `filters`, `legacy_navigation` |
+| B1 construction and operations | `__init__`, `config`, `wsgi`, `version`, `runserver.py`, `observability`, `browser_policy`, `errors` |
+| B2 API and representation | `api`, `api_validation`, `serialization`, `timestamps`, `timezones`, `cursors` |
+| B3 resource coordination | `executions`, `execution_order`, `navigation`, `metrics`, `timeline`, `inspection`, `events`, `executables`, `children`, `values`, `history`, `estimates` |
 | B4 database and SQL | `db.py`, `query/api-*.sql`, `query/detector-*.sql` |
 | B5 change detection | `changes`, `detector` |
-| F1 shell and startup | `frontend.py`, `templates/app/`, `main`, `bootstrap`, `api`, `display`, `theme-init`, `ui`, `loading-space` |
+| B6 legacy adapter | `ssis`, `views`, `filters`, `processors`, `validation`, `legacy_navigation`, legacy templates |
+| F1 shell and startup | `frontend.py`, `templates/app/`, `main`, `app`, `bootstrap`, `api`, `display`, `theme-init`, `ui`, `loading-space` |
 | F2 filters and time | `selection`, `filters`, `range-editor`, `time-range`, `catalog-search`, `navigation`, `table-order` |
 | F3 overview | `overview*`, `render-overview`, `refresh-loop`, `timeline`, `render-timeline` |
 | F4 detail | `detail*`, `render-detail`, `section-table`, `observation-page`, events, executables, children and values with their renderers |
@@ -118,7 +119,7 @@ Read unit by unit and write one note per unit. Regenerate the units from the led
 | T tests | `tests/`, `tests/native/`, `web/tests/` |
 | O build and dependencies | `web/vite.config.js`, `web/package*.json`, `requirements*.txt`, `constraints*.txt`, `.gitattributes` |
 
-Follow the data flow: B4, B3, B2, B1, B5, F1–F6, T, O.
+Follow the data flow: B4, B3, B2, B1, B5, B6, F1–F6, T, O.
 
 For each unit, check:
 

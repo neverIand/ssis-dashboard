@@ -26,7 +26,7 @@ Run from the repository in PowerShell:
 
 ```powershell
 $repo = (Get-Location).Path
-$pythonExe = Join-Path $repo '.local\validation-venv314\Scripts\python.exe'
+$pythonExe = Join-Path $repo '.local\venv314\Scripts\python.exe'
 $env:DASHBOARD_CONFIG = Join-Path $repo '.local\backend-validation\dashboard.cfg'
 $runLabel = (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ')
 $evidenceDir = Join-Path $repo ('.local\backend-validation\runs\' + $runLabel)

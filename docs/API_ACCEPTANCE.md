@@ -32,47 +32,22 @@ Every row requires no-store JSON, a server-generated request ID and the document
 
 ## G01/G02 local API results: 26 October 2026
 
-Task 2 extends history with explicit bound SQL LIKE selectors and adds one separately scoped server-label GET. Exact history resources, default cursor binding and the earlier fourteen-operation evidence remain intact. The new operation is included in current schema/shared-boundary tests; it is not retroactively part of the original Stage C replay.
+Task 2 added explicit SQL LIKE selectors to history and one separately scoped server-label GET. Exact history, cursor binding and the fourteen-operation evidence are unchanged; the new operation is outside the original Stage C replay. Three opt-in native history tests pass: exact pages in both directions, sampling edges, and mixed-package LIKE and bracket patterns against an independent per-package estimate oracle. In native HTTP and browser replay the label matches legacy; metadata stays zero-query, the label is one scalar query with five-second limits, and its failures stay isolated without retry or polling. All of this ran as the configured local administrator, not an independent reader.
 
-Three opt-in native history tests pass against the existing local SQL Server/ODBC configuration: exact pages in both directions, sampling edge cases, and mixed-package LIKE pages/bracket patterns compared with an independent per-package estimate oracle. Native HTTP/browser replay shows the configured server label matching legacy and history/detail common identities. Metadata remains zero-query; the label executes one scalar query with at most five-second login/query limits. Controlled browser/driver failures verify safe isolation and no label retry/polling. These observations use the configured local administrator, not an independent reader.
+History pages over 2,000, 20,000 and 100,000 connection-local executions (200 package identities) select 201 IDs before enrichment and read the historical source once across page scopes. That removed the prototype's per-package rescans (2,000-row descending page: 2,592,402 to 2,402 source rows read). Five uninstrumented samples per case:
 
-Connection-local fixtures contain 2,000 / 20,000 / 100,000 executions across 200 exact package identities. Each page batch selects 201 IDs (200 returned plus continuation detection) before event/logging/estimate enrichment. Actual plans retain at most 201 enriched rows and 200 page scopes; this fixture materializes 0–1,129 prior-success rows. Candidate ranking reads the historical source once across page scopes. This removes the prototype's per-package floor rescans: the 2,000-row descending case falls from 2,592,402 to 2,402 source rows read. Exact-mode SQL is unchanged. No `RECOMPILE`, catalog write, permission change, shared-cache flush or new dependency was added.
+| Source rows / page | Source rows read | Logical reads / scans | Median ms (range) |
+| --- | ---: | ---: | ---: |
+| 2,000 / descending first | 2,402 | 1,315 / 412 | 105 (84–260) |
+| 20,000 / descending first | 20,402 | 1,731 / 412 | 251 (159–586) |
+| 100,000 / descending first | 100,402 | 3,806 / 412 | 731 (665–11,850) |
+| 100,000 / ascending first | 100,402 | 3,398 / 412 | 328 (290–392) |
 
-Five uninstrumented SQL execute/fetch samples per page case are retained in full. The following are local medians and observed ranges, not p95 or capacity claims. Logical reads and scan counts cover the diagnostic batch, including temporary work; source rows read refer specifically to fixture execution accesses.
-
-| Source rows / page case | Execution-source rows read | Logical reads / scans | Median ms | Observed range ms |
-| --- | ---: | ---: | ---: | ---: |
-| 2,000 / descending first | 2,402 | 1,315 / 412 | 104.603 | 83.949–259.567 |
-| 2,000 / ascending first | 2,402 | 906 / 412 | 67.635 | 36.143–238.073 |
-| 2,000 / descending midpoint | 2,402 | 1,308 / 412 | 62.901 | 60.353–140.006 |
-| 20,000 / descending first | 20,402 | 1,731 / 412 | 251.277 | 158.529–586.035 |
-| 20,000 / ascending first | 20,402 | 1,323 / 412 | 125.446 | 51.059–185.078 |
-| 20,000 / descending midpoint | 20,402 | 1,731 / 412 | 166.188 | 107.448–218.290 |
-| 100,000 / descending first | 100,402 | 3,806 / 412 | 730.537 | 665.016–11,850.341 |
-| 100,000 / ascending first | 100,402 | 3,398 / 412 | 327.750 | 289.643–392.493 |
-| 100,000 / descending midpoint | 100,402 | 3,802 / 412 | 351.011 | 262.032–460.214 |
-
-**Retained concern for task 3:** plans report memory-grant warnings and some 20,000/100,000 descending cases spill a sort to tempdb. The 11.85-second sample remains included; its cause is not established. A separate diagnostic pass retains full IO/TIME/plan messages, including compilation CPU and elapsed time (individual observed messages up to 691 ms); these instrumented messages are not a latency decomposition or a recurring per-request estimate. No stable network/production latency acceptance follows from these results.
-
-The first-page fence has separate broad/selective actual plans at every size. It reads 1 / 3 source rows respectively, with 3 logical reads at 2,000/20,000 and 5 at 100,000, one scan, and recorded compile elapsed messages of 0–11 ms. Independent MAX selection confirms the returned upper ID. WSGI serialization/schema checks return 200 rows in 115,089 / 115,494 / 115,488 bytes and 234.668 / 555.059 / 1,641.340 ms respectively, with exactly two SQL queries. For this response-size phase only, intentionally invalid negative-duration fixture rows are normalized to zero; native correctness/oracle checks retain their original edge cases.
-
-Selected evidence and source/helper hashes are retained under `.local/reports/backend/20261026-legacy-gaps/`, preserving run-relative paths. Raw five-sample measurements, diagnostic plans, initial prototype and excluded pilot failures are distinguished in its index. SQL growth remains linear in visible history for exact sampling, and the fixture is not a reader/catalog-visibility substitute. Reader SHOWPLAN/HTTP, representative workload, actual browser lifecycle and hosting gates remain open; task 3 independently reviews these changed boundaries.
+Some 20,000/100,000 descending plans spill a sort and report memory-grant warnings. The cause of the 11.85-second sample is not established. The first-page fence reads 1–3 source rows; a 200-row response is about 115 KB. Growth stays linear in visible history. Evidence: `.local/reports/backend/20261026-legacy-gaps/`. Reader, representative-workload, browser-lifecycle and hosting gates remain open.
 
 ### Task 3 scoped follow-up: 27 October 2026
 
-Independent review retained the bounded-page/per-package estimate algorithm and its measured reduction in repeated source reads. The unchanged pattern-page SQL was repeated over the same connection-local 100,000-row / 200-package shape, with two explicitly excluded warmups per case. All repeated DTO fingerprints remain identical within their case.
-
-| Case | Measured samples | Median ms | Observed range ms | Execution-source rows read / logical reads |
-| --- | ---: | ---: | ---: | ---: |
-| Descending first 200 | 30 | 570.454 | 450.503–619.592 | 100,402 / 3,806 |
-| Ascending first 200 | 5 | 278.210 | 247.724–292.642 | 100,402 / 3,398 |
-| Descending midpoint 200 | 5 | 421.513 | 352.470–439.890 | 100,402 / 3,802 |
-
-The prior 11.85-second sample did not recur; its cause is still unknown and its original receipt is preserved. Descending-first diagnostics still spill a sort. The retained earlier plan shows 73,632 actual sort rows versus 838 estimated, with 486 pages written/read to tempdb; a separate excessive-grant warning belongs to the small scope-index build. Compilation/IO/TIME messages and actual plans remain available. The follow-up does not establish representative reader/network capacity or resolve the spill. No history SQL hint, cache/statistics/catalog change or replacement algorithm was introduced merely to suppress the warning.
-
-Review also identified a naming mismatch between `SERVERPROPERTY('ServerName')` and legacy's `@@SERVERNAME` / SQL Azure `DEMO` branch. The scalar API now follows the legacy expression while returning only `server_name`. Native local WSGI/schema replay matches legacy, returns 145 bytes in one measured 19.211 ms response and preserves no-store/request IDs and metadata isolation. Actual renamed-host and SQL Azure conditions are `NOT RUN`; static branch alignment is not environment acceptance.
-
-Task-3 source/test/review/browser/native receipts and cleanup are retained separately in `.local/reports/backend/20261027-task3-review/`. The original task-1/task-2 archives and commit receipt remain unchanged. [Progress](PROGRESS.md#task-3-review-submilestones) owns the scoped review verdict; parked gates remain open.
+The independent review kept the algorithm and its reduction in repeated reads. Thirty samples of the 100,000-row descending first page gave a median of 570 ms (451–620); the 11.85-second sample did not recur, and its cause is still unknown (the 9 November review, R-05, suggests plan eviction on this workstation; not proven). The sort still spills: 73,632 actual against 838 estimated rows, 486 pages through tempdb. No hint, statistics or catalog change was made to hide it. The server label now follows legacy's `@@SERVERNAME` and SQL Azure expression; renamed-host and SQL Azure conditions are NOT RUN. Evidence: `.local/reports/backend/20261027-task3-review/`. [Progress](PROGRESS.md#task-3-review-submilestones) owns the verdict.
 
 ## Shared boundary checks
 
@@ -194,11 +169,11 @@ Record revision/source hashes, interpreter/driver/catalog scope, timestamps, exa
 
 ## Recorded results
 
+Each record keeps its date, candidate, method, decision-relevant figures, limits and evidence path. The full text of every record up to 15 November 2026, with all intermediate tables, is at `6180174:docs/API_ACCEPTANCE.md`. Timings are local observations, not p95 targets or capacity claims, unless a record says otherwise.
+
 ### Page-selection RECOMPILE removal: 15 November 2026
 
-Batch H (below) kept `OPTION (RECOMPILE)` on the page-selection statement of `api-executions-ordered-page.sql` and `api-executions-sort.sql`. Its re-measurement showed that the candidate without them was faster on the real catalog, and the user chose on 15 November to remove both. Four hints remain in the execution list, all `RECOMPILE, FORCE ORDER` on event aggregation; none is on page selection or the fence.
-
-The working tree before and after (the only difference is the two hints) alternated in one run as in batch H: 36 real-catalog cases (19 executions, three contexts) and 112 temporary cases (2,000 and 20,000 executions). Returned IDs were the same in all 148; work-table reads and source scan counts were equal in all 148; source reads were equal in 102 (10 temporary cases read 1 page more, 36 read 8–36 pages fewer).
+The user chose to remove `OPTION (RECOMPILE)` from the page-selection statement of `api-executions-ordered-page.sql` and `api-executions-sort.sql`, which batch H had kept. Four hints remain in the execution list, all `RECOMPILE, FORCE ORDER` on event aggregation. With and without the two hints alternated in one run: 36 real-catalog cases (19 executions, three reader contexts) and 112 temporary cases (2,000 and 20,000 executions). Returned IDs, work-table reads and source scan counts were equal in all 148; source reads were equal in 102 (10 temporary cases read 1 page more, 36 read 8–36 fewer).
 
 | Median ms, with hints → without | Ordinary sort | Calculated sort |
 | --- | ---: | ---: |
@@ -208,60 +183,46 @@ The working tree before and after (the only difference is the two hints) alterna
 | 2,000 temporary | 69 → 62 | 106 → 84 |
 | 20,000 temporary | 100 → 91 | 157 → 171 |
 
-On the real catalog all 30 ordinary and calculated cases were faster, by 64–166 ms (ordinary) and 98–239 ms (calculated); the fence does not change. Compile CPU per request fell from 199–343 ms to 125–265 ms (`STATISTICS TIME`, administrator and `dashboard_limited`, four sorts). Of the 112 temporary cases 39 were faster and 16 slower by more than 10 % plus 5 ms: 13 of the 16 at 20,000 executions, 7 of those unfiltered; the largest were the unfiltered ordinary sorts at 20,000 (`package_name` second page 203 → 446 ms, first page 168 → 318 ms; `created_at` second page 148 → 295 ms) and the largest calculated one was `error_count` second page 642 → 753 ms. The explanation supported by the batch H plans is that a cached plan sorts on all 12 (ordinary) or 5 (calculated) `CASE` keys instead of 3; plans were not captured again in this run. In these measurements the removal made the ordinary and calculated sort batches of the small real catalog about 0.1–0.2 s faster, and the largest slowdown observed on the temporary sources was 0.24 s. The default `execution_id` list uses `api-executions-page.sql` and is not affected.
-
-A reuse check at 20,000 temporary executions (fence and three calculated sorts, four selections in both orders, with and without the hints) returned the same IDs in all 64 runs with the same reads in every variant. Raw results: `.local/reports/backend/20261115-select-hints/`. Not checked: actual plans and operator-level rows read for this change (none captured, and the reader accounts have no `SHOWPLAN` permission); reuse for the ordinary sorts, across a change of sort on one cached batch text (the check used a separate cache tag per sort) and around the index that only the logging-level sort creates; 100,000 executions; an office catalog; cached plans across pooled connections over time; and a real catalog large enough to show the slower pages. If the office catalog shows them, restoring the hint on the ordinary page is a one-line change.
+On the real catalog all 30 sorted cases were faster (64–166 ms ordinary, 98–239 ms calculated) and compile CPU per request fell from 199–343 ms to 125–265 ms. Of the 112 temporary cases 39 were faster and 16 slower by more than 10 % plus 5 ms, 13 of them at 20,000 executions and 7 of those unfiltered; the largest was the unfiltered `package_name` second page, 203 → 446 ms. The explanation supported by the batch H plans, single observations with no other cause isolated, is that a cached plan sorts on all 12 (ordinary) or 5 (calculated) `CASE` keys instead of 3; plans were not captured again. The default `execution_id` list is not affected. A reuse check (fence and three calculated sorts, four selections in both orders at 20,000) returned the same IDs and reads in all 64 runs. Evidence: `.local/reports/backend/20261115-select-hints/`. Not checked: plans or operator rows read for this change (readers lack `SHOWPLAN`); reuse for the ordinary sorts, across a change of sort on one cached batch and around the logging-level index; 100,000 executions; an office catalog; pooled connections over time. If a large catalog shows the slower pages, restoring the ordinary page's hint is a one-line change.
 
 ### Calculated-sort logging lookup: 14 November 2026
 
-`api-executions-sort.sql` read the system `LOGGING_LEVEL` value through `UPDATE … JOIN`, which takes an arbitrary one of two matching rows. Both lookups (the whole cohort when sorting by logging level, the page otherwise) now join a grouped subquery that returns `MAX` of the value and `COUNT_BIG(*)` per execution, and the batch returns the count as `logging_rows`. The API rejects a row whose count is not 0 or 1, as detail and History do. When sorting by logging level the cohort also gets a unique clustered index on `execution_id` before the lookup.
+`api-executions-sort.sql` read the system `LOGGING_LEVEL` value through `UPDATE … JOIN`, which takes an arbitrary one of two matching rows. Both lookups now join a grouped subquery returning `MAX` of the value and `COUNT_BIG(*)` per execution, the batch returns the count as `logging_rows`, and the API rejects a count other than 0 or 1 as detail and History do. When sorting by logging level the cohort first gets a unique clustered index on `execution_id`. Before (`7672278`) and after alternated over 51 cases: the real catalog in three contexts, two selections and three sorts; 20,000 temporary rows with six selections, three sorts, two pages. Ordered IDs were the same in all 51 for every shape. Totals are over the 11 temporary logging-level cases:
 
-Before (`7672278`) and after were alternated as in batch H: one warm-up, one `STATISTICS IO` run, then the median of 7 or 9 timed runs. 51 cases: the real catalog (19 executions) in three contexts, two selections and three sorts; 20,000 temporary rows with six selections, three sorts, first and second page. The ordered execution IDs returned were the same in all 51 cases for every shape. Totals below are sums over the 11 temporary logging-level cases unless stated.
-
-| Shape | Source logical reads | Worktable and temporary-table reads | Sum of median times | Decision |
+| Shape | Source logical reads | Worktable and temporary-table reads | Sum of medians | Decision |
 | --- | --- | --- | --- | --- |
-| Grouped subquery, with the index for the logging-level sort | Equal in all 51 cases, scan counts too | 69,275 to 9,674 | 2,370 to 2,316 ms | Adopted |
-| The same without the index | Equal in all 51 cases | 69,275 to 69,403 | 2,421 to 2,882 ms | Rejected: slower where the cohort is large |
-| Group after joining the temporary table again | Within 27 pages | 69,275 to 200,279 | 2,821 to 2,949 ms | Rejected |
-| `CROSS APPLY` per row | 28,434 to 299,201 (unfiltered: 2,294 to 86,804, scans 203 to 20,202) | 69,275 to 69,403 | 2,724 to 2,940 ms | Rejected |
+| Grouped subquery, with the index | Equal in all 51, scans too | 69,275 → 9,674 | 2,370 → 2,316 ms | Adopted |
+| The same without the index | Equal in all 51 | 69,275 → 69,403 | 2,421 → 2,882 ms | Rejected |
+| Group after joining the temporary table again | Within 27 pages | 69,275 → 200,279 | 2,821 → 2,949 ms | Rejected |
+| `CROSS APPLY` per row | 28,434 → 299,201 | 69,275 → 69,403 | 2,724 → 2,940 ms | Rejected |
 
-The adopted shape per case: worktable and temporary-table reads fell in eight cases (unfiltered 20,432 to 607) and rose in three small ones (one package 206 to 507; six-hour window 937 to 3,093, twice), which is the index on a small cohort. Median times moved between −79 and +61 ms with no pattern; the unfiltered first page was 294 ms before and 355 ms after, its second page 503 and 424 ms. The other two sorts ran 74,585 pages before and 74,841 after in those tables (the extra column) and their times were equal within the noise. On the real catalog source reads and scans were equal in all 18 cases; temporary-table reads of the logging-level sort rose by 3 to 23 pages per case (for example 175 to 195).
-
-The cohort lookup at 20,000 rows, with per-statement `STATISTICS TIME` (median of 9): before, a sort of the cohort, a merge join and a 1.7 MB grant, 274 ms; without the index, a hash join and a 6.5 MB grant, 580 ms; adopted, a merge join of two ordered scans with no grant, 194 ms plus 36 ms to build the index. Compilation: a fresh compile of the whole batch took 308–551 ms before and 310–484 ms after (median of 7, `dashboard_reader` and `dashboard_limited`, three sorts). With the four sorts alternated on one warm connection as `dashboard_reader`, the median compile time per execution was 373 to 438 ms before and 289 to 481 ms after, and the median number of compile messages with a non-zero elapsed time was the same (4 for the logging-level sort, 5 for the others). The probe does not identify statements or keep per-run counts, so this shows no visible growth in compile time on a warm connection; it does not prove that the index causes no extra recompilation. No `RECOMPILE` was added.
-
-Actual plans on the real catalog could be read only as the administrator, because the reader accounts have no `SHOWPLAN` permission: the lookup read 320 rows before and 301 (cohort) or 320 (page) after, with the same number of joins. Reader visibility is therefore covered by logical reads and scan counts only. The native fixture test adds a second system row inside a savepoint and gets one row with a count of two and the larger value for all four sorts. The API on the real catalog returned 200 with 16 distinct rows for the four sorts in both directions.
-
-The collector first used here added some pyodbc message lists twice, so its read counts were too high (a real-catalog total of 6,916 was 3,983). Every figure in this section is from the corrected collector; the first runs are kept under `old-collector/`. The batch H and reversed-duration sections below first used the earlier collector; both were measured again on 14 November with the corrected one and now quote those results. Raw results: `.local/reports/backend/20261114-logging-rows/`. Not checked: 100,000 executions, an office catalog, actual plans and operator-level rows read under reader visibility, and a real catalog that holds a duplicate system row (the catalog writes one per execution).
+Per case, the adopted shape read less in eight cases (unfiltered 20,432 → 607) and more in three small ones (the index on a small cohort, at most 937 → 3,093); medians moved between −79 and +61 ms without a pattern. The cohort lookup statement at 20,000 rows took 274 ms before (sort, merge join, 1.7 MB grant), 580 ms without the index (hash join) and 194 ms plus 36 ms for the index after (merge join, no grant). A fresh compile of the batch took 308–551 ms before and 310–484 ms after; on a warm connection compile time did not visibly grow, which does not prove the index adds no recompilation. On the real catalog source reads and scans were equal in all 18 cases, while temporary-table reads of the logging-level sort rose by 3–23 pages per case (the index), an accepted cost; actual plans, readable only as administrator, read 320 rows before and 301 or 320 after. A native test adds a second system row inside a savepoint and gets one row with a count of two and the larger value for all four sorts. Evidence: `.local/reports/backend/20261114-logging-rows/` (figures from the corrected message collector; first runs in `old-collector/`). Not checked: 100,000 executions, an office catalog, plans under reader visibility, a real duplicate row.
 
 ### Reversed-duration sort key: 14 November 2026
 
-`api-executions-sort.sql` gives the duration sort a NULL key when the end precedes the start (`AND t.ended >= t.started` in the existing `CASE`), matching the NULL `duration_seconds` the API now reports. Before, such a row had a negative key, which the cursor encoder rejects.
-
-Before (`a44ef35`) and after were alternated as in batch H: one warm-up, one `STATISTICS IO` run, then the median of 7 or 9 timed runs. Duration sort, both directions.
+The duration sort key is NULL when the end precedes the start, matching the NULL `duration_seconds` the API now reports; the negative key used to fail cursor encoding. Before (`a44ef35`) and after alternated, duration sort in both directions:
 
 | Source | Cases | Same IDs | Reads and scans |
 | --- | ---: | ---: | --- |
-| Real catalog, three contexts (19 executions, none reversed) | 6 | 6 | Equal |
-| 2,000 and 20,000 temporary, no reversed rows, three selections | 12 | 12 | Equal |
+| Real catalog, three contexts (none reversed) | 6 | 6 | Equal |
+| 2,000 and 20,000 temporary, none reversed | 12 | 12 | Equal |
 | 2,000 and 20,000 temporary, 1 in 500 reversed | 12 | 10 | Equal in 11; one read 2 pages fewer of 2,546 |
 
-The two cases with different IDs are the ascending unfiltered pages, where the reversed rows used to come first with negative keys and now sort last with the NULLs; the returned page has no negative key. Timings varied in both directions (real catalog 461–514 ms after, 471–513 ms before). The native test fixture now has two reversed rows; with the old SQL the duration sort fails there with `Invalid database sort key`. Figures are from the 14 November re-measurement with the corrected message collector (see the calculated-sort logging lookup above); the first run counted some pages twice and is kept beside it. Raw results: `.local/reports/backend/20261114-reversed-duration/` (`recount/` for the figures here). Not checked: 100,000 executions and an office catalog.
+The two differing cases are the ascending unfiltered pages, where reversed rows now sort with the NULLs instead of first. Real-catalog timings were 461–514 ms after and 471–513 ms before. The native fixture has two reversed rows, on which the old SQL fails with `Invalid database sort key`. Evidence: `.local/reports/backend/20261114-reversed-duration/recount/`. Not checked: 100,000 executions and an office catalog.
 
 ### Batch H execution-list RECOMPILE narrowing: 14 November 2026
 
-The 10 November full-project review (N-03) found ten `OPTION (RECOMPILE)` hints in the execution list SQL and proposed removing six. Measurement supported four. This supersedes the C8.2b.3 note that the fence retains its recompilation.
+The 10 November review (N-03) proposed removing six of the ten `OPTION (RECOMPILE)` hints in the execution list. This batch removed four; the other two followed on 15 November (above). It supersedes the C8.2b.3 note that the fence retains its recompilation.
 
 | Statement | Hint | Result |
 | --- | --- | --- |
 | `api-executions-fence.sql`, upper ID | `RECOMPILE` | Removed |
 | `api-executions-sort.sql`, cohort materialization | `RECOMPILE` | Removed |
 | `api-executions-sort.sql`, logging level for the cohort and for the page | `RECOMPILE` (2) | Removed |
-| `api-executions-ordered-page.sql` and `api-executions-sort.sql`, page selection | `RECOMPILE` (2) | Kept here; removed on 15 November (section above) |
+| `api-executions-ordered-page.sql` and `api-executions-sort.sql`, page selection | `RECOMPILE` (2) | Kept here; removed on 15 November |
 | Event aggregation in all three page files | `RECOMPILE, FORCE ORDER` (4) | Kept, not retested |
 
-Each case compared the committed SQL (`c0d3dc0`) with the candidate, alternating the two: one warm-up, one run with `STATISTICS IO` for logical reads and source scan counts, then 7 or 9 timed runs without it (median). Real-catalog runs open a new connection each time; temporary-source runs share one connection per size. Real catalog: 19 executions, as administrator, `dashboard_reader` and `dashboard_limited` (session `EXECUTE AS USER`), with all statuses and with status 7, for the fence, two ordinary sorts and three calculated sorts (36 cases). Temporary sources: 2,000 and 20,000 executions, six selections, first and second pages (112 cases). **100,000 executions NOT RUN** (user decision, 14 November: beyond the expected use).
-
-Returned IDs were identical in all 148 cases. Work-table logical reads and source scan counts were equal in every case (work-table scan counts were not kept). Source logical reads were equal in 141 cases: four temporary fence cases read 3 pages instead of 2, and three temporary logging-level sorts read 24–27 pages fewer (of 1,409–4,404).
+Committed SQL (`c0d3dc0`) and candidate alternated: 36 real-catalog cases (19 executions; administrator, `dashboard_reader`, `dashboard_limited`; all statuses and status 7; fence, two ordinary and three calculated sorts) and 112 temporary cases (2,000 and 20,000 executions, six selections, two pages). IDs were identical in all 148, work-table reads and source scans equal; source reads were equal in 141 (four fences 2 → 3 pages, three logging-level sorts 24–27 fewer).
 
 | Median ms, before → after | Fence | Ordinary sort | Calculated sort |
 | --- | ---: | ---: | ---: |
@@ -271,526 +232,171 @@ Returned IDs were identical in all 148 cases. Work-table logical reads and sourc
 | 2,000 temporary | 6 → 1 | 82 → 79 | 142 → 113 |
 | 20,000 temporary | 9 → 3 | 115 → 118 | 237 → 246 |
 
-A separate `STATISTICS TIME` run on the real catalog (administrator and `dashboard_limited`, new connection per run, median of 7) summed the parse-and-compile messages of each batch:
-
-| Compile CPU ms, before → after | Administrator | `dashboard_limited` |
-| --- | ---: | ---: |
-| Fence | 47 → 0 | 63 → 0 |
-| Ordinary sort (`created_at`) | 250 → 265 | 281 → 297 |
-| Calculated sort, duration | 323 → 226 | 307 → 288 |
-| Calculated sort, logging level | 265 → 156 | 328 → 172 |
-| Calculated sort, error count | 296 → 202 | 282 → 234 |
-
-Compile elapsed time was 93–612 ms before and 0–531 ms after, below the wall time of each batch (96–729 ms before, 3–600 ms after). The first run of this table summed some message lists twice and gave sums above the wall time; the explanation recorded then, that the messages overlap, was wrong. The fence no longer compiles; the calculated sorts compile less; the ordinary page, whose hints are unchanged, compiles as before. Temporary sources compile cheaply, so they show little change. Cases slower by more than 10 % plus 5 ms: none of 36 real (24 were faster) and 6 of 112 temporary (19–57 ms, equal reads; 21 were faster). These are treated as timing variation.
-
-A first candidate also removed the two page-selection hints. Work-table reads and source scan counts were again equal in every case and source reads were equal in 98 of 148 (50 temporary cases differed: 14 read 1 page more, 36 read 8–36 pages fewer), but 23 of 112 temporary cases were slower (18 of them at 20,000, 9 of those unfiltered): ordinary `package_name` second page 185 → 429 ms, `created_at` second page 135 → 278 ms, calculated `error_count` first page 694 → 800 ms. On the real catalog (19 executions) the same candidate was faster in 35 of 36 cases, because the selection statement no longer compiles on every request: median ordinary sort 430 → 319 ms and calculated sort 522 → 213 ms, against 479 → 475 ms and 555 → 430 ms for the adopted version in its own run. The first version of this record did not state that. The two runs were separate and their baselines differ (ordinary 430 and 479 ms), so they do not isolate what the two hints cost or save; the section above compares the two directly. Actual plans of the selection statement at 20,000 (all executions, first page) show one Sort either way, but its key list differs: with `RECOMPILE` the paired `CASE` keys simplify to 3 sort columns; a cached plan sorts on all 12 (ordinary page) or 5 (calculated).
-
-| Selection statement, elapsed ms | With `RECOMPILE` | Cached plan |
-| --- | ---: | ---: |
-| Ordinary, `package_name` ascending | 70 | 364 |
-| Ordinary, `created_at` descending | 77 | 287 |
-| Calculated, `error_count` descending | 69 | 149 |
-
-These are single plans, not repeated samples; the wider key list is the visible difference, and no other cause was isolated. Both hints were restored with a comment giving this reason.
-
-The filters compare columns with local variables, so a cached fence or cohort plan is built from unknown-value estimates, not from the first caller's values. To check reuse, the fence and three calculated sorts ran at 20,000 temporary executions on one connection over four selections (one package of 200, failed, a six-hour window, all) in both orders, each order with its own cached plans, before and after: 64 runs returned the same IDs. Each calculated sort read the same source and work-table pages in all four variants; the fence read the same in either order (2 → 3 pages for all executions, as above). Timings varied in both directions without a pattern.
-
-All figures in this section are from the 14 November re-measurement with the corrected message collector and with both SQL versions pinned from `c0d3dc0` and `a44ef35`; the first run counted some pages and compile times twice. Raw results: `.local/reports/backend/20261114-batch-h-recompile/recount/` (`measure.py`, `measure-h.json` for the adopted version, `measure-h-candidate.json` for the first candidate, `diagnose.py`, `diagnose.json`, `diagnose.out` for compile time, reuse and plans, `figures.py` for the figures quoted here); the first run's files are in the parent folder. Not checked: reuse on the real catalog views with selective filters (19 executions cannot show it), cached plans across pooled connections over time, 100,000 executions, and an office catalog.
+Compile CPU per batch from `STATISTICS TIME` (administrator and `dashboard_limited`): fence 47–63 ms → 0; calculated sorts 19–156 ms less; ordinary sort unchanged. No real case and 6 of 112 temporary cases were slower by more than 10 % plus 5 ms (19–57 ms, equal reads). A first candidate also removed the two page-selection hints; in single actual plans at 20,000 the selection statement then sorted on 12 (ordinary) or 5 (calculated) `CASE` keys instead of 3 and took 287–364 ms instead of 70–77 ms (ordinary) and 149 instead of 69 ms (calculated); no other cause was isolated, and the hints were kept here. That candidate was also faster on the real catalog in 35 of 36 cases, which led to the 15 November comparison. A reuse check (fence and three calculated sorts, four selections in both orders at 20,000) kept IDs and reads. Evidence: `.local/reports/backend/20261114-batch-h-recompile/recount/` (corrected collector, both SQL versions pinned; the first run, which counted some messages twice, is in the parent folder). Not checked: reuse on real views with selective filters, pooled connections over time, 100,000 executions, an office catalog.
 
 ### C4 list-page estimate SQL work: 8 November 2026
 
-UX review item O11 adds `estimate` to `/executions` rows. On 8 November the user made active estimates opt-in (`API_ACTIVE_ESTIMATES_ENABLED`, default `False`, advertised as `capabilities.active_estimates`) and chose a per-process cache over recomputing on every refresh. With the flag off, detail and list estimates are NULL and no estimate SQL runs. With it on, `dashboard/estimates.py` caches each estimate by execution ID and start time for `API_ESTIMATE_CACHE_SECONDS` (default 300; at most 4,096 entries). A list page reads only its uncached, started, unfinished rows, in one `api-executions-estimates.sql` call after the page is selected; the detail page (C3) uses the same cache. History is unchanged.
+UX item O11 adds `estimate` to `/executions` rows. Active estimates are opt-in (`API_ACTIVE_ESTIMATES_ENABLED`) and cached per process by execution and start time, so a list page reads only its uncached active rows, in one `api-executions-estimates.sql` call after the page is selected; the [contract](API_CONTRACT.md) owns the cache rules. The batch reads the target IDs through the public view into a `SELECT INTO` temporary table (keeping the catalog collation) and estimates all their identities in one read of the catalog. Fixture as in C1/C3, newest 200 executions active (110 identities); one actual-plan diagnostic and 10 warm samples per case:
 
-`api-executions-estimates.sql` takes the target IDs as integer XML (at most the page limit), reads them through the public view (rechecking visibility) into a temporary table created by `SELECT INTO`, so its name columns keep the catalog collation, and estimates all their identities in one read of the catalog. It reuses the pattern history page's ranking: per identity, it keeps successes ending after the earliest target start plus the six latest ending by then, then takes each target's own TOP (5).
-
-Same fixture shape as C1/C3, with the newest 200 executions made active (110 identities). Each case took one actual-plan diagnostic and 10 warm samples. Harness and raw results: `.local/reports/backend/20261108-c4-list-estimates/` (`measure_c4.py`, `results.json`, and `results-r2.json` after the collation fix from review; `profile_c4.py`, `real_api_c4.py`, `real-api.json`).
-
-| Executions | Targets | `#det` rows read / logical reads | Warm median (ms, two runs) | Spills |
+| Executions | Targets | Source rows read / logical reads | Warm median ms | Spills |
 | --- | --- | --- | --- | --- |
-| 2,000 | 1 / 50 / 200 | 2,002 / 28 · 2,051 / 126 · 2,201 / 426 | 26–33 / 34–43 / 57–68 | 0 |
-| 20,000 | 1 / 50 / 200 | 20,002 / 242 · 20,051 / 340 · 20,201 / 640 | 52–70 / 94–112 / 109–139 | 1 sort (50, 200) |
-| 100,000 | 1 / 50 / 200 | 100,002 / 1,198 · 100,051 / 1,345 · 100,201 / 1,795 | 216–265 / 362–606 / 423–624 | 1 sort (50, 200) |
-| 100,000 | 200 of one identity | 100,201 / 1,795 | 199–225 | 0 |
+| 2,000 | 1 / 50 / 200 | 2,002–2,201 / 28–426 | 26–68 | 0 |
+| 20,000 | 1 / 50 / 200 | 20,002–20,201 / 242–640 | 52–139 | 1 sort (50, 200) |
+| 100,000 | 1 / 50 / 200 | 100,002–100,201 / 1,198–1,795 | 216–624 | 1 sort (50, 200) |
 
-Reads and spills were identical in both runs; only timings varied. For comparison, the 200-row ID page itself takes 43–70 ms at every size. Every estimate matched the Python oracle. The read covers every visible execution once at any target count, because no index covers names or end times. At 100,000 rows the ranking statement dominates (actual plan, 200 targets: 705 ms CPU). That is the hash join of about 95,000 visible successes to the page's identities on three names (about 220 ms) and the sort of the 54,907 candidates for the window ranking (about 255 ms). The optimizer estimated 3,150 rows for that sort, so its grant was too small and it spilled once. No `RECOMPILE` was added.
-
-The cache is what makes this acceptable on the overview. A running execution gains no new samples; only retention or a permission change can remove, hide or reveal earlier successes, and the cache accepts lagging such a change by its lifetime. Each running execution is therefore read once per cache lifetime instead of on every 30-second refresh. A refresh with only cached or no active rows makes no estimate query. The trade-offs are recorded in the contract: one cross-request cache per process, scoped by the configured SQL identity, and an estimate that can lag a retention or permission change by up to the cache lifetime.
-
-Read-only against the real local views (18 visible executions as one target set): `internal.operations` 85 rows / 40 reads, `internal.executions` 33 / 131, median 32 ms, first compile about 380 ms across two statements. Every estimate equals the oracle (12 with samples). Through Flask with the flag on, the finished list makes no estimate query. With every started row forced active, one estimate read follows the page, each row equals History's estimate for the same execution, and an immediate second request makes no estimate query. No local execution was running, so that check used the forced path. Reader identity and representative volume remain NOT RUN.
+The read covers every visible execution once at any target count, because no index covers names or end times. At 100,000 rows the ranking statement dominates (hash join of about 95,000 successes to the page's identities, then a window sort whose grant was estimated for 3,150 rows and spilled once). Every estimate matched the Python oracle; no `RECOMPILE` was added. The cache makes this acceptable: each running execution is read once per cache lifetime, not on every 30-second refresh. On the real views (18 executions) the read took a median of 32 ms; through Flask the finished list makes no estimate query, and a forced-active page makes one, matching History, then none on the next request. Evidence: `.local/reports/backend/20261108-c4-list-estimates/`. Reader identity and representative volume NOT RUN.
 
 ### C3 detail estimate SQL work: 8 November 2026
 
-UX review item D3 adds `estimate` to `GET /executions/{id}`. The new `api-execution-estimate.sql` runs only while the execution has started and not ended, so finished and unstarted executions keep the existing two reads, and the executables, events, values and children reads are unchanged. It reads the target through the public view (a seek, rechecking visibility) and averages its exact identity's five latest visible successes that ended by its start, excluding itself, as History does. History pages keep their own SQL.
+UX item D3 adds `estimate` to `GET /executions/{id}`. `api-execution-estimate.sql` runs only while the execution has started and not ended; it averages the exact identity's five latest visible successes that ended by the target's start, as History does. Connection-local sources as in C1; one diagnostic and 10 warm samples per case:
 
-Connection-local `#det`, `#ev` and `#par` replaced the views, as in C1 (same fixture shape, no name or end-time index). Targets were active executions of a common identity, a rare identity and a new identity with no earlier success. Each case took one actual-plan diagnostic and 10 warm samples. Harness and raw results: `.local/reports/backend/20261108-c3-detail-estimate/` (`measure_c3.py`, `results-r2.json`; the first run, `results.json`, picked a common target whose identity had only failures and is superseded).
-
-| Executions | `#det` rows read / logical reads | Warm median (ms, two runs) | First compile after the fixture build |
+| Executions | Source rows read / logical reads | Warm median ms | First compile ms |
 | --- | --- | --- | --- |
-| 2,000 | 2,001 / 31 | 0.8–1.5 | 29–40 ms |
-| 20,000 | 20,001 / 246 | 7.8–16.4 | 198–241 ms |
-| 100,000 | 100,001 / 1,203 | 51–69 | 389–469 ms |
+| 2,000 | 2,001 / 31 | 0.8–1.5 | 29–40 |
+| 20,000 | 20,001 / 246 | 7.8–16.4 | 198–241 |
+| 100,000 | 100,001 / 1,203 | 51–69 | 389–469 |
 
-The read is the same for every target, whether it finds five samples or none: no catalog index covers names or end times, so the TOP (5) reads every visible execution once and its sort keeps five rows. No diagnostic spilled, and no `RECOMPILE` was added. The existing detail reads seek one row each. The estimate is therefore the only catalog-size read of the detail page. History's first page already reads the identity's source twice. Since C4, the estimate is opt-in and cached by execution and start time ([C4](#c4-list-page-estimate-sql-work-8-november-2026)), so an active detail page reads it once per cache lifetime rather than on every refresh.
-
-Read-only against the real local views (18 executions): `internal.operations` 68 rows / 6 reads, `internal.executions` 15 / 122, median 1.5–2.9 ms, first compile 216 ms. For every execution, the SQL estimate equals an independent Python oracle (12 with samples, no mismatches). Through Flask, all 18 finished executions return `estimate: null` with two queries. With the active path forced, each detail estimate equals History's estimate for the same execution, with three queries. No local execution was running, so the active path on the real catalog used that forced path. Reader identity and representative volume remain NOT RUN.
+The TOP (5) reads every visible execution once whatever it finds, because no index covers names or end times; it is the detail page's only catalog-size read. No spill, no `RECOMPILE`. Since C4 it is cached with the list estimates. On the real views every estimate equals a Python oracle (12 with samples). Evidence: `.local/reports/backend/20261108-c3-detail-estimate/`. Reader identity and representative volume NOT RUN.
 
 ### C1 package filter SQL work: 8 November 2026
 
-UX review item O3 adds an exact `package` cohort parameter to `/executions`, `/metrics/summary` and `/metrics/timeline`. Each of the six cohort resources (fence, ID page, ordered page, calculated-sort page, summary, timeline) gains one parameter, `@package nvarchar(260)`, and one predicate, `(@package IS NULL OR e.package_name = @package)`, beside the existing folder/project predicates. Equality follows the catalog collation, as for folder and project. On the local catalog `probe.dtsx` therefore matches `Probe.dtsx`.
+UX item O3 adds an exact `package` parameter to `/executions`, `/metrics/summary` and `/metrics/timeline`: each of the six cohort batches gains `@package nvarchar(260)` and `(@package IS NULL OR e.package_name = @package)`, compared under the catalog collation. Connection-local sources clustered on ID, with no name or creation-time index; 15 days, 50 packages (one on every second row, `Rare.dtsx` on 0.1 %):
 
-Connection-local `#det`, `#ev` and `#par` replaced the three views, clustered on execution or operation ID with no name or `created_time` index, like the internal tables. The data covered 15 days, 4 folders, 5 projects and 50 packages (one package on every second row; `Rare.dtsx` on 0.1%). A narrow-window case selects only the last 1.5 days (10,000 of 100,000 rows). Each case took one actual-plan diagnostic and 10 warm samples. Harness and raw results: `.local/reports/backend/20261108-c1-package-filter/` (`measure_c1.py`, `results-r2.json`; the first run, `results.json`, measured the real timeline over the wrong buckets and is superseded).
-
-| Selection | Fence `#det` rows / reads at 2,000 · 20,000 · 100,000 | ID page rows read (rows returned) | Summary and timeline |
+| Selection | Fence rows read | ID page rows read (returned) | Summary and timeline |
 | --- | --- | --- | --- |
-| None | 2 / 2 · 2 / 2 · 2 / 3 | 51 at every size | every row: 2,000 / 26 · 20,000 / 240 · 100,000 / 1,195 |
-| Folder (25%, existing) | 4 rows | 201 | every row |
-| Common package (50%) | 3 rows | 101 | every row |
-| Rare package (0.1%) | 994 rows | 1,007 (2) · 19,007 (20) · 50,001 (51) | every row |
-| Absent package | every row (no page query runs) | — | every row |
-| Rare package, narrow window, 100,000 | 994 rows | 99,007 (10) | every row |
-| Absent package, narrow window, 100,000 | 100,000 / 1,196 | — | every row |
+| None | 2 | 51 | every row |
+| Common package (50 %) | 3 | 101 | every row |
+| Rare package (0.1 %) | 994 | 1,007 (2) / 19,007 (20) / 50,001 (51) at 2,000 / 20,000 / 100,000 | every row |
+| Absent package | every row (no page query) | — | every row |
+| Rare package, narrow window, 100,000 | 994 | 99,007 (10) | every row |
 
-The filter cannot seek: no catalog index covers package names or creation times, and the dashboard adds no SSISDB objects. A selective package therefore reads in descending ID order until the page is full, past the selected window if the window holds too few matches. An absent name reads every visible execution once in the fence. The bound is the catalog, not the window. Summary and timeline already read every visible execution for any selection, so the filter adds no new worst case, but a rare or absent package makes the list as costly as the summary. The ordered and calculated-sort pages read every row with or without the filter, as before. Plans kept their shape and no `RECOMPILE` was added (the ID page's event-count statement keeps its existing one). Most statements (290 of 309) compiled in under 30 ms. The first compiles after each fixture rebuild took up to 103 ms at 2,000 and 20,000 rows and up to 901 ms at 100,000 rows.
-
-Read-only against the real local views, 1 October to 9 November 2026 (18 visible executions) with daily buckets over the same window: a package filter left base reads unchanged. `internal.operations` read 67 rows / 4 reads, the whole table, with or without the filter, and `executions` 18 / 134 for fence, summary and timeline. Only the enrichment of the smaller page changed. Summary and timeline totals agreed for no filter (18), an existing package (12) and an absent one (0). Through the API, list, summary and timeline agreed for every package (4, 2 and 12 rows, and 0 for an absent name). A cursor rejected a changed package, and a 261-unit name or `package_pattern` returned 400. Reader identity and representative volume remain NOT RUN.
+The filter cannot seek, so a selective or absent package reads in descending ID order until the page fills, past the window if needed: the bound is the catalog, the same as summary and timeline already have. Ordered and calculated-sort pages read every row with or without the filter. Plans kept their shape; no `RECOMPILE` was added. On the real views list, summary and timeline agreed for every package; a changed package invalidates a cursor and a 261-unit name returns 400. Evidence: `.local/reports/backend/20261108-c1-package-filter/`. Reader identity and representative volume NOT RUN.
 
 ### P5.1b change-detection SQL work: 7 November 2026
 
-Round 4 (after three independent reviews). The detector anchors to operation IDs: `catalog.operations` supplies the high-water mark and each poll's window of at most 201 new IDs, and executions are looked up per listed ID (`CROSS APPLY ... TOP (1)`). Every seed read is bounded by the mark it took, so rows committed above it while the seed runs are left to the first poll. The committed IDs below the mark (the newest 256, and the replaced state's unexpired ID gaps, at most 256, one keyed lookup each) are read into a table variable before the active executions, so an execution that commits during the seed is either active or a gap. Connection-local `#ops` and `#det` replaced the two views, with 2,000 / 20,000 / 100,000 executions, every third operation ID a deployment, the newest 256 executions active and 256 uncommitted IDs (gaps) near the top. The harness asserts every case's actual inputs before measuring (512 distinct tracked IDs, a full 201-ID burst window, one new execution, 256 carried IDs below the seed's lookback), then takes one actual-plan diagnostic and 30 warm samples after two warmups. Earlier rounds are superseded (round 1 mislabelled some inputs; round 2's seed was not bounded by its mark; round 3 read actives and committed IDs in one statement). Harness and raw results: `.local/reports/backend/20261107-p51-change-detection/p51-review-02/measure3.py`, `results-r4.json`.
+The detector anchors to operation IDs: `catalog.operations` gives the mark and each poll's window of at most 201 new IDs, and executions are looked up per listed ID. Seeds are bounded by the mark they take and read committed IDs before active executions. Connection-local sources at 2,000 / 20,000 / 100,000 executions, every third operation ID a deployment, the newest 256 active and 256 ID gaps near the top; inputs asserted before measuring; one actual-plan diagnostic and 30 warm samples (round 4, after three reviews):
 
-| Case | `#det` rows read / logical reads at 2,000 · 20,000 · 100,000 | Median ms at 100,000 (range) |
+| Case | Execution rows read / logical reads at 2,000 · 20,000 · 100,000 | Median ms at 100,000 |
 | --- | --- | --- |
-| Seed (start, resync, incomplete) | 2,000 / 22 · 20,000 / 199 · 100,000 / 986 (one range read of every execution up to the mark); `#ops` 172 / 6 | 47.3 (29.5–223.0) |
-| Seed with 256 carried gaps | as above; `#ops` 343 / 518 (256 extra keyed lookups) | 54.2 (37.4–260.1) |
-| Poll, nothing new, nothing tracked | 0 / 0 at every size; `#ops` 2 logical reads | 6.6 (5.3–7.3) |
-| Poll, 50 tracked | 50 / 100 · 50 / 100 · 50 / 150 (50 seeks) | 8.9 (7.6–43.8) |
-| Poll, 1 new, 49 tracked | 50 / 102 · 50 / 102 · 50 / 153 | 8.8 (2.8–95.4) |
-| Poll, 512 tracked (256 active + 256 gaps) | 256 / 983 · 256 / 983 · 256 / 1,454 (512 seeks) | 20.9 (6.6–86.4) |
-| Poll, full burst window (201 IDs) | 201 / 580 · 201 / 580 · 201 / 852 (308 seeks) | 17.6 (3.9–210.1) |
-| Poll after the last execution with 10,000 deployments above it | 100,000-row catalog: `#ops` 201 / 2, `#det` 50 / 753 | 10.4 (7.5–47.0) |
+| Seed | 2,000 / 22 · 20,000 / 199 · 100,000 / 986 | 47 |
+| Seed with 256 carried gaps | as above, plus 256 keyed lookups on operations | 54 |
+| Poll, nothing new, nothing tracked | 0 at every size | 7 |
+| Poll, 50 tracked | 50 / 100 · 50 / 100 · 50 / 150 | 9 |
+| Poll, 512 tracked | 256 / 983 · 256 / 983 · 256 / 1,454 | 21 |
+| Poll, full 201-ID window | 201 / 580 · 201 / 580 · 201 / 852 | 18 |
+| Poll after 10,000 deployments above the last execution | operations 201 / 2, executions 50 / 753 | 10 |
 
-No poll case scans at any size; the work is one keyed lookup per window or tracked ID. The plain-join version (`.local/reports/backend/20261107-p51-change-detection/p51b-sql-01/detector-poll.join.sql`) let the optimizer merge-join with a full scan: 22 / 199 / 986 logical reads for 512 tracked IDs, cheaper on small catalogs but growing with the catalog (and 39,604 rows read for the 20,000-row burst). The per-ID form is kept because a recurring background poll needs a bound that does not depend on catalog size; it costs more on small catalogs (983 versus 22). The seed still reads every execution up to the mark once, because no status index exists; it runs only at start, after a resync and while the state is incomplete. No join hint or `RECOMPILE` was needed. Deployments above the last execution are read once per window, so a run of them no longer costs every later poll. Compilation took 0–36 ms per statement on these sources.
-
-Read-only against the real local views (62 operations, 16 visible executions): the seed scans `internal.operations` (186 rows, 10 logical reads); a poll tracking all 16 executions uses only seeks (operations 16 rows / 35 reads, executions 16 / 32); a poll from ID 0 reads the 62-ID window with seeks. The first compilation of each statement over the view expansion took 3–297 ms; later executions reused the plans. Two concurrent-writer native tests (`tests/native/test_change_queries.py`) commit rows from a second connection during the seeds: rows above the mark (the round-2 seed failed it) and running executions just below the mark committed after a higher ID (the round-3 seed failed it); both pass now. With a fixture package running on the local catalog, the detector, polling every second, reported creation, the change to running and the successful end (with the catalog's end time) within about a second of each change. Reader-identity plans, representative catalog volume and concurrent load remain NOT RUN, as for the other Stage C gates.
+No poll scans: the work is one keyed lookup per window or tracked ID. A plain join was cheaper on small catalogs (22 reads for 512 tracked IDs) but grew with the catalog, so the per-ID form was kept for a background poll. The seed reads every execution up to the mark once (no status index) and runs only at start, after a resync and while the state is incomplete. On the real views polls used only seeks; two concurrent-writer native tests pass, and a fixture run was reported within about a second of each change. Evidence: `.local/reports/backend/20261107-p51-change-detection/`. Reader-identity plans, representative volume and concurrent load NOT RUN.
 
 ### C8.2c local resource results: 26 October 2026
 
-Application baseline `864ec53`, run revision `7617c84`; no application, SQL, dependency or runtime configuration changed. Reused CPython 3.14.8 / pyodbc 5.3.0 / ODBC Driver 17 and the existing local administrator configuration. Sandbox Windows integrated authentication returned `08001`; the authorized outside-sandbox read-only replay succeeded. The catalog contained sixteen executions and its before/after fingerprint/counts matched. These bounded local results passed scoped independent review on 26 October; remaining environment/capacity gates below are separate.
+Application baseline `864ec53`, run revision `7617c84`, no source change; local administrator, sixteen executions, catalog fingerprint unchanged. Passed a scoped independent review on 26 October.
 
 | Check | Observed result |
 | --- | --- |
-| Fake-driver concurrent recovery | Twelve four-request waves, **48 distinct request IDs**. Six waves mix success, execute timeout, fetch failure and cancellation; six successful retry waves follow. Exact per-request data/query counts, close order and 48/48 cursor/connection closes pass. High-water 4/4, final 0/0. |
-| Native WSGI | **200 schema-validated responses**, twenty cases repeated ten times with four workers. Typed data fingerprints, request IDs, bounded query counts and cleanup pass. |
-| Native loopback HTTP | **200 schema-validated workload responses** with the same bounded matrix. Seven additional completed HTTP responses cover safe timeout/error, liveness and recovery; one client deliberately disconnects. **407 completed responses / 408 request lifetimes** in total across both layers. |
-| Native query ownership | **746 queries / connections / cursors opened and closed**: 745 correlated application query reports, plus one explicitly cancelled driver query with its separate report. Request/connection/cursor high-water **4/4/4**, final **0/0/0**. A separate monitor connection and all seven monitor cursors close; setup/control queries are outside workload counts. |
-| Native timeout/error/recovery | A five-second connection-local wait under readiness's one-second driver cap returns safe **504**; deliberate SQL error returns safe **500**, without its diagnostic canary. Fresh readiness and database-free liveness recover. The additional tracked opt-in timeout/recovery test passes on the real driver. |
-| Explicit driver cancellation | DMV observation sees the probe's `WAITFOR`; calling `cursor.cancel()` causes the worker's executing query to report **HY008**, then the worker exits, both logical owners close and the server request disappears. Observed cancel-to-worker completion **0.928 ms** is one local observation, not a capacity/latency budget. The application does not wire browser abort to this explicit driver call. |
-| HTTP disconnect | The server still shows `WAITFOR` after the client socket closes and 150 ms elapses. Liveness succeeds concurrently with zero SQL. The configured query timeout ends that work, followed by logical closes and an empty server-request observation. Disconnect did not cancel SQL immediately. |
-| Frontend owner stress | Twenty-four execution replacements with repeated six-tab changes reject late success/403 responses; only the latest generation publishes. Three independent owners refresh 200-row maximum-text continuation pages: per-owner active high-water 1, combined 3, final 0. After disposal, advancing controlled time by ten minutes adds no requests/publications. These are controlled owner tests. |
-| Packaged in-app browser | Maximum-text Events page/continuation/refresh, tab clearing/return, a delayed section followed by rapid tab changes, delayed 403 after a replacement search and transient 503/Retry pass on actual packaged UI with explicitly synthetic responses. Two owned tabs close. |
-| Cleanup | Native HTTP thread exits and its ephemeral listener is released. Preview process and native probe PIDs are absent on the final process inventory; preview port 5180 is released. No owned service remains. |
+| Fake-driver concurrent recovery | Twelve four-request waves, 48 request IDs mixing success, timeouts, fetch failures and cancellation with retries; every cursor and connection closed, high-water 4/4, final 0/0. |
+| Native WSGI and loopback HTTP | 200 schema-validated responses in each layer (twenty cases × ten, four workers), plus seven HTTP failure/recovery responses; 407 completed responses of 408 request lifetimes (one deliberate disconnect). |
+| Native query ownership | 746 queries, connections and cursors opened and closed; high-water 4/4/4, final 0/0/0. |
+| Timeout, error, recovery | A wait past readiness's one-second cap returns a safe 504, a deliberate SQL error a safe 500; readiness and liveness recover. |
+| Driver cancellation | `cursor.cancel()` ends the server's `WAITFOR` with `HY008` and closes both owners. The application does not wire browser abort to it. |
+| HTTP disconnect | SQL keeps running after the client disconnects until the query timeout ends it; then everything closes. |
+| Frontend owners and packaged browser | In controlled owner tests, rapid replacement, continuation refresh, delayed replies, retry and disposal publish only the latest generation and add nothing after disposal; the packaged browser ran the same paths against explicitly synthetic responses. |
+| Cleanup | Server thread, preview process and port released. |
 
-The maximum-text browser fixture returns **44,950,222 bytes** on page one and **44,950,322 bytes** on its 200-row continuation. Each message and path reaches its contract cap; source/name fields reach their own caps. The loaded page contains **6,516 DOM elements**, including closed disclosure text, and about **21.62 million UTF-16 text units** in its event table. Two continuation refreshes and returning to the tab retain the same element count; expanded disclosures survive refresh. Switching away clears returned event text, leaving the table scaffold/empty placeholder. This measures DOM retention, not browser heap reclamation. Initial 200-row action-to-ready is **1,292 ms**, including loopback transfer and automation, not isolated rendering or test-network p95. Two automation waits on this very large DOM hit tool deadlines; subsequent direct DOM observations confirmed ready state. The raw checks retain those instrumentation limits; an initial source-disclosure length was mislabeled as message length, and the final explicit message observation confirms 32,768 UTF-16 units / 16,384 emoji characters. FE-4 remains a measured advisory; no lazy-render optimization is included.
-
-Regression: **415 Node tests PASS** under Node 22.23.4; **414 Python tests run, 401 PASS / 13 opt-in native skips**, with the new native timeout/recovery case separately **PASS**. Production build and documentation checks pass. No production fix was necessary. A pilot setup-order error and an incorrect Node invocation are excluded from acceptance and retained as temporary diagnostics.
-
-Independent review rechecked all **8 candidate hashes / 27 retained evidence hashes**, replayed the two new Node tests and fake-driver Python test, and reconciled every raw request/query/sample. No blocking finding or production fix was required. The evidence-retention helper now preserves relative paths; an additive `source-overlay/` supplies both same-named Python tests without replacing the original hash-bound evidence. `native-manifest-annotations.json` identifies inherited unused C8.2b fields (`warm_rounds=100`, `warmup_per_case=2`, `fresh_client_samples=5`): actual C8.2c limits/counts come from its summary and raw records, with ten repetitions per case/layer and four workers. The original native manifest is preserved unchanged. Review receipts are `review-r001.md` and `review-r002.md` in the selected report.
-
-Private native evidence: `.local/backend-validation/runs/c82c-20261026-native/` (`manifest.private.json`, samples, safe query/request logs, ownership/cancellation/disconnect summary and source snapshots). Selected regression/browser/cleanup evidence and helper hashes: `.local/reports/backend/20261026-c82c/`. Reusable native helper: `.local/backend-validation/tools/probe-resource-lifecycle.py`; the existing `.local/tools/serve-detail-preview.py` supplies the synthetic browser cases. Independent Windows-reader HTTP, representative sustained catalogs/load, reader SHOWPLAN, native cleanup failure OBS-02, actual hidden/cache/corporate-browser lifecycle, test-network p95 and hosting remain open or parked. This replay does not retire legacy or advance task 2.
+The maximum-text Events fixture returns about 45 MB per 200-row page, 6,516 DOM elements and 21.6 million text units; switching tabs clears the text. Regression at the time: Node 415, Python 414 run / 401 pass / 13 native skipped. Evidence: `.local/backend-validation/runs/c82c-20261026-native/` and `.local/reports/backend/20261026-c82c/`. Independent reader HTTP, sustained representative load, reader SHOWPLAN, OBS-02, actual browser lifecycle, network p95 and hosting remain open.
 
 ### Review replay: 17 October 2026
 
-Reviewed application revision `9bd7a9c` / repository baseline `36b48f8`, with unchanged application code, SQL and dependency pins. Fresh validation:
-
-| Check | Result and limit |
-| --- | --- |
-| Full tracked suite | **341 tests PASS**, Windows x64 / standard CPython 3.14.8 |
-| Native combined replay | **1,249 assertions / 118 schema responses / 171 queries PASS**, all 14 operations in administrator, normal and restricted SQL contexts |
-| Status/capability/failure coverage | 82 success, 12 capability 403, 3 policy-bound cursor 400, 20 hidden/absent 404, one deliberate native timeout 504; readiness recovered |
-| Cleanup | Every observed owned query cleanup succeeded; the controlled timeout was the only failed application query; no TCP server was started |
-| Focused logging conversion | **8 native cases PASS** with same-named nonsystem string parameters: two detail lookups, ID/created-time pages and all four calculated-sort shapes; disposable connection-local fixtures only |
-| Retained workload bounds | Rechecked **51 actual page-plan observations**: ordinary page/count inserts exactly 51/201 candidates, no ordinary whole-cohort materialization; calculated cohort/counts reach 20,000 |
-
-The focused conversion probe did not reproduce a new correctness defect; it is not proof of every future SQL plan. The workload-bound check is an offline recheck of retained plans, not a fresh timing run. No catalog data, permissions or package execution changed. No production, real Scale Out/active workload, independent reader sign-in/HTTP or sustained-resource acceptance is claimed.
-
-Private evidence: `.local/backend-validation/runs/c8-acceptance-20261017T010821473592Z/acceptance.private.json` and its checked summary; focused review helper/results are in `.local/reports/reviews/20261017-stage-c/`. Design/performance findings and next actions are in [progress](PROGRESS.md#review-of-stage-c--17-october-2026).
+Revision `9bd7a9c` (baseline `36b48f8`): the full suite (341 tests) and the native combined replay (1,249 assertions, 118 schema responses, 171 queries over all 14 operations in administrator, normal and restricted contexts) pass, with 82 successes, 12 capability denials, 3 cursor policy failures, 20 hidden/absent results and one deliberate timeout; readiness recovered. Eight native logging-conversion cases pass, and 51 retained page plans keep ordinary pages at 51/201 candidates. Evidence: `.local/backend-validation/runs/c8-acceptance-20261017T010821473592Z/` and `.local/reports/reviews/20261017-stage-c/`. In-process WSGI and SQL impersonation only.
 
 ### SQL remedies replay: 17 October 2026
 
-After C8.2b.3, **341 database-free tests pass** (344 discovered, three opt-in native tests skipped); those **three native SQL tests also pass separately**. The [checked-in suite](../tests/native/README.md) executes actual SQL over temporary sources and compares complete rows across all sorts/directions, NULL tails, precision, filters and retention boundaries.
-
-Fresh combined acceptance again passes **1,249 assertions / 118 schema responses / 171 queries** across all 14 operations and administrator/normal/restricted SQL contexts. The status split remains 82 successes, 12 capability denials, three policy-bound cursor failures, 20 hidden/absent results and one deliberate timeout; readiness recovers and every owned query cleanup succeeds. This is in-process WSGI and SQL impersonation, not independent reader sign-in/HTTP.
-
-Private replay: `.local/backend-validation/runs/c8-acceptance-20261017T103153811074Z/acceptance.private.json`. Native regression/unit logs, exact SQL comparisons and the [workload results](#c82b3-execution-query-remedies) are retained under `.local/reports/backend/20261017-sql-remedies/`. Existing production/resource/reader gates remain open.
+After C8.2b.3, 341 database-free tests and the three native SQL tests pass, and the combined replay again passes 1,249 assertions / 118 responses / 171 queries with the same status split. Evidence: `.local/backend-validation/runs/c8-acceptance-20261017T103153811074Z/` and `.local/reports/backend/20261017-sql-remedies/`.
 
 ### Retained evidence
 
-These are dated milestone results, not reruns during document consolidation. Raw records, plans and account/data details remain ignored under `.local/backend-validation/`; use its run/tool indexes. Detailed per-task logs remain available with `git show 36b48f8:docs/PROGRESS.md`.
+Dated milestone results, not reruns. Raw records stay under `.local/backend-validation/`.
 
 | Milestone | Evidence retained / design consequence |
 | --- | --- |
-| C1a | OpenAPI 3.1.1 / JSON Schema 2020-12, 14 operations, concrete schemas/examples and invalid-instance checks; no SQL claim from schema validation |
-| C1b | Native exact datetimeoffset conversion: 26 assertions / 15 queries, including adjacent 100-ns instants and extreme offsets; legacy conversion unchanged |
-| C1c | 42 assertions / 9 native WSGI responses / 4 query attempts, real readiness timeout/recovery and missing-driver handling |
-| C2/C3 performance review | Event work 16 scans / 32,112 rows / 2,192 logical reads → 1 / 2,007 / 137; ordinary 20,000-row fixtures materialize at most 201 candidates; cached navigation retained. 355 WSGI responses / 479 queries / 87,243 assertions |
-| C3b/C3c | Independent summary/cohort and IANA/DST timeline comparisons, exact boundaries/zero buckets and native reader SQL scopes; grouped output bounds do not bound cohort scans |
-| C4a | One conditional event aggregation replaces repeated category queries; actual-plan source-work reduction retained with its catalog lookup/IO tradeoff |
-| C4b/C4c | Native observation paging, repeated/parallel/ambiguous child fixtures and path/source matching; metadata selected after bounded candidates; deep/repeated-key workload gates remain |
-| C5 | 139,146 native assertions / 480 schema responses; Unicode search, NULL IDs, fixed SQL fragments and safe text prefixes. Real Scale Out remains separate |
-| C6 | 2,013 native assertions / 345 schema responses; section IDs, canaries, SQL plus serializer redaction and typed display values |
-| C7a | 786 native assertions / 140 schema responses; exact identities, both ID directions, precision, status scope and guarded system logging conversion |
-| C7b | Prior-success oracle, exact duration totals and rounded estimate ends; indexed visible timestamp source avoids repeated catalog expansion while retaining history-growth work |
-| C8.1 | 16 October combined replay: 1,249 assertions / 118 responses / 171 queries; fresh equivalent replay above |
-| C8.2a | 300 identical typed-result binding comparisons; 770 affected schema responses / 1,414 queries / 141,621 assertions; all 14 nullable-resource plan pairs preserve results without increased source work |
-| C8.2b.1/.2a | [Current-catalog distributions, compilation, execution cardinality, reader IO and their exact measurement limits](#workload-protocol) |
-
-The C8.2a interleaved query-only median examples were 3,967→523 ms (ordinary execution page), 1,713→29 ms (executable page), and 1,977→27 ms (timeline). These excluded connection setup. They justify removing driver NULL type discovery on explicitly typed batches, not an overall HTTP/p95 speedup claim.
-
-The original combined replay's administrator/normal/restricted scopes saw 16/16/2 executions. It checked the restricted hidden/absent behavior on all five execution-scoped operations and enabled/disabled value policy without reading sensitive source values. Stage B separately recorded actual Windows reader legacy HTTP; C8.3 must still exercise the API under those actual process identities.
+| C1a | OpenAPI 3.1.1 / JSON Schema 2020-12, 14 operations, schemas, examples and invalid-instance checks |
+| C1b | Native exact datetimeoffset conversion, including adjacent 100-ns instants and extreme offsets |
+| C1c | Native readiness timeout/recovery and missing-driver handling |
+| C2/C3 performance review | Event work 32,112 → 2,007 rows read; ordinary 20,000-row pages materialize at most 201 candidates |
+| C3b/C3c | Independent summary and IANA/DST timeline comparisons; grouped output bounds do not bound cohort scans |
+| C4a | One conditional event aggregation replaces repeated category queries |
+| C4b/C4c | Native observation paging, repeated/parallel/ambiguous child fixtures; metadata selected after bounded candidates |
+| C5 | Unicode search, NULL IDs, fixed SQL fragments and safe text prefixes; real Scale Out separate |
+| C6 | Section IDs, canaries, SQL plus serializer redaction and typed display values |
+| C7a/C7b | Exact identities, both directions, status scope, guarded logging conversion; prior-success oracle and exact estimates |
+| C8.1 | 16 October combined replay: 1,249 assertions / 118 responses / 171 queries |
+| C8.2a | Explicit NULL binding: 300 identical typed-result comparisons; query-only medians such as 3,967 → 523 ms (execution page), not an HTTP speedup claim |
 
 ### C8.2b.1 retained baseline
 
-Completed locally 16 October 2026, application revision `9bd7a9c`, Windows x64/CPython 3.14.8, pyodbc 5.3.0, ODBC Driver 17 **17.10.0006**, SQL Server **16.0.1000.6**. The configured SQL identity is administrator; this is neither independent reader HTTP nor representative production data. Visible sources contain **3 folders, 3 projects, 16 executions, 238 executable statistics, 2,009 events, 242 parameters and one override**. The selected parent has fourteen statistics and four children. Source counts and exact execution identity/status/time fingerprints match before/after.
+16 October 2026, revision `9bd7a9c`, CPython 3.14.8, pyodbc 5.3.0, ODBC Driver 17.10, SQL Server 16.0; configured administrator; 16 executions, 2,009 events, 242 parameters. After forty warmups, 2,000 schema-validated responses (100 per case, twenty cases, all fourteen operations) passed with stable data and closed resources. Handler milliseconds, median / p95:
 
-After forty warmups, **2,000 schema-validated responses / 3,700 application queries PASS**: 100 samples for each of twenty cases. All fourteen operations are covered; data fingerprints, unique request IDs, query budgets, row caps, native phase correlation and both resource closes pass. Each case has a stable response size. The largest body is **26,204 bytes** for the 50-event continuation. Warmups and exploratory pilot samples are excluded from the following nearest-rank p95 results.
-
-| Case | Median / p95 / maximum handler ms | Data rows or objects | Response bytes |
+| Case | Median / p95 ms | Case | Median / p95 ms |
 | --- | --- | --- | --- |
-| meta | 0.53 / 1.20 / 2.44 | 1 object | 1,383 |
-| live | 0.35 / 0.87 / 1.04 | 1 object | 127 |
-| ready | 4.18 / 77.41 / 145.68 | 1 object | 130 |
-| executions-id | 719.21 / 1,077.56 / 1,691.79 | 16 | 8,344 |
-| executions-created | 749.41 / 1,063.93 / 1,331.20 | 16 | 8,342 |
-| executions-duration | 762.09 / 1,091.58 / 1,499.03 | 16 | 8,348 |
-| executions-errors | 735.28 / 1,065.99 / 1,251.16 | 16 | 8,343 |
-| folders | 18.92 / 873.58 / 977.04 | 3 | 500 |
-| projects | 11.60 / 851.29 / 1,137.19 | 1 | 419 |
-| summary | 3.65 / 134.31 / 374.72 | 1 object | 581 |
-| timeline | 21.06 / 231.00 / 394.99 | 24 | 3,880 |
-| detail | 19.72 / 638.22 / 790.94 | 1 object | 713 |
-| executables | 41.23 / 370.52 / 829.04 | 14 | 5,331 |
-| children | 149.81 / 918.70 / 3,969.43 | 4 | 1,698 |
-| events-first | 259.33 / 569.55 / 807.03 | 50 | 23,487 |
-| events-next | 254.49 / 604.76 / 1,022.61 | 50 | 26,204 |
-| parameters | 49.97 / 395.02 / 892.11 | 10 | 3,020 |
-| overrides | 47.74 / 394.92 / 773.45 | 1 | 494 |
-| history | 77.13 / 291.23 / 1,038.88 | 2 | 1,464 |
-| empty-executions | 126.13 / 240.45 / 412.04 | 0 | 352 |
+| meta | 0.5 / 1.2 | detail | 20 / 638 |
+| ready | 4 / 77 | executables | 41 / 371 |
+| executions (four sorts) | 719–762 / 1,064–1,092 | children | 150 / 919 |
+| folders / projects | 19 / 874, 12 / 851 | events first / next | 259 / 570, 254 / 605 |
+| summary / timeline | 4 / 134, 21 / 231 | parameters / overrides | 50 / 395, 48 / 395 |
+| history | 77 / 291 | empty executions | 126 / 240 |
 
-**The proposed one-second full-page/network target is not passed.** These execution pages contain only sixteen rows and exclude TCP/production hosting; even this local screening has four execution p95s above one second. Their median summed execute phases are **683–699 ms**, versus **0.89–3.81 ms** for connection acquisition. ID execution's execute-phase p95 is **1,045.81 ms**; mapping and application overhead are small. These are per-phase distributions, not additive p95 components. Navigation and child tails also occur in execute; the child maximum is retained as an outlier, not discarded or assigned an unproved cause.
-
-The fresh-client pass adds **70 schema-validated first responses / 125 successful queries** in seventy new interpreter processes. Per-operation client-setup medians are **271–289 ms**, including sampler imports/configuration/application setup. Selected first-handler median/range observations are **816 / 717–909 ms** (ID executions), **135 / 106–379 ms** (timeline), **237 / 98–428 ms** (executables) and **183 / 114–736 ms** (children). All fourteen operations have five observations, stable data and clean owned resources. These are fresh-client observations with existing SQL caches, without a cold p95 or production-server startup claim.
-
-#### Compilation and source work
-
-The untimed pass covers **29 distinct resource/parameter sets across all 25 resources**, with three fresh-connection repeats each: **87 native queries PASS** with identical typed outputs per set. Actual IO and operator counters are retained, including LOB reads and warnings. Ordinary page/count materializations contain sixteen rows, below the 51-candidate bound; this does not prove the bound on larger cohorts. Representative second-repeat totals exclude connection-local/work tables:
-
-| Query shape | Persistent-source scans / logical reads / LOB logical reads | Additional observed work |
-| --- | --- | --- |
-| ID / created execution pages | 21 / 368 / 0 | Each reads 3,872 parameter rows (242 × 16) for logging enrichment |
-| Duration / error calculated pages | 21 / 233 / 0 | Each reads 242 parameter rows; whole matching cohort has sixteen rows |
-| Event first / continuation pages | 4 / 388 / 0 | Each reads 120 event-table rows and 4,018 operation-message rows for a 50-row response |
-| History page | 13 / 249 / 0 | Two returned targets; 484 parameter rows, one materialized eligible prior success |
-
-Payload/candidate bounds do not establish bounded total source work. The ordinary-page parameter enrichment and event-page access are concrete larger-workload follow-ups. Zero LOB reads on this catalog do not satisfy wide-text/value acceptance. Warnings include conversions, missing temporary-table statistics and some memory grants; no spill warning appears in the captured plans. These are observations, not automatic reasons to rewrite SQL.
-
-Per-execution parse/compile message elapsed sums for the three diagnostic repeats are:
-
-| Query shape | Reported parse/compile elapsed ms, repeats 1 / 2 / 3 |
-| --- | --- |
-| Execution fence, populated cohort | 263 / 95 / 70 |
-| ID page | 579 / 526 / 592 |
-| Created-time ordinary page | 262 / 415 / 383 |
-| Calculated duration page | 562 / 411 / 583 |
-| Calculated error page | 503 / 530 / 764 |
-| Execution fence, empty cohort | 110 / 115 / 145 |
-
-The fence is uncached on every diagnostic repeat; each ID/ordinary page shows three uncached statements. Calculated branches also contain recurring uncached statements. This is evidence of material recurring compilation to test before adjusting hints. The message sums include all reported statement scopes and are not a wall-clock subtraction from the sampled WSGI time.
-
-Cached examples show why the distinction matters. Folder page plan metadata stays at **349 ms**, while actual repeated compile messages are **353 / 0 / 0 ms**. Timeline statement metadata totals **181 ms** in each plan; its messages are **185 ms / not emitted / not emitted**, with cache retrieval flags true. The history batch's first message sum is **1,054 ms**, followed by **0 / 0 ms**, while last-plan metadata remains. Do not charge those historical costs to every warm request. Three diagnostics are not a compile p95; warm navigation tails require further cache/plan investigation rather than a blanket hint change.
-
-#### Evidence and remaining work
-
-Retained private directories under `.local/backend-validation/runs/` are `c82b1-20261016T184442343257Z` (manifest, source fingerprints, forty warmups, 2,000 JSONL samples, phase summaries and offline checked summary), `c82b1-fresh-20261016T185355895427Z` (seventy first-request records) and `c82b1-plans-20261016T190056664708Z` (29 × 3 plan/IO/time records). Reusable ignored tools are `probe-api-workload.py` and `summarize-api-workload.py`; the warm sampler source/hash is saved with its run. Exploratory pilot and incomplete diagnostic attempts are excluded. No runtime code, SQL resource, dependency, permissions or shared cache was changed.
-
+The one-second full-page target is not passed: four execution p95s exceed it with only sixteen rows, almost all of it in SQL execute (683–699 ms median) rather than connection acquisition (1–4 ms). Plan diagnostics showed recurring compilation of the fence and page statements (hundreds of milliseconds per diagnostic), ordinary pages reading every parameter row for logging enrichment, and event pages reading 4,018 message rows for 50 returned; C8.2b.3 acted on these. Seventy fresh-client first requests (five for each of the 14 operations) passed; the five for ID executions took 717–909 ms. Evidence: `.local/backend-validation/runs/c82b1-*`.
 
 ### C8.2b.2a retained execution-cardinality results
 
-Completed locally 17 October 2026 with unchanged application/SQL revision `9bd7a9c` (repository baseline `bfe4914`). These are synthetic source-cardinality and actual-catalog SQL-scope checks, not a test-network or production-capacity pass. All catalog source counts and execution identity/status/time fingerprints match before/after every phase.
-
-The connection-local fixture contains **20,002 executions, 99,998 events and 38,182 parameters**. Exactly 20,000 executions match the broad window. Main name widths are 128/128/260 UTF-16 units; observation, environment and logging NULLs remain present. Exact folder/project, status, narrower-time and pattern cohorts contain 200/1,177/2,222/4,000/2,000 rows respectively.
-
-**153 schema responses / 242 application queries PASS**: 48 first/deep correctness responses across all twelve sorts/both directions, twenty NULL-block/actual-continuation responses, 34 warmups and 51 measured responses (three per case). Ordered IDs, all observed fields/vocabularies, timestamps/counts/durations/elapsed values, ceilings/continuations, request IDs, row/query bounds and actual cursor/connection closure pass. The NULL-block pairs begin at rank 19,000 and follow the returned cursor to 19,200.
-
-**1,700 native samples / 3,000 checked-in SQL batches PASS**, after 34 excluded warmup samples/60 batches. Each case has 100 observations and stable typed output, including the sentinel. Timing is native client wall time for the one or two SQL batches on a prepared session, including result collection/cursor close; preparation, reset/commit, API serialization and transport are excluded. WSGI observations have fresh prepared sources per query and include cleanup; their three-sample ranges are not p95s or a framework-overhead estimate.
-
-| Case | DTO rows | Native SQL median / p95 / max ms (N=100) | Prepared WSGI median (min–max) ms (N=3) | Body bytes |
-| --- | ---: | ---: | ---: | ---: |
-| id-50 | 50 | 174.87 / 303.43 / 441.56 | 1,834.40 (1,708.94–2,190.26) | 103,197–103,198 |
-| id-200 | 200 | 204.11 / 351.82 / 553.33 | 1,517.12 (1,334.65–2,666.10) | 410,417–410,421 |
-| id-deep-200 | 200 | 192.36 / 323.47 / 394.30 | 1,104.40 (915.33–1,196.51) | 409,942 |
-| created-50 | 50 | 334.61 / 547.38 / 620.77 | 1,879.65 (1,612.80–2,018.44) | 104,534 |
-| created-200 | 200 | 369.66 / 583.83 / 768.33 | 1,579.69 (1,249.66–1,913.69) | 410,155 |
-| created-deep-200 | 200 | 368.67 / 546.49 / 718.64 | 1,403.71 (1,256.64–1,692.82) | 410,182 |
-| duration-50 | 50 | 1,488.39 / 5,653.85 / 7,891.51 | 3,151.72 (2,411.55–3,434.87) | 104,148 |
-| duration-200 | 200 | 1,443.78 / 5,415.28 / 9,967.35 | 3,859.74 (2,966.92–6,409.89) | 413,393 |
-| duration-deep-200 | 200 | 1,528.86 / 4,716.19 / 10,815.42 | 4,868.94 (3,790.03–5,509.51) | 412,775 |
-| errors-50 | 50 | 1,893.55 / 5,484.41 / 9,959.65 | 3,614.27 (2,409.13–8,334.83) | 103,238 |
-| errors-200 | 200 | 1,948.89 / 5,905.03 / 7,603.64 | 3,996.61 (3,199.55–4,079.81) | 410,405 |
-| errors-deep-200 | 200 | 1,983.68 / 5,520.04 / 7,430.19 | 6,481.30 (3,163.38–10,401.06) | 410,373–410,376 |
-| exact-folder | 50 | 180.87 / 361.59 / 468.48 | 2,478.01 (2,113.35–2,830.91) | 104,337 |
-| exact-project | 50 | 232.16 / 423.01 / 585.25 | 2,180.98 (2,124.15–3,755.13) | 103,221 |
-| status-filter | 50 | 290.06 / 487.76 / 757.70 | 1,480.02 (1,374.07–2,620.30) | 103,960 |
-| time-filter | 50 | 903.56 / 2,733.03 / 4,166.56 | 2,202.65 (1,762.56–3,423.59) | 103,266–103,267 |
-| pattern-filter | 50 | 228.03 / 429.28 / 803.64 | 2,314.70 (2,148.33–2,856.67) | 104,513 |
-
-#### Larger-source work diagnostics
-
-All 23 distinct retained resource/parameter sets have three fresh-session plan/IO/TIME observations (**69 queries**). Diagnostic setup precedes statistics and timing; only source names and `NOCOUNT` differ from the checked-in batches. The second repeat below is a labelled observation, not a latency percentile. Source IO counts only fixture source tables; total IO also includes query temporaries/worktables. Access rows use `ActualRowsRead` when present and `ActualRows` otherwise.
-
-| Case | Source scans / logical / LOB reads | All logical / LOB reads | Execution / event / parameter access rows |
-| --- | ---: | ---: | ---: |
-| id-50 | 3 / 740 / 0 | 759 / 0 | 51 / 99,998 / 38,182 |
-| id-200 | 3 / 765 / 0 | 834 / 0 | 201 / 99,998 / 38,182 |
-| id-deep-200 | 3 / 760 / 0 | 829 / 0 | 201 / 99,998 / 38,182 |
-| created-200 | 3 / 4,063 / 0 | 4,142 / 0 | 20,002 / 99,998 / 38,182 |
-| created-deep-200 | 3 / 4,063 / 0 | 4,142 / 0 | 20,002 / 99,998 / 38,182 |
-| duration-200 | 14 / 4,229 / 0 | 12,774 / 0 | 20,000 / 99,998 / 38,182 |
-| duration-deep-200 | 14 / 4,229 / 0 | 12,772 / 0 | 20,000 / 99,998 / 38,182 |
-| errors-200 | 25 / 4,229 / 0 | 36,595 / 0 | 20,000 / 99,998 / 38,182 |
-| errors-deep-200 | 25 / 4,229 / 0 | 36,583 / 0 | 20,000 / 99,998 / 38,182 |
-| exact-folder | 3 / 1,564 / 0 | 1,587 / 0 | 5,001 / 99,998 / 38,182 |
-| status-filter | 3 / 4,063 / 0 | 5,142 / 0 | 19,995 / 99,998 / 38,182 |
-| time-filter | 7 / 4,137 / 0 | 10,647 / 0 | 19,499 / 99,998 / 38,182 |
-
-Actual page/count materializations remain at most **51/201 rows**. Ordinary queries do not materialize a whole execution cohort. Calculated sorts retain global cohort metrics; full-cohort and query-temporary work must be evaluated separately from the bounded returned page. Fresh temporary object/cache behavior is not SSISDB permission-view behavior. Per-execution compile messages and last-plan/cache metadata remain private; compile-message sums are not non-overlapping wall-clock components or recurring catalog-cost estimates.
-
-#### Existing reader SQL scope and IO
-
-**12 context/case sets × three repeats = 36 diagnostic queries**, plus twelve independent controls, compare ID, created-time, duration and error-count pages through actual public views in configured/normal/restricted SQL contexts. These are administrator-session impersonation checks, not independent Windows-reader sign-in or HTTP. Source IO below excludes query temporaries/worktables.
-
-| SQL context | Case | Visible rows | Source scans / logical / LOB reads, second repeat |
-| --- | --- | ---: | ---: |
-| Configured administrator | executions-id | 16 | 21 / 368 / 0 |
-| Configured administrator | executions-created | 16 | 21 / 368 / 0 |
-| Configured administrator | executions-duration | 16 | 21 / 233 / 0 |
-| Configured administrator | executions-errors | 16 | 21 / 233 / 0 |
-| Restricted reader | executions-id | 2 | 3,436 / 16,557 / 0 |
-| Restricted reader | executions-created | 2 | 3,436 / 16,557 / 0 |
-| Restricted reader | executions-duration | 2 | 3,450 / 16,633 / 0 |
-| Restricted reader | executions-errors | 2 | 3,450 / 16,633 / 0 |
-| Normal reader | executions-id | 16 | 21 / 368 / 0 |
-| Normal reader | executions-created | 16 | 21 / 368 / 0 |
-| Normal reader | executions-duration | 16 | 21 / 233 / 0 |
-| Normal reader | executions-errors | 16 | 21 / 233 / 0 |
-
-Reader result order and complete projected native values match independent controls, repeats are stable and owned resources close after `REVERT`. Reader SHOWPLAN and independent reader HTTP retain their explicit gaps. No grant, catalog write, package run, shared-cache flush, dependency change or TCP server was needed.
-
-#### Findings, evidence and remaining gates
-
-The six broad ordinary native SQL p95s are **303–584 ms**, while broad calculated cases are **4,716–5,905 ms**; the duration-deep maximum remains **10,815 ms**. These are prepared temporary-source client measurements. JSON bodies span **103,197–104,534 bytes** at 50 rows and **409,942–413,393 bytes** at 200 rows. Actual catalog reader pages remain below 50 rows, so neither the synthetic model nor small reader scopes pass the proposed full-page/test-network budget.
-
-The independent insert-cardinality checker reconciles all 51 page-plan observations with the oracle: `#execution_page`/`#page_counts` contain exactly the 51/201 requested candidates; `#execution_cohort`/global `#execution_counts` contain the matching global calculated cohort (20,000 broad, 2,222 status-filtered, 4,000 time-filtered). Duration-200 records 40,000 cumulative cohort access rows; errors-200 records 60,000 cohort access rows plus 20,000 count rows. These are cumulative operator access rows, not distinct rows or separate materializations. Total logical reads are **12,774** and **36,595**, versus **4,142** for created-200, even though those source-only totals are **4,229 / 4,229 / 4,063**. Query-temporary work is material and must remain visible in comparisons.
-
-At least one fresh diagnostic repeat captures `SpillToTempDb`/`SortSpillDetails` for **created-50, created-deep-200, duration-200, duration-deep-200, errors-200 and errors-deep-200**. Timed warm samples did not collect plans, so these warnings cannot be assigned to individual timing outliers. Preserve global metrics and compare narrower calculated cohorts/page enrichment, temporary access, memory/spills and native public-view/reader behavior before adopting a fix. The large fixture reads its 38,182 parameter rows once per retained page plan, whereas C8.2b.1's small actual catalog repeats parameter reads for ordinary pages; do not assume one shape applies to every cardinality or identity.
-
-Both existing readers are non-sysadmin/non-owner and have SHOWPLAN permission **0**. The normal reader has `ssis_logreader`; the restricted reader does not. The restricted reader returns two matching rows but has much higher public-view IO than the sixteen-row administrator/global-reader scope. No reader access-row or plan inference is made without SHOWPLAN, and no grants were added. C8.2b.3 must include this scope in SQL comparisons.
-
-Private directories under `.local/backend-validation/runs/` are `c82b2a-20261017T000435455105Z` (oracle/manifests/API/check-summary), `c82b2a-sql-warm-20261017T001618212098Z` (1,700 JSONL samples), `c82b2a-nullable-20261017T004759410529Z`, `c82b2a-plans-20261017T004952048347Z` (69 plans/IO/TIME calls and exact insert-bound check) and `c82b2a-readers-20261017T005325474980Z`. Sources and offline verifiers remain ignored and reusable. The separate three-round native pilot is excluded. Requested local log/index housekeeping overlapped samples 1,574–1,625; no other task-owned SQL workload ran concurrently. All raw timings are retained; no isolated-capacity acceptance is claimed.
-
-C8.2b.2b/.2c retain observation/text/summary/timeline/history workloads. C8.2c sustained/concurrent resources, C8.3 independent Windows-reader HTTP, reader SHOWPLAN, real active/Scale Out data, OBS-02 and deferred hosting/stream retain their own gates. The baseline above did not change application/SQL sources; subsequent remedies are recorded below.
+17 October 2026, revision `9bd7a9c`: 20,000 matching temporary executions with 99,998 events and 38,182 parameters. 153 schema responses (all twelve sorts, both directions, first, deep and NULL-block pages) and 1,700 native SQL samples pass with oracle-equal DTOs. Native SQL p95: ordinary sorts 303–584 ms; calculated sorts 4,716–5,905 ms (maximum 10,815 ms). Bodies are about 104 KB at 50 rows and 410 KB at 200. Pages materialize at most 51/201 candidates; calculated sorts carry the whole cohort, and their temporary work (12,774 and 36,595 logical reads for duration and errors at 200 rows, against 4,142 for created time) must stay visible in comparisons. Several diagnostics spilled sorts. Through public views, a restricted reader seeing 2 rows read 16,557 pages with 3,436 scans against 368 pages and 21 scans for the 16-row administrator scope; both existing readers lack SHOWPLAN. C8.2b.3 addressed this. Evidence: `.local/backend-validation/runs/c82b2a-*`.
 
 ### C8.2b.3 execution query remedies
 
-17 October 2026, compared with SQL at `36b48f8`. Three query resources changed; API shapes, cursor keys, visibility, limits and dependencies are unchanged.
+17 October 2026, compared with SQL at `36b48f8`; API shapes, cursor keys, visibility and limits unchanged.
 
-- Calculated sorts materialize only IDs, exact numeric keys and reusable counts. Duration is computed during selection; public execution metadata is fetched after paging.
-- ID pages use fixed ascending/descending ranges with cached selection. Ordinary final logging enrichment no longer recompiles, and guards conversion of same-named nonsystem parameters. Non-ID selection and the filter-sensitive fence retain their existing recompilation.
-- Isolated event aggregation uses `RECOMPILE, FORCE ORDER`. The measured join order avoids expanding public-view permission checks before joining selected IDs. Fully cached aggregation and blanket hash/loop hints were rejected: some worsened restricted-reader work dramatically.
+- Calculated sorts materialize only IDs, exact numeric keys and reusable counts; public metadata is fetched after paging.
+- ID pages use fixed ascending/descending ranges with cached selection; ordinary logging enrichment no longer recompiles and guards same-named non-system parameters.
+- Isolated event aggregation uses `RECOMPILE, FORCE ORDER`, avoiding public-view permission expansion before the selected IDs. A fully cached aggregation and blanket hash or loop hints were measured and rejected; some made restricted-reader work much worse.
 
-**80 paired native cases / 160 diagnostic queries passed exact projected-row and cursor-key comparison:** 65 temporary-source cases (all sorts/directions, first/deep pages and selective filters), plus five sorts in each of three catalog visibility contexts. Actual plans are available for temporary sources and the administrator; readers retain IO/TIME only. All **254 page/count insert checks** match returned candidate cardinality and stay at or below 201. Event aggregation still reads its source once in the large fixture.
+Eighty paired native cases (65 temporary-source, 15 real-catalog in three visibility contexts) matched rows and cursor keys exactly, and 254 page/count insert checks stayed at or below 201 rows. Actual plans cover the temporary sources and the administrator only; the readers have IO and TIME.
 
-| Workload, 201-candidate limit | Before → after total logical reads | Before → after source logical reads |
+| Workload, 201 candidates | Total logical reads, before → after | Source logical reads |
 | --- | ---: | ---: |
-| 20,000 rows, ID | 834 → 1,068 | 765 → 765 |
-| 20,000 rows, created time | 4,142 → 4,142 | 4,063 → 4,063 |
 | 20,000 rows, duration | 12,766 → 5,193 | 4,229 → 4,688 |
 | 20,000 rows, errors | 36,586 → 25,293 | 4,229 → 4,688 |
 | Current catalog, administrator ID (16 rows) | 483 → 395 | 368 → 232 |
 | Restricted reader, ID (2 rows) | 17,958 → 517 | 16,557 → 510 |
-| Restricted reader, created time (2 rows) | 17,958 → 518 | 16,557 → 511 |
 | Restricted reader, duration/errors (2 rows) | 18,042 / 18,041 → 767 | 16,633 → 752 |
 
-Restricted ID-page source scans fall **3,436 → 57**; calculated-page scans fall **3,450 → 100**. Administrator ordinary logging-source reads fall **144 → 9**. No permission was broadened and application queries still use public views only.
-
-The tradeoffs remain visible: explicit ID-page insertion adds 234 bounded temporary reads at 201 rows (59 at 51); calculated metadata rechecks add source lookups after paging. On the small administrator catalog calculated total reads rise 383–384 → 450, while the large-cohort temporary-work reduction is substantial. The candidate has no calculated-sort spill in these diagnostic plans; ordinary-sort spills remain, so this is not a general spill-elimination claim.
-
-Warm temporary-source comparison used alternating variants, two excluded warmups per variant/case, 20 measured repetitions each, fixed 51-candidate limits and reused native connections. Source preparation and query-temporary reset are outside the timer; every sample checks identical projected values/bytes. Medians in ms, before → after: ID **131 → 137**, created time **247 → 265**, duration **648 → 273**, errors **1,259 → 622**. These are SQL-only measurements; ordinary fixture timing did not improve. Full-page/network p95 and production acceptance remain open.
-
-The same alternating protocol on the actual catalog used **30 repetitions per variant/case** (720 samples, plus 160 fixture samples above). Median SQL-only milliseconds:
-
-| Sort | Administrator, 16 rows | Normal reader, 16 rows | Restricted reader, 2 rows |
-| --- | ---: | ---: | ---: |
-| ID | 490 → 291 | 390 → 282 | 735 → 304 |
-| Created time | 412 → 395 | 402 → 394 | 755 → 414 |
-| Duration | 448 → 727 | 397 → 469 | 738 → 491 |
-| Errors | 431 → 477 | 401 → 480 | 758 → 493 |
-
-Small administrator/global-reader calculated pages pay for the extra metadata read and compilation; this is an observed tradeoff, not a universal speedup. Tail timings also remain variable. Retain the substantial large-cohort and restricted-reader work reduction without adding a second small-cohort implementation. A further 32 diagnostic samples of cached calculated-page logging showed unchanged reads and inconsistent timing/compilation benefit, so that candidate was not retained. All timings, including regressions, remain in the raw evidence; these limited SQL samples do not establish a full-page/network p95 target.
-
-Reusable probes, rejected candidates, original SQL, raw plans/IO, warm samples and checks are ignored under `.local/reports/backend/20261017-sql-remedies/`. The checked-in [native regression suite](../tests/native/README.md) reproduces SQL correctness with temporary sources on an existing SQL Server connection; it does not substitute for public-view reader validation. No catalog writes, grants, package runs, cache flushes or TCP server were used.
+Warm SQL medians on the temporary source: duration 648 → 273 ms, errors 1,259 → 622 ms; ID and created time did not improve (131 → 137 ms, 247 → 265 ms), and the explicit ID-page insert adds 234 bounded temporary reads at 201 rows (total 834 → 1,068), an accepted cost. On the real catalog the ID page and restricted reader improved (ID 490 → 291 ms administrator, 735 → 304 ms restricted), while small calculated pages became slower for the administrator (duration 448 → 727 ms) because of the extra metadata read and compilation; the large-cohort and reader reductions were kept over a second small-cohort implementation. Evidence: `.local/reports/backend/20261017-sql-remedies/`.
 
 ### C8.2b.2b observation and text results
 
-**18 October 2026, application/SQL baseline `ac9663b`: local measurements complete; repeated-child pairing acceptance remains open.** Application, SQL, API contracts, frontend and dependencies are unchanged. The existing Windows x64 CPython **3.14.8**, pyodbc **5.3.0**, ODBC Driver **17.10.0006** and SQL Server **16.00.1000** ran the [observation/text protocol](#c82b2b-observation-and-text-protocol). All fixtures were connection-local; real catalog counts/execution fingerprints remain unchanged before and after every selected phase.
+18 October 2026, baseline `ac9663b`, no source change. 67 native WSGI responses passed complete DTO comparison across executables, children, events, parameters and overrides, including deep and NULL-time continuations, maximal paths, ambiguous child ends, full-source Unicode search and redaction (redacted values are NULL before the driver boundary). With maximal text a 200-row page can reach 43,238,902 bytes (events), 28.8 MB (executables) or 15.7 MB (children); the row cap does not bound transfer size.
 
-**Correctness:** **67 native WSGI responses / 175 application queries PASS**: 37 initial cases and 30 actual-next/true-empty replays. Complete independent DTOs cover both sorts and directions of executable/child/event pages, first 50, maximum 200, direct rank-1,000 continuation, a NULL-time continuation, maximal valid paths/names, nullable/unknown results, missing/ambiguous/time-reversed child ends and an unidentified post. Fourteen server-issued next cursors preserve exact `as_of`, upper fence and ordered DTOs. Full-source literal search finds Unicode/punctuation beyond the displayed prefix. Sensitive/policy-redacted values never appear in responses or safe application events; native replay also confirms their SQL-projected value is NULL before the driver boundary.
-
-The initial case named `parameters-empty` contains one logging parameter and is counted as a logging-only case. The supplemental replay uses a different visible execution with genuinely empty parameter/override sources and verifies zero rows, NULL ceiling and no continuation for both. Initial WSGI cases populate full fixtures on each query connection; supplemental visibility queries use only common execution/logging sources. Native warm sessions retain the complete family fixture for all resource calls. These channels have different connection/preparation work and must not be subtracted to infer API overhead. Handler observations are single-case correctness/size measurements, without WSGI p95.
-
-Selected **uncompressed UTF-8 JSON** sizes; the maximum fields are deliberately combined, rather than representative catalog payloads:
-
-| Prepared case | Rows | Response bytes |
-| --- | ---: | ---: |
-| Executables, ID ascending, maximum page | 200 | 28,811,772 |
-| Executables, ID ascending, default page | 50 | 7,203,513 |
-| Children, repeated short identity | 200 | 60,330 |
-| Children, maximal path/source metadata | 200 | 15,712,815 |
-| Events, literal full-source search / maximal text | 200 | 43,238,902 |
-| Parameters, maximal names/variant text and redaction | 200 | 1,277,130 |
-| Overrides, values permitted | 200 | 11,860,306 |
-| Overrides, values disabled by policy | 200 | 2,424,310 |
-
-The 200-row cap bounds cardinality, while maximal per-row text can still produce about **43 MB**. Preserve this payload finding for phase 4's on-demand sections and eventual network/browser acceptance; this measurement does not change the wire contract or pass a transfer/render budget.
-
-#### Source work and compilation
-
-**72 actual-plan/IO/TIME diagnostics PASS 192 candidate/enrichment insertion checks.** Twelve page shapes each run three times at 2,000 and 20,000 source rows/starts. Every candidate, metadata, event/value row and selected-child-end materialization stays at **51/201** rows; repeated child identities collapse to **four** pairing keys, or **one** for the maximal-path case. The 20,000-start execution has **59,803** source events, including a NULL-ID post; another execution has **900** maximal-path start/post events. There are 20,000 executable observations / 250 definitions, 20,000 generated parameters plus logging rows, and 20,000 overrides.
-
-Retained third diagnostics below show complete-batch logical reads, including query-temporary work. They are two source cardinalities, not a before/after optimization. Source plan choices can differ between the cardinalities.
-
-| Page shape | 2,000-source regular / LOB reads | 20,000-source regular / LOB reads |
-| --- | ---: | ---: |
-| Executables, first 200 | 1,134 / 32,783 | 1,535 / 32,779 |
-| Children, first 50 | 17,607 / 0 | 88,281 / 0 |
-| Children, first 200 | 18,522 / 0 | 89,824 / 0 |
-| Children, deep 200 | 18,522 / 0 | 89,824 / 0 |
-| Children, maximal path 200 | 6,088 / 116,132 | 7,258 / 114,644 |
-| Events, ID first 50 | 426 / 0 | 512 / 0 |
-| Events, full-source search / maximal text 200 | 1,639 / 162,853 | 42,017 / 120,307 |
-| Parameters, first 200 | 875 / 1,157 | 1,911 / 571 |
-| Overrides, values permitted, first 200 | 3,063 / 31,203 | 2,640 / 31,223 |
-| Overrides, values disabled, first 200 | 3,063 / 28 | 2,640 / 28 |
-
-**The child-pairing growth finding remains open as C8.2b.2b.R1 in [progress](PROGRESS.md#remaining-acceptance).** For a 201-candidate page with four exact identities, cumulative event-source rows read grow **20,648 → 121,810**, source scans **4 → 204**, and complete-batch regular reads **18,522 → 89,824**. Both sizes preserve the same candidate/key/end bounds. Thus bounded output/enrichment does not bound the historical keyed-event stream used by the window pairing. Some diagnostics capture `SpillToTempDb`/`SortSpillDetails`; smaller candidate limits still pay the historical work. Temporary-source indexes/security differ from public views, so these figures identify a measured query-shape risk, not production reader scan counts.
-
-Retain all three repeats, individual parse/compile messages, cache flags, last-plan metadata and warnings. At 20,000 sources the third diagnostics emit one to three compile messages per page; message-sum elapsed ranges **1–5 ms**. These diagnostic message sums are not an exclusive wall-clock partition or compile p95. Last-plan compile metadata is not added to every warm sample. No RECOMPILE, join hint, cache or history cap was introduced to make this check pass.
-
-#### Warm native SQL distributions
-
-**1,500 samples / 4,200 SQL calls PASS**, plus **30 excluded warmup samples / 84 calls**. Each of 15 cases retains 100 serial fixed-order observations with stable complete typed SQL outputs and closed cursors. Four sampler-owned prepared sessions close at completion. Query-owned page reset, fixture creation, connection acquisition, result hashing, schemas, API serialization and network are outside these SQL timers. Task samplers ran sequentially; this is not an isolated-capacity test. Every outlier is retained. Milliseconds:
-
-| Case | Median | p95 | Maximum |
-| --- | ---: | ---: | ---: |
-| Executables, ID first 200 | 422.0 | 596.4 | 995.7 |
-| Executables, time first 200 | 221.9 | 349.9 | 700.7 |
-| Executables, ID first 50 | 117.7 | 156.7 | 209.6 |
-| Executables, deep 200 | 240.0 | 329.9 | 384.8 |
-| Executables, NULL-time 200 | 212.7 | 288.6 | 365.3 |
-| Children, ID first 200 | 1,391.2 | 1,754.0 | 2,066.7 |
-| Children, ID first 50 | 1,408.5 | 1,751.2 | 1,978.7 |
-| Children, deep 200 | 1,556.0 | 1,813.0 | 2,338.7 |
-| Children, maximal path 200 | 649.5 | 1,588.9 | 2,371.7 |
-| Events, ID first 50 | 12.0 | 82.8 | 153.7 |
-| Events, Unicode warning search | 519.5 | 1,299.6 | 2,091.4 |
-| Events, full-source search / maximal text 200 | 1,214.6 | 2,722.6 | 4,161.7 |
-| Parameters, first 200 | 50.8 | 91.6 | 148.9 |
-| Overrides, values permitted, first 200 | 187.9 | 329.9 | 376.3 |
-| Overrides, values disabled, first 200 | 49.5 | 65.6 | 224.8 |
-
-These prepared SQL tails do not close any HTTP/network/browser budget. In particular, similar 50/200-row child costs support investigating historical pairing work rather than treating the row cap as a complete performance bound.
-
-#### Existing reader SQL IO and remaining gates
-
-**30 public-view SQL diagnostics PASS**: both existing nonprivileged reader mappings, five page resources, three repeats each; IDs match independent public-view order and projected results remain stable. Session impersonation is explicit. Both readers retain sysadmin/db_owner/ssis_admin **0** and SHOWPLAN **0**; only the normal reader has `ssis_logreader`. No permissions changed. Third-repeat regular/LOB reads:
-
-| Page | Normal: rows; regular / LOB reads | Restricted: rows; regular / LOB reads |
-| --- | ---: | ---: |
-| Executables | 14; 150 / 0 | 2; 152 / 0 |
-| Children | 4; 631 / 6 | 0; 38 / 0 |
-| Events | 120; 1,507 / 465 | 20; 740 / 63 |
-| Parameters | 10; 108 / 9 | 15; 484 / 14 |
-| Overrides, values disabled | 0; 12 / 0 | 1; 84 / 0 |
-
-These are actual visible small/empty pages, not populated/full-page reader workloads. Reader SHOWPLAN, independent Windows sign-in/API HTTP, real active/Scale Out data, network p95, C8.2b.2c aggregate/history growth, C8.2c sustained/concurrent resources, OBS-02 and deferred hosting retain their own open gates. Successful per-query closes do not pass sustained resource or native cleanup-failure acceptance.
-
-The independent offline verifier reconciles response bytes/data fingerprints, all 100-sample distributions, SQL/query counts, 192 actual insert cardinalities, reader scopes and unchanged catalog fingerprints. **131 focused database-free contract/observation/value/resource tests PASS**. Reusable probes/verifier/retention helpers remain in `.local/backend-validation/tools/`. Selected summaries, reconciliation, source snapshots and promotion/archive receipts are retained under `.local/reports/backend/20261018-c82b2b/`; complete raw phase evidence is recoverable from the hash-checked `.local/backend-validation/archive/c82b2b-20261018.zip` using the [local artifact workflow](installation.md#cleanup-and-recovery). Pilot/parser failures are excluded from acceptance counts and stay classified as disposable temporary output.
+Warm native SQL at 20,000 sources, median / p95 ms: executables first 200 422 / 596, children first 200 1,391 / 1,754, events first 50 12 / 83, events full-source search with maximal text 1,215 / 2,723, parameters 51 / 92. Children cost the same at 50 and 200 rows because pairing read the key's whole history: from 2,000 to 20,000 starts, event rows read grew from 20,648 to 121,810 for the same 201 candidates. That was fixed in C8.2b.2b.R1. The two existing readers were checked by session impersonation through public views (IO only, no SHOWPLAN) on their small visible pages; that is not independent sign-in or a populated reader workload. Evidence: `.local/reports/backend/20261018-c82b2b/` and the hash-checked archive `.local/backend-validation/archive/c82b2b-20261018.zip`.
 
 ### C8.2b.2b.R1 child-pairing results
 
-**24 October 2026, candidate on base `b23d976`. Codex accepted it after native verification (round 1), and it is committed as `1699821`.** Only `api-children-page.sql` pairing changed (SQL SHA-256 `b2fccef6…b2ca`, base `b782c12a…c9ab`). The page now reads each start's adjacent keyed start/post instead of the whole keyed history: one seek between two page starts of a key, a 64-row window before a key's first and after its last page start, and, only for keys still unsettled, one shared doubling walk per direction that stops when every key is settled. No cache, history cap, hint or RECOMPILE was added; result columns, DTOs, cursors and the frontend are unchanged. The same environment as C8.2b.2b ran the [protocol](#c82b2br1-child-pairing-protocol).
+24 October 2026, committed as `1699821` after Codex accepted it with native verification. Only the pairing in `api-children-page.sql` changed: each start reads its adjacent keyed start or post, with a bounded window at the edges of the page and one shared doubling walk for keys still unsettled. DTOs are identical for all 12 cases at 2,000, 20,000 and 50,000 starts and for 128 real-catalog cursor chains; six wrong SQL variants fail the new native test.
 
-**Correctness:** both SQL trees pass all 12 child WSGI cases (8 initial and 4 actual-next) at 2,000, 20,000 and 50,000 starts with complete independent DTO equality. The new native test passes all three cases, and six deliberately wrong SQL variants fail it. On the real catalog, base and candidate DTOs are identical for all 16 visible executions × both orders/directions × limits 2/200 (128 cursor chains); both existing reader scopes pass their public-view SQL IO check.
-
-**Source work** (third diagnostic; event-source rows read split into selection/enrichment and pairing):
-
-| Page shape | Pairing rows, base 2k / 20k / 50k | Pairing rows, candidate 2k / 20k / 50k | Complete-batch regular reads at 20k / 50k, base → candidate |
+| Page, first 200 | Pairing rows read, base 2k / 20k / 50k | Candidate | Warm median ms at 50k, base → candidate |
 | --- | ---: | ---: | ---: |
-| ID ascending, first 200 | 6,884 / 60,705 / 150,408 | 2,788 / 2,788 / 2,788 | 89,824 → 8,126 / 221,088 → 12,137 |
-| ID descending, first 200 | 6,884 / 60,705 / 150,408 | 3,156 / 43,166 / 3,156 | 89,824 → 28,458 / 221,088 → 12,345 |
-| Time ascending, first 200 | 6,884 / 60,705 / 150,408 | 2,788 / 2,948 / 2,890 | 89,826 → 8,472 / 221,089 → 12,498 |
-| Time descending, first 200 | 6,884 / 60,705 / 150,408 | 3,140 / 42,998 / 3,166 | 89,823 → 28,348 / 221,087 → 12,634 |
-| ID first 50 | 6,884 / 60,705 / 150,408 | 976 / 976 / 976 | 88,281 → 4,381 / 219,545 → 8,392 |
-| Deep 200 | 6,884 / 60,705 / 150,408 | 3,156 / 3,156 / 3,156 | 89,824 → 8,334 / 221,090 → 12,345 |
-| Maximal path 200 | 6,882 / 60,703 / 150,406 | 930 / 930 / 930 | 7,258 → 5,638 / 11,270 → 5,639 (LOB 114,642 → 95,496) |
+| ID ascending | 6,884 / 60,705 / 150,408 | 2,788 at every size | 3,803 → 210 |
+| ID descending | 6,884 / 60,705 / 150,408 | 3,156 / 43,166 / 3,156 | 3,921 → 323 |
+| Maximal path | 6,882 / 60,703 / 150,406 | 930 at every size | 926 → 572 |
 
-Candidate pairing work no longer depends on how often a key repeated. The 20,000-start descending pages are the exception that proves the rule: the last start of one key has no post (start 19,998), and showing that no later end exists reads the execution's remaining **20,004** events once. Those are unrelated wide events, not repetitions of the key; at 50,000 the last four starts all have posts. Base diagnostics capture `SpillToTempDb`/`SortSpillDetails` at 2,000 and 50,000; no candidate diagnostic spills. Candidate per-execution compile messages stay at 0–11 ms CPU, without RECOMPILE.
-
-Selection/enrichment rows (`#child_page`, `@child_starts`) are identical in base and candidate: 13,764 / 61,105 / 150,808. The unchanged candidate selection scans the temporary heap at every size because these sources have no covering index. This is outside pairing and is not equivalent to SSISDB's clustered/operation indexes. It stays an open selection-plan observation for representative catalog/reader plans (reader SHOWPLAN remains NOT RUN). On the 16-execution real catalog, the busiest child page (4 starts) reads 993 event-message pages instead of 351. That fixed window/seek overhead does not grow with history, and is recorded as a small-catalog tradeoff.
-
-**Warm native SQL** (milliseconds; candidate 100 samples per case, base 20 at 20,000 run alone and 10 at 50,000; retained C8.2b.2b base for comparison):
-
-| Case | Base 20k median / p95 / max | Candidate 20k | Base 50k | Candidate 50k |
-| --- | ---: | ---: | ---: | ---: |
-| ID ascending, first 200 | 1,472.1 / 1,591.1 / 1,694.1 | 126.4 / 134.1 / 202.0 | 3,803.1 / 3,958.7 / 3,958.7 | 210.3 / 215.6 / 271.6 |
-| ID descending, first 200 | 1,606.4 / 1,847.8 / 1,857.9 | 357.9 / 405.4 / 442.1 | 3,921.2 / 4,098.6 / 4,098.6 | 322.6 / 432.9 / 615.8 |
-| Time ascending, first 200 | 1,626.3 / 1,858.3 / 1,897.3 | 309.9 / 344.6 / 516.2 | 3,949.1 / 4,291.9 / 4,291.9 | 309.2 / 432.3 / 468.1 |
-| Time descending, first 200 | 1,651.8 / 1,851.1 / 1,852.3 | 374.4 / 465.3 / 526.5 | 3,704.0 / 4,262.2 / 4,262.2 | 327.4 / 417.4 / 574.5 |
-| ID first 50 | 1,477.9 / 1,654.9 / 1,700.9 | 98.7 / 101.5 / 144.4 | 3,777.5 / 4,005.8 / 4,005.8 | 182.6 / 192.3 / 273.4 |
-| Deep 200 | 1,596.9 / 1,841.7 / 1,945.6 | 247.2 / 285.0 / 470.1 | 3,950.1 / 4,500.8 / 4,500.8 | 207.9 / 391.2 / 470.8 |
-| Maximal path 200 | 648.6 / 766.3 / 773.0 | 572.6 / 592.4 / 849.8 | 925.9 / 2,422.9 / 2,422.9 | 572.1 / 590.6 / 600.4 |
-
-The retained C8.2b.2b 20,000-start medians (1,391–1,556 ms) agree with today's base. The base 50,000 samples overlapped other local probe work, so they are indicative only. Every output stayed stable, all sampler connections closed and catalog fingerprints were unchanged. The remaining selection growth with the stream of unrelated events, reader SHOWPLAN, independent Windows-reader HTTP (C8.3), sustained/concurrent resources (C8.2c) and real active/Scale Out data keep their existing gates. Selected summaries are in `.local/reports/backend/20261024-c82b2b-r1/`; the reusable harnesses are `.local/backend-validation/tools/probe-child-pairing.py` and `compare-children-catalog.py`.
+The base samples at 50,000 overlapped other local probe work and are indicative only. Pairing work no longer depends on how often a key repeats. The exception is a start with no post, where proving no later end exists reads the execution's remaining events once (20,004 at 20,000 starts). Base plans spilled; the candidate's did not. Selection still scans the temporary heap at every size, which SSISDB's indexes may not; on the 16-execution catalog the busiest page reads 993 pages instead of 351, a fixed overhead. The selection plan on a representative catalog under reader visibility remains to be checked (reader SHOWPLAN NOT RUN). Evidence: `.local/reports/backend/20261024-c82b2b-r1/`.
 
 ### C8.2b.2c aggregate and history results
 
-**24 October 2026, candidate on base `b23d976` plus the C8.2b.2b.R1 candidate. Codex accepted it after native verification (round 1), and it is committed as `1699821`.** Only `api-history-page.sql` changed (SHA-256 `33b7a415…`, base `bb9898d6…`). Before materializing prior successes, the page now reads the end time of the sixth latest visible success ending by its earliest row start, and materializes only successes ending at or after that floor. Each row still samples exactly its five latest prior successes; the floor only skips successes that no row could sample. The summary, timeline and fence SQL, the DTOs and the frontend are unchanged. The [protocol](#c82b2c-aggregate-and-history-protocol) ran on the C8.2b.2b environment.
+24 October 2026, committed as `1699821` after Codex accepted it with native verification. Only `api-history-page.sql` changed: before materializing prior successes it reads the end time of the sixth latest success ending by the page's earliest start, and materializes only successes ending at or after that floor. Every estimate equals the Python oracle at 2,000, 20,000 and 100,000 executions in all 14 cases; summaries and all 1,000 hour buckets in three time zones match; 44 real-catalog history chains are identical.
 
-**Correctness:** both SQL trees pass all 14 cases at 2,000, 20,000 and 100,000 executions. Every history estimate equals the Python oracle, across both directions, 50/200 rows, the next and deep cursors (up to 198 estimates per page). Summary status totals match for broad (100,000), selective (2,000) and pattern (90,000) cohorts. All 1,000 hour buckets match in each of the London, New York and Auckland timelines, as do the selective timeline and the day timelines with 23- and 25-hour days. The new native history test passes, and four wrong floor variants fail it: TOP (5), a strict floor, a floor from the latest start, and a missing NULL guard. On the real catalog, base and candidate DTOs are identical for 44 history chains, summaries and timelines across 4 package identities (76 estimates); diagnose passes.
-
-**History source work** (third diagnostic; source rows read / logical reads / rows materialized as prior successes):
-
-| Page | 2,000 base → candidate | 20,000 base → candidate | 100,000 base → candidate |
+| History page at 100,000 | Source rows read, base → candidate | Prior successes materialized | Warm median ms |
 | --- | ---: | ---: | ---: |
-| Descending 200 | 4,084 / 881 / 1,240 → 6,084 / 907 / 1,240 | 24,202 / 1,624 / 12,525 → 44,202 / 1,770 / 2,516 | 104,202 / 3,212 / 62,674 → 204,202 / 3,841 / 2,509 |
-| Ascending 200 | 4,084 / 881 / 1,240 → 6,084 / 907 / 1,240 | 24,205 / 1,536 / 2,500 → 44,205 / 1,770 / 2,500 | 104,205 / 2,673 / 2,494 → 204,205 / 3,840 / 2,494 |
-| Descending 50 | 3,052 / 471 / 1,240 → 5,052 / 494 / 632 | 21,052 / 657 / 12,525 → 41,052 / 812 / 633 | 101,052 / 1,937 / 62,674 → 201,052 / 2,732 / 632 |
-| Deep 50 | 3,032 / 453 / 601 → 5,032 / 479 / 601 | 21,071 / 628 / 6,238 → 41,071 / 812 / 632 | 101,071 / 1,728 / 31,298 → 201,071 / 2,730 / 631 |
+| Descending 200 | 104,202 → 204,202 | 62,674 → 2,509 | 365 → 252 |
+| Descending 50 | 101,052 → 201,052 | 62,674 → 632 | 330 → 191 |
+| Ascending 200 | 104,205 → 204,205 | 2,494 → 2,494 | 65 → 66 |
 
-Prior-success materialization no longer grows with package history: it stays at about 630 rows for a 50-row page and 2,500 for a 200-row page. The cost is one more pass over the cohort source, a TOP (6) whose sort keeps six rows, so source rows read roughly double and logical reads rise by up to 60%. Reading every candidate execution remains inherent, because the catalog has no package or end-time index and an exact sample cannot skip any success that might end later. No diagnostic spills; compile messages are 0 ms CPU.
-
-**Summaries and timelines** read exactly the cohort source once (2,000 / 20,000 / 100,000 rows), the same in both trees; this is inherent without a creation-time index. Summary logical reads are 26 / 234 / 1,167. Timeline reads are dominated by one bucket seek per execution: 8,067 / 44,275 / 205,208 for 1,000 hour buckets, against 4,240 / 40,448 / 201,381 for 42 day buckets, so bucket count adds almost nothing. The selective timeline reads 4,102 / 4,671 / 7,208.
-
-**Warm native SQL** (milliseconds, median / p95 / maximum, 30 samples per case at 100,000 executions; full per-size distributions in the retained summaries):
-
-| Case | Base | Candidate |
-| --- | ---: | ---: |
-| History descending 200 | 364.9 / 413.2 / 429.1 | 252.4 / 346.2 / 346.2 |
-| History ascending 200 | 65.4 / 101.7 / 107.6 | 66.1 / 163.5 / 192.8 |
-| History descending 50 | 329.9 / 425.8 / 458.0 | 191.0 / 348.4 / 350.8 |
-| History deep 50 | 157.3 / 174.8 / 175.0 | 139.0 / 174.8 / 330.5 |
-| Summary broad / selective / pattern | 101.9 / 53.8 / 113.1 (medians) | unchanged SQL |
-| Timeline 1,000 hours (London / New York / Auckland) | 738.1 / 718.9 / 672.5 (medians) | unchanged SQL |
-| Timeline selective / day / Auckland day | 104.3 / 656.6 / 643.6 (medians) | unchanged SQL |
-
-At 2,000 and 20,000 executions, history medians stay within 15 ms of the base or improve (20,000 deep: 55.9 → 35.6). Thirty-sample p95/maximum values vary by tens of milliseconds between runs; they are local observations, not a capacity claim. The 1,000-hour timeline at 100,000 executions (about 0.7 s of SQL) is the costliest case. It is linear in the cohort, not in history or bucket count, and stays an input to the P4.6a render/network budget. Reader SHOWPLAN, independent Windows-reader HTTP (C8.3), sustained/concurrent resources (C8.2c) and real active/Scale Out data keep their gates. Selected summaries are in `.local/reports/backend/20261024-c82b2c/`; the harnesses are `.local/backend-validation/tools/probe-aggregate-growth.py` and `compare-aggregates-catalog.py`.
+Materialization no longer grows with package history; the cost is a second pass over the cohort, so source rows read roughly double. Summaries and timelines read the cohort once (inherent without a creation-time index); a 1,000-hour timeline over 100,000 executions costs about 0.7 s of SQL, linear in the cohort, and stays an input to the render and network budget. Evidence: `.local/reports/backend/20261024-c82b2c/`. Reader SHOWPLAN, independent reader HTTP, sustained resources and real active or Scale Out data keep their gates.
