@@ -98,6 +98,12 @@ def execution_page(values, config, *, fixed_to, estimate_cache):
                     else 'api-executions-ordered-page.sql')
         page_parameters += (selection['sort'], *seek)
     rows = [] if upper is None else query(resource, page_parameters)
+    if selection['sort'] in CALCULATED_SORTS:
+        for row in rows:
+            # The calculated-sort batch counts system LOGGING_LEVEL rows, as detail and History do.
+            if (type(row['logging_rows']) is not int or row['logging_rows'] not in (0, 1)
+                    or (row['logging_rows'] == 0 and row['logging_level'] is not None)):
+                raise ValueError('Unexpected execution metadata.')
     has_more = len(rows) > selection['limit']
     page = rows[:selection['limit']]
     # Elapsed time follows this request's clock; the cursor's first-page as_of only fences and expires the chain.

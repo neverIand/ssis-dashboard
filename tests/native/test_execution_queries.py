@@ -131,6 +131,39 @@ class ExecutionSQLTests(unittest.TestCase):
                 with self.subTest(sort=sort, selection=selection):
                     self.compare_chain(sort, 'desc', selection=selection, where=where)
 
+    def traverse(self, sort, direction='asc'):
+        collected, last, seek = [], None, None
+        for _ in range(10):
+            rows = self.page(sort, direction, last=last, seek=seek)
+            collected.extend(rows[:50])
+            if len(rows) <= 50:
+                return collected
+            last = rows[49]['execution_id']
+            key, nulls = encode_key(rows[49], sort)
+            seek = seek_values({'last_id': str(last), 'sort_key': key, 'sort_nulls': nulls}, sort)
+        self.fail('Unbounded or non-progressing cursor chain')
+
+    def test_calculated_sorts_count_system_logging_rows(self):
+        self.cursor.execute('SELECT TOP (1) execution_id FROM #sample_parameters WHERE object_type=50 ORDER BY execution_id;')
+        duplicated = self.cursor.fetchone()[0]
+        for sort in sorted(CALCULATED_SORTS):
+            with self.subTest(sort=sort):
+                self.cursor.execute('SAVE TRANSACTION logging_rows;')
+                try:
+                    # The fixture has one system row for most executions and a same-named user string for all.
+                    rows = self.traverse(sort)
+                    self.assertGreater(len(rows), 51)
+                    self.assertEqual({(row['logging_rows'], row['logging_level'] is None) for row in rows}, {(0, True), (1, False)})
+                    self.cursor.execute("INSERT #sample_parameters VALUES (?,50,N'LOGGING_LEVEL',CONVERT(sql_variant,CONVERT(int,99)));",
+                                        duplicated)
+                    again = self.traverse(sort)
+                    # Still one row per execution, with the count of two and the larger value: never an arbitrary one.
+                    self.assertEqual(sorted(row['execution_id'] for row in again), sorted(row['execution_id'] for row in rows))
+                    self.assertEqual([(row['logging_rows'], row['logging_level']) for row in again
+                                      if row['execution_id'] == duplicated], [(2, 99)])
+                finally:
+                    self.cursor.execute('ROLLBACK TRANSACTION logging_rows;')
+
     def test_deleted_cursor_row_does_not_break_continuation(self):
         for sort in ('execution_id', 'created_at', *sorted(CALCULATED_SORTS)):
             with self.subTest(sort=sort):

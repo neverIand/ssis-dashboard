@@ -13,7 +13,7 @@ DECLARE @from datetimeoffset(7) = CONVERT(datetimeoffset(7), ?),
 -- UTC seconds plus fractional ticks preserve 100-ns precision without the
 -- nanosecond BIGINT overflow of long durations. Missing times keep a NULL key, and so does an end before its
 -- start: the API reports that duration as NULL, and the row sorts with the other NULLs.
-SELECT e.execution_id, CAST(NULL AS int) AS logging_level,
+SELECT e.execution_id, CAST(NULL AS int) AS logging_level, CONVERT(bigint, 0) AS logging_rows,
        CASE WHEN @sort = N'duration_seconds' AND t.ended >= t.started THEN
            DATEDIFF_BIG(second, t.started, t.ended) * CONVERT(bigint, 10000000)
            + (DATEPART(nanosecond, t.ended) - DATEPART(nanosecond, t.started)) / 100
@@ -32,11 +32,22 @@ WHERE e.created_time >= @from AND e.created_time < @to
   AND (@s1 IS NULL OR e.status IN (@s1, @s2, @s3, @s4, @s5, @s6, @s7, @s8, @s9))
   AND e.execution_id <= @upper;
 
+-- One value and a row count per execution, as in the detail and History lookups: two system LOGGING_LEVEL
+-- rows give one deterministic key here and are rejected by the API when such a row reaches a page.
 IF @sort = N'logging_level'
-    UPDATE c SET logging_level = CONVERT(int, CASE WHEN v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL' THEN v.parameter_value END)
+BEGIN
+    -- The key lets the grouped lookup merge without a sort or hash; only this sort pays for it.
+    CREATE UNIQUE CLUSTERED INDEX cohort_id ON #execution_cohort (execution_id);
+    UPDATE c SET logging_level = l.logging_level, logging_rows = l.logging_rows
     FROM #execution_cohort AS c
-    INNER JOIN catalog.execution_parameter_values AS v ON v.execution_id = c.execution_id
-    WHERE v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL';
+    INNER JOIN (
+        SELECT v.execution_id, COUNT_BIG(*) AS logging_rows,
+               MAX(CONVERT(int, CASE WHEN v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL' THEN v.parameter_value END)) AS logging_level
+        FROM catalog.execution_parameter_values AS v
+        WHERE v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL'
+        GROUP BY v.execution_id
+    ) AS l ON l.execution_id = c.execution_id;
+END;
 
 IF @sort IN (N'warning_count', N'error_count')
 BEGIN
@@ -97,10 +108,15 @@ BEGIN
 END;
 
 IF @sort <> N'logging_level'
-    UPDATE p SET logging_level = CONVERT(int, CASE WHEN v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL' THEN v.parameter_value END)
+    UPDATE p SET logging_level = l.logging_level, logging_rows = l.logging_rows
     FROM #execution_page AS p
-    INNER JOIN catalog.execution_parameter_values AS v ON v.execution_id = p.execution_id
-    WHERE v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL';
+    INNER JOIN (
+        SELECT v.execution_id, COUNT_BIG(*) AS logging_rows,
+               MAX(CONVERT(int, CASE WHEN v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL' THEN v.parameter_value END)) AS logging_level
+        FROM catalog.execution_parameter_values AS v
+        WHERE v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL'
+        GROUP BY v.execution_id
+    ) AS l ON l.execution_id = p.execution_id;
 
 -- Recheck public execution visibility when fetching page metadata.
 SELECT p.*, e.folder_name, e.project_name, e.package_name, e.project_lsn,

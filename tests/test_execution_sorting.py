@@ -47,6 +47,7 @@ class ExecutionSortingTests(unittest.TestCase):
         self.client = self.app.test_client()
         start = parse_timestamp('2026-10-15T11:00:00.0000000Z')
         self.rows = []
+        self.logging_rows = {}
         for identifier in range(1,9):
             index = identifier - 1
             row = pages.execution(identifier, project_name=['Z','A','B','A','A','B','A','A'][index],
@@ -96,8 +97,26 @@ class ExecutionSortingTests(unittest.TestCase):
                 else:
                     row['sort_text1']=key[0]
                     if sort=='environment': row['sort_text2']=key[1]
+            if resource=='api-executions-sort.sql':
+                row['logging_rows']=self.logging_rows.get(row['execution_id'], 0 if row['logging_level'] is None else 1)
             result.append(row)
         return result
+
+    def test_calculated_sorts_reject_unexpected_logging_row_counts(self):
+        # Two system LOGGING_LEVEL rows cannot repeat a row in this batch, so the batch reports the count.
+        for sort in sorted(CALCULATED_SORTS):
+            for identifier, count in ((3, 2), (3, None), (3, True), (3, 0), (2, -1)):
+                with self.subTest(sort=sort, count=count):
+                    self.logging_rows = {identifier: count}
+                    response = self.get({**pages.WINDOW, 'sort': sort, 'limit': '200'})
+                    self.assertEqual(response.status_code, 500, response.json)
+                    self.contract.validator('Problem').validate(response.json)
+        # The look-ahead row is checked as well: row 2 sorts last by logging level and is beyond a seven-row page.
+        self.logging_rows = {2: 2}
+        self.assertEqual(self.get({**pages.WINDOW, 'sort': 'logging_level', 'limit': '7'}).status_code, 500)
+        self.assertEqual(self.get({**pages.WINDOW, 'sort': 'logging_level', 'limit': '6'}).status_code, 200)
+        # The ID and ordinary-column lists do not carry the count.
+        self.assertEqual(self.get({**pages.WINDOW, 'sort': 'created_at', 'limit': '200'}).status_code, 200)
 
     def get(self, values):
         return self.client.get('/api/v1/executions',query_string=values)
@@ -171,7 +190,7 @@ class ExecutionSortingTests(unittest.TestCase):
         from dashboard.db import execute_query
 
         self.query.side_effect = execute_query
-        row = self.rows[0]
+        row = {**self.rows[0], 'logging_rows': 1}
         for sort in EXECUTION_SORTS:
             with self.subTest(sort=sort):
                 sql_cursors, connections = [], []
