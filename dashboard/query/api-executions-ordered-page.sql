@@ -60,9 +60,10 @@ ORDER BY sort_null1 ASC,
          sort_null2 ASC,
          CASE WHEN @descending = 0 THEN sort_text2 END ASC, CASE WHEN @descending = 1 THEN sort_text2 END DESC,
          CASE WHEN @descending = 0 THEN r.execution_id END ASC, CASE WHEN @descending = 1 THEN r.execution_id END DESC
--- RECOMPILE stays: with @sort and @descending known, the CASE order keys simplify (3 sort columns, not 12). At 20,000
--- executions this statement took 74-100 ms; a cached plan took 195-254 ms.
-OPTION (RECOMPILE);
+-- No RECOMPILE (user decision, 15 November 2026). Measured: without it the sorted pages of a 19-execution catalog
+-- were 64-166 ms faster; some pages over 20,000 temporary executions were up to 243 ms slower, because a cached
+-- plan sorts on all 12 CASE keys instead of 3. See docs/API_ACCEPTANCE.md.
+;
 
 -- Preserve bounded-page join order before expanding public-view permissions.
 SELECT p.execution_id,

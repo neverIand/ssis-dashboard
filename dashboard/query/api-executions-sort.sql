@@ -87,8 +87,8 @@ WHERE @last IS NULL OR sort_null1 > @last_null1
 ORDER BY sort_null1 ASC,
          CASE WHEN @descending = 0 THEN sort_number END ASC, CASE WHEN @descending = 1 THEN sort_number END DESC,
          CASE WHEN @descending = 0 THEN execution_id END ASC, CASE WHEN @descending = 1 THEN execution_id END DESC
--- RECOMPILE stays, as in the ordinary page: the CASE order keys simplify (3 sort columns, not 5) when @descending is known.
-OPTION (RECOMPILE);
+-- No RECOMPILE, as in the ordinary page (user decision, 15 November 2026; measurements in docs/API_ACCEPTANCE.md).
+;
 
 -- Fetch remaining metrics only for the bounded page. FORCE ORDER keeps the
 -- selected IDs ahead of the public event view's permission expansion.
