@@ -1,4 +1,5 @@
 // Focused event/form double. Real browser checks own focus, native dates and layout.
+import { installPopover, popoverButton } from './popover-dom.js';
 class Control extends EventTarget {
   constructor(document, tag = 'div') {
     super();
@@ -33,10 +34,12 @@ class Control extends EventTarget {
 }
 
 export function filtersDOM(metadata, search = '') {
-  const window = Object.assign(new EventTarget(), { location: new URL(`https://example.test/dashboard/app/${search}`) });
+  const window = Object.assign(new EventTarget(), { location: new URL(`https://example.test/dashboard/app/${search}`),
+    ResizeObserver: class { observe() {} disconnect() {} } });
   const navigate = (_, __, url) => { window.location = new URL(url, window.location); };
   window.history = { replaceState: navigate, pushState: navigate };
-  const document = Object.assign(new EventTarget(), { defaultView: window });
+  const document = Object.assign(new EventTarget(), { defaultView: window,
+    documentElement: { clientWidth: 1280, clientHeight: 720 } });
   document.createElement = tag => new Control(document, tag);
   const root = new Control(document), form = new Control(document, 'form');
   root.queries.set('#overview-filters', form); root.ownerDocument = document;
@@ -65,14 +68,21 @@ export function filtersDOM(metadata, search = '') {
   const triggers = [], closes = [];
   for (const key of ['folder', 'project', 'package', 'status', 'created']) {
     const trigger = add(`[data-open-filter="${key}"]`, 'button'); trigger.dataset.openFilter = key; triggers.push(trigger);
-    const panel = add(`[data-filter-panel="${key}"]`); panel.hidden = true;
+    const panel = add(`[data-filter-panel="${key}"]`);
     const close = new Control(document, 'button'); closes.push(close); panel.children.push(close);
+    installPopover(panel, trigger, () => {
+      const first = key === 'created' ? presets[0] : key === 'status' ? form.querySelector('#status').children[0]
+        : form.querySelector(key === 'package' ? '#package-name' : `#${key}-search`);
+      first.autofocus ??= true;
+      return first;
+    });
+    popoverButton(close, panel, 'hide');
     add(`[data-filter-label="${key}"]`);
   }
   form.queries.set('[data-open-filter]', triggers); form.queries.set('[data-close-filter]', closes);
   const status = add('#status');
   for (const value of ['', ...metadata.execution_statuses.map(item => String(item.code))]) {
-    const checkbox = new Control(document, 'input'); checkbox.value = value; checkbox.checked = value === ''; status.children.push(checkbox);
+    const checkbox = new Control(document, 'input'); checkbox.value = value; checkbox.checked = checkbox.autofocus = value === ''; status.children.push(checkbox);
   }
   for (const key of ['folder', 'project']) {
     add(`#${key}-search`, 'input');
@@ -92,7 +102,11 @@ export function filtersDOM(metadata, search = '') {
     submit: () => form.dispatchEvent(new Event('submit', { cancelable: true })),
     click: selector => form.querySelector(selector).click(),
     open: key => form.querySelector(`[data-open-filter="${key}"]`).click(),
-    close: () => closes[0].click(),
+    close: () => {
+      const index = triggers.findIndex(trigger => form.querySelector(`[data-filter-panel="${trigger.dataset.openFilter}"]`)
+        .matches(':popover-open'));
+      closes[index]?.click();
+    },
     edit(selector, value, event = 'input') {
       const node = form.querySelector(selector); node.value = value; node.dispatchEvent(new Event(event));
     },

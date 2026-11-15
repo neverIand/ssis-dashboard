@@ -44,7 +44,7 @@ test('C2: the Package panel applies an exact name, shows it, keeps it across sco
   const trigger = dom.get('[data-open-filter="package"]'), input = dom.get('#package-name');
   assert.equal(dom.get('[data-filter-label="package"]').textContent, 'All packages');
   dom.open('package');
-  assert.equal(trigger.getAttribute('aria-expanded'), 'true');
+  assert.equal(dom.get('[data-filter-panel="package"]').matches(':popover-open'), true);
   assert.equal(dom.document.activeElement, input);
   assert.equal(dom.get('[data-all-scope="package"]').getAttribute('aria-pressed'), 'true');
   dom.edit('#package-name', 'Load Journals.dtsx');
@@ -54,7 +54,7 @@ test('C2: the Package panel applies an exact name, shows it, keeps it across sco
   assert.equal(new URLSearchParams(dom.window.location.search).get('package'), 'Load Journals.dtsx');
   assert.equal(dom.get('[data-filter-label="package"]').textContent, 'Load Journals.dtsx');
   assert.equal(trigger.getAttribute('aria-label'), 'Package: Load Journals.dtsx');
-  assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+  assert.equal(dom.get('[data-filter-panel="package"]').matches(':popover-open'), false);
   assert.equal(dom.document.activeElement, trigger);
 
   // Reopening prefills the applied name; the Apply button commits the edited text.
@@ -86,11 +86,12 @@ test('C2: invalid package text stays in the panel with a message; Escape and Clo
   dom.open('package'); dom.edit('#package-name', 'p'.repeat(261)); dom.click('[data-apply-package]');
   assert.equal(dom.applied.length, count); assert.equal(dom.window.location.search, search);
   assert.match(dom.get('[data-package-status]').textContent, /1–260 UTF-16 units/);
-  assert.equal(dom.get('[data-filter-panel="package"]').hidden, false);
+  assert.equal(dom.get('[data-filter-panel="package"]').matches(':popover-open'), true);
   dom.edit('#package-name', 'q');
   assert.equal(dom.get('[data-package-status]').textContent, '', 'editing clears the message');
-  dom.form.dispatchEvent(Object.defineProperty(new Event('keydown'), 'key', { value: 'Escape' }));
-  assert.equal(dom.get('[data-filter-panel="package"]').hidden, true);
+  // The browser handles Escape; the resulting close event discards the unapplied package text.
+  dom.get('[data-filter-panel="package"]').hidePopover();
+  assert.equal(dom.get('[data-filter-panel="package"]').matches(':popover-open'), false);
   assert.equal(dom.applied.length, count); assert.equal(dom.applied.at(-1).package, 'Keep.dtsx');
   dom.open('package'); assert.equal(dom.get('#package-name').value, 'Keep.dtsx', 'reopening discards the draft');
   assert.equal(dom.get('[data-package-status]').textContent, '');

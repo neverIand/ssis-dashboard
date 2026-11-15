@@ -75,6 +75,15 @@ export function inlineStatus(node, text, detail = '') {
   node.title = [text, detail].filter(Boolean).join(' · ');
 }
 
+// Fixed top-layer panels share viewport clamping; CSS anchors are beyond Baseline 2025.
+export function positionPopover(panel, trigger) {
+  const { clientWidth, clientHeight } = panel.ownerDocument.documentElement;
+  const anchor = trigger.getBoundingClientRect(), box = panel.getBoundingClientRect();
+  panel.style.left = `${Math.max(8, Math.min(anchor.left, clientWidth - box.width - 8))}px`;
+  const top = anchor.bottom + box.height + 8 <= clientHeight ? anchor.bottom + 6 : anchor.top - box.height - 6;
+  panel.style.top = `${Math.max(8, Math.min(top, clientHeight - box.height - 8))}px`;
+}
+
 export function mountInfoTips(root) {
   const document = root.ownerDocument, window = document.defaultView, removers = [];
   const listen = (node, event, action) => {
@@ -84,13 +93,10 @@ export function mountInfoTips(root) {
     const tip = document.getElementById(button.getAttribute('aria-describedby'));
     const container = button.parentElement;
     let hovered = false;
-    const hide = () => { tip.hidden = true; };
+    const hide = () => tip.hidePopover();
     const show = () => {
-      tip.hidden = false;
-      const anchor = button.getBoundingClientRect(), box = tip.getBoundingClientRect();
-      tip.style.left = `${Math.max(8, Math.min(anchor.left, window.innerWidth - box.width - 8))}px`;
-      tip.style.top = `${anchor.bottom + box.height + 8 <= window.innerHeight
-        ? anchor.bottom + 6 : Math.max(8, anchor.top - box.height - 6)}px`;
+      tip.showPopover();
+      positionPopover(tip, button);
     };
     hide();
     listen(container, 'pointerenter', () => { hovered = true; show(); });

@@ -3,12 +3,13 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { ApiError } from '../src/api.js';
 import { mountDetail } from '../src/render-detail.js';
-import { mountInfoTips } from '../src/ui.js';
+import { mountInfoTips, positionPopover } from '../src/ui.js';
 import { detailDOM, detailResponse, runningDetailResponse } from './detail-fixture.js';
 import { eventPage } from './event-fixture.js';
 import { historyMetadata, historyPage, historyRow } from './history-fixture.js';
 import { deferred, requestId } from './fixtures.js';
 import { Node } from './overview-dom.js';
+import { installPopover } from './popover-dom.js';
 
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const click = node => node.dispatchEvent(new Event('click'));
@@ -39,7 +40,7 @@ const chooseStatuses = (dom, codes) => {
 test('Custom status popover applies exactly once on close; Escape cancels and restores the applied checks', async t => {
   const dom = screen(t); await flush(); const count = dom.calls.length;
   click(dom.get('history-custom')); chooseStatuses(dom, ['4', '7']);
-  assert.equal(dom.get('history-custom').getAttribute('aria-expanded'), 'true');
+  assert.equal(String(dom.get('history-status-options').matches(':popover-open')), 'true');
   assert.equal(dom.calls.length, count);
   click(dom.get('history-close')); await flush();
   assert.equal(dom.calls.length, count + 1);
@@ -49,7 +50,7 @@ test('Custom status popover applies exactly once on close; Escape cancels and re
   click(dom.get('history-custom')); chooseStatuses(dom, ['2']);
   const event = dispatch(dom.get('history-status-options'), 'keydown', dom.document.activeElement, 'Escape');
   assert.equal(event.defaultPrevented, true); assert.equal(dom.calls.length, count + 1);
-  assert.equal(dom.get('history-status-options').hidden, true);
+  assert.equal(!dom.get('history-status-options').matches(':popover-open'), true);
   assert.deepEqual(dom.get('history-choices').children.filter(label => label.firstChild.checked).map(label => label.firstChild.value), ['4', '7']);
 });
 
@@ -64,17 +65,19 @@ test('Custom commits on focus leaving, ignores unchanged closes, and rejects an 
   click(dom.get('history-custom')); chooseStatuses(dom, []);
   dom.get('history-filters').dispatchEvent(new Event('submit')); await flush();
   assert.equal(dom.calls.length, count); assert.match(dom.get('history-notice').textContent, /at least one/);
-  assert.equal(dom.get('history-status-options').hidden, true);
+  assert.equal(!dom.get('history-status-options').matches(':popover-open'), true);
 });
 
 test('a preset consumes an open Custom draft without an intermediate request', async t => {
   const dom = screen(t); await flush(); const count = dom.calls.length;
   click(dom.get('history-custom')); chooseStatuses(dom, ['4', '7']);
   const running = dom.get('history-presets').children.find(button => button.dataset.historyPreset === 'running');
-  assert.equal(dispatch(dom.document, 'pointerdown', running).defaultPrevented, true);
+  assert.equal(dispatch(dom.document, 'pointerdown', running).defaultPrevented, false);
+  dom.get('history-status-options').hidePopover();
+  assert.equal(dom.calls.length, count, 'Native dismissal before preset activation cannot send an intermediate read');
   click(running); dispatch(dom.document, 'click', running); await flush();
   assert.equal(dom.calls.length, count + 1); assert.equal(dom.calls.at(-1).params.status, '2');
-  assert.equal(dom.document.activeElement, running); assert.equal(dom.get('history-status-options').hidden, true);
+  assert.equal(dom.document.activeElement, running); assert.equal(!dom.get('history-status-options').matches(':popover-open'), true);
 });
 
 test('busy refresh preserves icon names/focus, and closing Custom cannot dispatch while busy', async t => {
@@ -86,7 +89,7 @@ test('busy refresh preserves icon names/focus, and closing Custom cannot dispatc
   assert.equal(refresh.getAttribute('aria-disabled'), 'true'); assert.equal(dom.document.activeElement, refresh);
   assert.equal(dom.get('detail-poll-toggle').getAttribute('aria-label'), 'Pause auto refresh');
   click(dom.get('history-close')); click(dom.get('history-custom'));
-  assert.equal(dom.calls.length, count); assert.equal(dom.get('history-status-options').hidden, true);
+  assert.equal(dom.calls.length, count); assert.equal(!dom.get('history-status-options').matches(':popover-open'), true);
   wait.resolve(historyPage()); await flush();
   assert.equal(refresh.getAttribute('aria-disabled'), 'false');
   click(dom.get('detail-poll-toggle'));
@@ -180,12 +183,27 @@ test('the page reserves its scrollbar gutter and disclosure styles follow expand
   }
 });
 
-test('info tips work on hover/focus, fit the viewport, dismiss on Escape and remove listeners', () => {
-  const document = Object.assign(new EventTarget(), { activeElement: null });
+test('a restored popover stays visible after its trigger scrolls beyond either viewport edge (F001)', () => {
+  const document = { documentElement: { clientWidth: 360, clientHeight: 812 } };
+  const panel = { ownerDocument: document, style: {}, getBoundingClientRect: () => ({ width: 340, height: 474 }) };
+  for (const [anchor, top] of [
+    [{ left: 40, top: -370, bottom: -334 }, '8px'],
+    [{ left: 40, top: 1000, bottom: 1036 }, '330px']
+  ]) {
+    positionPopover(panel, { getBoundingClientRect: () => anchor });
+    assert.equal(panel.style.left, '12px');
+    assert.equal(panel.style.top, top);
+  }
+});
+
+test('info tips work on hover/focus, fit beside the viewport scrollbar, dismiss on Escape and remove listeners', () => {
+  const document = Object.assign(new EventTarget(), { activeElement: null,
+    documentElement: { clientWidth: 360, clientHeight: 900 } });
   const window = Object.assign(new EventTarget(), { innerWidth: 375, innerHeight: 900 });
   document.defaultView = window;
   const root = new Node(document, 'root'), container = new Node(document, 'span');
   const button = new Node(document, 'button'), tip = new Node(document, 'span', 'Definition');
+  installPopover(tip);
   button.setAttribute('aria-describedby', 'definition');
   root.append(container); container.append(button, tip);
   button.getBoundingClientRect = () => ({ left: 340, top: 870, bottom: 890 });
@@ -193,14 +211,14 @@ test('info tips work on hover/focus, fit the viewport, dismiss on Escape and rem
   document.getElementById = id => id === 'definition' ? tip : null;
   root.querySelectorAll = () => [button];
   const dispose = mountInfoTips(root);
-  assert.equal(tip.hidden, true);
+  assert.equal(tip.matches(':popover-open'), false);
   container.dispatchEvent(new Event('pointerenter'));
-  assert.equal(tip.hidden, false); assert.equal(tip.style.left, '37px'); assert.equal(tip.style.top, '784px');
-  container.dispatchEvent(new Event('pointerleave')); assert.equal(tip.hidden, true);
-  button.focus(); button.dispatchEvent(new Event('focus')); assert.equal(tip.hidden, false);
-  dispatch(document, 'keydown', button, 'Escape'); assert.equal(tip.hidden, true);
+  assert.equal(tip.matches(':popover-open'), true); assert.equal(tip.style.left, '22px'); assert.equal(tip.style.top, '784px');
+  container.dispatchEvent(new Event('pointerleave')); assert.equal(tip.matches(':popover-open'), false);
+  button.focus(); button.dispatchEvent(new Event('focus')); assert.equal(tip.matches(':popover-open'), true);
+  dispatch(document, 'keydown', button, 'Escape'); assert.equal(tip.matches(':popover-open'), false);
   assert.equal(document.activeElement, button);
-  dispose(); container.dispatchEvent(new Event('pointerenter')); assert.equal(tip.hidden, true);
+  dispose(); container.dispatchEvent(new Event('pointerenter')); assert.equal(tip.matches(':popover-open'), false);
 });
 
 test('native templates retain only row/timeline disclosures and one pager per toolbar', () => {

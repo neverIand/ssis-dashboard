@@ -238,7 +238,8 @@ test('unchanged closes send nothing; status Done, outside pointer and keyboard f
     box.checked = !box.checked; status.dispatchEvent(new Event('change'));
     const before = dom.applied.length;
     if (via === 'done') dom.close();
-    else dom.document.dispatchEvent(new Event(via === 'pointer' ? 'pointerdown' : 'focusin'));
+    else if (via === 'pointer') dom.get('[data-filter-panel="status"]').hidePopover();
+    else dom.document.dispatchEvent(new Event('focusin'));
     assert.equal(dom.applied.length, before + 1, via);
     dom.close(); assert.equal(dom.applied.length, before + 1, 'Second close is inert');
   }
@@ -252,11 +253,11 @@ test('Escape discards Status changes, restores checked values and focus, and can
   status.children[1].checked = false; status.children[2].checked = true;
   status.dispatchEvent(new Event('change'));
   const event = new Event('keydown', { cancelable: true }); Object.defineProperty(event, 'key', { value: 'Escape' });
-  dom.form.dispatchEvent(event);
+  dom.document.dispatchEvent(event);
   assert.equal(event.defaultPrevented, true);
   assert.equal(dom.applied.length, 1);
   assert.equal(dom.window.location.search, query);
-  assert.equal(dom.get('[data-filter-panel="status"]').hidden, true);
+  assert.equal(!dom.get('[data-filter-panel="status"]').matches(':popover-open'), true);
   assert.equal(dom.document.activeElement, dom.get('[data-open-filter="status"]'));
   dom.open('status');
   assert.deepEqual(status.children.filter(node => node.checked).map(node => node.value), ['1']);
@@ -348,7 +349,8 @@ test('clicking a card/header/scope with an open Status draft commits one merged 
     const status = dom.get('#status'); status.children[1].checked = true; status.dispatchEvent(new Event('change'));
     const action = dom.document.createElement('a'); action.dataset.selectionLink = '';
     const pointer = eventAt('pointerdown', action); dom.document.dispatchEvent(pointer);
-    assert.equal(pointer.defaultPrevented, true, 'Do not clear rows or move pointer focus before click');
+    assert.equal(pointer.defaultPrevented, false, 'Native pointer focus is allowed; the draft waits for activation');
+    dom.get('[data-filter-panel="status"]').hidePopover();
     assert.equal(dom.applied.length, 1);
     dom.select(changes); dom.document.dispatchEvent(eventAt('click', action));
     assert.equal(dom.applied.length, 2);
@@ -361,7 +363,8 @@ test('a timeline drill with an open Status draft commits status and bucket range
   const status = dom.get('#status'); status.children[1].checked = true; status.dispatchEvent(new Event('change'));
   const drill = dom.document.createElement('button'); drill.dataset.selectionAction = '';
   const pointer = eventAt('pointerdown', drill); dom.document.dispatchEvent(pointer);
-  assert.equal(pointer.defaultPrevented, true, 'the draft is not committed before the drill');
+  assert.equal(pointer.defaultPrevented, false, 'the chart can receive focus before its merged drill');
+  dom.get('[data-filter-panel="status"]').hidePopover();
   assert.equal(dom.applied.length, 1);
   const range = { created: null, from: '2026-10-17T00:00:00.0000000Z', to: '2026-10-17T05:00:00.0000000Z' };
   dom.select(range); dom.document.dispatchEvent(eventAt('click', drill));
@@ -369,12 +372,72 @@ test('a timeline drill with an open Status draft commits status and bucket range
   assert.deepEqual([dom.applied.at(-1).status, dom.applied.at(-1).from, dom.applied.at(-1).to], [[1], range.from, range.to]);
 });
 
+test('a single timeline click keeps the Status draft visible and cancellable or committable (F001)', t => {
+  for (const finish of ['Escape', 'Done', 'outside focus']) {
+    const dom = setup(t); dom.open('status');
+    const status = dom.get('#status'), panel = dom.get('[data-filter-panel="status"]');
+    status.children[1].checked = true; status.dispatchEvent(new Event('change'));
+    const bar = dom.document.createElement('g'); bar.dataset.selectionAction = '';
+    dom.document.dispatchEvent(eventAt('pointerdown', bar));
+    bar.focus();
+    panel.hidePopover();
+    dom.document.dispatchEvent(eventAt('click', bar));
+    assert.equal(panel.matches(':popover-open'), true, 'the uncommitted draft stays visible after a lone chart click');
+    assert.equal(dom.applied.length, 1);
+    assert.equal(dom.window.location.search, '');
+    assert.equal(status.children[1].checked, true);
+    assert.equal(dom.document.activeElement, bar, 'restoring the picker preserves the chart activation focus');
+    assert.equal(dom.get('[data-filter-notice]').textContent, 'Close Status to apply; Escape cancels.');
+    if (finish === 'Escape') {
+      const escape = eventAt('keydown', dom.document.activeElement);
+      Object.defineProperty(escape, 'key', { value: 'Escape' });
+      dom.document.dispatchEvent(escape);
+      assert.equal(escape.defaultPrevented, true);
+      assert.equal(dom.applied.length, 1);
+      assert.equal(dom.window.location.search, '');
+      assert.equal(status.children[1].checked, false);
+    } else {
+      if (finish === 'Done') dom.close();
+      else dom.document.dispatchEvent(eventAt('focusin', bar));
+      assert.equal(dom.applied.length, 2);
+      assert.deepEqual(dom.applied.at(-1).status, [1]);
+      assert.equal(dom.window.location.searchParams.get('status'), '1');
+    }
+    assert.equal(panel.matches(':popover-open'), false);
+    assert.equal(dom.get('[data-filter-notice]').textContent, '');
+    dom.select({ limit: 100 });
+    assert.deepEqual(dom.applied.at(-1).status, finish === 'Escape' ? [] : [1], 'no hidden draft can leak later');
+  }
+});
+
+test('a canceled selection pointer leaves Status open and allows a later keyboard close (F002)', t => {
+  for (const action of ['selectionAction', 'selectionLink', 'sort', 'executionLink']) {
+    const dom = setup(t); dom.open('status');
+    const status = dom.get('#status'), panel = dom.get('[data-filter-panel="status"]');
+    status.children[1].checked = true; status.dispatchEvent(new Event('change'));
+    const target = dom.document.createElement('button'); target.dataset[action] = '';
+    dom.document.dispatchEvent(eventAt('pointerdown', target));
+    dom.document.dispatchEvent(eventAt('pointercancel', target));
+    assert.equal(panel.matches(':popover-open'), true);
+    assert.equal(dom.applied.length, 1, 'canceling a pointer does not submit Status');
+    dom.document.dispatchEvent(eventAt('focusin', target));
+    assert.equal(panel.matches(':popover-open'), false, 'keyboard focus can close after a canceled pointer');
+    assert.equal(dom.applied.length, 2);
+    assert.deepEqual(dom.applied.at(-1).status, [1]);
+  }
+});
+
 test('a timeline double click keeps an open Status draft through its first click (UX B3, Codex R2-1)', t => {
   const dom = setup(t); dom.open('status');
   const status = dom.get('#status'); status.children[1].checked = true; status.dispatchEvent(new Event('change'));
   const bar = dom.document.createElement('g'); bar.dataset.selectionAction = '';
-  for (const type of ['pointerdown', 'click', 'pointerdown', 'click']) dom.document.dispatchEvent(eventAt(type, bar));
+  for (const type of ['pointerdown', 'click', 'pointerdown', 'click']) {
+    dom.document.dispatchEvent(eventAt(type, bar));
+    if (type === 'pointerdown') { bar.focus(); dom.get('[data-filter-panel="status"]').hidePopover(); }
+    else assert.equal(dom.get('[data-filter-panel="status"]').matches(':popover-open'), true);
+  }
   assert.equal(dom.applied.length, 1, 'no commit before the dblclick drill');
+  assert.equal(dom.document.activeElement, bar, 'the drill can move focus from the chart to the list');
   const range = { created: null, from: '2026-10-17T00:00:00.0000000Z', to: '2026-10-17T05:00:00.0000000Z' };
   dom.select(range);
   assert.equal(dom.applied.length, 2);
@@ -389,7 +452,9 @@ test('a detail link consumes closing Status into its URL before rows can be clea
     const link = dom.document.createElement('a'); link.dataset.executionLink = ''; link.dataset.executionId = '17';
     link.href = '/dashboard/app/executions/17' + fragment;
     const pointer = eventAt('pointerdown', link); dom.document.dispatchEvent(pointer);
-    assert.equal(pointer.defaultPrevented, true); assert.equal(dom.applied.length, 1);
+    assert.equal(pointer.defaultPrevented, false); assert.equal(dom.applied.length, 1);
+    dom.get('[data-filter-panel="status"]').hidePopover();
+    assert.equal(dom.applied.length, 1, 'Native light dismiss must not consume the activation target');
     const click = eventAt(activation, link); dom.document.dispatchEvent(click);
     assert.equal(click.defaultPrevented, false, 'Native link activation remains available');
     assert.equal(dom.applied.length, 2); assert.deepEqual(dom.applied.at(-1).status, [2]);

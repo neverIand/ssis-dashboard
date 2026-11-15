@@ -1,5 +1,6 @@
 import { envelope, wireTime } from './fixtures.js';
 import { Node } from './overview-dom.js';
+import { installPopover, popoverButton } from './popover-dom.js';
 
 export function detailResponse(executionId = '9223372036854775807') {
   return envelope({
@@ -28,7 +29,7 @@ export function detailDOM() {
     Object.assign(window.location, { pathname: url.pathname, search: url.search, hash: url.hash });
   } };
   const document = Object.assign(new EventTarget(), { location: window.location, defaultView: window,
-    visibilityState: 'visible', activeElement: null });
+    visibilityState: 'visible', activeElement: null, documentElement: { clientWidth: 1280, clientHeight: 720 } });
   document.createElement = tag => new Node(document, tag);
   document.createElementNS = (_namespace,tag) => new Node(document,tag);
   document.createTextNode = value => new Node(document, '#text', value);
@@ -90,6 +91,8 @@ export function detailDOM() {
   get('events-filters').append(...['kind','q','apply','reset'].map(key => get(`events-${key}`)));
   get('history-panel').append(get('history-presets'),get('history-custom'),get('history-status-options'));
   get('history-status-options').append(get('history-close'),get('history-filters'));
+  installPopover(get('history-status-options'), get('history-custom'), () => get('history-choices').firstChild?.firstChild);
+  popoverButton(get('history-close'), get('history-status-options'), 'hide');
   get('history-filters').append(get('history-choices'),get('history-apply'));
   get('history-panel').append(get('history-chart-toggle'),get('history-chart-panel'));
   get('history-chart-panel').append(...['plot','selected','scale','empty','x-axis','y-axis'].map(key=>get(`history-chart-${key}`)));

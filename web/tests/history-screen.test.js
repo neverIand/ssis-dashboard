@@ -178,12 +178,12 @@ test('a saved checkpoint restores the pause and the view, and disposal leaves no
   assert.equal(again.paused, true);
   assert.equal(again.view.statusOptionsOpen, true);
   assert.equal(again.view.chart.open, false);
-  assert.equal(second.get('history-status-options').hidden, false);
+  assert.equal(!second.get('history-status-options').matches(':popover-open'), false);
   // Without a saved checkpoint the same page starts running, with the options closed.
   const fresh = screen(t, scoped);
   await settle();
   assert.equal(fresh.get('history-poll-toggle').getAttribute('aria-label'), 'Pause auto refresh');
-  assert.equal(fresh.get('history-status-options').hidden, true);
+  assert.equal(!fresh.get('history-status-options').matches(':popover-open'), true);
 });
 
 test('disposal removes every listener the screen added and stops the view and the loader', async t => {

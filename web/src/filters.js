@@ -5,6 +5,7 @@ import { mountRangeEditor } from './range-editor.js';
 import { catalogName, createSelectionSession, packageNameUnits, SelectionError, selectionSearch, validateSelection }
   from './selection.js';
 import { rangeLabel } from './time-range.js';
+import { positionPopover } from './ui.js';
 
 // Enter that confirms an input-method candidate (isComposing, or keyCode 229) is not a submit.
 const submitKey = event => event.key === 'Enter' && !event.isComposing && event.keyCode !== 229;
@@ -25,6 +26,7 @@ export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}
     logging_level: 'Logging level', duration_seconds: 'Duration', warning_count: 'Warnings', error_count: 'Errors' };
   const session = createSelectionSession(metadata), removers = [];
   const pickers = new Map();
+  const geometry = new window.ResizeObserver(position);
   let opened = null, searchTimer = null;
   function listen(element, event, handler) {
     element.addEventListener(event, handler);
@@ -36,24 +38,19 @@ export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}
     option.textContent = `${sortNames[key] ?? key} ${direction === 'asc' ? '↑' : '↓'}`;
     return option;
   })));
-  function close({ focus = false, commitStatus = true } = {}) {
+  function close({ focus = false, commitStatus = true, hide = true } = {}) {
     if (!opened) return;
     clearTimeout(searchTimer);
     const { panel, trigger, key } = opened;
-    panel.hidden = true;
-    trigger.setAttribute('aria-expanded', 'false');
+    opened = null;
+    if (hide) panel.hidePopover();
     pickers.get(key)?.cancel();
     if (key === 'created') range.cancel();
-    opened = null;
     if (key === 'status' && commitStatus) commit();
     if (focus) trigger.focus();
   }
   function position() {
-    if (!opened) return;
-    const box = form.getBoundingClientRect(), anchor = opened.trigger.getBoundingClientRect();
-    const width = opened.panel.getBoundingClientRect().width;
-    opened.panel.style.left = `${Math.max(0, Math.min(anchor.left - box.left, box.width - width))}px`;
-    opened.panel.style.top = `${anchor.bottom - box.top + 8}px`;
+    if (opened?.panel.matches(':popover-open')) positionPopover(opened.panel, opened.trigger);
   }
   function label(key, value) {
     get(`[data-filter-label="${key}"]`).textContent = value;
@@ -207,47 +204,54 @@ export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}
     const trigger = opened?.trigger;
     select(bounds); trigger?.focus();
   } });
-  for (const trigger of form.querySelectorAll('[data-open-filter]')) listen(trigger, 'click', () => {
+  for (const trigger of form.querySelectorAll('[data-open-filter]')) {
     const key = trigger.dataset.openFilter;
-    if (opened?.key === key) { close({ focus: true }); return; }
-    close();
     const panel = get(`[data-filter-panel="${key}"]`);
-    opened = { key, trigger, panel };
-    panel.hidden = false; trigger.setAttribute('aria-expanded', 'true');
-    if (pickers.has(key)) {
-      const search = get(`#${key}-search`);
-      search.value = ''; get(`[data-exact-scope="${key}"]`).hidden = true;
-      get(`[data-all-scope="${key}"]`).setAttribute('aria-pressed', String(session.applied[key] === null));
-      void pickers.get(key).search('', key === 'project' ? session.applied.folder : null);
-      search.focus();
-    } else if (key === 'package') {
-      packageName.value = session.applied.package ?? ''; packageStatus.textContent = ''; packageEdited = false;
-      get('[data-all-scope="package"]').setAttribute('aria-pressed', String(session.applied.package === null));
-      packageName.focus(); packageName.select?.();
-    } else if (key === 'created') { range.open(session.draft, effectiveWindow()); get('[data-created-preset]').focus(); }
-    else status.querySelector('input').focus();
-    position();
-  });
-  for (const button of form.querySelectorAll('[data-close-filter]')) listen(button, 'click', () => close({ focus: true }));
-  listen(document, 'pointerdown', event => {
-    if (opened && !opened.panel.contains(event.target) && !opened.trigger.contains(event.target)) {
-      // Let a selection action consume the Status draft once. Prevent mouse focus
-      // from committing and removing the clicked row before its click is delivered.
-      if (opened.key === 'status' &&
-        event.target.closest?.('[data-selection-link], [data-selection-action], [data-sort], [data-execution-link]')) {
-        event.preventDefault();
+    geometry.observe(panel);
+    listen(panel, 'beforetoggle', event => {
+      if (event.newState === 'closed') {
+        // Native light dismiss runs before click. Selection actions must consume the draft first.
+        if (opened?.panel === panel && !opened.activation) close({ hide: false });
+        return;
       }
-      else close();
+      if (session.applied === null) { event.preventDefault(); return; }
+      if (opened?.panel === panel) return;
+      close();
+      opened = { key, trigger, panel, activation: null };
+      if (pickers.has(key)) {
+        const search = get(`#${key}-search`);
+        search.value = ''; get(`[data-exact-scope="${key}"]`).hidden = true;
+        get(`[data-all-scope="${key}"]`).setAttribute('aria-pressed', String(session.applied[key] === null));
+        void pickers.get(key).search('', key === 'project' ? session.applied.folder : null);
+      } else if (key === 'package') {
+        packageName.value = session.applied.package ?? ''; packageStatus.textContent = ''; packageEdited = false;
+        get('[data-all-scope="package"]').setAttribute('aria-pressed', String(session.applied.package === null));
+      } else if (key === 'created') range.open(session.draft, effectiveWindow());
+    });
+    listen(panel, 'toggle', position);
+  }
+  listen(packageName, 'focus', () => packageName.select?.());
+  listen(document, 'pointerdown', event => {
+    if (opened?.key === 'status') {
+      opened.activation = event.target.closest?.(
+        '[data-selection-link], [data-selection-action], [data-sort], [data-execution-link]');
     }
   });
+  listen(document, 'pointercancel', () => { if (opened) opened.activation = null; });
   function outsideClick(event) {
     if (!opened || opened.panel.contains(event.target) || opened.trigger.contains(event.target)) return;
-    // A chart click may be the first half of a drill double click; keep the Status draft for that one merged commit.
-    if (opened.key === 'status' && event.target.closest?.('[data-selection-action]')) return;
+    // Keep a first chart click's draft visible without taking focus from the double-click target.
+    if (opened.key === 'status' && event.target.closest?.('[data-selection-action]')) {
+      opened.activation = null;
+      const first = status.querySelector('input');
+      first.autofocus = false;
+      opened.panel.showPopover();
+      first.autofocus = true;
+      return;
+    }
     const link = event.target.closest?.('[data-execution-link]');
     if (opened.key === 'status' && link) {
-      // The click has an activation target now. Update that exact anchor before
-      // the commit clears rows, so ordinary and modified navigation carry Status.
+      // Update the activated anchor before committing clears rows.
       link.setAttribute('href', executionHref(link.dataset.executionId,
         validateSelection(session.draft, metadata), { metadata, appBase, origin: window.location.origin,
           section: readDetailFragment(new URL(link.href, window.location.origin).hash, metadata) }));
@@ -256,20 +260,23 @@ export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}
   }
   listen(document, 'click', outsideClick);
   listen(document, 'auxclick', outsideClick);
-  listen(form, 'keydown', event => {
-    if (event.key === 'Escape' && opened) {
+  listen(document, 'keydown', event => {
+    if (event.key === 'Escape' && opened?.key === 'status') {
       event.preventDefault();
-      if (opened.key === 'status') { session.update({ status: session.applied.status }); showDraft(); }
+      session.update({ status: session.applied.status }); showDraft();
       close({ focus: true, commitStatus: false });
     }
-    else if (submitKey(event) && opened && event.target.tagName === 'INPUT') event.preventDefault();
+  });
+  listen(form, 'keydown', event => {
+    if (submitKey(event) && opened && event.target.tagName === 'INPUT') event.preventDefault();
   });
   listen(document, 'focusin', event => {
-    if (opened && !opened.panel.contains(event.target) && !opened.trigger.contains(event.target)) {
+    if (opened && !opened.activation && !opened.panel.contains(event.target) && !opened.trigger.contains(event.target)) {
       close();
     }
   });
   listen(window, 'resize', position);
+  listen(document, 'scroll', position);
   listen(status, 'change', event => {
     const all = status.querySelector('input[value=""]');
     const codes = [...status.querySelectorAll('input')].filter(checkbox => checkbox.value !== '');
@@ -326,6 +333,7 @@ export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}
   });
   restore();
   return { select, dispose() {
+    geometry.disconnect();
     close({ commitStatus: false }); clearTimeout(searchTimer); range.cancel();
     for (const owner of pickers.values()) owner.dispose();
     for (const control of Object.values(order)) control.disabled = true;

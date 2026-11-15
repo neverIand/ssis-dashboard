@@ -11,7 +11,7 @@
                         <div class="scope-path" aria-label="Execution scope and current page">
                             {% for kind in ['folder', 'project', 'package'] %}
                             {% if kind != 'folder' %}<span class="scope-separator" aria-hidden="true">/</span>{% endif %}
-                            <button type="button" class="scope-trigger" data-open-filter="{{ kind }}" aria-haspopup="dialog" aria-controls="{{ kind }}-picker" aria-expanded="false">
+                            <button type="button" class="scope-trigger" data-open-filter="{{ kind }}" aria-haspopup="dialog" popovertarget="{{ kind }}-picker">
                                 <span data-filter-label="{{ kind }}">All {{ kind }}s</span><span class="chevron" aria-hidden="true">⌄</span>
                             </button>
                             {% endfor %}
@@ -25,12 +25,12 @@
                     </div>
                     <div class="filter-bar">
                         <div class="filter-inline"><span id="status-label">Status</span>
-                            <button type="button" class="filter-trigger" data-open-filter="status" aria-haspopup="dialog" aria-controls="status-picker" aria-expanded="false">
+                            <button type="button" class="filter-trigger" data-open-filter="status" aria-haspopup="dialog" popovertarget="status-picker">
                                 <span data-filter-label="status">All statuses</span><span class="chevron" aria-hidden="true">⌄</span>
                             </button>
                         </div>
                         <div class="filter-inline filter-created"><span id="created-label">Created</span>
-                            <button type="button" class="filter-trigger" data-open-filter="created" aria-haspopup="dialog" aria-controls="created-picker" aria-expanded="false">
+                            <button type="button" class="filter-trigger" data-open-filter="created" aria-haspopup="dialog" popovertarget="created-picker">
                                 <span data-filter-label="created">Default window</span><span class="chevron" aria-hidden="true">⌄</span>
                             </button>
                         </div>
@@ -42,10 +42,10 @@
                         </div>
                     </div>
                     {% for kind in ['folder', 'project'] %}
-                    <div id="{{ kind }}-picker" class="filter-popover" data-filter-panel="{{ kind }}" role="dialog" aria-labelledby="{{ kind }}-heading" hidden>
-                        <div class="popover-heading"><h2 id="{{ kind }}-heading">{{ kind|capitalize }}</h2><button type="button" class="button-quiet" data-close-filter aria-label="Close {{ kind }} picker">×</button></div>
+                    <div id="{{ kind }}-picker" class="filter-popover" data-filter-panel="{{ kind }}" role="dialog" aria-labelledby="{{ kind }}-heading" popover="auto">
+                        <div class="popover-heading"><h2 id="{{ kind }}-heading">{{ kind|capitalize }}</h2><button type="button" class="button-quiet" data-close-filter popovertarget="{{ kind }}-picker" popovertargetaction="hide" aria-label="Close {{ kind }} picker">×</button></div>
                         <label for="{{ kind }}-search" class="visually-hidden">Search {{ kind }}s</label>
-                        <input id="{{ kind }}-search" type="search" placeholder="Search {{ kind }}s" autocomplete="off" maxlength="128" aria-describedby="{{ kind }}-search-status">
+                        <input id="{{ kind }}-search" type="search" placeholder="Search {{ kind }}s" autocomplete="off" maxlength="128" aria-describedby="{{ kind }}-search-status" autofocus>
                         <button type="button" class="catalog-choice" data-all-scope="{{ kind }}">All {{ kind }}s</button>
                         <div class="catalog-choices" data-catalog-choices="{{ kind }}"></div>
                         <p id="{{ kind }}-search-status" class="resource-status" data-catalog-status="{{ kind }}" role="status"></p>
@@ -56,26 +56,26 @@
                         </div>
                     </div>
                     {% endfor %}
-                    <div id="package-picker" class="filter-popover" data-filter-panel="package" role="dialog" aria-labelledby="package-heading" hidden>
-                        <div class="popover-heading"><h2 id="package-heading">Package</h2><button type="button" class="button-quiet" data-close-filter aria-label="Close package picker">×</button></div>
+                    <div id="package-picker" class="filter-popover" data-filter-panel="package" role="dialog" aria-labelledby="package-heading" popover="auto">
+                        <div class="popover-heading"><h2 id="package-heading">Package</h2><button type="button" class="button-quiet" data-close-filter popovertarget="package-picker" popovertargetaction="hide" aria-label="Close package picker">×</button></div>
                         <label for="package-name" class="visually-hidden">Exact package name</label>
-                        <input id="package-name" type="text" placeholder="Exact package name" autocomplete="off" spellcheck="false" maxlength="260" aria-describedby="package-status">
+                        <input id="package-name" type="text" placeholder="Exact package name" autocomplete="off" spellcheck="false" maxlength="260" aria-describedby="package-status" autofocus>
                         <button type="button" class="catalog-choice" data-all-scope="package">All packages</button>
                         <p id="package-status" class="resource-status" data-package-status role="status"></p>
                         <div class="popover-actions"><button type="button" data-apply-package>Apply</button></div>
                     </div>
-                    <div id="status-picker" class="filter-popover status-popover" data-filter-panel="status" role="dialog" aria-labelledby="status-heading" hidden>
-                        <div class="popover-heading"><h2 id="status-heading">Status</h2><button type="button" class="button-quiet" data-close-filter aria-label="Close status picker">×</button></div>
+                    <div id="status-picker" class="filter-popover status-popover" data-filter-panel="status" role="dialog" aria-labelledby="status-heading" popover="auto">
+                        <div class="popover-heading"><h2 id="status-heading">Status</h2><button type="button" class="button-quiet" data-close-filter popovertarget="status-picker" popovertargetaction="hide" aria-label="Close status picker">×</button></div>
                         <fieldset id="status" class="status-options"><legend class="visually-hidden">Execution statuses</legend>
-                            <div data-status-choices><label><input type="checkbox" name="status" value="" checked>All statuses</label></div>
+                            <div data-status-choices><label><input type="checkbox" name="status" value="" checked autofocus>All statuses</label></div>
                         </fieldset>
-                        <div class="popover-actions"><button type="button" data-close-filter>Done</button></div>
+                        <div class="popover-actions"><button type="button" data-close-filter popovertarget="status-picker" popovertargetaction="hide">Done</button></div>
                     </div>
-                    <div id="created-picker" class="filter-popover created-popover" data-filter-panel="created" role="dialog" aria-labelledby="created-heading" hidden>
-                        <div class="popover-heading"><h2 id="created-heading">Created</h2><button type="button" class="button-quiet" data-close-filter aria-label="Close time picker">×</button></div>
+                    <div id="created-picker" class="filter-popover created-popover" data-filter-panel="created" role="dialog" aria-labelledby="created-heading" popover="auto">
+                        <div class="popover-heading"><h2 id="created-heading">Created</h2><button type="button" class="button-quiet" data-close-filter popovertarget="created-picker" popovertargetaction="hide" aria-label="Close time picker">×</button></div>
                         <div class="creation-presets" role="group" aria-label="Creation window">
                             {% for value, label in [('default', 'Default window'), ('today', 'Today'), ('24h', 'Last 24 hours'), ('7d', 'Last 7 days'), ('30d', 'Last 30 days'), ('180d', 'Last 180 days'), ('custom', 'Custom range')] %}
-                            <button type="button" class="catalog-choice" data-created-preset="{{ value }}" aria-pressed="false">{{ label }}</button>
+                            <button type="button" class="catalog-choice" data-created-preset="{{ value }}" aria-pressed="false"{% if value == 'default' %} autofocus{% endif %}>{{ label }}</button>
                             {% endfor %}
                         </div>
                         <div data-custom-window hidden>
@@ -100,7 +100,7 @@
                             </details>
                         </div>
                         <p class="resource-status" data-time-notice role="status"></p>
-                        <div class="popover-actions"><button type="button" data-close-filter>Cancel</button><button type="button" class="button-primary" data-use-range>Use range</button></div>
+                        <div class="popover-actions"><button type="button" data-close-filter popovertarget="created-picker" popovertargetaction="hide">Cancel</button><button type="button" class="button-primary" data-use-range>Use range</button></div>
                     </div>
                 </fieldset>
                 <button type="button" data-recover-filters hidden>Reset invalid filters</button>
@@ -136,7 +136,7 @@
                     <label>Interval<select data-timeline-bucket><option value="day">Day</option><option value="hour">Hour</option></select></label>
                     <label class="timeline-choice">Bucket<select data-timeline-choice></select></label>
                     <div class="duration-legend"><span data-chart-status="7">Succeeded</span><span data-chart-status="4">Failed</span><span data-chart-status="other">Other</span></div>
-                    <span class="info-tip"><button type="button" class="info-trigger" aria-label="About timeline counts" aria-describedby="timeline-tip"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="8"/><path d="M10 9v6 M10 5v1"/></svg></button><span class="info-text" hidden id="timeline-tip" role="tooltip"><span data-timeline-scope></span> Starts and current outcomes belong to each execution's creation bucket. Edge buckets include only the selected range. Hover or focus for values; Left/Right or Home/End to move; Enter or double click shows that bucket in the list.</span></span>
+                    <span class="info-tip"><button type="button" class="info-trigger" aria-label="About timeline counts" aria-describedby="timeline-tip"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="8"/><path d="M10 9v6 M10 5v1"/></svg></button><span class="info-text" popover="manual" id="timeline-tip" role="tooltip"><span data-timeline-scope></span> Starts and current outcomes belong to each execution's creation bucket. Edge buckets include only the selected range. Hover or focus for values; Left/Right or Home/End to move; Enter or double click shows that bucket in the list.</span></span>
                     <div class="toolbar-meta"><p class="inline-status" data-timeline-status role="status"></p><button type="button" class="button-quiet" data-timeline-retry hidden>Retry</button></div>
                 </div>
                 <div class="chart-frame">

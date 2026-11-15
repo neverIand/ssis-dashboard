@@ -12,7 +12,7 @@ Current scope is project deployment and monitoring. Legacy `msdb` storage, packa
 
 1. Preserve deterministic configuration, owned database resources, timeouts and safe errors.
 2. Maintain a documented read-only `/api/v1` contract with typed data, access/redaction policy, global sorting and bounded pagination.
-3. Use vanilla ES modules and authored CSS. Vite is allowed for development/builds; ship prebuilt assets. Chart/table libraries are allowed only when their complexity is justified by accessibility, maintenance, size and lifecycle benefits, with licensing reviewed.
+3. Use vanilla ES modules and authored CSS, targeting APIs that reached Baseline by the end of 2025 without older-browser polyfills (user decision, 15 November 2026). Vite is allowed for development/builds; ship prebuilt assets. Chart/table libraries are allowed only when their complexity is justified by accessibility, maintenance, size and lifecycle benefits, with licensing reviewed.
 4. Preserve execution filters, detail/observations, searchable events, parameters/overrides, history and charts, recording intentional differences from legacy behavior.
 5. Update data in place without reloading the page, preserving selection, order, paging, scroll, focus and chart state.
 6. Deliver production live updates through shared SSISDB change detection and SSE initially; use WebSockets only for a concrete bidirectional requirement. Include reconnect/resync, heartbeats, bounded queues, visible connection state and polling fallback.

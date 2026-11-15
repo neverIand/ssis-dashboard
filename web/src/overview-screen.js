@@ -25,6 +25,7 @@ export function mountOverviewScreen(root, saved = null) {
       checkbox.name = 'status';
       checkbox.value = String(item.code);
       checkbox.checked = item.code === '';
+      checkbox.autofocus = item.code === '';
       label.append(checkbox, document.createTextNode(item.code === '' ? item.name : formatCode(item)));
       return label;
     }));

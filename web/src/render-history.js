@@ -4,6 +4,7 @@ import { mountHistoryChart } from './render-history-chart.js';
 import { allHistoryStatuses } from './history.js';
 import { historyExecutionHref } from './history-navigation.js';
 import { mountSectionTable } from './section-table.js';
+import { positionPopover } from './ui.js';
 
 export function mountHistory(root, { metadata, actions, navigation, executionId, restoreView = null, showIdentity = false,
   notLoaded = 'No history loaded.', rememberChart = false }) {
@@ -33,8 +34,8 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
   const form = get('filters'), presets = new Map(), choices = new Map(), statusOptions = get('status-options');
   const chart = mountHistoryChart(root, { metadata, restoreView: restoreView?.chart, remember: rememberChart,
     openExecution: id => { const href = rows.get(id)?.link.getAttribute('href'); if (href) document.defaultView.location.assign(href); } });
-  let appliedStatus = null;
-  statusOptions.hidden = restoreView?.statusOptionsOpen !== true;
+  let appliedStatus = null, commitOnClose = true, presetPointer = false;
+  const statusesOpen = () => statusOptions.matches(':popover-open');
   for (const [key, label, status] of [
     ['all', 'All', allHistoryStatuses(metadata)],
     ['succeeded', 'Succeeded', '7'],
@@ -53,6 +54,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
     const label = element('label', undefined, 'check-label'), input = element('input');
     input.type = 'checkbox';
     input.value = String(item.code);
+    input.autofocus = choices.size === 0;
     label.append(input, element('span', formatCode(item)));
     get('choices').append(label);
     choices.set(input.value, input);
@@ -140,35 +142,30 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
     for (const [code, input] of choices) input.checked = appliedStatus?.split(',').includes(code) ?? false;
   };
   function closeStatuses({ commit = true, focus = false } = {}) {
-    if (statusOptions.hidden) return;
-    statusOptions.hidden = true;
-    custom.setAttribute('aria-expanded', 'false');
+    if (!statusesOpen()) return;
+    commitOnClose = commit;
+    statusOptions.hidePopover();
+    if (focus) custom.focus({ preventScroll: true });
+  }
+  function positionStatuses() {
+    if (statusesOpen()) positionPopover(statusOptions, custom);
+  }
+  listen(statusOptions, 'beforetoggle', event => {
+    if (event.newState === 'open') {
+      if (view.busy || panel.hidden) { event.preventDefault(); return; }
+      presetPointer = false;
+      return;
+    }
+    const commit = commitOnClose && !presetPointer;
+    commitOnClose = true; presetPointer = false;
     const status = [...choices].filter(([, input]) => input.checked).map(([code]) => code).join(',');
     if (!commit || view.busy) restoreChoices();
     else if (!status) {
       restoreChoices();
       notice.textContent = 'Choose at least one history status.';
     } else if (status !== appliedStatus) actions.order({ status });
-    if (focus) custom.focus({ preventScroll: true });
-  }
-  function positionStatuses() {
-    if (statusOptions.hidden) return;
-    const box = panel.getBoundingClientRect(), anchor = custom.getBoundingClientRect();
-    statusOptions.style.top = `${anchor.bottom - box.top + 6}px`;
-    statusOptions.style.left = `${Math.max(0, Math.min(anchor.left - box.left, Math.max(0, box.width - 400)))}px`;
-  }
-  listen(custom, 'click', () => {
-    if (view.busy || panel.hidden) return;
-    if (!statusOptions.hidden) {
-      closeStatuses({ focus: true });
-      return;
-    }
-    statusOptions.hidden = false;
-    custom.setAttribute('aria-expanded', 'true');
-    positionStatuses();
-    choices.values().next().value?.focus({ preventScroll: true });
   });
-  listen(close, 'click', () => closeStatuses({ focus: true }));
+  listen(statusOptions, 'toggle', positionStatuses);
   listen(statusOptions, 'keydown', (event) => {
     if (event.key === 'Escape') {
       event.preventDefault();
@@ -176,14 +173,13 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
     }
   });
   listen(document, 'pointerdown', (event) => {
-    if (statusOptions.hidden || statusOptions.contains(event.target) || custom.contains(event.target)) return;
-    if ([...presets.values()].some(({ button }) => button.contains(event.target))) event.preventDefault();
-    else closeStatuses();
+    presetPointer = statusesOpen() && [...presets.values()].some(({ button }) => button.contains(event.target));
   });
-  for (const eventName of ['click', 'focusin']) listen(document, eventName, (event) => {
-    if (!statusOptions.hidden && !statusOptions.contains(event.target) && !custom.contains(event.target)) closeStatuses();
+  listen(document, 'focusin', (event) => {
+    if (!presetPointer && !statusOptions.contains(event.target) && !custom.contains(event.target)) closeStatuses();
   });
   listen(document.defaultView, 'resize', positionStatuses);
+  listen(document, 'scroll', positionStatuses);
   for (const { button, status } of presets.values()) listen(button, 'click', () => {
     if (view.busy || panel.hidden) return;
     closeStatuses({ commit: false });
@@ -223,7 +219,6 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
         appliedStatus = state.query.status;
       }
       for (const { button, status } of presets.values()) button.setAttribute('aria-pressed', String(status === state.query.status));
-      custom.setAttribute('aria-expanded', String(!statusOptions.hidden));
       custom.setAttribute('aria-pressed', String(![...presets.values()].some((item) => item.status === state.query.status)));
       custom.title = state.query.status.split(',').map(code => formatCode(
         metadata.execution_statuses.find(item => String(item.code) === code) ?? { code: Number(code), name: 'unknown' }
@@ -243,21 +238,23 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
     },
     afterStatus: positionStatuses,
     restore(returning) {
-      statusOptions.hidden = returning.statusOptionsOpen !== true;
-      custom.setAttribute('aria-expanded', String(!statusOptions.hidden));
-      positionStatuses();
+      if (returning.statusOptionsOpen === true && !panel.hidden) {
+        const first = choices.values().next().value;
+        first.autofocus = false;
+        statusOptions.showPopover(); positionStatuses();
+        first.autofocus = true;
+      }
     },
     checkpoint: () => ({
       chart: chart.checkpoint(),
-      statusOptionsOpen: !statusOptions.hidden,
+      statusOptionsOpen: statusesOpen(),
       draft: [...choices].filter(([, input]) => input.checked).map(([code]) => code)
     }),
-    beforeDispose: () => chart.dispose(),
+    beforeDispose: () => { closeStatuses({ commit: false }); chart.dispose(); },
     clear() {
+      closeStatuses({ commit: false });
       get('choices').replaceChildren();
       get('presets').replaceChildren();
-      statusOptions.hidden = true;
-      custom.setAttribute('aria-expanded', 'false');
     }
   });
 }
