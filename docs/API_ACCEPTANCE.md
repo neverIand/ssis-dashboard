@@ -194,6 +194,45 @@ Record revision/source hashes, interpreter/driver/catalog scope, timestamps, exa
 
 ## Recorded results
 
+### Page-selection RECOMPILE removal: 15 November 2026
+
+Batch H (below) kept `OPTION (RECOMPILE)` on the page-selection statement of `api-executions-ordered-page.sql` and `api-executions-sort.sql`. Its re-measurement showed that the candidate without them was faster on the real catalog, and the user chose on 15 November to remove both. Four hints remain in the execution list, all `RECOMPILE, FORCE ORDER` on event aggregation; none is on page selection or the fence.
+
+The working tree before and after (the only difference is the two hints) alternated in one run as in batch H: 36 real-catalog cases (19 executions, three contexts) and 112 temporary cases (2,000 and 20,000 executions). Returned IDs were the same in all 148; work-table reads and source scan counts were equal in all 148; source reads were equal in 102 (10 temporary cases read 1 page more, 36 read 8–36 pages fewer).
+
+| Median ms, with hints → without | Ordinary sort | Calculated sort |
+| --- | ---: | ---: |
+| Real, administrator | 462 → 349 | 433 → 234 |
+| Real, `dashboard_reader` | 480 → 335 | 390 → 252 |
+| Real, `dashboard_limited` | 455 → 352 | 423 → 251 |
+| 2,000 temporary | 69 → 62 | 106 → 84 |
+| 20,000 temporary | 100 → 91 | 157 → 171 |
+
+On the real catalog all 30 ordinary and calculated cases were faster, by 64–166 ms (ordinary) and 98–239 ms (calculated); the fence does not change. Compile CPU per request fell from 199–343 ms to 125–265 ms (`STATISTICS TIME`, administrator and `dashboard_limited`, four sorts). Of the 112 temporary cases 39 were faster and 16 slower by more than 10 % plus 5 ms: 13 of the 16 at 20,000 executions, 7 of those unfiltered; the largest were the unfiltered ordinary sorts at 20,000 (`package_name` second page 203 → 446 ms, first page 168 → 318 ms; `created_at` second page 148 → 295 ms) and the largest calculated one was `error_count` second page 642 → 753 ms. The explanation supported by the batch H plans is that a cached plan sorts on all 12 (ordinary) or 5 (calculated) `CASE` keys instead of 3; plans were not captured again in this run. In these measurements the removal made the ordinary and calculated sort batches of the small real catalog about 0.1–0.2 s faster, and the largest slowdown observed on the temporary sources was 0.24 s. The default `execution_id` list uses `api-executions-page.sql` and is not affected.
+
+A reuse check at 20,000 temporary executions (fence and three calculated sorts, four selections in both orders, with and without the hints) returned the same IDs in all 64 runs with the same reads in every variant. Raw results: `.local/reports/backend/20261115-select-hints/`. Not checked: actual plans and operator-level rows read for this change (none captured, and the reader accounts have no `SHOWPLAN` permission); reuse for the ordinary sorts, across a change of sort on one cached batch text (the check used a separate cache tag per sort) and around the index that only the logging-level sort creates; 100,000 executions; an office catalog; cached plans across pooled connections over time; and a real catalog large enough to show the slower pages. If the office catalog shows them, restoring the hint on the ordinary page is a one-line change.
+
+### Calculated-sort logging lookup: 14 November 2026
+
+`api-executions-sort.sql` read the system `LOGGING_LEVEL` value through `UPDATE … JOIN`, which takes an arbitrary one of two matching rows. Both lookups (the whole cohort when sorting by logging level, the page otherwise) now join a grouped subquery that returns `MAX` of the value and `COUNT_BIG(*)` per execution, and the batch returns the count as `logging_rows`. The API rejects a row whose count is not 0 or 1, as detail and History do. When sorting by logging level the cohort also gets a unique clustered index on `execution_id` before the lookup.
+
+Before (`7672278`) and after were alternated as in batch H: one warm-up, one `STATISTICS IO` run, then the median of 7 or 9 timed runs. 51 cases: the real catalog (19 executions) in three contexts, two selections and three sorts; 20,000 temporary rows with six selections, three sorts, first and second page. The ordered execution IDs returned were the same in all 51 cases for every shape. Totals below are sums over the 11 temporary logging-level cases unless stated.
+
+| Shape | Source logical reads | Worktable and temporary-table reads | Sum of median times | Decision |
+| --- | --- | --- | --- | --- |
+| Grouped subquery, with the index for the logging-level sort | Equal in all 51 cases, scan counts too | 69,275 to 9,674 | 2,370 to 2,316 ms | Adopted |
+| The same without the index | Equal in all 51 cases | 69,275 to 69,403 | 2,421 to 2,882 ms | Rejected: slower where the cohort is large |
+| Group after joining the temporary table again | Within 27 pages | 69,275 to 200,279 | 2,821 to 2,949 ms | Rejected |
+| `CROSS APPLY` per row | 28,434 to 299,201 (unfiltered: 2,294 to 86,804, scans 203 to 20,202) | 69,275 to 69,403 | 2,724 to 2,940 ms | Rejected |
+
+The adopted shape per case: worktable and temporary-table reads fell in eight cases (unfiltered 20,432 to 607) and rose in three small ones (one package 206 to 507; six-hour window 937 to 3,093, twice), which is the index on a small cohort. Median times moved between −79 and +61 ms with no pattern; the unfiltered first page was 294 ms before and 355 ms after, its second page 503 and 424 ms. The other two sorts ran 74,585 pages before and 74,841 after in those tables (the extra column) and their times were equal within the noise. On the real catalog source reads and scans were equal in all 18 cases; temporary-table reads of the logging-level sort rose by 3 to 23 pages per case (for example 175 to 195).
+
+The cohort lookup at 20,000 rows, with per-statement `STATISTICS TIME` (median of 9): before, a sort of the cohort, a merge join and a 1.7 MB grant, 274 ms; without the index, a hash join and a 6.5 MB grant, 580 ms; adopted, a merge join of two ordered scans with no grant, 194 ms plus 36 ms to build the index. Compilation: a fresh compile of the whole batch took 308–551 ms before and 310–484 ms after (median of 7, `dashboard_reader` and `dashboard_limited`, three sorts). With the four sorts alternated on one warm connection as `dashboard_reader`, the median compile time per execution was 373 to 438 ms before and 289 to 481 ms after, and the median number of compile messages with a non-zero elapsed time was the same (4 for the logging-level sort, 5 for the others). The probe does not identify statements or keep per-run counts, so this shows no visible growth in compile time on a warm connection; it does not prove that the index causes no extra recompilation. No `RECOMPILE` was added.
+
+Actual plans on the real catalog could be read only as the administrator, because the reader accounts have no `SHOWPLAN` permission: the lookup read 320 rows before and 301 (cohort) or 320 (page) after, with the same number of joins. Reader visibility is therefore covered by logical reads and scan counts only. The native fixture test adds a second system row inside a savepoint and gets one row with a count of two and the larger value for all four sorts. The API on the real catalog returned 200 with 16 distinct rows for the four sorts in both directions.
+
+The collector first used here added some pyodbc message lists twice, so its read counts were too high (a real-catalog total of 6,916 was 3,983). Every figure in this section is from the corrected collector; the first runs are kept under `old-collector/`. The batch H and reversed-duration sections below first used the earlier collector; both were measured again on 14 November with the corrected one and now quote those results. Raw results: `.local/reports/backend/20261114-logging-rows/`. Not checked: 100,000 executions, an office catalog, actual plans and operator-level rows read under reader visibility, and a real catalog that holds a duplicate system row (the catalog writes one per execution).
+
 ### Reversed-duration sort key: 14 November 2026
 
 `api-executions-sort.sql` gives the duration sort a NULL key when the end precedes the start (`AND t.ended >= t.started` in the existing `CASE`), matching the NULL `duration_seconds` the API now reports. Before, such a row had a negative key, which the cursor encoder rejects.
@@ -204,9 +243,9 @@ Before (`a44ef35`) and after were alternated as in batch H: one warm-up, one `ST
 | --- | ---: | ---: | --- |
 | Real catalog, three contexts (19 executions, none reversed) | 6 | 6 | Equal |
 | 2,000 and 20,000 temporary, no reversed rows, three selections | 12 | 12 | Equal |
-| 2,000 and 20,000 temporary, 1 in 500 reversed | 12 | 10 | Equal in 11; one read 4 pages fewer of 4,704 |
+| 2,000 and 20,000 temporary, 1 in 500 reversed | 12 | 10 | Equal in 11; one read 2 pages fewer of 2,546 |
 
-The two cases with different IDs are the ascending unfiltered pages, where the reversed rows used to come first with negative keys and now sort last with the NULLs; the returned page has no negative key. Timings varied in both directions (real catalog 367–498 ms after, 400–505 ms before). The native test fixture now has two reversed rows; with the old SQL the duration sort fails there with `Invalid database sort key`. Raw results: `.local/reports/backend/20261114-reversed-duration/`. Not checked: 100,000 executions and an office catalog.
+The two cases with different IDs are the ascending unfiltered pages, where the reversed rows used to come first with negative keys and now sort last with the NULLs; the returned page has no negative key. Timings varied in both directions (real catalog 461–514 ms after, 471–513 ms before). The native test fixture now has two reversed rows; with the old SQL the duration sort fails there with `Invalid database sort key`. Figures are from the 14 November re-measurement with the corrected message collector (see the calculated-sort logging lookup above); the first run counted some pages twice and is kept beside it. Raw results: `.local/reports/backend/20261114-reversed-duration/` (`recount/` for the figures here). Not checked: 100,000 executions and an office catalog.
 
 ### Batch H execution-list RECOMPILE narrowing: 14 November 2026
 
@@ -217,46 +256,46 @@ The 10 November full-project review (N-03) found ten `OPTION (RECOMPILE)` hints 
 | `api-executions-fence.sql`, upper ID | `RECOMPILE` | Removed |
 | `api-executions-sort.sql`, cohort materialization | `RECOMPILE` | Removed |
 | `api-executions-sort.sql`, logging level for the cohort and for the page | `RECOMPILE` (2) | Removed |
-| `api-executions-ordered-page.sql` and `api-executions-sort.sql`, page selection | `RECOMPILE` (2) | Kept |
+| `api-executions-ordered-page.sql` and `api-executions-sort.sql`, page selection | `RECOMPILE` (2) | Kept here; removed on 15 November (section above) |
 | Event aggregation in all three page files | `RECOMPILE, FORCE ORDER` (4) | Kept, not retested |
 
 Each case compared the committed SQL (`c0d3dc0`) with the candidate, alternating the two: one warm-up, one run with `STATISTICS IO` for logical reads and source scan counts, then 7 or 9 timed runs without it (median). Real-catalog runs open a new connection each time; temporary-source runs share one connection per size. Real catalog: 19 executions, as administrator, `dashboard_reader` and `dashboard_limited` (session `EXECUTE AS USER`), with all statuses and with status 7, for the fence, two ordinary sorts and three calculated sorts (36 cases). Temporary sources: 2,000 and 20,000 executions, six selections, first and second pages (112 cases). **100,000 executions NOT RUN** (user decision, 14 November: beyond the expected use).
 
-Returned IDs were identical in all 148 cases. Work-table logical reads and source scan counts were equal in every case (work-table scan counts were not kept). Source logical reads were equal in 141 cases: four temporary fence cases read 3 pages instead of 2, and three temporary logging-level sorts read 48–54 pages fewer (of 2,603–8,385).
+Returned IDs were identical in all 148 cases. Work-table logical reads and source scan counts were equal in every case (work-table scan counts were not kept). Source logical reads were equal in 141 cases: four temporary fence cases read 3 pages instead of 2, and three temporary logging-level sorts read 24–27 pages fewer (of 1,409–4,404).
 
 | Median ms, before → after | Fence | Ordinary sort | Calculated sort |
 | --- | ---: | ---: | ---: |
-| Real, administrator | 120 → 2 | 497 → 489 | 528 → 413 |
-| Real, `dashboard_reader` | 92 → 2 | 459 → 448 | 485 → 371 |
-| Real, `dashboard_limited` | 71 → 3 | 442 → 433 | 511 → 396 |
-| 2,000 temporary | 4 → 0 | 74 → 74 | 110 → 99 |
-| 20,000 temporary | 4 → 1 | 85 → 83 | 166 → 157 |
+| Real, administrator | 115 → 3 | 498 → 498 | 578 → 466 |
+| Real, `dashboard_reader` | 117 → 10 | 482 → 477 | 555 → 419 |
+| Real, `dashboard_limited` | 87 → 4 | 439 → 444 | 529 → 426 |
+| 2,000 temporary | 6 → 1 | 82 → 79 | 142 → 113 |
+| 20,000 temporary | 9 → 3 | 115 → 118 | 237 → 246 |
 
 A separate `STATISTICS TIME` run on the real catalog (administrator and `dashboard_limited`, new connection per run, median of 7) summed the parse-and-compile messages of each batch:
 
 | Compile CPU ms, before → after | Administrator | `dashboard_limited` |
 | --- | ---: | ---: |
-| Fence | 158 → 0 | 102 → 0 |
-| Ordinary sort (`created_at`) | 712 → 688 | 690 → 688 |
-| Calculated sort, duration | 788 → 646 | 756 → 578 |
-| Calculated sort, logging level | 820 → 500 | 844 → 480 |
-| Calculated sort, error count | 712 → 592 | 848 → 660 |
+| Fence | 47 → 0 | 63 → 0 |
+| Ordinary sort (`created_at`) | 250 → 265 | 281 → 297 |
+| Calculated sort, duration | 323 → 226 | 307 → 288 |
+| Calculated sort, logging level | 265 → 156 | 328 → 172 |
+| Calculated sort, error count | 296 → 202 | 282 → 234 |
 
-The messages overlap (their sum exceeds the wall time), so they show direction, not an exact saving. The fence no longer compiles; the calculated sorts compile less; the ordinary page, whose hints are unchanged, compiles as before. Temporary sources compile cheaply, so they show little change. Cases slower by more than 10 % plus 5 ms: 1 of 36 real (`dashboard_limited`, status 7, ordinary status sort, 445 → 531 ms with equal reads; 24 were faster) and 9 of 112 temporary (18–45 ms, equal reads; 11 were faster). These are treated as timing variation.
+Compile elapsed time was 93–612 ms before and 0–531 ms after, below the wall time of each batch (96–729 ms before, 3–600 ms after). The first run of this table summed some message lists twice and gave sums above the wall time; the explanation recorded then, that the messages overlap, was wrong. The fence no longer compiles; the calculated sorts compile less; the ordinary page, whose hints are unchanged, compiles as before. Temporary sources compile cheaply, so they show little change. Cases slower by more than 10 % plus 5 ms: none of 36 real (24 were faster) and 6 of 112 temporary (19–57 ms, equal reads; 21 were faster). These are treated as timing variation.
 
-A first candidate also removed the two page-selection hints. Work-table reads and source scan counts were again equal in every case and source reads were equal in 98 of 148 (50 temporary cases differed: 14 read 1–2 pages more, 36 read 8–63 pages fewer), but 21 of 112 temporary cases were slower, mostly at 20,000: ordinary `package_name` second page 353 → 775 ms, `created_at` second page 146 → 434 ms, calculated `error_count` second page 941 → 1,207 ms. Actual plans of the selection statement at 20,000 (all executions, first page) show one Sort either way, but its key list differs: with `RECOMPILE` the paired `CASE` keys simplify to 3 sort columns; a cached plan sorts on all 12 (ordinary page) or 5 (calculated).
+A first candidate also removed the two page-selection hints. Work-table reads and source scan counts were again equal in every case and source reads were equal in 98 of 148 (50 temporary cases differed: 14 read 1 page more, 36 read 8–36 pages fewer), but 23 of 112 temporary cases were slower (18 of them at 20,000, 9 of those unfiltered): ordinary `package_name` second page 185 → 429 ms, `created_at` second page 135 → 278 ms, calculated `error_count` first page 694 → 800 ms. On the real catalog (19 executions) the same candidate was faster in 35 of 36 cases, because the selection statement no longer compiles on every request: median ordinary sort 430 → 319 ms and calculated sort 522 → 213 ms, against 479 → 475 ms and 555 → 430 ms for the adopted version in its own run. The first version of this record did not state that. The two runs were separate and their baselines differ (ordinary 430 and 479 ms), so they do not isolate what the two hints cost or save; the section above compares the two directly. Actual plans of the selection statement at 20,000 (all executions, first page) show one Sort either way, but its key list differs: with `RECOMPILE` the paired `CASE` keys simplify to 3 sort columns; a cached plan sorts on all 12 (ordinary page) or 5 (calculated).
 
 | Selection statement, elapsed ms | With `RECOMPILE` | Cached plan |
 | --- | ---: | ---: |
-| Ordinary, `package_name` ascending | 100 | 254 |
-| Ordinary, `created_at` descending | 74 | 195 |
-| Calculated, `error_count` descending | 55 | 137 |
+| Ordinary, `package_name` ascending | 70 | 364 |
+| Ordinary, `created_at` descending | 77 | 287 |
+| Calculated, `error_count` descending | 69 | 149 |
 
 These are single plans, not repeated samples; the wider key list is the visible difference, and no other cause was isolated. Both hints were restored with a comment giving this reason.
 
 The filters compare columns with local variables, so a cached fence or cohort plan is built from unknown-value estimates, not from the first caller's values. To check reuse, the fence and three calculated sorts ran at 20,000 temporary executions on one connection over four selections (one package of 200, failed, a six-hour window, all) in both orders, each order with its own cached plans, before and after: 64 runs returned the same IDs. Each calculated sort read the same source and work-table pages in all four variants; the fence read the same in either order (2 → 3 pages for all executions, as above). Timings varied in both directions without a pattern.
 
-Raw results: `.local/reports/backend/20261114-batch-h-recompile/` (`measure.py`, `measure.json` for the final candidate, `measure-all-six-removed.json` for the first; `diagnose.py`, `diagnose.json`, `diagnose.out`, `diagnose-c.out` for compile time, reuse and plans). Not checked: reuse on the real catalog views with selective filters (19 executions cannot show it), cached plans across pooled connections over time, 100,000 executions, and an office catalog.
+All figures in this section are from the 14 November re-measurement with the corrected message collector and with both SQL versions pinned from `c0d3dc0` and `a44ef35`; the first run counted some pages and compile times twice. Raw results: `.local/reports/backend/20261114-batch-h-recompile/recount/` (`measure.py`, `measure-h.json` for the adopted version, `measure-h-candidate.json` for the first candidate, `diagnose.py`, `diagnose.json`, `diagnose.out` for compile time, reuse and plans, `figures.py` for the figures quoted here); the first run's files are in the parent folder. Not checked: reuse on the real catalog views with selective filters (19 executions cannot show it), cached plans across pooled connections over time, 100,000 executions, and an office catalog.
 
 ### C4 list-page estimate SQL work: 8 November 2026
 
