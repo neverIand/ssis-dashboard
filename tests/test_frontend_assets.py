@@ -81,8 +81,7 @@ class PackagedFrontendTests(unittest.TestCase):
                 self.assertNotIn(':', filename)
                 self.assertTrue((ASSET_ROOT / filename).is_file(), filename)
         self.assertFalse((ASSET_ROOT / 'index.html').exists())
-        self.assertEqual((ASSET_ROOT / 'LICENSES.txt').read_bytes(),
-                         (ASSET_ROOT.parents[2] / 'web/LICENSES.txt').read_bytes())
+        self.assertFalse((ASSET_ROOT / 'LICENSES.txt').exists())
         self.assertEqual((ASSET_ROOT / 'theme-init.js').read_bytes(),
                          (ASSET_ROOT.parents[2] / 'web/src/theme-init.js').read_bytes())
         self.assertEqual((ASSET_ROOT / 'favicon.svg').read_bytes(),
@@ -117,8 +116,8 @@ class PackagedFrontendTests(unittest.TestCase):
                         with client.open(url, method=method, headers=headers) as response:
                             self.assertEqual(response.status_code, status)
                             self.assertEqual(response.headers['Cache-Control'], 'public, max-age=31536000, immutable')
-            for path in ['app/theme-init.js', 'app/LICENSES.txt', 'app/manifest.json', 'css/main.css',
-                         'app/assets/../theme-init.js', 'app/assets/../LICENSES.txt',
+            for path in ['app/theme-init.js', 'app/favicon.svg', 'app/manifest.json', 'css/main.css',
+                         'app/assets/../theme-init.js', 'app/assets/../favicon.svg',
                          'app/assets/%2e%2e/manifest.json', 'app/assets/../../css/main.css']:
                 url = f'{prefix}/static/{path}'
                 with self.subTest(prefix=prefix, path=path):
@@ -138,7 +137,7 @@ class PackagedFrontendTests(unittest.TestCase):
         self.connect.assert_not_called()
 
     def test_manifest_assets_load_at_root_and_mounted_prefix_without_sql(self):
-        files = {chunk['file'] for chunk in self.manifest.values()} | {'LICENSES.txt', 'theme-init.js', 'favicon.svg'}
+        files = {chunk['file'] for chunk in self.manifest.values()} | {'theme-init.js', 'favicon.svg'}
         files.update(filename for chunk in self.manifest.values() for filename in chunk.get('css', []))
         files.update(filename for chunk in self.manifest.values() for filename in chunk.get('assets', []))
         for prefix in ['', '/dashboard']:

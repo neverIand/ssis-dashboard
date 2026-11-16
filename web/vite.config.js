@@ -10,13 +10,8 @@ export default defineConfig({
   publicDir: false,
   appType: 'mpa',
   plugins: [{
-    name: 'browser-license-notices',
+    name: 'packaged-static-files',
     generateBundle() {
-      this.emitFile({
-        type: 'asset',
-        fileName: 'LICENSES.txt',
-        source: readFileSync(new URL('LICENSES.txt', import.meta.url), 'utf8'),
-      });
       // A classic, render-blocking script: it must run before the stylesheet paints.
       this.emitFile({
         type: 'asset',
@@ -40,6 +35,10 @@ export default defineConfig({
     },
   },
   build: {
+    // Baseline 2025: the last 2025 releases support every feature that was Baseline by the end of 2025.
+    // The single entry needs no modulepreload polyfill, so the bundle ships no third-party code.
+    target: ['chrome143', 'edge143', 'firefox146', 'safari26.2', 'ios26.2'],
+    modulePreload: { polyfill: false },
     // Only this dedicated generated directory is emptied by a build.
     outDir: fileURLToPath(new URL('../dashboard/static/app/', import.meta.url)),
     emptyOutDir: true,

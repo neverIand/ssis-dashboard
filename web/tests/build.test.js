@@ -12,9 +12,19 @@ test('production assets are present for Flask packaging', async () => {
   const entry = manifest['src/main.js'];
   assert.equal(entry.isEntry, true);
   assert.ok(entry.css.length > 0);
-  for (const filename of [entry.file, ...entry.css, 'LICENSES.txt']) {
+  for (const filename of [entry.file, ...entry.css, 'theme-init.js', 'favicon.svg']) {
     await access(new URL(filename, output));
   }
+  await assert.rejects(access(new URL('LICENSES.txt', output)), 'No third-party code ships, so no notice either');
+});
+
+test('production targets Baseline 2025 browsers without a modulepreload polyfill', async () => {
+  assert.deepEqual(config.build.target, ['chrome143', 'edge143', 'firefox146', 'safari26.2', 'ios26.2']);
+  assert.equal(config.build.modulePreload.polyfill, false);
+  const output = new URL('../../dashboard/static/app/', import.meta.url);
+  const manifest = JSON.parse(await readFile(new URL('manifest.json', output), 'utf8'));
+  assert.doesNotMatch(await readFile(new URL(manifest['src/main.js'].file, output), 'utf8'), /modulepreload/);
+  assert.doesNotMatch(await readFile(new URL('../src/main.js', import.meta.url), 'utf8'), /modulepreload-polyfill/);
 });
 
 test('development serves modules and proxies API requests on the same origin', async (t) => {
