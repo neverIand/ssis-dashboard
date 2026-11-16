@@ -6,7 +6,7 @@ import { mountOverview } from './render-overview.js';
 // Running, Succeeded and Failed first; the other statuses keep their code order.
 export function statusChoiceOrder(statuses) {
   const common = [2, 7, 4], rank = item => common.includes(item.code) ? common.indexOf(item.code) : common.length;
-  return [...statuses].sort((a, b) => rank(a) - rank(b));
+  return statuses.toSorted((a, b) => rank(a) - rank(b));
 }
 
 export function mountOverviewScreen(root, saved = null) {

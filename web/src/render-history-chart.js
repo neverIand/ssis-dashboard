@@ -73,7 +73,7 @@ export function mountHistoryChart(root, { metadata, restoreView = null, remember
   });
   function paint(page) {
     // The table keeps its server order; only this loaded-page projection is chronological.
-    const data = [...page.data].sort((a,
+    const data = page.data.toSorted((a,
       b) => a.created_at === b.created_at ? BigInt(a.execution_id) < BigInt(b.execution_id) ? -1 : 1 : a.created_at < b.created_at ? -1
         : 1);
     order = data.map((item) => item.execution_id);
