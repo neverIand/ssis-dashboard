@@ -22,7 +22,11 @@ export function runningDetailResponse(executionId = '9223372036854775807') {
 // DOM double for mounted startup/render behavior; no browser/layout claims.
 export function detailDOM() {
   const window = Object.assign(new EventTarget(), { location: { origin: 'https://example.test', search: '', hash: '', pathname: '/ops/app/executions/17' },
-    scrollX: 0, scrollY: 0, scrollTo(x, y) { this.scrollX = x; this.scrollY = y; } });
+    innerHeight: 900, getComputedStyle: node => ({ position: node.style.position || 'static' }),
+    scrollX: 0, scrollY: 0, scrollTo(x, y) {
+      this.scrollX = typeof x === 'object' ? x.left : x;
+      this.scrollY = typeof x === 'object' ? x.top : y;
+    } });
   window.history = { state: null, replacements: [], replaceState(state, _title, href) {
     this.state = state; this.replacements.push(href);
     const url = new URL(href, window.location.origin);
@@ -70,8 +74,12 @@ export function detailDOM() {
     const panel = new Node(document, 'section');
     nodes.set(`[data-detail-tab-panel="${section}"]`, panel);
     get('execution-detail').append(get(`${section}-toggle`), panel); panel.append(get(`${section}-panel`));
-    get(`${section}-panel`).append(...['status', 'notice', 'retry', 'sort', 'limit',
-      'previous', 'next', 'latest', 'scroll'].map(key => get(`${section}-${key}`)));
+    const toolbar = new Node(document, 'div');
+    nodes.set(`[data-${section}-toolbar]`, toolbar);
+    get(`${section}-panel`).append(toolbar, get(`${section}-scroll`));
+    get(`${section}-panel`).querySelector = selector => selector === '.table-toolbar' ? toolbar : null;
+    toolbar.append(...['status', 'notice', 'retry', 'sort', 'limit',
+      'previous', 'next', 'latest'].map(key => get(`${section}-${key}`)));
     get(`${section}-scroll`).append(get(`${section}-table`));
     const body = new Node(document, 'tbody');
     bodies[section] = body;
@@ -84,7 +92,7 @@ export function detailDOM() {
       nodes.set(`[data-${section}-header-${key}]`, button); cell.append(button); head.append(cell);
     }
     get(`${section}-table`).append(head);
-    get(`${section}-table`).querySelector = selector => selector === 'tbody' ? body : null;
+    get(`${section}-table`).querySelector = selector => selector === 'tbody' ? body : selector === 'thead' ? head : null;
     get(`${section}-retry`).hidden = get(`${section}-panel`).hidden = true;
   }
   get('events-panel').append(get('events-filters'));

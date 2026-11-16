@@ -99,13 +99,14 @@ test('O5/K2: the Other card names its parts; package links leave the Tab order t
   assert.equal(pkg.getAttribute('href'), id.getAttribute('href'));
 });
 
-test('O7: the default preset reads in days and exact timestamps sit under a closed Advanced disclosure', () => {
+test('O7: the default range reads in days and exact timestamps sit under a closed Advanced disclosure', () => {
   const settings = baseMetadata();
   settings.limits = { ...settings.limits, default_range_hours: 360 };
   const dom = filtersDOM(settings);
   const filters = mountFilters(dom.root, { metadata: settings, appBase: '/app/', effectiveWindow: () => null,
     onApplied: () => {}, api: { get: async () => envelope([]) } });
-  assert.equal(dom.get('[data-created-preset="default"]').textContent, 'Default window (15 days)');
+  assert.equal(dom.get('[data-created-preset="default"]'), null);
+  assert.equal(dom.get('[data-filter-label="created"]').textContent, 'Last 15 days');
   filters.dispose?.();
   const html = source('../../dashboard/templates/app/index.html');
   assert.match(html, /<details class="exact-times"><summary>Advanced: exact timestamps<\/summary>/);
@@ -152,6 +153,6 @@ test('R1-2: header stickiness and clipping depend on a measured fit, never on wi
   dom.scroll.clientWidth = 700;
   await dom.view.refresh();
   assert.equal(dom.scroll.dataset.fits, undefined, 'a wider table keeps its horizontal scroll');
-  assert.match(source('../src/styles.css'), /\[data-execution-scroll\]\[data-fits\] \{ overflow-x: clip; \}/);
-  assert.doesNotMatch(source('../src/styles.css'), /^\s*\[data-execution-scroll\] \{ overflow-x: clip; \}/m, 'no width-only clip');
+  assert.match(source('../src/styles.css'), /\[data-sticky-table\]\[data-fits\] \{ overflow-x: clip; \}/);
+  assert.doesNotMatch(source('../src/styles.css'), /^\s*\[data-sticky-table\] \{ overflow-x: clip; \}/m, 'no width-only clip');
 });

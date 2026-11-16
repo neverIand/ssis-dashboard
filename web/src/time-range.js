@@ -127,9 +127,14 @@ export function createServerClock(serverTime, now = () => performance.now()) {
   };
 }
 
-export function rangeLabel(selection, timeZone) {
+export const defaultRangePreset = hours => Object.keys(presetHours).find(key => presetHours[key] === hours) ?? null;
+
+export function rangeLabel(selection, timeZone, defaultHours = 24) {
   if (selection.created) return createdPresets[selection.created];
-  if (selection.from === null && selection.to === null) return 'Default window';
+  if (selection.from === null && selection.to === null) {
+    return createdPresets[defaultRangePreset(defaultHours)]
+      ?? `Last ${defaultHours % 24 === 0 ? `${defaultHours / 24} days` : `${defaultHours} hours`}`;
+  }
   const label = value => {
     if (value === null) return 'Default';
     const local = projectTime(value, timeZone);

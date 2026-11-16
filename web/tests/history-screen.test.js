@@ -11,6 +11,48 @@ const metadata = historyMetadata();
 const settle = async () => { for (let turn = 0; turn < 4; turn += 1) await new Promise(resolve => setImmediate(resolve)); };
 const scoped = '?match=exact&folder=Folder&project=Project&package=Main.dtsx';
 
+test('B3 standalone History reveals new pages and Rows while Refresh, sorting and restore keep their position', async t => {
+  const dom = screen(t, scoped, { respond: params => jsonResponse(historyPage([historyRow('5')], {
+    direction: params.direction, limit: Number(params.limit), has_more: true, next_cursor: 'page-two',
+  })) });
+  await settle();
+  const toolbar = dom.get('history-toolbar'), head = dom.get('history-table').querySelector('thead'), scrolls = [];
+  let headerTop = -120;
+  dom.window.scrollY = 700;
+  toolbar.style.position = 'sticky';
+  toolbar.getBoundingClientRect = () => {
+    const top = toolbar.style.position === 'static' ? 460 - dom.window.scrollY : 0;
+    return { top, bottom: top + 40, height: 40, width: 800 };
+  };
+  head.getBoundingClientRect = () => ({ top: headerTop, bottom: headerTop + 30 });
+  dom.window.scrollTo = request => { scrolls.push(request); dom.window.scrollY = request.top; };
+  const next = dom.get('history-next');
+  next.focus(); dom.click('history-next'); await settle();
+  assert.deepEqual(scrolls, [{ left: 0, top: 460, behavior: 'instant' }]);
+  assert.equal(dom.document.activeElement, next);
+  headerTop = 40;
+  dom.click('history-previous'); await settle();
+  assert.equal(scrolls.length, 1, 'visible header needs no scrolling');
+  headerTop = 10;
+  dom.click('history-latest'); await settle();
+  const limit = dom.get('history-limit');
+  limit.focus(); limit.value = '25'; limit.dispatchEvent(new Event('change')); await settle();
+  assert.equal(scrolls.length, 3);
+  assert.equal(dom.history().at(-1).limit, '25');
+  assert.equal(dom.document.activeElement, limit);
+  dom.click('history-refresh'); await settle();
+  dom.click('history-header-execution_id'); await settle();
+  assert.equal(scrolls.length, 3);
+  const saved = dom.mounted.checkpoint();
+  dom.mounted.dispose();
+  const restored = screen(t, scoped, { saved });
+  restored.window.scrollY = 280;
+  restored.get('history-table').querySelector('thead').getBoundingClientRect = () => ({ top: -100, bottom: -70 });
+  restored.window.scrollTo = () => assert.fail('retained History must not reveal a page');
+  await settle();
+  assert.equal(restored.window.scrollY, 280);
+});
+
 test('standalone History keeps the update clock visible during a pending refresh', async t => {
   const pending = deferred();
   let delayed = false;

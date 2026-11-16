@@ -55,6 +55,14 @@ class FrontendShellTests(unittest.TestCase):
     def write_manifest(self, manifest):
         self.manifest_path.write_text(json.dumps(manifest), encoding='utf-8')
 
+    def test_created_presets_render_in_row_major_order_with_the_first_preset_autofocused(self):
+        html = self.client.get('/app/').get_data(as_text=True)
+        buttons = re.findall(r'<button\b[^>]*data-created-preset="([^"]+)"([^>]*)>', html)
+        self.assertEqual([value for value, _ in buttons], ['today', '24h', '7d', '30d', '180d', 'custom'])
+        self.assertEqual([value for value, attrs in buttons if re.search(r'\bautofocus\b', attrs)], ['today'])
+        self.assertNotIn('Default window', html)
+        self.connect.assert_not_called()
+
     def test_only_successful_native_shells_receive_the_strict_content_security_policy(self):
         strict = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; "
                   "connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")

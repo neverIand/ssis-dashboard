@@ -300,6 +300,9 @@ main {
 .button-quiet { background: transparent; border-color: transparent; }
 .filter-popover { position: fixed; inset: auto; margin: 0; width: 28rem; max-width: calc(100vw - 1.0667rem); max-height: min(70vh, 38rem); overflow-y: auto; padding: 1rem; border: 1px solid var(--sd-control-border); border-radius: var(--sd-radius); background: var(--sd-surface); color: var(--sd-text); box-shadow: var(--sd-shadow); }
 .created-popover { width: 36rem; }
+/* Two equal columns, collapsing to one only when a preset's label would be cramped. */
+.creation-presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, max(10rem, calc((100% - 0.4rem) / 2))), 1fr)); gap: 0.4rem; }
+.creation-presets > button { white-space: nowrap; }
 .status-popover { width: 23rem; }
 .popover-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; margin-bottom: 0.6rem; }
 .popover-heading button { font-size: 1.2rem; padding: 0 0.6rem; }
@@ -705,6 +708,15 @@ tbody tr:hover { background: var(--sd-subtle); }
 [data-execution-table] td { font-size: 0.9333rem; line-height: 1.4; }
 [data-execution-table] .cell-detail { font-size: 0.8rem; line-height: 1.25; }
 [data-execution-table] .time-cell { white-space: nowrap; }
+@media (min-width: 66.67rem) {
+  /* Auto-width name/estimate columns absorb the spare space; other columns keep their content width. */
+  [data-execution-table] th:not(:nth-child(2), :nth-child(3)) { width: 1%; }
+  [data-execution-table] .time-cell { min-width: 0; max-width: 11.5rem; }
+  [data-execution-table] td.number-cell, [data-history-table] td:nth-child(5) { white-space: nowrap; }
+  [data-history-table] col:is(:nth-child(1), :nth-child(6)) { width: auto; }
+  [data-history-table] col:is(:nth-child(2), :nth-child(3), :nth-child(4), :nth-child(5)) { width: 1%; }
+  [data-history-table] :is(th, td):is(:nth-child(2), :nth-child(3), :nth-child(4)) { max-width: 11.5rem; }
+}
 @media (max-width: 66.6667rem) {
   /* Keep Status/Duration/Warn/Err in view near 768-1000 px: dates wrap above times. */
   [data-execution-table] { min-width: 44rem; }
@@ -717,7 +729,6 @@ tbody tr:hover { background: var(--sd-subtle); }
   .page-heading { grid-template-columns: minmax(0, 1fr); }
   .table-toolbar, .toolbar-filters, .filter-bar { flex-wrap: wrap; }
   .toolbar-meta { flex-basis: 12rem; }
-  .filter-meta { flex-basis: 100%; justify-content: start; }
   .page-heading > .section-actions { margin-left: auto; }
 }
 @media (max-width: 31.3333rem) {
@@ -749,16 +760,13 @@ tbody tr:hover { background: var(--sd-subtle); }
 .chart-count { margin-left: auto; color: var(--sd-secondary); font-size: 0.8667rem; white-space: nowrap; }
 .chart-mixed { display: block; margin: 0.3rem 0 0; color: var(--sd-warning); }
 [data-history-results][data-idle] :is(.table-toolbar, [data-history-chart-panel], [data-history-status-options]) { display: none; }
-/* Overview (UX batch B3): paging stays reachable on long pages without a second pager or footer: the list
-   toolbar sticks to the top of the viewport, and where the table never scrolls sideways its header sticks below it. */
+/* Paging stays reachable on long pages; fit is measured by the shared table viewport owner. */
 /* Phones wrap the toolbar to several rows, so it only sticks where it stays one or two rows. */
 @media (min-width: 49.4rem) {
-  .executions-toolbar { position: sticky; top: 0; z-index: 2; background: var(--sd-surface); border-radius: var(--sd-radius) var(--sd-radius) 0 0; }
-}
-@media (min-width: 49.4rem) {
-  [data-execution-scroll][data-fits] { overflow-x: clip; }
-  [data-execution-scroll][data-fits] [data-execution-table] thead th {
-    position: sticky; top: var(--sd-list-toolbar-height, 3.0667rem); z-index: 1;
+  [data-sticky-toolbar] { position: sticky; top: 0; z-index: 2; background: var(--sd-surface); border-radius: var(--sd-radius) var(--sd-radius) 0 0; }
+  [data-sticky-table][data-fits] { overflow-x: clip; }
+  [data-sticky-table][data-fits] thead th {
+    position: sticky; top: var(--sd-list-toolbar-height, 3.0667rem); z-index: 1; background: var(--sd-subtle);
   }
 }
 @keyframes sd-row-change-a { from { background: var(--sd-action-soft); } to { background: transparent; } }

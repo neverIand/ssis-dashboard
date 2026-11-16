@@ -64,8 +64,12 @@ export class Node extends EventTarget {
 }
 
 export function overviewDOM() {
-  const window = { location: { origin: 'https://example.test' },
-    scrollX: 0, scrollY: 0, scrollTo(x, y) { this.scrollX = x; this.scrollY = y; } };
+  const window = Object.assign(new EventTarget(), { location: { origin: 'https://example.test' }, innerHeight: 900,
+    getComputedStyle: node => ({ position: node.style.position || 'static' }),
+    scrollX: 0, scrollY: 0, scrollTo(x, y) {
+      this.scrollX = typeof x === 'object' ? x.left : x;
+      this.scrollY = typeof x === 'object' ? x.top : y;
+    } });
   const document = Object.assign(new EventTarget(), { defaultView: window, activeElement: null, visibilityState: 'visible',
     createElement: tag => new Node(document, tag),
     createElementNS: (_namespace,tag) => new Node(document,tag),
@@ -90,10 +94,14 @@ export function overviewDOM() {
     root.append(link); link.append(node);
   }
   const scroll = new Node(document, 'div'), table = new Node(document, 'table'), body = new Node(document, 'tbody');
-  root.append(scroll);
+  const toolbar = new Node(document, 'div'), head = new Node(document, 'thead');
+  root.append(toolbar, scroll);
+  elements.set('.executions-toolbar', toolbar);
+  toolbar.append(...['executions-status', 'list-retry', 'executions-previous', 'executions-next', 'executions-latest']
+    .map(key => elements.get(`[data-${key}]`)));
   scroll.append(table);
-  table.append(body);
-  table.querySelector = selector => selector === 'tbody' ? body : null;
+  table.append(head, body);
+  table.querySelector = selector => selector === 'tbody' ? body : selector === 'thead' ? head : null;
   elements.set('[data-execution-table]', table);
   const timelineBody=new Node(document,'tbody');
   const timelineTable=elements.get('[data-timeline-table]');timelineTable.append(timelineBody);

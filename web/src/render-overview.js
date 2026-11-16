@@ -5,6 +5,7 @@ import { selectionParams, selectionSearch } from './selection.js';
 import { mountTimeline } from './render-timeline.js';
 import { reserveLoadingSpace } from './loading-space.js';
 import { breakableText, inlineStatus, pollingButton } from './ui.js';
+import { mountTableViewport } from './table-viewport.js';
 
 export function mountOverview(root, { api, metadata, appBase, retainedPaths, restoreView = null,
   serverTime = null, onSelect = () => {} }) {
@@ -27,6 +28,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   const pollStatus = root.querySelector('[data-poll-status]');
   const scroll = table.parentElement;
   const reserveSpace = reserveLoadingSpace(scroll);
+  const viewport = mountTableViewport(table, scroll, root.querySelector('.executions-toolbar'));
   const rows = new Map();
   const cards = Object.fromEntries(['total', 'running', 'succeeded', 'failed', 'other']
     .map((key) => [key, root.querySelector(`[data-count="${key}"]`)]));
@@ -316,12 +318,12 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       `${display.count(values.other)} Other: ${otherParts.join(', ')}`);
     else cardLinks.other.removeAttribute('aria-label');
     timelineView.render(state.timeline,state.busy,state.selection,page);
-    fitStickyHeader();
     if (focused === listRetry && listRetry.hidden) refresh.focus({ preventScroll: true });
     if (rowFocus && document.activeElement !== focused) {
       (focused.isConnected ? focused : scroll).focus({ preventScroll: true });
     }
     if (currentPosition) restorePosition(currentPosition);
+    const restoring = returning !== null;
     if (returning && !state.busy && state.selection !== null) {
       if (page) {
         if (returning.focusId !== null || returning.tableFocused) {
@@ -331,19 +333,16 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       }
       returning = null;
     }
+    viewport.update(page, { busy: state.busy, reveal: !state.pageStale && state.phase !== 'list-error' && !restoring });
   } });
-  // Sticky headers need a region that does not scroll sideways; only clip it when nothing would be hidden.
-  const toolbar = root.querySelector('.executions-toolbar');
-  function fitStickyHeader() {
-    const fits = table.getBoundingClientRect().width <= scroll.clientWidth + 0.5;
-    if (fits) scroll.dataset.fits = ''; else delete scroll.dataset.fits;
-    if (toolbar) scroll.style.setProperty?.('--sd-list-toolbar-height', `${toolbar.getBoundingClientRect().height}px`);
-  }
-  window.addEventListener?.('resize', fitStickyHeader);
   const retryList = () => { void owner.retryList(); };
-  const previousPage = () => { void owner.previous(); };
-  const nextPage = () => { void owner.next(); };
-  const latestPage = () => { void owner.latest(); };
+  const pageAction = (control, action) => () => {
+    if (!control.disabled && control.getAttribute('aria-disabled') !== 'true') viewport.pageChange();
+    void action();
+  };
+  const previousPage = pageAction(previous, owner.previous);
+  const nextPage = pageAction(next, owner.next);
+  const latestPage = pageAction(latest, owner.latest);
   const refreshPage = () => { void (phase === 'summary-error' ? owner.retrySummary() : owner.refresh()); };
   const togglePolling = () => owner.togglePolling();
   const visibilityChanged = () => owner.setVisible(document.visibilityState !== 'hidden');
@@ -356,6 +355,8 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   listRetry.addEventListener('click', retryList);
   return {
     apply(selection, options) {
+      if (!options?.restore && selection && appliedSelection && selection.limit !== appliedSelection.limit) viewport.pageChange();
+      else viewport.cancelPageChange();
       if (!options?.restore) returning = null;
       return owner.apply(selection, options);
     },
@@ -369,6 +370,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     dispose() {
       owner.dispose();
       reserveSpace(false);
+      viewport.dispose();
       timelineView.dispose();
       document.removeEventListener('visibilitychange', visibilityChanged);
       pollToggle.removeEventListener('click', togglePolling);
@@ -377,7 +379,6 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       next.removeEventListener('click', nextPage);
       latest.removeEventListener('click', latestPage);
       refresh.removeEventListener('click', refreshPage);
-      window.removeEventListener?.('resize', fitStickyHeader);
       for (const [node, action] of cardActions) node.removeEventListener('click', action);
     },
   };

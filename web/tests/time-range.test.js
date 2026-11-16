@@ -6,7 +6,7 @@ import { timestampTicks } from '../src/selection.js';
 test('creation range labels retain seconds in the fixed display-zone format', () => {
   assert.equal(rangeLabel({from:'2026-10-17T16:00:01.1234567Z',to:'2026-10-17T17:30:02Z'}, 'Europe/London'),
     '2026-10-17 17:00:01 → 2026-10-17 18:30:02');
-  assert.equal(rangeLabel({from:null,to:null}, 'Europe/London'), 'Default window');
+  assert.equal(rangeLabel({from:null,to:null}, 'Europe/London'), 'Last 24 hours');
 });
 
 test('creation range labels distinguish repeated wall times from UTC or offset bounds', () => {

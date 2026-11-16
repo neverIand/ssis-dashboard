@@ -1,5 +1,5 @@
 import { presetHours, SelectionError, validateSelection } from './selection.js';
-import { calendarBound, localCandidates, nextDate, projectTime } from './time-range.js';
+import { calendarBound, defaultRangePreset, localCandidates, nextDate, projectTime } from './time-range.js';
 
 export function mountRangeEditor(form, { metadata, listen, onChoose }) {
   const get = selector => form.querySelector(selector);
@@ -9,20 +9,17 @@ export function mountRangeEditor(form, { metadata, listen, onChoose }) {
     date: get(`#${key}-date`), time: get(`#${key}-time`), exact: get(`#${key}`),
     occurrence: get(`#${key}-occurrence`), occurrenceLabel: get(`[data-occurrence-label="${key}"]`),
   }]));
-  let original = null, dirty = new Set(), mode = 'default';
+  let original = null, dirty = new Set(), mode = null;
   const exact = new Set();
   const zone = metadata.display_timezone;
   for (const button of presets) {
     const value = button.dataset.createdPreset;
-    const hours = metadata.limits.default_range_hours;
-    if (value === 'default') button.textContent = `Default window (${hours % 24 === 0
-      ? `${hours / 24} ${hours === 24 ? 'day' : 'days'}` : `${hours} h`})`;
     // Hide presets longer than the configured maximum instead of leaving dead buttons.
     button.hidden = button.disabled = (presetHours[value] ?? 0) > metadata.limits.max_range_hours;
     listen(button, 'click', () => {
       mode = value; notice.textContent = '';
       if (mode === 'custom') { show(); fields.from.date.focus(); }
-      else choose({ created: mode === 'default' ? null : mode, from: null, to: null });
+      else choose({ created: mode, from: null, to: null });
     });
   }
   function show() {
@@ -93,7 +90,7 @@ export function mountRangeEditor(form, { metadata, listen, onChoose }) {
             { end: key === 'to', includeTime: include.checked, occurrence: field.occurrence.value });
         }
       }
-      if (!range.from && !range.to) throw new SelectionError('Choose at least one date or use Default window.');
+      if (!range.from && !range.to) throw new SelectionError('Choose at least one date.');
       choose(range);
     } catch (error) {
       notice.textContent = error instanceof SelectionError ? error.message : 'The range could not be resolved. Try again.';
@@ -105,7 +102,7 @@ export function mountRangeEditor(form, { metadata, listen, onChoose }) {
         to: selection.to ?? effectiveWindow?.to ?? null };
       dirty = new Set(); exact.clear();
       const custom = selection.from !== null || selection.to !== null;
-      mode = selection.created ?? (custom ? 'custom' : 'default');
+      mode = selection.created ?? (custom ? 'custom' : defaultRangePreset(metadata.limits.default_range_hours));
       include.checked = original.from !== null || original.to !== null;
       for (const [key, field] of Object.entries(fields)) {
         const projected = original[key] ? projectTime(original[key], zone) : { date: '', time: '00:00:00' };

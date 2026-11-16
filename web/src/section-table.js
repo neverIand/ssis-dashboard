@@ -1,6 +1,7 @@
 import { createDisplay } from './display.js';
 import { mountTableOrder } from './table-order.js';
 import { reserveLoadingSpace } from './loading-space.js';
+import { mountTableViewport } from './table-viewport.js';
 
 // Own the DOM lifetime; adapters supply cells, filters and wording, never requests.
 export function mountSectionTable(root, { metadata, actions, restoreView = null }, {
@@ -17,7 +18,12 @@ export function mountSectionTable(root, { metadata, actions, restoreView = null 
   const table = get('table'), body = table.querySelector('tbody'), rows = new Map(), listeners = [];
   const display = createDisplay({ timeZone: metadata.display_timezone });
   const reserveSpace = reserveLoadingSpace(scroll);
-  const order = mountTableOrder(root, { resource, metadata, onOrder: actions.order, sorts });
+  const viewport = mountTableViewport(table, scroll, panel.querySelector('.table-toolbar'));
+  const order = mountTableOrder(root, { resource, metadata, onOrder(changes) {
+    if (changes.limit !== undefined && changes.limit !== state.query.limit) viewport.pageChange();
+    else viewport.cancelPageChange();
+    actions.order(changes);
+  }, sorts });
   Object.assign(controls, order.headers);
   const initialFocus = document.activeElement, initialScroll = { left: scroll.scrollLeft, top: scroll.scrollTop };
   let returning = enabled ? restoreView : null, rendered = null, renderedStart = null, state = null, busy = true;
@@ -32,7 +38,11 @@ export function mountSectionTable(root, { metadata, actions, restoreView = null 
     node.addEventListener(event, handler);
     listeners.push([node, event, handler]);
   };
-  for (const key of ['toggle', 'retry', 'previous', 'next', 'latest']) listen(controls[key], 'click', actions[key]);
+  for (const key of ['toggle', 'retry', 'previous', 'next', 'latest']) listen(controls[key], 'click', event => {
+    if (['previous', 'next', 'latest'].includes(key) && !busy && !panel.hidden
+        && controls[key].getAttribute('aria-disabled') !== 'true') viewport.pageChange();
+    actions[key](event);
+  });
   function empty(message) {
     rows.clear();
     const row = element('tr'), cell = element('td', message, 'empty-state');
@@ -148,7 +158,9 @@ export function mountSectionTable(root, { metadata, actions, restoreView = null 
           }
           scroll.scrollLeft = position.left;
           scroll.scrollTop = position.top;
+          const restoring = returning !== null;
           restore(page, view);
+          viewport.update(page, { busy, reveal: !panel.hidden && !error && !state.stale && !restoring });
         },
         checkpoint() {
           const saved = { left: scroll.scrollLeft, top: scroll.scrollTop };
@@ -161,6 +173,7 @@ export function mountSectionTable(root, { metadata, actions, restoreView = null 
         },
         dispose() {
           reserveSpace(false);
+          viewport.dispose();
           order.dispose();
           view.beforeDispose?.();
           for (const [node, event, handler] of listeners) node.removeEventListener(event, handler);

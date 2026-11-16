@@ -68,7 +68,7 @@ export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}
     }
     const names = metadata.execution_statuses.filter(item => draft.status.includes(item.code)).map(formatCode);
     label('status', names.length ? names.join(', ') : 'All statuses');
-    label('created', rangeLabel(draft, metadata.display_timezone));
+    label('created', rangeLabel(draft, metadata.display_timezone, metadata.limits.default_range_hours));
     const changed = JSON.stringify(draft) !== JSON.stringify(session.applied);
     notice.textContent = changed ? 'Close Status to apply; Escape cancels.' : '';
   }
