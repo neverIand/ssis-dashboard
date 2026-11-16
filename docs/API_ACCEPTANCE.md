@@ -171,6 +171,19 @@ Record revision/source hashes, interpreter/driver/catalog scope, timestamps, exa
 
 Each record keeps its date, candidate, method, decision-relevant figures, limits and evidence path. The full text of every record up to 15 November 2026, with all intermediate tables, is at `6180174:docs/API_ACCEPTANCE.md`. Timings are local observations, not p95 targets or capacity claims, unless a record says otherwise.
 
+### Parameter scope order: 16 November 2026
+
+Office feedback batch D (Progress Next action 24). `api-values-parameters-page.sql` selects the bounded key page by `object_type, execution_parameter_id` with a two-part seek instead of by ID; the ID fence, the key selection before value conversion and the sensitive masking are unchanged. Local catalog: 16 executions with parameters, 282 parameter rows, at most 18 per execution, already grouped by scope in ID order. Each execution was paged to the end at limits 5 and 50 under the administrator, `dashboard_reader` and `dashboard_limited` (`EXECUTE AS USER`). The table shows two alternating before/after rounds.
+
+| Context, limit | Logical reads, first walk of all executions: before → after | Median ms per page, round 1 / round 2: before → after |
+| --- | ---: | --- |
+| Administrator, 5 | 1,976 → 1,982 | 13.9 / 10.9 → 10.1 / 14.8 |
+| Administrator, 50 | 1,001 → 1,003 | 13.9 / 10.6 → 9.7 / 15.9 |
+| `dashboard_reader`, 5 | 1,976 → 1,982 | 13.3 / 10.3 → 9.2 / 15.3 |
+| `dashboard_limited`, 5 | 2,610 → 2,610 | 25.8 / 25.6 → 23.4 / 17.6 |
+
+Reads differ by at most 6 pages over 58 requests, and the timings overlap between versions. The native test `test_value_queries` inserts parameter rows with alternating scopes inside a rolled-back savepoint, then pages at limits 2 and 3 across the scope boundary and past the fence; it passed with the other 25 native tests. Identity values it allocates are not rolled back. Evidence: `.local/reports/backend/20261116-parameter-order/`. Not checked: plans and compile time, a catalog whose ID order interleaves scopes, executions with hundreds of parameters, an office catalog.
+
 ### Page-selection RECOMPILE removal: 15 November 2026
 
 The user chose to remove `OPTION (RECOMPILE)` from the page-selection statement of `api-executions-ordered-page.sql` and `api-executions-sort.sql`, which batch H had kept. Four hints remain in the execution list, all `RECOMPILE, FORCE ORDER` on event aggregation. With and without the two hints alternated in one run: 36 real-catalog cases (19 executions, three reader contexts) and 112 temporary cases (2,000 and 20,000 executions). Returned IDs, work-table reads and source scan counts were equal in all 148; source reads were equal in 102 (10 temporary cases read 1 page more, 36 read 8–36 fewer).

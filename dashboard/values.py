@@ -55,16 +55,25 @@ def value_page(value, values, config):
         if section not in SECTIONS:
             raise InvalidInput('Unsupported value section.')
         limit = inputs.integer(values['limit']) if 'limit' in values else 50
-        selection = cursors.digest({'execution_id': value, 'section': section, 'limit': limit})
+        bound_selection = {'execution_id': value, 'section': section, 'limit': limit}
+        if section == 'parameters':
+            bound_selection['order'] = ['object_type', 'execution_parameter_id']
+        selection = cursors.digest(bound_selection)
         scope = cursors.scope_digest(config)
         state = None
+        last_type = None
         if 'cursor' in values:
             state = cursors.open_cursor(values['cursor'], resource='v1/values', selection=selection, scope=scope, now=now)
             upper, last = inputs.identifier(state['upper_id']), inputs.identifier(state['last_id'])
-            if (last > upper or type(state['sort_key']) is not list or state['sort_key'] != [state['last_id']]
-                    or type(state['sort_nulls']) is not list or len(state['sort_nulls']) != 1
-                    or state['sort_nulls'][0] is not False):
+            key, nulls = state['sort_key'], state['sort_nulls']
+            width = 2 if section == 'parameters' else 1
+            if (last > upper or type(key) is not list or len(key) != width or key[-1] != state['last_id']
+                    or type(nulls) is not list or len(nulls) != width or any(flag is not False for flag in nulls)):
                 raise cursors.InvalidCursor()
+            if section == 'parameters':
+                last_type = key[0]
+                if type(last_type) is not int or not -32768 <= last_type <= 32767:
+                    raise cursors.InvalidCursor()
     except cursors.InvalidCursor:
         raise
     except InvalidInput:
@@ -90,9 +99,11 @@ def value_page(value, values, config):
     rows = []
     identity = SECTIONS[section]
     if upper is not None:
-        parameters = (identifier, limit + 1, upper, last)
+        parameters = (identifier, limit + 1, upper)
+        if section == 'parameters':
+            parameters += (last_type, last)
         if section == 'overrides':
-            parameters += (int(config['API_OVERRIDE_VALUES_ENABLED']),)
+            parameters += (last, int(config['API_OVERRIDE_VALUES_ENABLED']))
         rows = query('api-values-' + section + '-page.sql', parameters)
         if not rows:
             raise NotFound()
@@ -110,9 +121,11 @@ def value_page(value, values, config):
     token = None
     if has_more:
         last_id = data[-1][identity]
+        key = [data[-1]['object_type']['code'], last_id] if section == 'parameters' else [last_id]
         token = cursors.seal({'v': 2, 'resource': 'v1/values', 'selection': selection, 'scope': scope,
                              'as_of': as_of.isoformat(), 'upper_id': wire.bigint(upper), 'last_id': last_id,
-                             'sort_key': [last_id], 'sort_nulls': [False]})
-    return data, {'from': None, 'to': None, 'limit': limit, 'sort': identity, 'direction': 'asc',
+                             'sort_key': key, 'sort_nulls': [False] * len(key)})
+    return data, {'from': None, 'to': None, 'limit': limit,
+                  'sort': 'object_type' if section == 'parameters' else identity, 'direction': 'asc',
                   'as_of': as_of.isoformat(), 'upper_id': None if upper is None else wire.bigint(upper),
                   'next_cursor': token, 'has_more': has_more, 'consistency': 'live', 'section': section}

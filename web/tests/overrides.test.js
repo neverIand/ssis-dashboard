@@ -192,6 +192,23 @@ test('override UI shows only property, value and sensitivity with exact path exp
   for (const index of [1,2,3,4]) assert.equal(dom.overrideBody.children[index].children[1].children[2].hidden, true);
 });
 
+test('override previews and full values use state hooks for raw text and all marker states', async t => {
+  const rows = [overrideRow('1', { value: 'Redacted (policy)' }), overrideRow('2', { value: 'NULL (unredacted)' }),
+    overrideRow('3', { value: '(empty)' }), overrideRow('4', { value: null }), overrideRow('5', { value: '' }),
+    overrideRow('6', { value: null, sensitive: true, redacted: true, redaction_reason: 'sensitive' }),
+    overrideRow('7', { value: null, redacted: true, redaction_reason: 'policy' })];
+  const dom = screen(t, async (resource, options) => options.params?.section === 'overrides'
+    ? overridePage(rows) : response(resource, options));
+  await flush(); click(dom, 'overrides-toggle'); await flush();
+  rows.forEach((item, index) => {
+    const row = dom.overrideBody.children[index], cell = row.children[1], kind = index < 3 ? 'raw' : 'marker';
+    assert.equal(row.dataset.propertyId, item.property_id); assert.equal(row.dataset.scope, undefined);
+    assert.equal(cell.children[0].dataset.valueKind, kind);
+    assert.equal(cell.children[2].children[1].dataset.valueKind, kind);
+    assert.equal(cell.children[2].children[1].textContent, kind === 'raw' ? item.value : '');
+  });
+});
+
 test('policy-hidden values keep paths available while redaction clears old expanded text without losing path focus or scroll', async t => {
   let redacted = false;
   const dom = screen(t, async (resource, options) => options.params?.section === 'overrides' ? overridePage([overrideRow('1', redacted
@@ -201,6 +218,8 @@ test('policy-hidden values keep paths available while redaction clears old expan
   redacted = true; click(dom, 'detail-refresh'); value.children[0].focus(); await flush();
   assert.equal(dom.overrideBody.children[0], row); assert.equal(path.open, true); assert.equal(value.open, false);
   assert.doesNotMatch(row.textContent, /private-override-canary/); assert.equal(value.children[1].textContent, '');
+  assert.equal(row.children[1].children[0].dataset.valueKind, 'marker');
+  assert.equal(value.children[1].dataset.valueKind, 'marker');
   assert.equal(dom.document.activeElement, dom.get('overrides-scroll')); assert.equal(dom.get('overrides-scroll').scrollLeft, 120);
   path.children[0].focus(); click(dom, 'detail-refresh'); await flush(); assert.equal(dom.document.activeElement, path.children[0]);
 });

@@ -160,6 +160,16 @@ class APIContractTests(unittest.TestCase):
                          logging_level={'code': 123, 'name': 'unknown'})
         self.validator('Execution').validate(execution)
 
+    def test_value_meta_binds_section_to_its_fixed_sort(self):
+        for example, section, sort in (('ParametersResponse', 'parameters', 'object_type'),
+                                       ('OverridesResponse', 'overrides', 'property_id')):
+            meta = deepcopy(self.examples[example]['value']['meta'])
+            self.assertEqual((meta['section'], meta['sort'], meta['direction']), (section, sort, 'asc'))
+            self.validator('ValuesPageMeta').validate(meta)
+            for wrong in ('execution_parameter_id', 'property_id' if section == 'parameters' else 'object_type'):
+                self.assertFalse(self.validator('ValuesPageMeta').is_valid({**meta, 'sort': wrong}))
+            self.assertFalse(self.validator('ValuesPageMeta').is_valid({**meta, 'direction': 'desc'}))
+
     def test_sensitive_values_and_invalid_cross_field_states_are_rejected(self):
         cases = []
         parameter = self.example_row('ParametersResponse')

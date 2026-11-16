@@ -51,8 +51,15 @@ class ValueTests(unittest.TestCase):
         source = [r for r in self.rows[section] if r['execution_id']==parameters[0]]
         if resource.endswith('fence.sql'):
             return {'upper_id':max((r[identity] for r in source), default=None)}
-        _, take, upper, last, *policy = parameters
-        selected = sorted((r for r in source if (last or 0)<r[identity]<=upper), key=lambda r:r[identity])[:take]
+        _, take, upper, *seek = parameters
+        if section == 'parameters':
+            last_type, last = seek
+            key = lambda r: (r['object_type'], r[identity])
+            selected = sorted((r for r in source if r[identity] <= upper
+                               and (last_type is None or key(r) > (last_type, last))), key=key)[:take]
+        else:
+            last, _policy = seek
+            selected = sorted((r for r in source if (last or 0)<r[identity]<=upper), key=lambda r:r[identity])[:take]
         # This deliberately supplies raw forbidden values to test serializer enforcement.
         return deepcopy(selected) or [{'execution_id':parameters[0], identity:None, 'page_empty':1}]
 
@@ -83,9 +90,9 @@ class ValueTests(unittest.TestCase):
         self.app.config.update(AS_OF_DATE='2000-01-01T00:00:00Z', HOUR_SPAN=1)
         page = self.page()
         self.assertEqual((len(page['data']), page['meta']['section'], page['meta']['sort'], page['meta']['direction']),
-                         (50, 'parameters', 'execution_parameter_id', 'asc'))
+                         (50, 'parameters', 'object_type', 'asc'))
         self.assertEqual((page['meta']['upper_id'], page['meta']['as_of']), ('251', NOW.isoformat()))
-        self.assertEqual(self.query.call_args.args, ('api-values-parameters-page.sql', (42, 51, 251, None)))
+        self.assertEqual(self.query.call_args.args, ('api-values-parameters-page.sql', (42, 51, 251, None, None)))
         self.assertFalse(self.app.config['API_EVENTS_ENABLED'])
         self.assertFalse(self.app.config['API_OVERRIDE_VALUES_ENABLED'])
         self.visible.assert_called_once_with('42', self.app.config, as_of=NOW)
@@ -98,9 +105,49 @@ class ValueTests(unittest.TestCase):
             self.assertEqual([r[identity] for r in first['data']+second['data']], [str(i) for i in range(1, 252)])
             self.assertEqual((len(first['data']), len(second['data'])), (200, 51))
             self.assertEqual(second['meta']['as_of'], first['meta']['as_of'])
-            self.assertEqual(second['meta']['sort'], identity)
+            self.assertEqual(second['meta']['sort'], 'object_type' if section == 'parameters' else identity)
             self.assertFalse(second['meta']['has_more'])
             self.assertEqual(self.query.call_args.args[1][1], 201)
+
+    def test_parameters_seek_by_scope_then_id_across_interleaved_ids(self):
+        for limit in (2, 3):
+            with self.subTest(limit=limit):
+                self.rows['parameters'] = [row(identifier=i, object_type=code)
+                                           for i, code in enumerate((30, 20, 50, 20, 30, 50, -32768, 32767), 1)]
+                page = self.page({'limit': str(limit)})
+                collected = []
+                # These later rows would be eligible by scope/ID seek without the ID fence.
+                self.rows['parameters'] += [row(identifier=9, object_type=20), row(identifier=10, object_type=32767)]
+                while True:
+                    collected.extend(page['data'])
+                    self.assertEqual((page['meta']['sort'], page['meta']['upper_id']), ('object_type', '8'))
+                    if not page['meta']['has_more']:
+                        break
+                    last = page['data'][-1]
+                    payload = self.payload(page)
+                    self.assertEqual(payload['sort_key'], [last['object_type']['code'], last['execution_parameter_id']])
+                    self.assertEqual(payload['sort_nulls'], [False, False])
+                    page = self.page({'limit': str(limit), 'cursor': page['meta']['next_cursor']})
+                self.assertEqual([r['execution_parameter_id'] for r in collected], ['7', '2', '4', '1', '5', '3', '6', '8'])
+                self.assertEqual([r['object_type']['code'] for r in collected], [-32768, 20, 20, 30, 30, 50, 50, 32767])
+
+    def test_parameter_cursor_accepts_smallint_extremes_and_zero(self):
+        for code in (-32768, -1, 0, 32767):
+            with self.subTest(code=code):
+                self.rows['parameters'] = [row(identifier=i, object_type=code) for i in (1, 2)]
+                first = self.page({'limit': '1'})
+                self.assertEqual(self.payload(first)['sort_key'], [code, '1'])
+                second = self.page({'limit': '1', 'cursor': first['meta']['next_cursor']})
+                self.assertEqual(second['data'][0]['execution_parameter_id'], '2')
+                self.assertEqual(self.query.call_args.args[1], (42, 2, 2, code, 1))
+
+    def test_old_parameter_cursor_shape_and_old_order_binding_are_rejected(self):
+        payload = self.payload(self.page({'limit': '1'}))
+        old_key = {**payload, 'sort_key': ['1'], 'sort_nulls': [False]}
+        self.invalid_cursor({'limit': '1', 'cursor': cursors.seal(old_key)})
+        old_selection = cursors.digest({'execution_id': '42', 'section': 'parameters', 'limit': 1})
+        for state in (payload, old_key):
+            self.invalid_cursor({'limit': '1', 'cursor': cursors.seal({**state, 'selection': old_selection})})
 
     def test_sensitive_and_policy_redaction_ignore_faulty_plaintext_or_objects(self):
         for section in SECTIONS:
@@ -218,7 +265,12 @@ class ValueTests(unittest.TestCase):
         payload = self.payload(self.page({'limit':'1'}))
         for changes in ({'upper_id':'0'}, {'last_id':'9223372036854775807'}, {'sort_key':[]},
                         {'sort_key':[1]}, {'sort_key':['2']}, {'sort_nulls':[0]}, {'sort_nulls':[True]},
-                        {'sort_nulls':[]}, {'sort_key':'1'}):
+                        {'sort_nulls':[]}, {'sort_key':'1'}, {'sort_key':[30, 1]}, {'sort_key':[30, '2']},
+                        {'sort_key':[30, '01']}, {'sort_key':[30, '9223372036854775808']},
+                        {'sort_key':[True, '1']}, {'sort_key':[30.0, '1']}, {'sort_key':['30', '1']},
+                        {'sort_key':[None, '1']}, {'sort_key':[-32769, '1']}, {'sort_key':[32768, '1']},
+                        {'sort_nulls':[False, 0]}, {'sort_nulls':[0, False]}, {'sort_nulls':[False, True]},
+                        {'sort_nulls':[True, False]}, {'sort_nulls':[False, False, False]}):
             self.invalid_cursor({'limit':'1', 'cursor':cursors.seal({**payload, **changes})})
 
     def test_invalid_inputs_methods_and_bodies_do_no_catalog_work(self):
@@ -308,7 +360,7 @@ class ValueTests(unittest.TestCase):
                 connection.add_output_converter.assert_called_once()
                 cursor.close.assert_called_once()
                 connection.close.assert_called_once()
-            expected = (42, 51, 1, pyodbc.BinaryNull)+( (0,) if section=='overrides' else () )
+            expected = (42, 51, 1, pyodbc.BinaryNull)+( (0,) if section=='overrides' else (pyodbc.BinaryNull,) )
             self.assertEqual(cursors_used[-1].execute.call_args.args[1], expected)
 
     def test_database_failures_preserve_safe_status_and_short_circuit(self):

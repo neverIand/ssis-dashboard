@@ -343,8 +343,9 @@ paths:
     get:
       operationId: listValues
       summary: One bounded parameter or property-override section
-      description: Implemented in C6. Disabled by default; deny before SQL. Each section has fixed ascending numeric
-        ID paging before value projection. Override values default to NULL/policy-redacted; sensitive values are
+      description: Implemented in C6. Disabled by default; deny before SQL. Parameters page by object_type then
+        execution_parameter_id ascending; overrides page by property_id ascending. Both select bounded keys before
+        value projection and retain an ID upper-bound fence. Override values default to NULL/policy-redacted; sensitive values are
         always redacted in SQL and serialization. Original parameter type labels and display strings are preserved.
       x-implementation-status: implemented
       x-milestone: C6
@@ -982,7 +983,10 @@ components:
           - {$ref: '#/components/schemas/UtcTimestamp'}
           - {type: 'null'}
         limit: {type: integer, minimum: 1, maximum: 200}
-        sort: {type: string, enum: [execution_parameter_id, property_id]}
+        sort:
+          type: string
+          enum: [object_type, property_id]
+          description: Parameters use object_type then execution_parameter_id ascending; overrides use property_id ascending.
         direction:
           type: string
           const: asc
@@ -1007,7 +1011,7 @@ components:
           required: [section]
         then:
           properties:
-            sort: {const: execution_parameter_id}
+            sort: {const: object_type}
       - if:
           properties:
             section: {const: overrides}
@@ -2156,8 +2160,9 @@ components:
       name: section
       in: query
       required: false
-      description: One bounded values section; fixed ascending execution_parameter_id/property_id order, each with
-        its own query/cursor. Override values are policy-redacted by default.
+      description: One bounded values section; parameters order by object_type then execution_parameter_id ascending,
+        overrides by property_id ascending, each with its own query/cursor and ID upper-bound fence. Unknown object_type
+        codes sort numerically. Override values are policy-redacted by default.
       schema:
         type: string
         enum: [parameters, overrides]
@@ -2449,7 +2454,7 @@ components:
           redacted: true
           redaction_reason: sensitive
         meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z', from: null,
-          to: null, limit: 50, sort: execution_parameter_id, direction: asc, as_of: '2026-10-15T11:00:00.1234567Z',
+          to: null, limit: 50, sort: object_type, direction: asc, as_of: '2026-10-15T11:00:00.1234567Z',
           upper_id: '9007199254740993', next_cursor: null, has_more: false, consistency: live, section: parameters}
     OverridesResponse:
       summary: Synthetic target response; not live output

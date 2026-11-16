@@ -4,6 +4,7 @@ import { ApiError } from '../src/api.js';
 import { createDetailLoader } from '../src/detail.js';
 import { createDisplay } from '../src/display.js';
 import { parameterQuery, readParameterPage } from '../src/values.js';
+import { parameterTypeFamily } from '../src/render-values.js';
 import { mountDetail } from '../src/render-detail.js';
 import { deferred } from './fixtures.js';
 import { detailDOM, detailResponse, runningDetailResponse } from './detail-fixture.js';
@@ -41,7 +42,7 @@ test('parameter DTO keeps BIGINT order, exact names/types/value strings, NULL, e
   const rows = [parameterRow('9007199254740993', { value: null }), parameterRow('9007199254740994', { value: '', sql_type: '' }),
     parameterRow('9007199254740995', { value: null, sensitive: true, redacted: true, redaction_reason: 'sensitive' }),
     parameterRow('9007199254740996', { value: null, redacted: true, redaction_reason: 'policy' }),
-    parameterRow('9223372036854775807', { value: '😀'.repeat(16384), truncated: true, sql_type: 'Unknown future type', object_type: { code: -32768, name: 'unknown' } })];
+    parameterRow('9223372036854775807', { value: '😀'.repeat(16384), truncated: true, sql_type: 'Unknown future type', object_type: { code: 32767, name: 'unknown' } })];
   const page = parameterPage(rows);
   assert.equal(readParameterPage(page, '17', query, metadata, display), page);
   assert.equal(page.data[4].value.length, 32768);
@@ -69,6 +70,24 @@ test('malformed flags, identities, section/order/fence and leaked redacted text 
   }
   assert.equal(converted, false);
   assert.throws(() => readParameterPage(parameterPage([parameterRow('2'), parameterRow('1')]), '17', query, metadata, display));
+});
+
+test('parameters keep server scope/ID order when BIGINT IDs fall across a scope boundary and reject duplicate IDs', () => {
+  const scopes = [[-32768, 'unknown'], [20, 'project'], [30, 'package'], [50, 'system'], [32767, 'unknown']];
+  const rows = scopes.map(([code, name], index) => parameterRow(String(9007199254740997n - BigInt(index)), {
+    object_type: { code, name }
+  }));
+  const page = parameterPage(rows);
+  assert.equal(readParameterPage(page, '17', query, metadata, display), page);
+  for (const invalid of [
+    [rows[2], rows[1]], [rows[1], { ...rows[2], execution_parameter_id: rows[1].execution_parameter_id }],
+    [rows[1], { ...rows[1], execution_parameter_id: '1' }],
+    [parameterRow('1', { object_type: { code: -32769, name: 'unknown' } })],
+    [parameterRow('1', { object_type: { code: 32768, name: 'unknown' } })]
+  ]) assert.throws(() => readParameterPage(parameterPage(invalid), '17', query, metadata, display),
+    error => error.kind === 'invalid_response');
+  const oldMeta = parameterPage(); oldMeta.meta.sort = 'execution_parameter_id';
+  assert.throws(() => readParameterPage(oldMeta, '17', query, metadata, display), error => error.kind === 'invalid_response');
 });
 
 test('disabled capability discards restored parameters and all programmatic reads while other detail work continues', async t => {
@@ -129,6 +148,20 @@ test('a restored cursor invalidated by policy resets once and a failed fallback 
   assert.deepEqual(run.calls.at(-1).params, query);
 });
 
+test('an old parameter order cursor resets once and successfully loads the first scope-ordered page', async t => {
+  const reads = [];
+  const run = setup(t, async (resource, { params }) => {
+    if (!resource.endsWith('/values')) return response(resource);
+    reads.push(params);
+    if (params.cursor) throw new ApiError('http', { status: 400, code: 'invalid_cursor' });
+    return parameterPage([parameterRow('9', { object_type: { code: 20, name: 'project' } }), parameterRow('1')]);
+  }, { restoreParameters: { open: true, query, path: { entries: [null, 'old-id-order'], index: 1 } } });
+  await run.owner.load();
+  assert.deepEqual(reads, [{ ...query, cursor: 'old-id-order' }, query]);
+  assert.equal(run.state.parameters.pageNumber, 1); assert.equal(run.state.parameters.error, null);
+  assert.deepEqual(run.state.parameters.page.data.map(row => row.execution_parameter_id), ['9', '1']);
+});
+
 test('parameter deadlines, A to B to A generations and disposal reject late reads without leaking values', async t => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
   const pending = [], run = setup(t, (resource, options) => {
@@ -166,15 +199,53 @@ test('parameter UI renders literal types/flags and distinct redacted, NULL, empt
   const rows = [parameterRow('1', { value: '<b>literal</b>\r\n尾 '.repeat(20) }), parameterRow('2', { value: null }),
     parameterRow('3', { value: '' }), parameterRow('4', { value: null, sensitive: true, redacted: true, redaction_reason: 'sensitive' }),
     parameterRow('5', { value: null, redacted: true, redaction_reason: 'policy' }),
-    parameterRow('6', { value: '😀'.repeat(16384), truncated: true, object_type: { code: -1, name: 'unknown' } })];
+    parameterRow('6', { value: '😀'.repeat(16384), truncated: true, object_type: { code: 32767, name: 'unknown' } })];
   const dom = screen(t, async resource => resource.endsWith('/values') ? parameterPage(rows) : response(resource));
   await flush(); assert.equal(dom.get('parameters-panel').hidden, true);
   dom.get('parameters-toggle').dispatchEvent(new Event('click')); await flush(); const text = dom.parameterBody.textContent;
-  for (const value of ['Decimal(18,4)', 'NULL (unredacted)', '(empty)', 'Redacted (sensitive)', 'Redacted (policy)', 'Unknown (-1)', 'Truncated to 16384 characters.']) assert.ok(text.includes(value));
+  for (const value of ['Decimal(18,4)', 'NULL (unredacted)', '(empty)', 'Redacted (sensitive)', 'Redacted (policy)', 'Unknown (32767)', 'Truncated to 16384 characters.']) assert.ok(text.includes(value));
   const first = dom.parameterBody.children[0]; assert.equal(first.children[0].children[0].textContent, rows[0].name);
   assert.equal(first.children[3].children[2].children[1].textContent, rows[0].value);
   assert.deepEqual(first.children[4].children[0].children.filter(node => !node.hidden).map(node => node.textContent), ['Required', 'Value set']);
   assert.equal(first.title, 'Parameter ID: 1'); assert.equal(first.children[0].children.length, 1);
+});
+
+test('parameter type families retain exact known, unknown and empty labels in chips', async t => {
+  const families = {
+    text: ['String'], integer: ['Byte', 'SByte', 'Int16', 'Int32', 'Int64', 'UInt32', 'UInt64'],
+    decimal: ['Decimal', 'Double', 'Single'], boolean: ['Boolean'], datetime: ['DateTime'],
+    other: ['', 'CustomType', 'Decimal(18,4)', 'string', '__proto__', 'constructor', '<b>type</b>']
+  };
+  const expected = Object.entries(families).flatMap(([family, types]) => types.map(type => ({ type, family })));
+  for (const { type, family } of expected) assert.equal(parameterTypeFamily(type), family, type);
+  const rows = expected.map(({ type }, index) => parameterRow(String(index + 1), { sql_type: type }));
+  const dom = screen(t, async resource => resource.endsWith('/values') ? parameterPage(rows) : response(resource));
+  await flush(); dom.get('parameters-toggle').dispatchEvent(new Event('click')); await flush();
+  expected.forEach(({ type, family }, index) => {
+    const chip = dom.parameterBody.children[index].children[2].firstChild;
+    assert.equal(chip.className, 'type-chip'); assert.equal(chip.dataset.family, family);
+    assert.equal(chip.textContent, type === '' ? '(empty)' : type);
+  });
+});
+
+test('parameter rows expose scope hooks and mark values by state even when raw text resembles a marker', async t => {
+  const rows = [parameterRow('6', { object_type: { code: 20, name: 'project' }, value: 'Redacted (sensitive)' }),
+    parameterRow('1', { value: 'NULL (unredacted)' }), parameterRow('2', { value: '(empty)' }),
+    parameterRow('3', { value: null }), parameterRow('4', { value: '' }),
+    parameterRow('5', { value: null, sensitive: true, redacted: true, redaction_reason: 'sensitive' }),
+    parameterRow('7', { object_type: { code: 50, name: 'system' }, value: null, redacted: true, redaction_reason: 'policy' }),
+    parameterRow('8', { object_type: { code: 32767, name: 'unknown' }, value: '0' })];
+  const dom = screen(t, async resource => resource.endsWith('/values') ? parameterPage(rows) : response(resource));
+  await flush(); dom.get('parameters-toggle').dispatchEvent(new Event('click')); await flush();
+  rows.forEach((item, index) => {
+    const row = dom.parameterBody.children[index], cell = row.children[3];
+    assert.equal(row.dataset.scope, item.object_type.name);
+    assert.equal(row.dataset.parameterId, item.execution_parameter_id);
+    const kind = [0, 1, 2, 7].includes(index) ? 'raw' : 'marker';
+    assert.equal(cell.children[0].dataset.valueKind, kind);
+    assert.equal(cell.children[2].children[1].dataset.valueKind, kind);
+    if (kind === 'marker') assert.equal(cell.children[2].children[1].textContent, '');
+  });
 });
 
 test('a keyed value becoming redacted clears expanded raw text and moves hidden-value focus to its table', async t => {
@@ -188,6 +259,8 @@ test('a keyed value becoming redacted clears expanded raw text and moves hidden-
   assert.equal(dom.parameterBody.children[0], row); assert.equal(value.open, false); assert.equal(row.children[4].children[0], flags);
   assert.equal(flags.firstChild.textContent, 'Sensitive'); assert.equal(flags.firstChild.hidden, false);
   assert.doesNotMatch(row.textContent, /private-ordinary-value/); assert.equal(value.children[1].textContent, '');
+  assert.equal(row.children[3].children[0].dataset.valueKind, 'marker');
+  assert.equal(value.children[1].dataset.valueKind, 'marker');
   assert.equal(dom.document.activeElement, dom.get('parameters-scroll')); assert.equal(dom.get('parameters-scroll').scrollLeft, 120);
 });
 

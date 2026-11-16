@@ -2,6 +2,13 @@ import { formatBoolean, formatCode, formatId } from './display.js';
 import { clippedText } from './observation-page.js';
 import { mountSectionTable } from './section-table.js';
 
+const typeFamilies = {
+  String: 'text', Byte: 'integer', SByte: 'integer', Int16: 'integer', Int32: 'integer', Int64: 'integer',
+  UInt32: 'integer', UInt64: 'integer', Decimal: 'decimal', Double: 'decimal', Single: 'decimal',
+  Boolean: 'boolean', DateTime: 'datetime'
+};
+export const parameterTypeFamily = type => Object.hasOwn(typeFamilies, type) ? typeFamilies[type] : 'other';
+
 function mountValueTable(root, { metadata, actions, restoreView = null }, resource) {
   const parameter = resource === 'parameters', identity = parameter ? 'execution_parameter_id' : 'property_id';
   const valueColumn = parameter ? 3 : 1, enabled = metadata.capabilities.values;
@@ -36,6 +43,8 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
       cells[0].className = parameter ? 'parameter-name' : 'override-property';
       if (parameter) cells[2].className = 'parameter-type';
       const name = element('span'), identityLabel = element('span', undefined, 'cell-detail');
+      const type = parameter ? element('span', undefined, 'type-chip') : null;
+      if (parameter) cells[2].append(type);
       cells[0].append(name);
       if (!parameter) cells[0].append(identityLabel);
       const preview = element('p', undefined, 'value-preview'), truncated = element('p', undefined, 'cell-detail');
@@ -71,6 +80,7 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
         node,
         cells,
         name,
+        type,
         identity: identityLabel,
         preview,
         truncated,
@@ -90,7 +100,8 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
       row.node.dataset.scope = item.object_type.name;
       text(row.name, item.name);
       text(row.cells[1], formatCode(item.object_type));
-      text(row.cells[2], item.sql_type === '' ? '(empty)' : item.sql_type);
+      text(row.type, item.sql_type === '' ? '(empty)' : item.sql_type);
+      row.type.dataset.family = parameterTypeFamily(item.sql_type);
       for (const [key, label] of flags) {
         text(row.values[key], item[key] ? label : '');
         row.values[key].hidden = !item[key];
@@ -106,6 +117,8 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
     const value = item.redacted ? `Redacted (${item.redaction_reason})` : item.value === null ? 'NULL (unredacted)' : item.value === ''
       ? '(empty)' : item.value;
     const clipped = clippedText(value, 160);
+    const kind = item.redacted || item.value === null || item.value === '' ? 'marker' : 'raw';
+    row.preview.dataset.valueKind = row.full.dataset.valueKind = kind;
     text(row.preview, clipped ?? value);
     // Clear old text when a value becomes redacted; hidden content is not a redaction boundary.
     text(row.full, item.redacted ? '' : item.value ?? '');

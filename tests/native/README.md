@@ -23,8 +23,18 @@ server-request observations, HTTP disconnects and bounded concurrency remain
 separate C8.2c measurements in API validation.
 
 Use an existing private dashboard configuration with a SQL Server connection.
-No SSISDB objects, data or permissions are changed. The tests require only the
-project's normal test dependencies and the configured ODBC driver.
+The temporary-source suites do not change SSISDB objects, data or permissions.
+`test_value_queries.py` instead requires a disposable local SSISDB with a
+completed visible execution and permission to insert into
+`internal.execution_parameter_values`. Inside a savepoint it inserts increasing
+identity IDs with alternating project/package scopes, pages the checked-in
+public-view SQL with limits 2 and 3, and verifies ordering, exact membership and
+the ID fence against later inserts. It rolls back all inserted rows and verifies
+the original membership; identity allocations remain consumed. An unsupported
+internal schema or denied insert fails the test rather than silently replacing
+this with a temporary-source check. No permissions or identity seeds are changed.
+The tests require only the project's normal test dependencies and the configured
+ODBC driver.
 
 ```powershell
 $env:SSIS_DASHBOARD_NATIVE_TEST_CONFIG = (Resolve-Path .local/backend-validation/dashboard.cfg).Path

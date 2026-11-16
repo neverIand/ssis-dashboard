@@ -15,20 +15,24 @@ export const overrideQuery = (value, metadata) => valueQuery(value, metadata, 'o
 function readValuePage(response, query, metadata, display, section) {
   try {
     const identity = identities[section];
-    readObservationMeta(response, { ...query, sort: identity, direction: 'asc' }, metadata, display, { availability: false });
+    const parameter = section === 'parameters', sort = parameter ? 'object_type' : identity;
+    readObservationMeta(response, { ...query, sort, direction: 'asc' }, metadata, display, { availability: false });
     if (response.meta.section !== section) throw new TypeError();
-    let previous = 0n;
+    let previous = 0n, previousType = -32769;
+    const seen = new Set();
     for (const row of response.data) {
       if (row[identity] === null) throw new TypeError();
       formatId(row[identity]);
       const id = BigInt(row[identity]);
-      if (id <= previous || id > BigInt(response.meta.upper_id)) throw new TypeError();
-      previous = id;
+      if (seen.has(id) || id > BigInt(response.meta.upper_id)) throw new TypeError();
+      seen.add(id);
       for (const field of ['sensitive', 'redacted', 'truncated']) if (typeof row[field] !== 'boolean') throw new TypeError();
       if (section === 'parameters') {
         const code = row.object_type?.code;
         if (!Number.isSafeInteger(code) || code < -32768 || code > 32767
             || row.object_type.name !== ({ 20: 'project', 30: 'package', 50: 'system' }[code] ?? 'unknown')) throw new TypeError();
+        if (code < previousType || code === previousType && id <= previous) throw new TypeError();
+        previousType = code;
         for (const field of ['name', 'sql_type']) {
           if (row[field] === null) throw new TypeError();
           observationText(row[field], 128, true);
@@ -36,11 +40,13 @@ function readValuePage(response, query, metadata, display, section) {
         if (!row.name || row.name.includes('\0')) throw new TypeError();
         for (const field of ['required', 'value_set', 'runtime_override']) if (typeof row[field] !== 'boolean') throw new TypeError();
       } else {
+        if (id <= previous) throw new TypeError();
         if (typeof row.property_path !== 'string' || !row.property_path || row.property_path.includes('\0')) throw new TypeError();
         observationText(row.property_path, 4000, true);
         if (!metadata.capabilities.override_values && !row.sensitive
             && (!row.redacted || row.redaction_reason !== 'policy')) throw new TypeError();
       }
+      previous = id;
       if (row.sensitive && (!row.redacted || row.redaction_reason !== 'sensitive')) throw new TypeError();
       if (row.redacted) {
         // Never inspect or stringify text supplied in violation of sensitivity or policy.

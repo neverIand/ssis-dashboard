@@ -1,5 +1,5 @@
 SET NOCOUNT ON;
-DECLARE @execution_id bigint = ?, @take int = ?, @upper bigint = ?, @last bigint = ?;
+DECLARE @execution_id bigint = ?, @take int = ?, @upper bigint = ?, @last_type smallint = ?, @last_id bigint = ?;
 
 IF NOT EXISTS (SELECT 1 FROM catalog.executions WHERE execution_id = @execution_id)
 BEGIN
@@ -11,8 +11,9 @@ DECLARE @value_page TABLE (execution_parameter_id bigint NOT NULL PRIMARY KEY);
 INSERT @value_page
 SELECT TOP (@take) execution_parameter_id FROM catalog.execution_parameter_values
 WHERE execution_id = @execution_id AND execution_parameter_id <= @upper
-  AND execution_parameter_id > ISNULL(@last, CONVERT(bigint, 0))
-ORDER BY execution_parameter_id ASC;
+  AND (@last_type IS NULL OR object_type > @last_type
+       OR (object_type = @last_type AND execution_parameter_id > @last_id))
+ORDER BY object_type ASC, execution_parameter_id ASC;
 
 DECLARE @value_rows TABLE (
     execution_parameter_id bigint NOT NULL PRIMARY KEY, object_type smallint NOT NULL,
@@ -40,4 +41,4 @@ SELECT CASE WHEN r.execution_parameter_id IS NULL THEN 1 ELSE 0 END AS page_empt
        visible.execution_id, r.*
 FROM catalog.executions AS visible LEFT JOIN @value_rows AS r ON 1 = 1
 WHERE visible.execution_id = @execution_id
-ORDER BY r.execution_parameter_id ASC;
+ORDER BY r.object_type ASC, r.execution_parameter_id ASC;
