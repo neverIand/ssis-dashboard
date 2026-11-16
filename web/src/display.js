@@ -96,11 +96,14 @@ export function createDisplay({ timeZone } = {}) {
 }
 
 export function refreshStatus(display, generatedAt, poll, ended = false) {
+  // Visible text and extra title text, matching inlineStatus's presentation arguments.
   // An ended execution has nothing to resume: say so first, then when it was last read.
-  if (ended) return ['Execution ended', generatedAt ? `updated ${display.clock(generatedAt)}` : ''].filter(Boolean).join(' · ');
+  if (ended) return [generatedAt ? `Execution ended · updated ${display.clock(generatedAt)}` : 'Execution ended', ''];
   const mode = { idle: '', scheduled: poll.failures ? 'retry scheduled' : 'auto refresh on',
     paused: 'auto refresh paused', hidden: 'auto refresh paused (tab hidden)',
     updating: 'refreshing…', blocked: 'auto refresh stopped' }[poll.mode];
-  const text = [generatedAt ? `Updated ${display.clock(generatedAt)}` : '', mode].filter(Boolean).join(' · ');
-  return text.charAt(0).toUpperCase() + text.slice(1);
+  const compact = poll.mode === 'updating' || poll.mode === 'scheduled' && !poll.failures;
+  const text = [generatedAt ? `Updated ${display.clock(generatedAt)}` : '', compact ? '' : mode].filter(Boolean).join(' · ');
+  return [text.charAt(0).toUpperCase() + text.slice(1), compact
+    ? (poll.mode === 'updating' ? 'auto refresh on · refreshing…' : mode) : ''];
 }

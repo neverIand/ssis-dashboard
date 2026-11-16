@@ -140,8 +140,9 @@ test('normal detail status titles include the refresh text once through pause an
   const dom = screen(t, { response: () => runningDetailResponse('17') }); await flush();
   for (const [index, mode] of ['on', 'paused', 'on'].entries()) {
     const status = dom.get('detail-poll-status');
-    assert.equal(status.textContent, `Updated 17:00:00 · auto refresh ${mode}`);
-    assert.equal(status.title, `${status.textContent} · Observed 2026-10-17 17:00:00 · ${detailResponse().meta.generated_at}`);
+    assert.equal(status.textContent, `Updated 17:00:00${mode === 'paused' ? ' · auto refresh paused' : ''}`);
+    assert.equal(status.title, `${status.textContent} · Observed 2026-10-17 17:00:00 · ${detailResponse().meta.generated_at}`
+      + (mode === 'on' ? ' · auto refresh on' : ''));
     if (index < 2) { click(dom.get('detail-poll-toggle')); t.mock.timers.tick(0); await flush(); }
   }
   assert.equal(dom.calls.length, 4);

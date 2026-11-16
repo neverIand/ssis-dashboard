@@ -69,7 +69,7 @@ export function mountHistoryScreen(root, saved = null) {
     const owner = createHistoryLoader({ api, metadata, selection, paused, visible: document.visibilityState !== 'hidden',
       publish(state) {
         view.render(state, state.busy, true);
-        inlineStatus(status, refreshStatus(display, state.page?.meta.generated_at, state.poll));
+        inlineStatus(status, ...refreshStatus(display, state.page?.meta.generated_at, state.poll));
         pollingButton(toggle, state.poll.paused);
         paused = state.poll.paused;
         refresh.setAttribute('aria-disabled', String(state.busy));

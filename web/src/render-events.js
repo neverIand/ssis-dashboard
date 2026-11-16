@@ -37,9 +37,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
   const { get, controls, rows, display, element, text, listen, notice, status } = view;
   const { kind, q, apply, reset } = controls;
   const window = root.ownerDocument.defaultView;
-  // The async Clipboard API needs a secure context and permission. Plain-HTTP intranet hosts lack it,
-  // so the fallback selects the message for Ctrl+C instead of failing silently.
-  const clipboard = window?.isSecureContext ? window.navigator?.clipboard ?? null : null;
+  const clipboard = window.navigator?.clipboard;
   const copyStatus = get('copy-status');
   let copied = null, copyTimer = null, disposed = false;
   const resetCopy = () => {
@@ -50,21 +48,14 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
   async function copyMessage(row) {
     let ok = true;
     try {
-      if (!clipboard) throw new TypeError();
       await clipboard.writeText(row.copyText);
     } catch { ok = false; }
     // The row may have left the page, or the view been disposed, while the clipboard call was pending.
     if (disposed || !row.node.isConnected) return;
-    if (!ok) {
-      // Select the visible whole text; only a clipped preview needs the full body opened first.
-      const target = row.message.hidden ? row.preview : row.full;
-      if (!row.message.hidden) row.message.open = true;
-      window.getSelection?.()?.selectAllChildren(target);
-    }
     resetCopy();
     copied = row.copy;
-    copied.textContent = ok ? 'Copied' : 'Selected · press Ctrl+C';
-    copyStatus.textContent = ok ? 'Message copied.' : 'Message selected. Press Ctrl+C to copy it.';
+    copied.textContent = ok ? 'Copied' : 'Copy failed';
+    copyStatus.textContent = ok ? 'Message copied.' : 'Message not copied.';
     copyTimer = window.setTimeout(resetCopy, 2000);
   }
   const form = get('filters');
@@ -108,9 +99,13 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
       full.setAttribute('aria-label', 'Event message');
       const truncated = element('p', undefined, 'cell-detail');
       message.append(messageSummary, full);
-      const copy = element('button', 'Copy', 'copy-message');
-      copy.type = 'button';
-      cells[2].append(preview, truncated, message, copy);
+      const copy = clipboard?.writeText ? element('button', 'Copy', 'copy-message') : null;
+      cells[2].append(preview, truncated, message);
+      if (copy) {
+        copy.type = 'button';
+        copy.addEventListener('click', () => { void copyMessage(row); });
+        cells[2].append(copy);
+      }
       const details = element('details'), summary = element('summary', 'Details');
       const list = element('dl', undefined, 'observation-paths bounded-detail'), values = {};
       list.tabIndex = 0;
@@ -140,7 +135,6 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
         summary,
         values
       };
-      copy.addEventListener('click', () => { void copyMessage(row); });
       rows.set(item.event_id, row);
     }
     text(row.time, display.tableTimestamp(item.message_time, executionStart));
@@ -162,7 +156,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
     }
     text(row.full, literal(item.message));
     row.copyText = item.message ?? '';
-    row.copy.hidden = severity === 'none' || item.message === null;
+    if (row.copy) row.copy.hidden = severity === 'none' || item.message === null;
     row.message.hidden = whole || (clipped === null && !item.truncated);
     if (row.message.hidden) row.message.open = false;
     row.truncated.hidden = !item.truncated;

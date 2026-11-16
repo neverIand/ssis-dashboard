@@ -113,29 +113,54 @@ test('D1: error rows show the whole returned message in a keyboard-scrollable re
   assert.equal(warning.children[1].children[1].hidden, true, 'empty source names are not shown');
 });
 
-test('D1: Copy writes the returned text when permitted, otherwise selects it for Ctrl+C', async t => {
-  const selected = [];
-  const plain = mounted(t, { hash: '#events', prepare: target => Object.assign(target.window, {
-    getSelection: () => ({ selectAllChildren: node => selected.push(node) }), setTimeout: () => 1, clearTimeout: () => {} }) });
-  await flush(); await flush();
-  const fallback = plain.eventBody.firstChild.children[2].children[3];
-  assert.equal(fallback.hidden, false, 'shown without the Clipboard API');
-  fallback.dispatchEvent(new Event('click')); await flush();
-  assert.equal(selected[0], plain.eventBody.firstChild.children[2].children[0], 'whole error text is selected');
-  assert.equal(fallback.textContent, 'Selected · press Ctrl+C');
-  const info = mounted(t, { hash: '#events', events: params => eventPage([eventRow('3', { event_name: 'OnInformation' })], params) });
-  await flush(); await flush();
-  assert.equal(info.eventBody.firstChild.children[2].children[3].hidden, true, 'no Copy on information rows');
-  const written = [];
-  const dom = mounted(t, { hash: '#events', prepare: target => Object.assign(target.window, { isSecureContext: true,
+test('Copy buttons are absent without clipboard.writeText', async t => {
+  for (const navigator of [undefined, {}, { clipboard: {} }]) {
+    const dom = mounted(t, { hash: '#events', prepare: target => { target.window.navigator = navigator; } });
+    await flush(); await flush();
+    for (const row of dom.eventBody.children) assert.equal(row.children[2].children.length, 3);
+    assert.equal(dom.get('events-copy-status').textContent, '');
+  }
+});
+
+test('Copy writes the exact returned text and resets success feedback after two seconds', async t => {
+  const written = [], timers = [];
+  const message = '  Error\r\n\tmessage  ';
+  const dom = mounted(t, { hash: '#events', events: params => eventPage([
+    errorRow('1', { message }), eventRow('2', { event_name: 'OnInformation' }), errorRow('3', { message: null })], params),
+    prepare: target => Object.assign(target.window, {
     navigator: { clipboard: { writeText: async value => { written.push(value); } } },
-    setTimeout: () => 1, clearTimeout: () => {} }) });
+    setTimeout: (callback, delay) => { timers.push({ callback, delay }); return 1; }, clearTimeout: () => {} }) });
   await flush(); await flush();
   const copy = dom.eventBody.firstChild.children[2].children[3];
   assert.equal(copy.hidden, false);
+  assert.equal(dom.eventBody.children[1].children[2].children[3].hidden, true, 'no Copy on information rows');
+  assert.equal(dom.eventBody.children[2].children[2].children[3].hidden, true, 'no Copy on missing messages');
   copy.dispatchEvent(new Event('click')); await flush();
-  assert.equal(written[0], errorRow('1').message);
+  assert.deepEqual(written, [message]);
   assert.equal(copy.textContent, 'Copied');
+  assert.equal(dom.get('events-copy-status').textContent, 'Message copied.');
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].delay, 2000);
+  timers[0].callback();
+  assert.equal(copy.textContent, 'Copy');
+});
+
+test('a rejected clipboard write reports failure for two seconds and leaves the message disclosure alone', async t => {
+  const timers = [];
+  const dom = mounted(t, { hash: '#events', events: params => eventPage([
+    eventRow('1', { message: 'warning '.repeat(40) })], params), prepare: target => Object.assign(target.window, {
+    navigator: { clipboard: { writeText: async () => { throw new Error('Denied'); } } },
+    setTimeout: (callback, delay) => { timers.push({ callback, delay }); return 1; }, clearTimeout: () => {} }) });
+  await flush(); await flush();
+  const cell = dom.eventBody.firstChild.children[2], copy = cell.children[3], open = cell.children[2].open;
+  copy.dispatchEvent(new Event('click')); await flush();
+  assert.equal(copy.textContent, 'Copy failed');
+  assert.equal(dom.get('events-copy-status').textContent, 'Message not copied.');
+  assert.equal(cell.children[2].open, open);
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].delay, 2000);
+  timers[0].callback();
+  assert.equal(copy.textContent, 'Copy');
 });
 
 test('D7: a failed section read with nothing shown states the error and request ID in the table and wraps the status', async t => {
@@ -178,33 +203,26 @@ test('R1-2: a failed return to the first page keeps the earliest error from page
   assert.match(dom.get('first-error-message').textContent, /^— Error 1:/);
 });
 
-test('R1-3/4/5: fallback selects visible text, feedback reaches a status region, and late completion sets no timer', async t => {
-  const selected = [], timers = [];
-  const dom = mounted(t, { hash: '#events', events: params => eventPage([eventRow('2', { message: 'short warning' })], params),
-    prepare: target => Object.assign(target.window, { getSelection: () => ({ selectAllChildren: node => selected.push(node) }),
-      setTimeout: () => timers.push(1), clearTimeout: () => {} }) });
-  await flush(); await flush();
-  const row = dom.eventBody.firstChild, copy = row.children[2].children[3];
-  copy.dispatchEvent(new Event('click')); await flush();
-  assert.equal(selected[0], row.children[2].children[0], 'the visible preview, not the hidden disclosure body');
-  assert.equal(row.children[2].children[2].hidden, true);
-  assert.equal(copy.getAttribute('aria-label'), null, 'the visible text names the button');
-  assert.match(dom.get('events-copy-status').textContent, /Press Ctrl\+C/);
-  const pending = []; let read = 0;
-  const late = mounted(t, { hash: '#events', events: params => eventPage([errorRow(String(++read))], params), prepare: target => Object.assign(target.window, { isSecureContext: true,
+test('a clipboard completion after the copied row disconnects changes no feedback and sets no timer', async t => {
+  const timers = [], pending = []; let read = 0;
+  const late = mounted(t, { hash: '#events', events: params => eventPage([errorRow(String(++read))], params), prepare: target => Object.assign(target.window, {
     navigator: { clipboard: { writeText: () => new Promise(resolve => pending.push(resolve)) } },
     setTimeout: () => timers.push(2), clearTimeout: () => {} }) });
   await flush(); await flush();
-  late.eventBody.firstChild.children[2].children[3].dispatchEvent(new Event('click'));
+  const row = late.eventBody.firstChild, copy = row.children[2].children[3];
+  copy.dispatchEvent(new Event('click'));
   const count = timers.length;
   late.get('detail-refresh').dispatchEvent(new Event('click')); await flush();
+  assert.equal(row.isConnected, false);
   pending[0](); await flush();
   assert.equal(timers.length, count, 'no feedback timer after the copied row was replaced');
+  assert.equal(copy.textContent, 'Copy');
+  assert.equal(late.get('events-copy-status').textContent, '');
 });
 
 test('R2 advisory: disposal clears a running feedback timer, and a clipboard result after disposal does nothing', async t => {
   const active = new Set(); let next = 0;
-  const environment = target => Object.assign(target.window, { isSecureContext: true,
+  const environment = target => Object.assign(target.window, {
     setTimeout: () => { active.add(++next); return next; }, clearTimeout: id => { active.delete(id); },
     navigator: { clipboard: { writeText: () => new Promise(resolve => pending.push(resolve)) } } });
   const pending = [];

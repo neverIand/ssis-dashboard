@@ -72,7 +72,7 @@ export function overviewDOM() {
     createTextNode: text => new Node(document, '#text', text) });
   const root = new Node(document, 'root');
   const elements = new Map();
-  for (const key of [...['toggle','panel','bucket','choice','retry','scroll','status','scope','chart','values','selected','scale','zero','table','x-axis','y-axis','drill'].map(key=>`timeline-${key}`), 'executions-status', 'list-retry', 'cohort-window',
+  for (const key of [...['toggle','panel','bucket','choice','retry','scroll','status','scope','chart','values','selected','scale','zero','table','x-axis','y-axis','drill'].map(key=>`timeline-${key}`), 'executions-status', 'list-retry', 'cohort-tip-window',
     'app-status', 'executions-previous', 'executions-next', 'executions-latest', 'page-notice', 'overview-refresh', 'summary',
     'poll-toggle', 'poll-status', 'summary-other-note']) {
     const node = new Node(document, key.includes('retry') || ['overview-refresh', 'poll-toggle',

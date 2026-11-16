@@ -69,7 +69,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
       const full = display.timestamp(value), sameDay = created !== null && full.slice(0, 10) === display.timestamp(created).slice(0, 10);
       const stamp = element('time', sameDay ? full.slice(11) : full);
       stamp.setAttribute('datetime', value);
-      stamp.title = `${full} · ${value}`;
+      stamp.title = value;
       node.replaceChildren(stamp);
     }
   }
@@ -85,7 +85,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
       node.dataset.current = String(id === executionId);
       if (id === executionId) link.setAttribute('aria-current', 'page');
       cells[0].append(link, document.createTextNode(' '), badge);
-      if (id === executionId) cells[0].append(element('span', 'current', 'current-execution'));
+      if (id === executionId) cells[0].append(element('span', ' · current', 'current-execution'));
       if (showIdentity) {
         const identity = element('span', `${item.folder_name} / ${item.project_name} / ${item.package_name}`, 'history-identity');
         identity.title = identity.textContent;

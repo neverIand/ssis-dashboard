@@ -11,6 +11,30 @@ import { executable, executablePage } from './executable-fixture.js';
 const settle = () => new Promise(resolve => setImmediate(resolve));
 const observations = (id = detailResponse().data.execution_id) => executablePage([executable('1', { execution_id: id })]);
 
+test('a running detail keeps its update clock during refresh and its observation and error details in the title', async t => {
+  const dom = detailDOM(), pending = deferred();
+  let delayed = false;
+  const screen = mountDetail(dom.root, { metadata: metadata(), executionId: '17', appBase: '/app/', api: {
+    async get(resource) {
+      if (resource.endsWith('/executables')) return observations('17');
+      return delayed ? pending.promise : runningDetailResponse('17');
+    },
+  } });
+  t.after(screen.dispose); await settle();
+  const status = dom.get('detail-poll-status');
+  assert.equal(status.textContent, 'Updated 17:00:00');
+  assert.match(status.title, /auto refresh on/);
+  delayed = true;
+  dom.get('detail-refresh').dispatchEvent(new Event('click'));
+  assert.equal(status.textContent, 'Updated 17:00:00');
+  assert.match(status.title, /auto refresh on/);
+  assert.ok(status.title.includes(runningDetailResponse('17').meta.generated_at));
+  pending.reject(new ApiError('http', { status: 503, requestId })); await settle();
+  assert.equal(status.textContent, '⚠ Refresh failed · Updated 17:00:00 · retry scheduled');
+  assert.match(status.title, /Previous observation shown/);
+  assert.ok(status.title.includes(requestId));
+});
+
 test('detail bootstrap needs no overview controls and requests metadata, detail and its default tab', async t => {
   const dom = detailDOM(), settings = deferred(), calls = [];
   const response = detailResponse();
@@ -144,7 +168,8 @@ test('transient refresh is labeled with its old observation time; denial clears 
   dom.get('detail-refresh').dispatchEvent(new Event('click'));
   await settle();
   assert.equal(dom.get('execution-detail').hidden, false);
-  assert.match(dom.get('detail-status').textContent, /Refresh failed.*showing data from/);
+  assert.equal(dom.get('detail-status').textContent, '⚠ Refresh failed · Execution ended · updated 17:00:00');
+  assert.match(dom.get('detail-status').title, /Previous observation shown/);
   assert.ok(dom.get('detail-poll-status').title.includes(detailResponse('17').meta.generated_at));
   assert.ok(dom.get('detail-poll-status').title.includes(requestId));
   failure = new ApiError('http', { status: 403, requestId });
@@ -312,7 +337,7 @@ test('a later running read restores the toggle and respects the retained user pa
     assert.equal(toggle.getAttribute('aria-label'), paused ? 'Resume auto refresh' : 'Pause auto refresh');
     assert.equal(toggle.title, toggle.getAttribute('aria-label'));
     assert.equal(dom.get('detail-poll-status').textContent,
-      `Updated 17:00:00 · auto refresh ${paused ? 'paused' : 'on'}`);
+      paused ? 'Updated 17:00:00 · auto refresh paused' : 'Updated 17:00:00');
     t.mock.timers.tick(30000);
     await settle();
     assert.equal(reads, paused ? 6 : 8);

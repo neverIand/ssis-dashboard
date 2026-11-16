@@ -21,6 +21,57 @@ const summary = () => ({ ...envelope({ total: 3, by_status: [{ code: 1, name: 'c
   { code: 2, name: 'running', count: 3 }, { code: 4, name: 'failed', count: 0 }, { code: 7, name: 'succeeded', count: 0 }] }),
   meta: { ...envelope().meta, from, to, status_scope: 'all' } });
 
+test('the cohort tip keeps the loaded window through refresh, updates it and clears it with the page', async t => {
+  const dom = overviewDOM(), pending = deferred();
+  let current = page([item('3')]), wait = false, denied = false;
+  const view = mountOverview(dom.root, { metadata: settings, appBase: '/app/', api: {
+    async get(resource) {
+      if (resource !== 'executions') return { ...summary(), meta: { ...summary().meta, from, to: current.meta.to } };
+      if (denied) throw new ApiError('http', { status: 403 });
+      return wait ? pending.promise : current;
+    },
+  } });
+  t.after(view.dispose);
+  const tip = dom.get('cohort-tip-window');
+  assert.equal(dom.root.querySelector('[data-cohort-window]'), null);
+  assert.equal(tip.textContent, '');
+  await view.apply(defaultSelection(settings));
+  assert.equal(tip.textContent, ' Window: 2026-10-17 01:00:00 → 2026-10-17 19:00:00 (end exclusive).');
+  const loaded = tip.textContent;
+  wait = true;
+  const refreshing = view.refresh();
+  assert.equal(tip.textContent, loaded, 'the retained page still owns its exact window');
+  assert.equal(dom.get('poll-status').textContent, 'Updated 17:00:00');
+  assert.match(dom.get('poll-status').title, /auto refresh on/);
+  current = { ...page([]), meta: { ...current.meta, to: '2026-10-18T18:00:00.7654321Z' } };
+  pending.resolve(current); await refreshing;
+  assert.equal(tip.textContent, ' Window: 2026-10-17 01:00:00 → 2026-10-18 19:00:00 (end exclusive).');
+  denied = true; await view.refresh();
+  assert.equal(tip.textContent, '', 'no window sentence remains without a loaded page');
+});
+
+test('Overview time hovers contain only the exact API timestamp on same-day and cross-day rows', async t => {
+  const dom = overviewDOM(), tomorrow = '2026-10-18T16:00:00.9876543Z';
+  const view = mountOverview(dom.root, { metadata: settings, appBase: '/app/', api: {
+    get: async resource => resource === 'executions' ? page([
+      item('3'), item('2', { started_at: tomorrow }), item('1', { started_at: null, elapsed_seconds: null })]) : summary(),
+  } });
+  t.after(view.dispose);
+  await view.apply(defaultSelection(settings));
+  for (const [index, started] of [wireTime, tomorrow, null].entries()) {
+    const cells = dom.body.children[index].children;
+    assert.equal(cells[4].firstChild.title, wireTime);
+    assert.equal(cells[4].firstChild.dateTime, wireTime);
+    if (started === null) assert.equal(cells[5].textContent, '—');
+    else {
+      assert.equal(cells[5].firstChild.title, started);
+      assert.equal(cells[5].firstChild.dateTime, started);
+    }
+  }
+  assert.equal(dom.body.children[0].children[5].textContent, '17:00:00');
+  assert.equal(dom.body.children[1].children[5].textContent, '2026-10-18 17:00:00');
+});
+
 for (const control of ['previous', 'next', 'latest']) {
   test(`automatic refresh preserves ${control} focus, blocks busy paging and respects later focus movement`, async t => {
     t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
@@ -122,7 +173,7 @@ test('keyed rendering reuses rows and links, patches values, removes/adds/reorde
   assert.equal(dom.scroll.scrollLeft, 123);
   assert.equal(dom.scroll.scrollTop, 5);
   assert.equal(dom.get('executions-status').textContent, 'Page 1 · 3 rows');
-  assert.equal(dom.get('poll-status').textContent, 'Updated 17:00:00 · auto refresh on');
+  assert.equal(dom.get('poll-status').textContent, 'Updated 17:00:00');
   assert.equal(dom.get('poll-status').title, `Updated 17:00:00 · auto refresh on · Observed 2026-10-17 17:00:00 · ${wireTime}`);
   assert.doesNotMatch(dom.get('executions-status').textContent, /Updated|Live results/);
   assert.equal(dom.get('overview-refresh').attributes.get('aria-disabled'), 'false');
@@ -160,7 +211,7 @@ test('transient refresh errors retain and label existing DOM; denial removes it 
   await view.apply(defaultSelection(settings));
   const row = dom.body.children[0];
   const refreshing = view.refresh();
-  assert.match(dom.get('summary-status').textContent, /^Refreshing/);
+  assert.equal(dom.get('summary-status').textContent, 'Updated 17:00:00');
   await refreshing;
   assert.equal(dom.body.children[0], row);
   assert.match(dom.get('executions-status').textContent, /Previous results shown/);
@@ -168,7 +219,7 @@ test('transient refresh errors retain and label existing DOM; denial removes it 
   assert.ok(dom.get('executions-status').title.includes(wireTime));
   assert.ok(dom.get('summary-status').title.includes(wireTime));
   assert.doesNotMatch(dom.get('summary-status').textContent, /Refreshing/);
-  assert.equal(dom.get('poll-status').textContent, '⚠ Refresh failed · showing data from 17:00:00');
+  assert.equal(dom.get('poll-status').textContent, '⚠ Refresh failed · Updated 17:00:00 · retry scheduled');
   for (const status of ['poll-status', 'executions-status']) {
     assert.ok(dom.get(status).title.includes(requestId));
     assert.match(dom.get(status).title, /The service is unavailable/);
@@ -178,7 +229,7 @@ test('transient refresh errors retain and label existing DOM; denial removes it 
   assert.equal(row.isConnected, false);
   assert.equal(dom.root.querySelector('[data-count="total"]').textContent, '—');
   assert.doesNotMatch(dom.get('executions-status').textContent, /Previous results shown/);
-  assert.equal(dom.get('poll-status').textContent, '⚠ Executions unavailable');
+  assert.equal(dom.get('poll-status').textContent, '⚠ Executions unavailable · Auto refresh stopped');
   assert.equal(dom.get('overview-refresh').disabled, false);
   view.dispose();
   assert.equal(dom.get('overview-refresh').disabled, true);
@@ -196,7 +247,8 @@ for (const resource of ['executions', 'metrics/summary']) {
     } });
     t.after(view.dispose);
     await view.apply(defaultSelection(settings));
-    assert.equal(dom.get('poll-status').textContent, `⚠ ${resource === 'executions' ? 'Executions' : 'Summary'} unavailable`);
+    assert.equal(dom.get('poll-status').textContent, resource === 'executions'
+      ? '⚠ Executions unavailable · Retry scheduled' : '⚠ Summary unavailable · Updated 17:00:00 · retry scheduled');
     for (const key of ['poll-status', 'executions-status']) {
       assert.ok(dom.get(key).title.includes(requestId));
       assert.match(dom.get(key).title, /Unable to connect\. Try again\./);
@@ -221,7 +273,7 @@ test('summary refresh failure uses the retained counts time and preserves full i
   t.after(view.dispose);
   await view.apply(defaultSelection(settings));
   fail = true; await view.refresh();
-  assert.equal(dom.get('poll-status').textContent, '⚠ Refresh failed · showing data from 16:00:00');
+  assert.equal(dom.get('poll-status').textContent, '⚠ Refresh failed · Updated 16:00:00 · retry scheduled');
   assert.ok(dom.get('poll-status').title.includes(counts.meta.generated_at));
   assert.ok(dom.get('poll-status').title.includes(wireTime));
   for (const key of ['poll-status', 'executions-status']) {

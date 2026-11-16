@@ -144,7 +144,8 @@ class FrontendShellTests(unittest.TestCase):
         # The theme script is classic and render-blocking, ahead of the stylesheet it configures.
         self.assertLess(html.index('/static/app/theme-init.js'), html.index('/static/app/assets/main.css'))
         self.assertRegex(html, r'<script src="/static/app/theme-init.js"></script>')
-        self.assertIn('<select data-theme-choice><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select>', html)
+        self.assertIn('<select class="theme-choice" data-theme-choice aria-label="Theme" title="Theme">', html)
+        self.assertNotIn('>Theme<', html)
         for legacy_dependency in ['jquery', 'bootstrap', 'morris', 'raphael', 'smartmenus',
                                   'http-equiv="refresh"', 'google-analytics']:
             self.assertNotIn(legacy_dependency, html.lower())

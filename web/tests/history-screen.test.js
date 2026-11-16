@@ -11,6 +11,20 @@ const metadata = historyMetadata();
 const settle = async () => { for (let turn = 0; turn < 4; turn += 1) await new Promise(resolve => setImmediate(resolve)); };
 const scoped = '?match=exact&folder=Folder&project=Project&package=Main.dtsx';
 
+test('standalone History keeps the update clock visible during a pending refresh', async t => {
+  const pending = deferred();
+  let delayed = false;
+  const dom = screen(t, scoped, { respond: params => delayed ? pending.promise
+    : jsonResponse(historyPage([historyRow('5')], { direction: params.direction, limit: Number(params.limit) })) });
+  await settle();
+  delayed = true; dom.click('history-refresh'); await settle();
+  assert.equal(dom.get('history-poll-status').textContent, 'Updated 17:00:00');
+  assert.match(dom.get('history-poll-status').title, /auto refresh on/);
+  pending.resolve(jsonResponse(historyPage([historyRow('5')]))); await settle();
+  assert.equal(dom.get('history-poll-status').textContent, 'Updated 17:00:00');
+  assert.equal(dom.get('history-poll-status').title, 'Updated 17:00:00 · auto refresh on');
+});
+
 // The standalone History page on the detail double: wiring evidence only, no browser, focus or layout claims.
 function screen(t, search, { saved = null, respond = null, hidden = false } = {}) {
   const dom = detailDOM(), extra = new Map(), calls = [], held = [];
@@ -66,7 +80,8 @@ test('settings enable the scope form; a loaded scope shows its title, identity, 
   assert.equal(dom.document.title, 'History · Main.dtsx · SSIS Dashboard');
   // Standalone rows name their folder, project and package.
   assert.match(dom.historyBody.textContent, /Folder .* \/ Project \/ Main\.dtsx/);
-  assert.equal(dom.get('history-poll-status').textContent, 'Updated 17:00:00 · auto refresh on');
+  assert.equal(dom.get('history-poll-status').textContent, 'Updated 17:00:00');
+  assert.equal(dom.get('history-poll-status').title, 'Updated 17:00:00 · auto refresh on');
   assert.equal(dom.get('history-poll-toggle').getAttribute('aria-label'), 'Pause auto refresh');
   assert.equal(dom.get('history-refresh').getAttribute('aria-disabled'), 'false');
 });
@@ -148,7 +163,8 @@ test('the pause button and tab visibility reach the loader, and the pause is wha
   dom.document.visibilityState = 'hidden'; dom.document.dispatchEvent(new Event('visibilitychange')); await settle();
   assert.equal(dom.get('history-poll-status').textContent, 'Updated 17:00:00 · auto refresh paused (tab hidden)');
   dom.document.visibilityState = 'visible'; dom.document.dispatchEvent(new Event('visibilitychange')); await settle();
-  assert.equal(dom.get('history-poll-status').textContent, 'Updated 17:00:00 · auto refresh on');
+  assert.equal(dom.get('history-poll-status').textContent, 'Updated 17:00:00');
+  assert.equal(dom.get('history-poll-status').title, 'Updated 17:00:00 · auto refresh on');
   dom.click('history-poll-toggle'); await settle();
   assert.equal(dom.get('history-poll-toggle').getAttribute('aria-label'), 'Resume auto refresh');
   assert.equal(dom.get('history-poll-status').textContent, 'Updated 17:00:00 · auto refresh paused');

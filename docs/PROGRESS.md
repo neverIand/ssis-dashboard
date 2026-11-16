@@ -1,6 +1,6 @@
 # Implementation progress
 
-Updated 15 November 2026. Development base: `dev-next`. [Roadmap](roadmap.md) owns scope and priorities; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns current status, the work queue and open acceptance gates. Completed work is kept as short receipts. The full implementation journals are in Git: through 15 November 2026 at `6180174` (`git show 6180174:docs/PROGRESS.md`), through 25 October at `864ec53`, and before the 17 October consolidation at `36b48f8`.
+Updated 16 November 2026. Development base: `dev-next`. [Roadmap](roadmap.md) owns scope and priorities; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns current status, the work queue and open acceptance gates. Completed work is kept as short receipts. The full implementation journals are in Git: through 15 November 2026 at `6180174` (`git show 6180174:docs/PROGRESS.md`), through 25 October at `864ec53`, and before the 17 October consolidation at `36b48f8`.
 
 ## Current status
 
@@ -17,12 +17,20 @@ Updated 15 November 2026. Development base: `dev-next`. [Roadmap](roadmap.md) ow
 
 ## Next actions
 
-- [ ] **23. Native popovers (15 November): round 2 implemented and validated locally; awaiting Claude re-review.** Only `/app/` changes. The five Overview pickers and shared History Custom picker use native auto popovers and declarative buttons; info tips use manual popovers. Baseline 2025 is the user-approved API target without older-browser fallbacks; CSS anchors reached Baseline in 2026, so shared JS positioning remains. Claude round 1 requested changes for F001: a single timeline click hid an uncommitted Status draft. The candidate restores the visible picker without taking chart focus; Escape from the chart cancels, while Done/outside dismissal commits, and double click still merges Status/range once and focuses the list. F002's canceled pointer activation is cleared; viewport positioning also clamps vertically when a trigger scrolls offscreen. Three new regressions failed before their fixes and pass now. Node **534/534**, frontend/asset Python **22/22**, production build and size budgets pass. Interactive synthetic checks cover the corrected single/double click, cancel/commit, focus and narrow geometry; round 1 evidence retains the broader History, tooltip and 1280/800/375 px sweep. JS source **279,734 → 279,638 bytes**; total authored JS+CSS **318,692 → 318,608**; packaged Python gzip-9 **54,437 → 54,476**, effectively unchanged. No dependency or legacy change. Evidence: `.local/reports/frontend/20261115-native-popovers/round-002/`; contract task `20261115-native-popovers`, round 2. Independent resolution verification and A1–A4 checks remain open for this candidate; office browser, screen-reader and SSISDB acceptance remain separate.
+- [ ] **24. Office feedback, 16 November.** The user tested `/app/` in the office environment. Confirmed there: sensitive parameter values are redacted; the native popovers open one at a time and their keyboard shortcuts work; Copy works through the Clipboard API; the pinned `pyodbc` 5.3.0 works with ODBC Driver 17. The browser and its version were not recorded. The requested changes are grouped in five batches, simplest first. Codex implements each batch and Claude reviews it in the browser.
+
+  | Batch | Requested changes | Status |
+  | --- | --- | --- |
+  | A — text and small styling | Theme switch denser, without its visible label. Remove the creation-window text to the right of the Overview filters. Error messages in a monospace font. History tab execution cell reads `Failed · current`. A time cell's hover shows only the exact timestamp, not the displayed time again. Copy uses only the Clipboard API; the selection fallback goes. The refresh status no longer says "auto refresh on", only when auto refresh is off, and sits right-aligned next to Refresh | Implemented A1-A7: compact theme, window in the count tip, monospace errors, History separator, exact timestamp hovers, Clipboard-only Copy and compact right-aligned refresh status. The earliest-error excerpt in the detail header is monospace too. Build, Node 547/547, frontend/asset Python 22/22. Claude reviewed it in the browser against the local SSISDB at 1440 and 390 px: no control moves between refresh states, and the hover titles, tip window, separator and fonts are as specified. The in-app browser denies clipboard writes, so only the failure path of Copy was seen there. Complete |
+  | B — layout | Narrower Created/Started/Ended columns, the Overview first. The Executables header sticks like the Overview list header. A page change scrolls the table back to its first row. Range presets in two columns. The Default window entry (`HOUR_SPAN`) leaves the Created list | Planned |
+  | C — tab return | Returning to the tab refreshes only when a scheduled refresh is due, not on every switch; Refresh stays immediate | Planned |
+  | D — Parameters | Scopes told apart by row tint and types by coloured labels; raw values monospace; scopes grouped instead of mixed (server order or a filter, to be decided from the SQL) | Planned; a SQL change needs native tests |
+  | E — Overview paging time | With a custom range of about 10 months, the next Overview page of 50 rows takes about 1 s in the office. Measure first (statement, reads, compilation), then change | Planned; needs measurement at volume |
 
 The 4 November queue, the UX review batches inserted into it and the fixes for the two full-project reviews are complete locally; their receipts follow. Open items wait for the user:
 
 - **Decisions:** a loopback-only P5.2 stream prototype; the shared paging helper (D1/Q1: R-06, R-13, R-14); one estimate SQL shape or four (D2, R-15); the authored-size budget before P5.2 (D6/Q3); stabilising the local SQL Server for measurements (D7, R-05); keeping the retained-document checkpoint code (Q2, see CACHE-01 below); Fetch Metadata tightening for API routes (Q7, N-11); keeping full-project reviews independent of memory notes (Q9); what a NULL executable result means (UX review D5, 5 November). The two review reports hold the options: `.local/reports/reviews/20261109-full-review-claude-opus-5-5/decisions.md` and `.local/reports/reviews/20261110-full-review-claude-fable-5-2/decisions.md`.
-- **Held by the user:** the `pyodbc` update until the office environment is tested; N-10 (status line as a live region) until a screen reader is available.
+- **Held by the user:** N-10 (status line as a live region) until a screen reader is available. The `pyodbc` update (R-23) awaits the user's word: the office run of 16 November used the pinned 5.3.0 with ODBC Driver 17.
 - **Needs the office environment:** the rest of R-08 (permission-denied login, offline or restoring database) and the volume and reader checks listed under [remaining acceptance](#remaining-acceptance).
 
 - [x] **22. Documentation compaction: complete locally, 15 November.** User decision D3 option A, with R-21 and R-22. Documents 535 KB → 410 KB (Progress 95 → 40 KB, API acceptance 124 → 60 KB). The full text stays at `6180174`.
@@ -60,6 +68,7 @@ Dates are commit dates; validation counts are those at the time. Where a review 
 - [x] **19. Batch H and reversed-duration figures re-measured** — `edde28b`, 15 November. The first measurement script counted some pyodbc message lists twice; with a corrected collector every conclusion held and the quoted page counts and compile times were replaced. The re-measurement also showed the two kept page-selection hints cost more on a small catalog than they saved. Codex review.
 - [x] **20. Page-selection `RECOMPILE` removed** — `6fd1b6f`, 15 November, the user's decision. [Record](API_ACCEPTANCE.md#page-selection-recompile-removal-15-november-2026): on the 19-execution catalog all 30 sorted cases were 64–239 ms faster; some unfiltered pages over 20,000 temporary executions were up to 243 ms slower. If an office catalog shows that, restoring the ordinary page's hint is a one-line change. Codex review.
 - [x] **21. History screen wiring tests** — `6180174`, 15 November (rest of R-11). Nine tests; 52 of 52 mutants of `history-screen.js` fail them, against 12 of 43 before. Node 531. Wiring evidence only, not browser focus or layout; not asserted: an immediate refresh on returning to a hidden tab, and `preventDefault` on form submit. Codex review.
+- [x] **23. Native popovers** — `abf99fa`, 15 November. The five Overview pickers and the shared History Custom picker use native auto popovers, and info tips manual popovers; Baseline 2025 APIs without fallbacks; legacy pages unchanged. Node 534, frontend/asset Python 22. Evidence: `.local/reports/frontend/20261115-native-popovers/round-002/`. Claude review, accepted in round 2 (contract task `20261115-native-popovers`). Open advisory F003 (P3): after a lone timeline click, Done returns focus to `<body>` instead of the Status trigger. The office browser confirmed one open picker at a time and the keyboard shortcuts (16 November). Screen reader NOT RUN.
 
 ### Previous queue
 
@@ -187,11 +196,11 @@ Unavailable-environment checks remain parked under the 18 October instruction. [
 | --- | --- | --- |
 | Actual hidden-tab return | Deferred — NOT RUN | VIS-01–03: real hidden/visible events, no new hidden cycle, one resync, preserved pause/denial and no duplicate timer. Dispatched visibility events do not count. |
 | Cached-document return | Deferred — NOT RUN | CACHE-01–02: prove a retained document returned, then observe metadata/page revalidation, pause/view restoration and one expired-cursor reset. Ordinary Back is insufficient. The shells are served `no-store`, and the in-app browser rebuilt the page on Back (Q2). |
-| Corporate/cross-browser | Deferred — NOT RUN | BROWSER-01 in actual corporate Edge/Chrome; include Firefox/Safari when used, with keyboard/layout/failure/lifecycle evidence, and the Clipboard API path of Copy (only the selection fallback has been seen). |
+| Corporate/cross-browser | Deferred — NOT RUN | BROWSER-01 in actual corporate Edge/Chrome; include Firefox/Safari when used, with keyboard/layout/failure/lifecycle evidence. Copy has no selection fallback since batch A of Next action 24. The user reported on 16 November that the office browser runs the native popovers and the Clipboard API path of Copy; browser, version and the other checks were not recorded. |
 | Accessibility and zoom | NOT RUN | Real 150% system zoom, Windows high contrast, screen readers (also needed for N-10) and reduced motion. |
 | A running execution in the browser | NOT RUN | The current-page change highlight (O10), live estimate rendering, a status change during a read (N-01) and elapsed time on a later page (R-01). The local fixture runs end within seconds. |
 | Native calendar popup | NOT RUN | Date/time field entry and timezone conversion are observed; native popup interaction still needs its own browser check. |
-| Complete enabled-resource/reader matrix | Incomplete | Accepted local SSISDB spot checks do not complete enabled event/value cases, real policy/visibility changes or the independent-reader matrix. |
+| Complete enabled-resource/reader matrix | Incomplete | Accepted local SSISDB spot checks do not complete enabled event/value cases, real policy/visibility changes or the independent-reader matrix. On 16 November the office catalog showed sensitive parameter values redacted (user's report, identity not recorded). |
 
 ## Phase 4 / native execution workflows
 
@@ -312,7 +321,7 @@ Layered reviews under [the review process](PROJECT_REVIEW.md), both of `72e673a`
 
 The second review missed 12 of the first review's 24 findings and added 10 of its own, two of them P3 behaviour bugs at the API/browser boundary. Four of its items had been seen in a memory note opened before the process was read; they are counted as KNOWN.
 
-Disposition as of 15 November (R = 9 November, N = 10 November). Each fix was reviewed by Codex before commit; see Next actions 6 to 22.
+Disposition as of 16 November (R = 9 November, N = 10 November). Each fix was reviewed by Codex before commit; see Next actions 6 to 22.
 
 | Findings | Disposition |
 | --- | --- |
@@ -329,7 +338,7 @@ Disposition as of 15 November (R = 9 November, N = 10 November). Each fix was re
 | R-18, N-08 | Fixed, `7caf427` |
 | R-19 | Fixed, `b717d50` |
 | R-11 | Fixed, `b717d50`, `4deacd5` and `6180174` (composition root and detail, overview and History screens) |
-| R-23 | Partly fixed, `7672278`: `tzdata` 2026.6 and the two time-zone sources documented. Open: `pyodbc`, held by the user until the office environment is tested |
+| R-23 | Partly fixed, `7672278`: `tzdata` 2026.6 and the two time-zone sources documented. Open: the `pyodbc` update, awaiting the user's word; the pinned 5.3.0 works in the office with ODBC Driver 17 (16 November) |
 | R-21, R-22 | Fixed with Next action 22 (decision D3, option A, 15 November) |
 | N-10 | Deferred on the user's instruction: the fix needs a screen reader to verify |
 | R-06, R-13 | Open: shared paging helper and the estimate import cycle, await the user's decision (D1) |

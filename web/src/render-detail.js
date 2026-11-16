@@ -175,15 +175,12 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     const observed = state.response
       ? `Observed ${display.timestamp(state.response.meta.generated_at)} · ${state.response.meta.generated_at}` : '';
     const error = state.error ? `${state.error.message}${state.error.requestId ? ` · Request ID: ${state.error.requestId}` : ''}` : '';
-    const refreshText = refreshStatus(display, state.response?.meta.generated_at, state.poll, state.terminal);
-    const pageStatus = state.busy && state.operation !== 'section'
-      ? (state.response ? 'Refreshing… Previous observation shown.' : 'Loading execution…')
-      : state.phase === 'error' ? (state.stale
-        ? `⚠ Refresh failed · showing data from ${display.clock(state.response.meta.generated_at)}`
-          : `⚠ Execution unavailable · ${state.error.message}`)
-        : refreshText;
-    inlineStatus(pollStatus, pageStatus, [observed, error,
-      pageStatus !== refreshText ? refreshText : ''].filter(Boolean).join(' · '));
+    const [refreshText, refreshDetail] = refreshStatus(display, state.response?.meta.generated_at, state.poll, state.terminal);
+    const pageStatus = state.phase === 'error' ? [state.response ? '⚠ Refresh failed'
+      : `⚠ Execution unavailable · ${state.error.message}`, refreshText].filter(Boolean).join(' · ')
+      : state.response ? refreshText : 'Loading execution…';
+    inlineStatus(pollStatus, pageStatus, [observed, error, refreshDetail,
+      state.stale ? 'Previous observation shown.' : ''].filter(Boolean).join(' · '));
     if (!state.response) clear();
     else if (state.response !== rendered) {
       const values = detailFields(state.response, display);

@@ -37,8 +37,7 @@
                         <button class="button-quiet" type="button" data-reset-filters disabled>Reset</button>
                         <div class="filter-meta">
                             <span class="inline-notice" data-filter-notice role="status"></span>
-                            <span class="cohort-window" data-cohort-window aria-label="Creation window"></span>
-                            {% call tip('cohort-tip', 'About summary counts', 'All-status counts in this creation window; the list uses the selected statuses. The window end is exclusive.') %}<span data-summary-other-note hidden></span>{% endcall %}
+                            {% call tip('cohort-tip', 'About summary counts', 'All-status counts in this creation window; the list uses the selected statuses.') %}<span data-summary-other-note hidden></span><span data-cohort-tip-window></span>{% endcall %}
                         </div>
                     </div>
                     {% for kind in ['folder', 'project'] %}

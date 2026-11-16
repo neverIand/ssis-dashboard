@@ -13,7 +13,7 @@ const stamp = cell => cell.firstChild;
 const exact = (node, value, text) => {
   assert.equal(node.textContent, text);
   assert.equal(node.getAttribute('datetime'), value);
-  assert.ok(node.title.includes(value));
+  assert.equal(node.title, value);
 };
 
 test('detail observations use the execution date while history keeps creation and cross-day dates, exact attributes and compact status', async t => {
@@ -25,11 +25,16 @@ test('detail observations use the execution date while history keeps creation an
     children: childPage([child()]),
     events: eventPage([eventRow(), eventRow('2', {message_time:'2026-10-17T16:00:00.1240000Z'})]),
     history: historyPage([historyRow('17', {estimate:estimate()}),
-      historyRow('16', {started_at:tomorrow, ended_at:tomorrow})]),
+      historyRow('16', {started_at:tomorrow, ended_at:tomorrow}),
+      historyRow('15', {status:{code:2,name:'running'}, ended_at:null, duration_seconds:null, estimate:estimate()})]),
   };
   const screen = mountDetail(dom.root, {metadata, executionId:'17', appBase:'/app/',
     api:{async get(resource) { calls.push(resource); return responses[resource.split('/').at(-1)] ?? detailResponse('17'); }}});
   t.after(screen.dispose); await settle();
+  for (const key of ['created', 'started', 'ended']) {
+    assert.equal(dom.field(key).getAttribute('title'), wireTime);
+    assert.equal(dom.field(key).getAttribute('datetime'), wireTime);
+  }
   for (const section of Object.keys(responses)) {
     dom.get(`${section}-toggle`).dispatchEvent(new Event('click')); await settle();
     const status = dom.get(`${section}-status`);
@@ -51,13 +56,16 @@ test('detail observations use the execution date while history keeps creation an
   for (const [row, item] of responses.history.data.entries()) {
     for (const [index, key] of ['created_at','started_at','ended_at'].entries()) {
       const value = item[key];
-      exact(dom.historyBody.children[row].children[index+1].firstChild, value,
+      const cell = dom.historyBody.children[row].children[index+1];
+      if (value === null) { assert.equal(cell.textContent, '—'); continue; }
+      exact(cell.firstChild, value,
         value === tomorrow ? '2026-10-18 17:00:00' : index === 0 ? '2026-10-17 17:00:00' : '17:00:00');
     }
   }
   // Ended rows compare with the estimate instead of repeating its end time (UX batch B2, H3).
   assert.equal(dom.historyBody.children[0].children[5].children[1].hidden, true);
   assert.equal(dom.historyBody.children[0].children[5].children[1].textContent, '');
+  exact(dom.historyBody.children[2].children[5].children[1].firstChild, wireTime, '17:00:00');
   dom.get('detail-refresh').dispatchEvent(new Event('click')); await settle();
   assert.equal(calls.length, 7, 'Refresh reads base detail and the active history tab only');
 });

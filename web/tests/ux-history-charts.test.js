@@ -37,7 +37,9 @@ test('D3 explicitly requests every known status and visibly marks a failed curre
   const dom=historyScreen(t,rows);await openHistory(dom);
   assert.equal(dom.calls.at(-1).params.status,all);assert.equal(dom.historyBody.children.length,3);
   const current=dom.historyBody.children[0];assert.equal(current.dataset.current,'true');
-  assert.equal(current.children[0].firstChild.getAttribute('aria-current'),'page');assert.match(current.textContent,/current/);
+  assert.equal(current.children[0].firstChild.getAttribute('aria-current'),'page');
+  assert.equal(current.children[0].textContent, '17 Failed · current');
+  assert.equal(current.children[0].children.at(-1).textContent, ' · current', 'the separator is in the accessible text once');
   assert.equal(dom.historyBody.children[1].dataset.current,'false');assert.doesNotMatch(dom.historyBody.children[1].textContent,/current/);
   assert.equal(!dom.get('history-status-options').matches(':popover-open'),true);assert.equal(preset(dom,'all').getAttribute('aria-pressed'),'true');
   current.children[0].firstChild.focus();click(dom.get('detail-refresh'));await flush();

@@ -16,7 +16,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   const listStatus = root.querySelector('[data-executions-status]');
   const otherNote = root.querySelector('[data-summary-other-note]');
   const listRetry = root.querySelector('[data-list-retry]');
-  const bounds = root.querySelector('[data-cohort-window]');
+  const tipWindow = root.querySelector('[data-cohort-tip-window]');
   const previous = root.querySelector('[data-executions-previous]');
   const next = root.querySelector('[data-executions-next]');
   const latest = root.querySelector('[data-executions-latest]');
@@ -76,7 +76,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       node.append(element('span', part));
     }
     node.dateTime = value;
-    node.title = `${full} · ${value}`;
+    node.title = value;
     return node;
   }
 
@@ -263,25 +263,18 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       : state.phase === 'loading-list' ? 'Loading executions…' : pageDetails || 'No selection';
     listStatus.title = [listStatus.textContent, listStatus.title].filter(Boolean).join(' · ');
     const stale = state.pageStale || state.summaryStale;
-    const failedObservation = state.phase === 'summary-error' ? state.summary : page;
-    const refreshText = page ? refreshStatus(display, page.meta.generated_at, state.poll) : '';
-    const message = error ? (stale && failedObservation
-      ? `⚠ Refresh failed · showing data from ${display.clock(failedObservation.meta.generated_at)}`
-      : `⚠ ${state.phase === 'summary-error' ? 'Summary' : 'Executions'} unavailable`)
-      : stale ? 'Refreshing… Previous counts shown.'
-      : !page ? (state.selection ? 'Loading executions…' : 'No selection')
-      : state.phase === 'loading-summary' ? 'Loading summary…' : refreshText;
-    inlineStatus(pollStatus, message, [errorDetails,
+    const observation = state.phase === 'summary-error' && state.summary ? state.summary : page;
+    const [refreshText, refreshDetail] = refreshStatus(display, observation?.meta.generated_at, state.poll);
+    const message = error ? [stale ? '⚠ Refresh failed'
+      : `⚠ ${state.phase === 'summary-error' ? 'Summary' : 'Executions'} unavailable`, refreshText].filter(Boolean).join(' · ')
+      : page ? refreshText : state.selection ? 'Loading executions…' : 'No selection';
+    inlineStatus(pollStatus, message, [errorDetails, stale ? 'Previous counts shown.' : '', refreshDetail,
       page ? `Observed ${display.timestamp(page.meta.generated_at)} · ${page.meta.generated_at}` : '',
       state.summaryStale && state.summary
-        ? `Counts observed ${display.timestamp(state.summary.meta.generated_at)} · ${state.summary.meta.generated_at}` : '',
-      message !== refreshText ? refreshText : ''].filter(Boolean).join(' · '));
-    bounds.hidden = false;
-    if (page) {
-      bounds.replaceChildren(document.createTextNode('Created '), time(page.meta.from),
-        document.createTextNode(' → '), time(page.meta.to));
-    } else bounds.replaceChildren();
-    bounds.title = page ? `${bounds.textContent} (exclusive)` : '';
+        ? `Counts observed ${display.timestamp(state.summary.meta.generated_at)} · ${state.summary.meta.generated_at}` : ''
+    ].filter(Boolean).join(' · '));
+    tipWindow.textContent = page
+      ? ` Window: ${display.timestamp(page.meta.from)} → ${display.timestamp(page.meta.to)} (end exclusive).` : '';
     const counts = state.summary ? Object.fromEntries(state.summary.data.by_status.map((item) => [item.code, item.count])) : null;
     const values = state.summary ? { total: state.summary.data.total, running: counts[2], succeeded: counts[7], failed: counts[4],
       other: state.summary.data.by_status.filter(item => ![2,4,7].includes(item.code)).reduce((total,item) => total + item.count,

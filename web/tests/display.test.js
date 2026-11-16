@@ -132,20 +132,28 @@ test('display text is independent of zh-CN and non-Latin default locales', t => 
   }
 });
 
-test('one refresh indicator keeps the last observation and distinguishes paused, hidden, retry and stopped states', () => {
-  for (const [mode, failures, text] of [['scheduled', 0, 'auto refresh on'], ['scheduled', 1, 'retry scheduled'],
-    ['paused', 0, 'auto refresh paused'], ['hidden', 0, 'auto refresh paused (tab hidden)'],
-    ['updating', 0, 'refreshing…'], ['blocked', 0, 'auto refresh stopped']]) {
-    assert.equal(refreshStatus(display, wireTime, {mode, failures}), `Updated 17:00:00 · ${text}`);
-  }
-  assert.equal(refreshStatus(display, null, {mode:'idle'}), '');
-  assert.equal(refreshStatus(display, null, {mode:'updating'}), 'Refreshing…');
-  assert.equal(refreshStatus(display, null, {mode:'paused'}), 'Auto refresh paused');
-});
+for (const [mode, failures, visibleMode, detail] of [
+  ['idle', 0, '', ''],
+  ['scheduled', 0, '', 'auto refresh on'],
+  ['scheduled', 1, 'retry scheduled', ''],
+  ['paused', 0, 'auto refresh paused', ''],
+  ['hidden', 0, 'auto refresh paused (tab hidden)', ''],
+  ['updating', 0, '', 'auto refresh on · refreshing…'],
+  ['updating', 1, '', 'auto refresh on · refreshing…'],
+  ['blocked', 0, 'auto refresh stopped', ''],
+]) {
+  test(`refresh indicator: ${mode}, failures ${failures}, with and without an observation`, () => {
+    assert.deepEqual(refreshStatus(display, wireTime, { mode, failures }),
+      [`Updated 17:00:00${visibleMode ? ` · ${visibleMode}` : ''}`, detail]);
+    assert.deepEqual(refreshStatus(display, null, { mode, failures }),
+      [visibleMode.charAt(0).toUpperCase() + visibleMode.slice(1), detail]);
+  });
+}
 
 test('an ended execution has a compact status independent of pause, visibility and retry state', () => {
-  for (const mode of ['idle', 'paused', 'hidden', 'blocked', 'scheduled']) {
-    assert.equal(refreshStatus(display, wireTime, { mode, failures: 1 }, true),
-      'Execution ended · updated 17:00:00');
+  for (const mode of ['idle', 'paused', 'hidden', 'blocked', 'scheduled', 'updating']) {
+    assert.deepEqual(refreshStatus(display, wireTime, { mode, failures: 1 }, true),
+      ['Execution ended · updated 17:00:00', '']);
+    assert.deepEqual(refreshStatus(display, null, { mode }, true), ['Execution ended', '']);
   }
 });

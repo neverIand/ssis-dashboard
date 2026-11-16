@@ -115,8 +115,7 @@ test('overview keeps the open timeline and both reserved areas through a delayed
   assert.equal(dom.get('timeline-selected').textContent, '');
   assert.equal(row.isConnected, false);
   assert.equal(dom.root.querySelector('[data-count="total"]').textContent, '—');
-  assert.equal(dom.get('cohort-window').hidden, false);
-  assert.equal(dom.get('cohort-window').textContent, '');
+  assert.equal(dom.get('cohort-tip-window').textContent, '');
   assert.equal(dom.get('summary-status'), status);
   list.resolve(overviewPage()); await flush();
   assert.equal(dom.get('timeline-panel').style.minHeight, '671px');
@@ -139,13 +138,13 @@ test('overview refresh keeps keyed rows while announcing previous counts, then c
   const row = dom.body.firstChild, status = dom.get('summary-status');
   delay = true; const refresh = view.refresh();
   assert.equal(dom.body.firstChild, row);
-  assert.match(status.textContent, /Previous counts shown/);
+  assert.equal(status.textContent, 'Updated 17:00:00');
+  assert.match(status.title, /Previous counts shown/);
   assert.equal(dom.scroll.getAttribute('data-loading'), null);
   list.reject(new ApiError('forbidden', { status: 403 })); await refresh;
   assert.equal(row.isConnected, false);
   assert.equal(dom.scroll.style.minHeight ?? '', '');
-  assert.equal(dom.get('cohort-window').hidden, false);
-  assert.equal(dom.get('cohort-window').textContent, '');
+  assert.equal(dom.get('cohort-tip-window').textContent, '');
 });
 
 test('rolling refresh with moved bounds clears old timeline counts inside a reserved panel whose data-table row stays put', async t => {
@@ -245,7 +244,8 @@ test('native templates put live feedback in existing toolbars and a single page 
   }
   assert.match(detail, /data-detail-poll-status data-detail-status role="status"/);
   assert.doesNotMatch(detail, /data-detail-retry|data-detail-request-id|event-search-hint|data-events-scope/);
-  assert.match(overview, /class="cohort-window" data-cohort-window/);
+  assert.doesNotMatch(overview, /data-cohort-window/);
+  assert.match(overview, /data-cohort-tip-window/);
   assert.match(overview, /data-execution-scroll data-loading/);
   assert.match(overview, /data-poll-status data-summary-status role="status"/);
 });

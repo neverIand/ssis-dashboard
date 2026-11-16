@@ -1,6 +1,7 @@
 /* Theme tokens. Light (Soft grey) is the default; dark applies by system preference unless
    the user chose Light, or always when the user chose Dark. Keep the two dark blocks identical. */
 :root {
+  --sd-font-mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
   --sd-page: #e5e7ea;
   --sd-surface: #f0f1f3;
   --sd-subtle: #e3e6ea;
@@ -148,8 +149,7 @@ h2 {
   max-width: 100%;
   font-size: 0.9333rem;
 }
-.theme-choice { display: flex; align-items: center; gap: 0.4rem; color: var(--sd-secondary); font-size: 0.8667rem; }
-.theme-choice select { width: auto; min-height: 0; height: 1.9rem; padding-block: 0; font-size: 0.8667rem; }
+.theme-choice { width: auto; max-width: 6.5rem; min-height: 0; height: 1.9rem; padding-block: 0; font-size: 0.8667rem; }
 
 main {
   display: grid;
@@ -173,13 +173,13 @@ main {
   background: var(--sd-surface);
 }
 
-.cohort-window, .resource-status {
+.resource-status {
   color: var(--sd-secondary);
   font-size: 0.8667rem;
   overflow-wrap: anywhere;
 }
 
-.cohort-window, .resource-status:not(:empty) { margin-bottom: 0.8rem; }
+.resource-status:not(:empty) { margin-bottom: 0.8rem; }
 
 .section-actions .refresh-status { margin: 0; }
 
@@ -193,7 +193,7 @@ main {
   max-width: 100%;
   flex: 0 0 27rem;
 }
-.refresh-status, .inline-status, .inline-notice, .cohort-window {
+.refresh-status, .inline-status, .inline-notice {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
@@ -201,7 +201,7 @@ main {
   font-size: 0.8667rem;
   color: var(--sd-secondary);
 }
-.page-heading > .section-actions > .refresh-status { margin: 0; line-height: 2.2rem; }
+.page-heading > .section-actions > .refresh-status { margin: 0; line-height: 2.2rem; text-align: right; }
 [data-execution-scroll][data-loading] { min-height: 48rem; }
 .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 2.2rem; min-width: 2.2rem; height: 2.2rem; padding: 0; }
 .icon-button svg, .info-trigger svg { display: block; flex-shrink: 0; }
@@ -511,6 +511,7 @@ tbody tr:hover { background: var(--sd-subtle); }
 .observation-section summary { cursor: pointer; }
 .event-name { overflow-wrap: break-word; white-space: pre-wrap; }
 .event-preview, .event-body { white-space: pre-wrap; overflow-wrap: break-word; }
+[data-events-table] tr[data-severity="error"] :is(.event-preview, .event-body), [data-first-error-message] { font-family: var(--sd-font-mono); }
 .event-search { flex: 1; min-width: 7rem; }
 [data-events-q] { width: 12rem; }
 .parameter-name, .parameter-type, .value-preview, .value-body, .override-property, .override-path { white-space: pre-wrap; overflow-wrap: break-word; }
@@ -583,7 +584,7 @@ tbody tr:hover { background: var(--sd-subtle); }
 .history-status-popover form { max-height: min(24rem, 60vh); overflow: auto; }
 [data-history-table] tr[data-current="true"] { background: var(--sd-action-soft); }
 [data-history-table] tr[data-current="true"] td:first-child { box-shadow: inset 3px 0 var(--sd-action); }
-.current-execution { display: inline; margin-left: 0.3rem; font-size: 0.75rem; font-weight: 600; color: var(--sd-action); }
+.current-execution { display: inline; font-size: 0.75rem; font-weight: 600; color: var(--sd-action); }
 .history-duration-chart { padding: 0.6rem; border-bottom: 1px solid var(--sd-border); }
 .chart-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem; }
 .chart-frame { display: grid; grid-template-columns: minmax(3.5rem, 5.5rem) minmax(0, 1fr); grid-template-rows: 11rem 1.4rem; gap: 0.4rem 0.5rem; min-width: 0; }
@@ -701,8 +702,6 @@ tbody tr:hover { background: var(--sd-subtle); }
 }
 
 .filter-meta { display: flex; align-items: center; gap: 0.3rem; flex: 1; justify-content: end; min-width: 0; }
-.filter-meta:has(.inline-notice:not(:empty)) .cohort-window { display: none; }
-.filter-meta .cohort-window { margin: 0; }
 [data-execution-table] td { font-size: 0.9333rem; line-height: 1.4; }
 [data-execution-table] .cell-detail { font-size: 0.8rem; line-height: 1.25; }
 [data-execution-table] .time-cell { white-space: nowrap; }
