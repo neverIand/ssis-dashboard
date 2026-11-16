@@ -9,6 +9,7 @@ Start with [current status and the next actions](PROGRESS.md#next-actions). Use 
 | Understand ownership, lifecycle, hosting and rollback | [Modernization plan](MODERNIZATION_PLAN.md) |
 | Find completion status, accepted reviews, evidence and open gates | [Progress](PROGRESS.md) |
 | Compare legacy/native workflows and resolve replacement gaps | [Frontend parity inventory](FRONTEND_PARITY.md) |
+| Find the remaining office checks and concrete steps | [Next office run](FRONTEND_ACCEPTANCE.md#next-office-run); [office receipt and remaining status](PROGRESS.md#remaining-browser-acceptance) |
 | Run browser/lifecycle/keyboard/layout acceptance | [Frontend acceptance procedures](FRONTEND_ACCEPTANCE.md); [current gate status](PROGRESS.md#remaining-browser-acceptance) |
 | Build an API client | [API semantics](API_CONTRACT.md), [OpenAPI](openapi.yaml) |
 | Validate API correctness, query work and performance | [API validation](API_ACCEPTANCE.md) |

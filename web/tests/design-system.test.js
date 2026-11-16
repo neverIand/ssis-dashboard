@@ -69,15 +69,39 @@ test('F2-2: theme-init.js applies only a saved Light/Dark choice and tolerates b
     document: { documentElement: { setAttribute() { throw new Error('unexpected'); } } } }));
 });
 
-test('F2-1: the system and manual dark token blocks are identical, and no literal colour sits outside the theme blocks', () => {
-  const system = css.match(/@media \(prefers-color-scheme: dark\) \{\s*:root:not\(\[data-theme="light"\]\) \{([^}]*)\}/);
-  const manual = css.match(/:root\[data-theme="dark"\] \{([^}]*)\}/);
-  assert.ok(system && manual);
+test('theme-init.js marks only a browser without invoker commands as below the Baseline 2025 floor', () => {
+  const script = source('../src/theme-init.js');
+  const Current = class {}, Old = class {};
+  Object.defineProperty(Current.prototype, 'command', { value: '' });
+  for (const [HTMLButtonElement, expected] of [[Current, false], [Old, true], [undefined, true]]) {
+    const attributes = new Map();
+    vm.runInNewContext(script, { window: { localStorage: storage({}), HTMLButtonElement },
+      document: { documentElement: { setAttribute: (key, value) => attributes.set(key, value) } } });
+    assert.equal(attributes.has('data-browser-unsupported'), expected, String(HTMLButtonElement?.name));
+  }
+  const html = readFileSync(new URL('../../dashboard/templates/app/base.html', import.meta.url), 'utf8');
+  assert.match(html, /<p class="browser-notice" data-browser-notice hidden>[^<]*143[^<]*146[^<]*26\.2[^<]*<\/p>/);
+  // The global [hidden] rule is !important, so the notice rule must be too.
+  assert.match(css, /\[hidden\] \{ display: none !important; \}/);
+  assert.match(css, /:root\[data-browser-unsupported\] \[data-browser-notice\] \{ display: block !important;/);
+});
+
+test('F2-1: each colour token is one light-dark() pair, a manual choice only fixes color-scheme, and no literal colour sits outside the tokens', () => {
+  const tokens = css.match(/:root \{([^}]*)\}/);
+  assert.ok(tokens);
   const declarations = block => block.split(';').map(line => line.trim()).filter(Boolean);
-  assert.deepEqual(declarations(system[1]), declarations(manual[1]));
-  assert.ok(declarations(manual[1]).includes('color-scheme: dark'));
-  const rest = css.slice(css.indexOf(manual[0]) + manual[0].length);
-  assert.doesNotMatch(rest, /#[0-9a-f]{3,8}\b|rgba?\(/i);
+  const colour = /#[0-9a-f]{3,8}\b|rgba?\(/i, value = String.raw`(?:#[0-9a-f]{6}|rgb\([^),]*\))`;
+  const colours = declarations(tokens[1]).filter(line => colour.test(line));
+  assert.ok(colours.length > 20);
+  for (const line of colours) assert.match(line, new RegExp(String.raw`^--sd-[\w-]+: light-dark\(${value}, ${value}\)$`, 'i'));
+  assert.ok(declarations(tokens[1]).includes('color-scheme: light dark'));
+  assert.match(css, /:root\[data-theme="light"\] \{ color-scheme: light; \}/);
+  assert.match(css, /:root\[data-theme="dark"\] \{ color-scheme: dark; \}/);
+  // Any other color-scheme would flip the light-dark() tokens inside that element.
+  assert.equal(css.match(/color-scheme:/g).length, 3);
+  assert.doesNotMatch(css, /prefers-color-scheme/);
+  const rest = css.slice(css.indexOf(tokens[0]) + tokens[0].length);
+  assert.doesNotMatch(rest, colour);
   assert.doesNotMatch(css, /#fff(fff)?\b|#000(000)?\b|\bwhite\b(?!-space)|\bblack\b/i);
 });
 

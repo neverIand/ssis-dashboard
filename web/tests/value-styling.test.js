@@ -6,7 +6,10 @@ const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
 const declarations = block => Object.fromEntries([...block.matchAll(/([\w-]+):\s*([^;]+);/g)]
   .map(([, name, value]) => [name, value.trim()]));
 const rule = selector => declarations(css.slice(css.indexOf(selector)).match(/\{([^}]+)\}/)[1]);
-const themes = [rule(':root {'), rule(':root[data-theme="dark"]')];
+// Each colour token is light-dark(light, dark): split the root block into the two themes.
+const theme = index => Object.fromEntries(Object.entries(rule(':root {')).map(([name, value]) =>
+  [name, value.match(/^light-dark\(([^,]+), ([^,]+)\)$/)?.[index + 1] ?? value]));
+const themes = [theme(0), theme(1)];
 const luminance = hex => {
   assert.match(hex, /^#[\da-f]{6}$/i);
   const channels = hex.slice(1).match(/../g).map(pair => parseInt(pair, 16) / 255)

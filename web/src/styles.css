@@ -1,89 +1,35 @@
-/* Theme tokens. Light (Soft grey) is the default; dark applies by system preference unless
-   the user chose Light, or always when the user chose Dark. Keep the two dark blocks identical. */
+/* Theme tokens: each colour is light-dark(light, dark). The page follows the system preference
+   unless the user chose Light or Dark, which fixes color-scheme on the root. */
 :root {
   --sd-font-mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
-  --sd-page: #e5e7ea;
-  --sd-surface: #f0f1f3;
-  --sd-subtle: #e3e6ea;
-  --sd-text: #262b33;
-  --sd-secondary: #575f6c;
-  --sd-border: #d1d6dd;
-  --sd-control-border: #b3bac6;
-  --sd-action: #3b56a0;
-  --sd-action-hover: #2f4687;
-  --sd-action-soft: #dfe4f2;
-  --sd-success: #2f6649;
-  --sd-success-soft: #dfe9e2;
-  --sd-error: #954240;
-  --sd-error-soft: #f0e0de;
-  --sd-warning: #7a5618;
-  --sd-warning-soft: #eee5d2;
-  --sd-scope-project: #e8edf6;
-  --sd-scope-package: #e8f0eb;
-  --sd-scope-system: #f1ebe2;
-  --sd-type-boolean: #6c438c;
-  --sd-type-boolean-soft: #e9e0ef;
-  --sd-type-datetime: #30686b;
-  --sd-type-datetime-soft: #dce9e9;
-  --sd-shadow-color: rgb(38 43 51 / 14%);
-  color-scheme: light;
+  --sd-page: light-dark(#e5e7ea, #16181c);
+  --sd-surface: light-dark(#f0f1f3, #1e2127);
+  --sd-subtle: light-dark(#e3e6ea, #272b32);
+  --sd-text: light-dark(#262b33, #d5d9df);
+  --sd-secondary: light-dark(#575f6c, #9ba3ae);
+  --sd-border: light-dark(#d1d6dd, #30353e);
+  --sd-control-border: light-dark(#b3bac6, #4a515c);
+  --sd-action: light-dark(#3b56a0, #8fa8e6);
+  --sd-action-hover: light-dark(#2f4687, #aabdf0);
+  --sd-action-soft: light-dark(#dfe4f2, #26304a);
+  --sd-success: light-dark(#2f6649, #7dbf98);
+  --sd-success-soft: light-dark(#dfe9e2, #1f3128);
+  --sd-error: light-dark(#954240, #e09790);
+  --sd-error-soft: light-dark(#f0e0de, #3a2524);
+  --sd-warning: light-dark(#7a5618, #d6b26e);
+  --sd-warning-soft: light-dark(#eee5d2, #352d1c);
+  --sd-scope-project: light-dark(#e8edf6, #232a38);
+  --sd-scope-package: light-dark(#e8f0eb, #202f29);
+  --sd-scope-system: light-dark(#f1ebe2, #302b24);
+  --sd-type-boolean: light-dark(#6c438c, #c2a0e3);
+  --sd-type-boolean-soft: light-dark(#e9e0ef, #302638);
+  --sd-type-datetime: light-dark(#30686b, #82bec3);
+  --sd-type-datetime-soft: light-dark(#dce9e9, #1e3033);
+  --sd-shadow-color: light-dark(rgb(38 43 51 / 14%), rgb(0 0 0 / 45%));
+  color-scheme: light dark;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --sd-page: #16181c;
-    --sd-surface: #1e2127;
-    --sd-subtle: #272b32;
-    --sd-text: #d5d9df;
-    --sd-secondary: #9ba3ae;
-    --sd-border: #30353e;
-    --sd-control-border: #4a515c;
-    --sd-action: #8fa8e6;
-    --sd-action-hover: #aabdf0;
-    --sd-action-soft: #26304a;
-    --sd-success: #7dbf98;
-    --sd-success-soft: #1f3128;
-    --sd-error: #e09790;
-    --sd-error-soft: #3a2524;
-    --sd-warning: #d6b26e;
-    --sd-warning-soft: #352d1c;
-    --sd-scope-project: #232a38;
-    --sd-scope-package: #202f29;
-    --sd-scope-system: #302b24;
-    --sd-type-boolean: #c2a0e3;
-    --sd-type-boolean-soft: #302638;
-    --sd-type-datetime: #82bec3;
-    --sd-type-datetime-soft: #1e3033;
-    --sd-shadow-color: rgb(0 0 0 / 45%);
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --sd-page: #16181c;
-  --sd-surface: #1e2127;
-  --sd-subtle: #272b32;
-  --sd-text: #d5d9df;
-  --sd-secondary: #9ba3ae;
-  --sd-border: #30353e;
-  --sd-control-border: #4a515c;
-  --sd-action: #8fa8e6;
-  --sd-action-hover: #aabdf0;
-  --sd-action-soft: #26304a;
-  --sd-success: #7dbf98;
-  --sd-success-soft: #1f3128;
-  --sd-error: #e09790;
-  --sd-error-soft: #3a2524;
-  --sd-warning: #d6b26e;
-  --sd-warning-soft: #352d1c;
-  --sd-scope-project: #232a38;
-  --sd-scope-package: #202f29;
-  --sd-scope-system: #302b24;
-  --sd-type-boolean: #c2a0e3;
-  --sd-type-boolean-soft: #302638;
-  --sd-type-datetime: #82bec3;
-  --sd-type-datetime-soft: #1e3033;
-  --sd-shadow-color: rgb(0 0 0 / 45%);
-  color-scheme: dark;
-}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
 :root {
   --sd-status-running: var(--sd-action);
   --sd-status-running-soft: var(--sd-action-soft);
@@ -184,6 +130,9 @@ main {
 
 .connection-state { flex: 1; min-width: 0; }
 .connection-state > p { overflow-wrap: anywhere; }
+/* theme-init.js marks a browser below the Baseline 2025 floor; otherwise the notice stays hidden.
+   Without the stylesheet it stays hidden too. !important outranks the global [hidden] rule. */
+:root[data-browser-unsupported] [data-browser-notice] { display: block !important; color: var(--sd-warning); }
 .header-content nav { display: flex; align-items: center; gap: 1rem; margin-left: auto; }
 [data-display-timezone] { color: var(--sd-secondary); }
 
@@ -710,7 +659,8 @@ tbody tr:hover { background: var(--sd-subtle); }
   }
 
   .header-content nav { margin-left: auto; }
-  .header-content:has(.connection-state > [data-app-status]:not([hidden])) .connection-state { order: 1; flex-basis: 100%; }
+  .header-content:has(.connection-state > [data-app-status]:not([hidden])) .connection-state,
+  :root[data-browser-unsupported] .connection-state { order: 1; flex-basis: 100%; }
   main { padding: 1.3333rem 1.0667rem; }
   .scope-trigger { max-width: min(24rem, 70vw); }
   .summary-card { padding: 0.6rem; }
