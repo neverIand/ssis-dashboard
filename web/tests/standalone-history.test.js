@@ -69,6 +69,54 @@ test('independent history pages refresh the current cursor; first-page reset and
   assert.equal(run.state.page.data[0].execution_id, '5');
 });
 
+test('history short hide/returns keep the original due time and overdue return starts one cycle', async t => {
+  const run = setup(t, async ({ params }) => page(params));
+  await run.owner.load();
+  run.owner.setVisible(false);
+  t.mock.timers.tick(10000);
+  run.owner.setVisible(true);
+  assert.equal(run.state.poll.nextAt, 30000);
+  t.mock.timers.tick(0); await settle();
+  assert.equal(run.calls.length, 1);
+  run.owner.setVisible(false);
+  t.mock.timers.tick(5000);
+  run.owner.setVisible(true);
+  assert.equal(run.state.poll.nextAt, 30000);
+  t.mock.timers.tick(14999); await settle();
+  assert.equal(run.calls.length, 1);
+  t.mock.timers.tick(1); await settle();
+  assert.equal(run.calls.length, 2);
+  run.owner.setVisible(false);
+  t.mock.timers.tick(60000); await settle();
+  assert.equal(run.calls.length, 2);
+  run.owner.setVisible(true);
+  assert.equal(run.state.poll.nextAt, 90000);
+  t.mock.timers.tick(0); await settle();
+  assert.equal(run.calls.length, 3);
+  assert.equal(run.state.poll.nextAt, 120000);
+});
+
+test('history work active on return finishes without an extra cycle', async t => {
+  const pending = deferred();
+  const run = setup(t, ({ params }, count) => count === 2 ? pending.promise : Promise.resolve(page(params)));
+  await run.owner.load();
+  t.mock.timers.tick(1000);
+  const work = run.owner.refresh();
+  run.owner.setVisible(false);
+  t.mock.timers.tick(1000);
+  run.owner.setVisible(true);
+  assert.equal(run.state.poll.nextAt, null);
+  pending.resolve(page(defaults()));
+  await work;
+  t.mock.timers.tick(0); await settle();
+  assert.equal(run.calls.length, 2);
+  assert.equal(run.state.poll.nextAt, 32000);
+  t.mock.timers.tick(29999); await settle();
+  assert.equal(run.calls.length, 2);
+  t.mock.timers.tick(1); await settle();
+  assert.equal(run.calls.length, 3);
+});
+
 test('scope replacement clears old rows and rejects late denials; mixed-package LIKE rows remain valid', async t => {
   const old = deferred();
   const run = setup(t, ({ params }, count) => count === 1 ? old.promise : Promise.resolve(page(params, {}, [
@@ -99,6 +147,9 @@ test('transient failure labels retained data; denial clears it and stops automat
   assert.equal(run.state.page, null);
   assert.equal(run.state.poll.mode, 'blocked');
   const calls = run.calls.length;
+  run.owner.setVisible(false);
+  run.owner.setVisible(true);
+  assert.equal(run.state.poll.nextAt, null);
   t.mock.timers.tick(600000); await settle();
   assert.equal(run.calls.length, calls);
 });

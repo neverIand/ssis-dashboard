@@ -38,6 +38,31 @@ test('detail polling and manual activation share one completion-based operation'
   assert.equal(run.state.poll.nextAt, 15000); // The slow cycle cost is capped at 10 seconds.
 });
 
+test('detail short hide/returns keep the original due time and overdue return starts one cycle', async t => {
+  const run = setup(t, () => runningDetailResponse('17'));
+  await run.owner.load();
+  run.owner.setVisible(false);
+  t.mock.timers.tick(500);
+  run.owner.setVisible(true);
+  assert.equal(run.state.poll.nextAt, 1000);
+  t.mock.timers.tick(0); await flush();
+  assert.equal(run.calls.length, 1);
+  run.owner.setVisible(false);
+  t.mock.timers.tick(499);
+  run.owner.setVisible(true);
+  assert.equal(run.state.poll.nextAt, 1000);
+  t.mock.timers.tick(1); await flush();
+  assert.equal(run.calls.length, 2);
+  run.owner.setVisible(false);
+  t.mock.timers.tick(2000); await flush();
+  assert.equal(run.calls.length, 2);
+  run.owner.setVisible(true);
+  assert.equal(run.state.poll.nextAt, 3000);
+  t.mock.timers.tick(0); await flush();
+  assert.equal(run.calls.length, 3);
+  assert.equal(run.state.poll.nextAt, 4000);
+});
+
 test('only transient same-ID failures retain their observed data and back off', async t => {
   let failure = null;
   const run = setup(t, async () => { if (failure) throw failure; return runningDetailResponse('17'); });
@@ -148,8 +173,13 @@ test('pause, resume and visibility recovery coalesce with a pending detail refre
   await work;
   t.mock.timers.tick(0);
   await flush();
-  assert.equal(attempts, 3);
+  assert.equal(attempts, 2);
   assert.equal(run.state.poll.nextAt, 11000);
+  t.mock.timers.tick(999); await flush();
+  assert.equal(attempts, 2);
+  t.mock.timers.tick(1); await flush();
+  assert.equal(attempts, 3);
+  assert.equal(run.state.poll.nextAt, 12000);
 });
 
 test('detail deadline retains only same-ID data, then disposal aborts pending work and polling', async t => {

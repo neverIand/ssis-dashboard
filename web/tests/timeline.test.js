@@ -102,7 +102,9 @@ test('one completion-based timer coalesces refresh and visible return behind tim
   t.mock.timers.enable({apis:['setTimeout','Date'],now:0});const wait=deferred();let slow=true;
   const run=setup(t,(resource,options)=>resource==='metrics/timeline'&&slow?wait.promise:Promise.resolve(response(resource,options)),{autoRefresh:true,pollIntervalMs:100});
   await run.owner.apply(selection());const opening=run.owner.toggleTimeline();t.mock.timers.tick(1000);await run.owner.refresh();run.owner.setVisible(false);run.owner.setVisible(true);assert.equal(run.calls.length,3);
-  slow=false;wait.resolve(timelinePage());await opening;t.mock.timers.tick(0);await flush();assert.equal(run.calls.length,6);
+  slow=false;wait.resolve(timelinePage());await opening;t.mock.timers.tick(0);await flush();assert.equal(run.calls.length,3);
+  assert.equal(run.state.poll.nextAt,6000);t.mock.timers.tick(4999);await flush();assert.equal(run.calls.length,3);
+  t.mock.timers.tick(1);await flush();assert.equal(run.calls.length,6);
   t.mock.timers.tick(99);await flush();assert.equal(run.calls.length,6);t.mock.timers.tick(1);await flush();assert.equal(run.calls.length,9);
 });
 

@@ -17,7 +17,7 @@ export function createHistoryLoader({ api, metadata, selection, publish, paused 
   const emit = changes => {
     state = { ...state, ...changes };
     loop.update({ busy: active !== null, eligible: valid, failed: state.error !== null,
-      retryable: state.error === null || retryable(state.error), coversReturn: true });
+      retryable: state.error === null || retryable(state.error) });
     notify();
   };
   function cancel() {

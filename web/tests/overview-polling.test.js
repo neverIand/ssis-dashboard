@@ -44,6 +44,28 @@ test('automatic and manual refresh share one sequence, with a single next poll a
   assert.equal(run.state.poll.nextAt, 2500);
 });
 
+test('short visible returns preserve the due time while manual refresh immediately replaces it', async t => {
+  const run = setup(t, async resource => resource === 'executions' ? page() : summary());
+  await run.owner.apply(run.selection);
+  t.mock.timers.tick(200);
+  run.owner.setVisible(false);
+  t.mock.timers.tick(200);
+  run.owner.setVisible(true);
+  assert.equal(run.state.poll.nextAt, 1000);
+  t.mock.timers.tick(0); await flush();
+  assert.equal(run.calls.length, 2);
+  t.mock.timers.tick(100);
+  await run.owner.refresh();
+  assert.equal(run.calls.length, 4);
+  assert.equal(run.state.poll.nextAt, 1500);
+  t.mock.timers.tick(500); await flush();
+  assert.equal(run.calls.length, 4);
+  t.mock.timers.tick(499); await flush();
+  assert.equal(run.calls.length, 4);
+  t.mock.timers.tick(1); await flush();
+  assert.equal(run.calls.length, 6);
+});
+
 test('slow summary and repeated manual/visibility events produce no overlapping cycles', async t => {
   const pending = deferred();
   let summaries = 0;
@@ -62,11 +84,15 @@ test('slow summary and repeated manual/visibility events produce no overlapping 
   assert.equal(run.calls.length, 4);
   pending.resolve(summary());
   await flush();
-  assert.equal(run.state.poll.nextAt, 6000);
+  assert.equal(run.state.poll.nextAt, 16000);
   t.mock.timers.tick(0);
   await flush();
+  assert.equal(run.calls.length, 4);
+  t.mock.timers.tick(9999); await flush();
+  assert.equal(run.calls.length, 4);
+  t.mock.timers.tick(1); await flush();
   assert.equal(run.calls.length, 6);
-  assert.equal(run.state.poll.nextAt, 7000);
+  assert.equal(run.state.poll.nextAt, 17000);
 });
 
 test('user pause stops auto requests across visibility changes, while manual refresh and resume remain usable', async t => {
@@ -153,7 +179,7 @@ test('automatic deeper refresh repeats the exact cursor/window and disposal canc
   assert.equal(run.states.length, states);
 });
 
-test('an initial or restored page load already in progress covers visibility return without another resync', async t => {
+test('an initial or restored page load active on return finishes without an extra cycle', async t => {
   const pending = deferred();
   let lists = 0;
   const run = setup(t, async resource => resource !== 'executions' ? summary()
@@ -169,7 +195,7 @@ test('an initial or restored page load already in progress covers visibility ret
   assert.equal(run.calls.length, 4);
 });
 
-test('summary-only retry does not substitute for a full overview resync on visible return', async t => {
+test('summary-only retry active on return finishes without an extra full overview cycle', async t => {
   const pending = deferred();
   let summaries = 0;
   const run = setup(t, async resource => {
@@ -186,9 +212,14 @@ test('summary-only retry does not substitute for a full overview resync on visib
   pending.resolve(summary());
   await retry;
   t.mock.timers.tick(0); await flush();
+  assert.equal(run.calls.length, 3);
+  assert.equal(run.state.poll.nextAt, 1000);
+  t.mock.timers.tick(999); await flush();
+  assert.equal(run.calls.length, 3);
+  t.mock.timers.tick(1); await flush();
   assert.equal(run.calls.length, 5);
   assert.equal(run.calls.at(-2).resource, 'executions');
-  assert.equal(run.state.poll.nextAt, 1000);
+  assert.equal(run.state.poll.nextAt, 2000);
 });
 
 test('a malformed automatic response stops polling until an explicit successful retry', async t => {

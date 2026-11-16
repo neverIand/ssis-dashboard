@@ -113,7 +113,7 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     state = { ...state, ...changes };
     const errors = [state.error, ...keys.filter(key => state[key].open).map(key => state[key].error)].filter(Boolean);
     show(loop.update({ busy: busy(), eligible: !state.terminal, failed: errors.length > 0,
-      retryable: errors.every(transient), coversReturn: state.operation === 'initial' || state.operation === 'select' }));
+      retryable: errors.every(transient) }));
   }
   const updateSection = (key, changes) => { state = { ...state, [key]: { ...state[key], ...changes } }; };
   function cancel() {

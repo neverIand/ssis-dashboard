@@ -154,7 +154,10 @@ test('the completion-based scheduler coalesces refresh and visibility recovery b
   await run.owner.load(); const opening = run.owner.section('parameters').select(); await flush(); t.mock.timers.tick(1000);
   await run.owner.refresh(); run.owner.setVisible(false); run.owner.setVisible(true); await flush(); assert.equal(run.calls.length, 2);
   delay = false; wait.resolve(parameterPage()); await opening; await flush();
-  const beforeResync = run.calls.length; t.mock.timers.tick(0); await flush(); assert.equal(run.calls.length, beforeResync + 2);
+  const completed = run.calls.length; t.mock.timers.tick(0); await flush(); assert.equal(run.calls.length, completed);
+  assert.equal(run.state.poll.nextAt, 6000);
+  t.mock.timers.tick(4999); await flush(); assert.equal(run.calls.length, completed);
+  t.mock.timers.tick(1); await flush(); assert.equal(run.calls.length, completed + 2);
   const after = run.calls.length; t.mock.timers.tick(99); await flush(); assert.equal(run.calls.length, after);
   t.mock.timers.tick(1); await flush(); assert.equal(run.calls.length, after + 2);
 });

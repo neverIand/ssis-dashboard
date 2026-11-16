@@ -134,7 +134,6 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, loca
     if (state.page === null) state = {...state, timeline:{...state.timeline, page:null, scope:null, error:null, stale:false}};
     const errors = [state.error, state.timeline.open ? state.timeline.error : null].filter(Boolean);
     show(loop.update({ busy: busy(), eligible: state.selection !== null,
-      coversReturn: state.operation === 'page',
       failed: errors.length > 0,
       retryable: errors.every(transient) }));
   };

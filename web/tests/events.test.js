@@ -158,7 +158,10 @@ test('one completion-based scheduler waits for event work and coalesces manual a
   await run.owner.load(); await run.owner.section('events').select(); t.mock.timers.tick(1000); await flush();
   const requests = run.calls.length; run.owner.refresh(); run.owner.section('events').next(); run.owner.setVisible(false); run.owner.setVisible(true);
   t.mock.timers.tick(1000); await flush(); assert.equal(run.calls.length, requests);
-  pending.resolve(eventPage()); await flush(); t.mock.timers.tick(0); await flush(); assert.equal(run.calls.length, requests + 2);
+  pending.resolve(eventPage()); await flush(); t.mock.timers.tick(0); await flush(); assert.equal(run.calls.length, requests);
+  assert.equal(run.state.poll.nextAt, 7000);
+  t.mock.timers.tick(4999); await flush(); assert.equal(run.calls.length, requests);
+  t.mock.timers.tick(1); await flush(); assert.equal(run.calls.length, requests + 2);
 });
 
 test('event generations and deadlines guard query switches, A to B to A, close and disposal', async t => {

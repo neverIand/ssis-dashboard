@@ -42,19 +42,20 @@ These cases cover D3c.2. Run them with production scheduling; do not shorten the
 ### VIS-01: idle hide and return
 
 1. Load a two-page-capable overview, wait for the list and summary to finish, and note the displayed next refresh time. Auto refresh should be enabled.
-2. Switch to another tab or minimize the window and confirm the overview actually becomes hidden. Remain hidden beyond at least two normal scheduled intervals; for a slow or backed-off cycle use the displayed delay rather than assuming 30 seconds.
-3. Return and confirm a real visible transition. Observe completion and the next scheduled cycle without repeatedly pressing Refresh.
+2. Switch to another tab or minimize the window and confirm the overview actually becomes hidden. Return before the displayed next refresh time and confirm a real visible transition. Repeat several short hide/return switches within that delay, then stay visible through the original next time.
+3. After a cycle completes, hide again and remain hidden past its next refresh time. For a slow or backed-off cycle use the displayed delay rather than assuming 30 seconds. Return and observe completion and the next scheduled cycle.
+4. Repeat a short hide/return and press **Refresh** while the return timer is pending; confirm that manual work starts immediately and replaces the timer.
 
-**Pass:** no new polling cycle starts while hidden. Return produces exactly one list/summary resync for the current page, then one completion-based schedule. A deeper page replays its exact entry cursor/window; page one re-resolves default/relative windows and preserves explicit bounds. Filters, sorting, current page and view anchors remain consistent. Record the hidden interval and request sequence.
+**Pass:** no new polling cycle starts while hidden. Short hide/return switches make no request and preserve the original next time, `lastCompleted + delayMs`; that time uses the current delay, including backoff after failure. A return after that delay produces exactly one list/summary cycle for the current page, then one completion-based schedule. Manual Refresh stays immediate and replaces a pending timer, with the next cycle scheduled from its completion. A deeper page replays its exact entry cursor/window; page one re-resolves default/relative windows and preserves explicit bounds. Filters, sorting, current page and view anchors remain consistent. Record completion times, hidden intervals, displayed next times and request sequences. Without actual hidden/visible events this gate remains `NOT RUN`.
 
 ### VIS-02: hide/return during work
 
 1. Use a delayed-list fixture. Start a refresh, hide the document while the list is pending, then return before it completes. Repeat with a delayed summary and with the active cycle completing while still hidden.
-2. Repeat a rapid hidden/visible transition during the same active refresh. Record whether one return resync is queued; do not infer its count from status text alone.
+2. Repeat rapid hidden/visible transitions during the same active refresh. Observe requests through completion and the next scheduled time to confirm there is no extra return resync; do not infer the count from status text alone.
 3. Produce a summary failure, start **Retry summary** with a delay, then hide/return while that request is pending.
 4. Separately repeat a hide/return during an initial load or explicit selection load.
 
-**Pass:** only one resource request is active in the coordinator at a time. An already-started cycle may finish while hidden, including its summary; that is not a new poll. Return during a refresh or summary-only retry coalesces to one subsequent full resync, with no extra timer. Initial/restored/selection loading already covers return and must not add another immediate full cycle. A later hidden transition removes any pending schedule. Changing selection during a delayed old response cannot display or clear the new selection using that old response.
+**Pass:** only one resource request is active in the coordinator at a time. An already-started cycle may finish while hidden, including its summary; that completion counts whether it succeeds or fails. Any work active on return, including a summary-only retry or initial/restored/selection loading, finishes without an extra resync and schedules the next cycle normally after completion. If work finishes while hidden, a return before `lastCompleted + delayMs` makes no request and keeps that next time; a return at or after it starts exactly one cycle. With no completed cycle, an idle eligible return starts one cycle immediately. A later hidden transition removes any pending schedule. Changing selection during a delayed old response cannot display or clear the new selection using that old response. Without actual hidden/visible events this gate remains `NOT RUN`.
 
 ### VIS-03: pause and nonretryable stopping
 

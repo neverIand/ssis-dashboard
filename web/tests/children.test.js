@@ -137,7 +137,10 @@ test('polling waits for both pages and coalesces manual and visible-return activ
   run.owner.refresh(); run.owner.section('children').next(); run.owner.setVisible(false); run.owner.setVisible(true);
   t.mock.timers.tick(1000); await flush(); assert.equal(run.calls.length, count);
   pending.resolve(childPage()); await flush(); t.mock.timers.tick(0); await flush();
-  assert.equal(run.calls.length, count + 3); assert.equal(run.state.busy, false);
+  assert.equal(run.calls.length, count); assert.equal(run.state.busy, false);
+  assert.equal(run.state.poll.nextAt, 7000);
+  t.mock.timers.tick(4999); await flush(); assert.equal(run.calls.length, count);
+  t.mock.timers.tick(1); await flush(); assert.equal(run.calls.length, count + 3);
 });
 
 test('child generations reject A to B to A late responses and disposal aborts the current page', async t => {

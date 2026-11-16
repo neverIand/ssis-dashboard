@@ -81,9 +81,12 @@ test('one scheduler waits for base plus section and coalesces manual/paging/visi
   assert.equal(run.calls.length, count);
   pending.resolve(executablePage()); await flush();
   t.mock.timers.tick(0); await flush();
-  assert.equal(run.calls.length, count + 2, 'One queued visible-return cycle uses the same owner');
+  assert.equal(run.calls.length, count, 'The active cycle covers return without an extra cycle');
   assert.equal(run.state.busy, false);
-  assert.equal(run.state.poll.nextAt, 3000);
+  assert.equal(run.state.poll.nextAt, 7000);
+  t.mock.timers.tick(4999); await flush(); assert.equal(run.calls.length, count);
+  t.mock.timers.tick(1); await flush(); assert.equal(run.calls.length, count + 2);
+  assert.equal(run.state.poll.nextAt, 8000);
 });
 
 test('closing a pending section aborts it, removes data and rejects late denial after reopen', async t => {
