@@ -12,6 +12,7 @@ from werkzeug.test import Client
 from werkzeug.wrappers import Response
 
 from dashboard import create_app
+from tests.source_size import strip_comments
 
 
 ASSET_ROOT = Path(__file__).resolve().parents[1] / 'dashboard/static/app'
@@ -26,7 +27,14 @@ class FrontendSizeBudgetTests(unittest.TestCase):
     def authored_bytes(self):
         files = [path for path in SOURCE_ROOT.rglob('*') if path.suffix in {'.js', '.css'} and path.is_file()]
         self.assertTrue(files, 'Authored JS/CSS is missing')
-        return sum(path.stat().st_size for path in files)
+        total = 0
+        for path in files:
+            try:
+                source = path.read_bytes().decode('utf-8')
+                total += len(strip_comments(source, path.suffix).encode('utf-8'))
+            except ValueError as error:
+                raise ValueError(f'{path}: {error}') from error
+        return total
 
     def packaged_gzip_bytes(self):
         if not ASSET_ROOT.is_dir():

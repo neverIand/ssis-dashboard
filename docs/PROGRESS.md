@@ -17,6 +17,8 @@ Updated 17 November 2026. Development base: `dev-next`. [Roadmap](roadmap.md) ow
 
 ## Next actions
 
+- [ ] **27. Authored budget without comments (17 November).** The user excluded ordinary comments from the 320 KiB authored JS+CSS budget because the production bundler strips them. The new total is 311,860 of 327,680 bytes, oxc agrees on the comment bytes for each of the 43 JS files, and a read-only source size survey is running.
+
 - [x] **26. Office feedback, 17 November.** The office run of 17 November is in the [office receipts](#remaining-browser-acceptance). Codex implements the requested tweaks as one batch and Claude reviews them in the browser.
 
   | Item | Requested change | Status |
