@@ -344,7 +344,7 @@ paths:
       operationId: listValues
       summary: One bounded parameter or property-override section
       description: Implemented in C6. Disabled by default; deny before SQL. Parameters page by object_type then
-        execution_parameter_id ascending; overrides page by property_id ascending. Both select bounded keys before
+        execution_parameter_id ascending and may filter by scope; overrides page by property_id ascending. Both select bounded keys before
         value projection and retain an ID upper-bound fence. Override values default to NULL/policy-redacted; sensitive values are
         always redacted in SQL and serialization. Original parameter type labels and display strings are preserved.
       x-implementation-status: implemented
@@ -354,6 +354,7 @@ paths:
       - {$ref: '#/components/parameters/Limit'}
       - {$ref: '#/components/parameters/Cursor'}
       - {$ref: '#/components/parameters/Section'}
+      - {$ref: '#/components/parameters/ParameterScope'}
       responses:
         '200':
           description: Successful documented resource; empty visible collections remain successful.
@@ -2167,6 +2168,15 @@ components:
         type: string
         enum: [parameters, overrides]
         default: parameters
+    ParameterScope:
+      name: scope
+      in: query
+      required: false
+      description: Filter the parameters section to one object type. Omit to include all types, including unknown codes.
+        A continuation must keep the same scope. Any scope on the overrides section returns 400.
+      schema:
+        type: string
+        enum: [project, package, system]
     ExecutionId:
       name: id
       in: path

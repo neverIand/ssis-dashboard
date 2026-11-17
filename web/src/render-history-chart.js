@@ -23,13 +23,11 @@ export function mountHistoryChart(root, { metadata, restoreView = null, remember
     rendered = null, order = [];
   const shape = (tag) => document.createElementNS('http://www.w3.org/2000/svg', tag);
   const duration = (value) => value === null ? 'Unavailable' : display.duration(value);
-  const describe = item => `Execution ${item.execution_id} · ${display.timestamp(item.created_at)} · ${formatCode(item.status)}`
-    + ` · Actual duration: ${duration(item.duration_seconds)}`
-    + (item.ended_at === null && item.elapsed_seconds !== null
-      ? ` · Elapsed (observed): ${display.duration(item.elapsed_seconds)}` : '')
-    + ` · Estimated duration: ${duration(item.estimate?.duration_seconds ?? null)}`
-    + (item.estimate ? ` · Mean of ${display.count(item.estimate.sample_count)} prior successful `
-      + `${item.estimate.sample_count === 1 ? 'run' : 'runs'}` : '');
+  function describe(item) {
+    const timing = item.ended_at === null && item.elapsed_seconds !== null ? `${display.duration(item.elapsed_seconds)} elapsed`
+      : duration(item.duration_seconds) + (item.estimate ? ` (estimate ${display.duration(item.estimate.duration_seconds)})` : '');
+    return `#${item.execution_id} · ${display.timestamp(item.created_at)} · ${formatCode(item.status)} · ${timing}`;
+  }
   function clear() {
     rows.clear();
     order = [];
@@ -103,7 +101,7 @@ export function mountHistoryChart(root, { metadata, restoreView = null, remember
       }
       row.item = item;
       row.title.textContent = describe(item);
-      attribute(row.group, 'aria-label', describe(item));
+      attribute(row.group, 'aria-label', row.title.textContent);
       attribute(row.group, 'data-status', item.status.code);
       const actual = item.duration_seconds, estimate = item.estimate?.duration_seconds ?? null;
       const height = actual === null || maximum === 0 ? 0 : actual / maximum * 150;
@@ -148,7 +146,7 @@ export function mountHistoryChart(root, { metadata, restoreView = null, remember
     // Below seven executions the 48 px groups leave no room for dates; the title and readout keep them.
     renderChartAxes(xAxis, yAxis, data.map((item) => ({
       text: data.length < 7 ? `#${item.execution_id}` : `${display.timestamp(item.created_at).slice(0, 10)}\n#${item.execution_id}`,
-      title: `${display.timestamp(item.created_at)} · Execution ${item.execution_id} · ${item.created_at}`
+      title: `${display.timestamp(item.created_at)} · #${item.execution_id}`
     })), maximum, (value) => durationTick(value, display));
     empty.hidden = available !== 0;
     empty.textContent = page.data.length ? 'No durations are available on this loaded history page.'

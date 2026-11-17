@@ -38,9 +38,12 @@ test('D3 explicitly requests every known status and visibly marks a failed curre
   assert.equal(dom.calls.at(-1).params.status,all);assert.equal(dom.historyBody.children.length,3);
   const current=dom.historyBody.children[0];assert.equal(current.dataset.current,'true');
   assert.equal(current.children[0].firstChild.getAttribute('aria-current'),'page');
-  assert.equal(current.children[0].textContent, '17 Failed · current');
+  assert.equal(current.children[0].textContent, '17 · current');
+  assert.equal(current.children[6].textContent, 'Failed');
+  assert.equal(current.children[6].firstChild.dataset.status, '4');
   assert.equal(current.children[0].children.at(-1).textContent, ' · current', 'the separator is in the accessible text once');
-  assert.equal(dom.historyBody.children[1].dataset.current,'false');assert.doesNotMatch(dom.historyBody.children[1].textContent,/current/);
+  assert.equal(dom.historyBody.children[1].dataset.current,'false');
+  assert.equal(dom.historyBody.children[1].children[0].textContent, '16');
   assert.equal(!dom.get('history-status-options').matches(':popover-open'),true);assert.equal(preset(dom,'all').getAttribute('aria-pressed'),'true');
   current.children[0].firstChild.focus();click(dom.get('detail-refresh'));await flush();
   assert.equal(dom.historyBody.children[0],current);assert.equal(dom.document.activeElement,current.children[0].firstChild);
@@ -93,7 +96,9 @@ test('history plots chronological creation order independently of table order, w
   assert.deepEqual(dom.get('history-chart-y-axis').children.map(node=>node.textContent),['40 s','20 s','0 ms']);
   // Short projections use compact ID labels; each label's title keeps the full creation time.
   assert.deepEqual(dom.get('history-chart-x-axis').children.map(node=>node.textContent),['#17','#19','#16']);
-  assert.match(dom.get('history-chart-x-axis').children[0].title,/2026-10-15.*Execution 17/);
+  assert.equal(dom.get('history-chart-x-axis').children[0].title, '2026-10-15 01:00:00 · #17');
+  assert.equal(groups[1].firstChild.textContent, '#19 · 2026-10-16 01:00:00 · Failed · 10 s (estimate 20 s)');
+  assert.equal(groups[1].getAttribute('aria-label'), groups[1].firstChild.textContent);
   assert.equal(dom.get('history-chart-scale').textContent,'Duration');
   assert.equal(groups.filter(row=>row.getAttribute('tabindex')==='0').length,1);
 });
@@ -109,7 +114,7 @@ test('history hover and keyboard expose values without requests; keyed plot focu
   const dom=historyScreen(t,rows,{get:()=>historyPage(rows)});await openHistory(dom,true);
   const plot=dom.get('history-chart-plot'),count=dom.calls.length,first=plot.children[0],last=plot.children[1];
   interaction(plot,'mouseover',first.children[1]);assert.equal(selected(dom),'17');
-  assert.match(dom.get('history-chart-selected').textContent,/Actual duration: 5 s/);
+  assert.equal(dom.get('history-chart-selected').textContent, '#17 · 2026-10-17 17:00:00 · Succeeded · 5 s');
   first.focus();interaction(plot,'focusin',first);assert.equal(first.getAttribute('aria-selected'),'true');
   assert.equal(interaction(plot,'keydown',first,'ArrowRight').defaultPrevented,true);
   assert.equal(dom.document.activeElement,last);assert.equal(selected(dom),'18');
@@ -124,12 +129,13 @@ test('history hover and keyboard expose values without requests; keyed plot focu
 });
 
 test('history keeps exact high IDs for chronological ties, and missing actuals remain absent beside estimate markers',async t=>{
-  const rows=[historyRow('9223372036854775807',{ended_at:null,duration_seconds:null,estimate:estimate({duration_seconds:20})}),historyRow('9007199254740993')];
+  const rows = [historyRow('9223372036854775807', { ended_at: null, duration_seconds: null, elapsed_seconds: null,
+    status: { code: 2, name: 'running' }, estimate: estimate({ duration_seconds: 20 }) }), historyRow('9007199254740993')];
   const dom=historyScreen(t,rows);await openHistory(dom,true);const groups=dom.get('history-chart-plot').children;
   assert.deepEqual(groups.map(row=>row.dataset.executionId),['9007199254740993','9223372036854775807']);
   assert.equal(selected(dom),'9223372036854775807');
   assert.equal(groups[1].children[1].getAttribute('display'),'none');assert.equal(groups[1].children[2].getAttribute('display'),'inline');
-  assert.match(groups[1].getAttribute('aria-label'),/Actual duration: Unavailable.*Estimated duration: 20 s/);
+  assert.equal(groups[1].getAttribute('aria-label'), '#9223372036854775807 · 2026-10-17 17:00:00 · Running · Unavailable (estimate 20 s)');
 });
 
 async function timelineScreen(t,rows){
@@ -143,16 +149,21 @@ const emptyBucket=(day)=>timelineBucket(stamp(day),stamp(day+1),{created_count:0
 
 test('timeline shows succeeded/failed/other stacks, chronological labels and the latest non-empty default',async t=>{
   const rows=[emptyBucket(14),timelineBucket(stamp(15),stamp(16),{created_count:10,started_count:9,succeeded_count:6,failed_count:3}),
-    timelineBucket(stamp(16),stamp(17),{created_count:7,started_count:5,succeeded_count:2,failed_count:0}),emptyBucket(17)];
+    timelineBucket(stamp(16),stamp(17),{created_count:3,started_count:3,succeeded_count:2,failed_count:1}),emptyBucket(17)];
   const dom=await timelineScreen(t,rows),groups=dom.get('timeline-chart').children;
   assert.deepEqual(groups.map(row=>row.dataset.bucketStart),rows.map(row=>row.start));assert.equal(dom.get('timeline-choice').value,stamp(16));
   assert.deepEqual(groups[1].children.slice(1,4).map(node=>node.dataset.chartStatus),['7','4','other']);
   assert.deepEqual(groups[1].children.slice(1,4).map(node=>Number(node.getAttribute('height'))),[90,45,15]);
   assert.deepEqual(groups[1].children.slice(1,4).map(node=>Number(node.getAttribute('y'))),[70,25,10]);
-  assert.equal(dom.timelineBody.children[1].children[6].textContent,'1');assert.equal(dom.timelineBody.children[2].children[6].textContent,'5');
+  assert.equal(dom.timelineBody.children[1].children[6].textContent,'1');assert.equal(dom.timelineBody.children[2].children[6].textContent,'0');
   assert.deepEqual(dom.get('timeline-y-axis').children.map(node=>node.textContent),['10','5','0']);
   assert.match(dom.get('timeline-x-axis').textContent,/2026-10-14.*2026-10-17/s);
-  assert.match(dom.get('timeline-selected').textContent,/Created: 7 · Succeeded: 2 · Failed: 0 · Other: 5/);
+  assert.equal(dom.get('timeline-x-axis').firstChild.title, '2026-10-14 01:00:00');
+  assert.equal(dom.get('timeline-status').title, 'Observed 2026-10-17 17:00:00');
+  assert.equal(dom.get('timeline-selected').textContent, '2026-10-16 01:00:00 → 2026-10-17 01:00:00 · 3 created: 2 succeeded, 1 failed');
+  assert.equal(groups[2].firstChild.textContent, dom.get('timeline-selected').textContent);
+  assert.equal(groups[2].getAttribute('aria-label'), groups[2].firstChild.textContent);
+  assert.match(groups[1].firstChild.textContent, / · 10 created: 6 succeeded, 3 failed, 1 other, 1 not started$/);
   assert.equal(dom.get('timeline-series'),undefined);
 });
 
@@ -160,7 +171,7 @@ test('timeline hover and keyboard select complete bucket values locally and keep
   const rows=[timelineBucket(stamp(15),stamp(16)),timelineBucket(stamp(16),stamp(17),{created_count:20,started_count:10})];
   const dom=await timelineScreen(t,rows),plot=dom.get('timeline-chart'),first=plot.children[0],last=plot.children[1],count=dom.calls.length;
   interaction(plot,'mouseover',first.children[2]);assert.equal(dom.get('timeline-choice').value,stamp(15));
-  assert.match(dom.get('timeline-selected').textContent,/Created: 10 · Succeeded: 3 · Failed: 2 · Other: 5/);
+  assert.match(dom.get('timeline-selected').textContent,/ · 10 created: 3 succeeded, 2 failed, 5 other, 2 not started$/);
   first.focus();interaction(plot,'focusin',first);interaction(plot,'keydown',first,'ArrowRight');
   assert.equal(dom.document.activeElement,last);assert.equal(last.getAttribute('aria-selected'),'true');
   interaction(plot,'keydown',last,' ');assert.equal(dom.calls.length,count);
@@ -173,6 +184,7 @@ test('all-zero timeline selects the latest loaded bucket with one zero tick and 
   const dom=await timelineScreen(t,[emptyBucket(15),emptyBucket(16)]);
   assert.equal(dom.get('timeline-choice').value,stamp(16));assert.equal(dom.get('timeline-zero').hidden,false);
   assert.deepEqual(dom.get('timeline-y-axis').children.map(node=>node.textContent),['0']);
+  assert.equal(dom.get('timeline-selected').textContent, '2026-10-16 01:00:00 → 2026-10-17 01:00:00 · none created');
   for(const group of dom.get('timeline-chart').children){
     assert.ok(group.children.slice(1,4).every(node=>node.getAttribute('height')==='0'));
     assert.equal(group.children[4].getAttribute('display'),'inline');

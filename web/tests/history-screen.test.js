@@ -61,10 +61,10 @@ test('standalone History keeps the update clock visible during a pending refresh
   await settle();
   delayed = true; dom.click('history-refresh'); await settle();
   assert.equal(dom.get('history-poll-status').textContent, 'Updated 17:00:00');
-  assert.match(dom.get('history-poll-status').title, /auto refresh on/);
+  assert.equal(dom.get('history-poll-status').title, 'Auto refresh on · Observed 2026-10-17 17:00:00');
   pending.resolve(jsonResponse(historyPage([historyRow('5')]))); await settle();
   assert.equal(dom.get('history-poll-status').textContent, 'Updated 17:00:00');
-  assert.equal(dom.get('history-poll-status').title, 'Updated 17:00:00 · auto refresh on');
+  assert.equal(dom.get('history-poll-status').title, 'Auto refresh on · Observed 2026-10-17 17:00:00');
 });
 
 // The standalone History page on the detail double: wiring evidence only, no browser, focus or layout claims.
@@ -123,7 +123,7 @@ test('settings enable the scope form; a loaded scope shows its title, identity, 
   // Standalone rows name their folder, project and package.
   assert.match(dom.historyBody.textContent, /Folder .* \/ Project \/ Main\.dtsx/);
   assert.equal(dom.get('history-poll-status').textContent, 'Updated 17:00:00');
-  assert.equal(dom.get('history-poll-status').title, 'Updated 17:00:00 · auto refresh on');
+  assert.equal(dom.get('history-poll-status').title, 'Auto refresh on · Observed 2026-10-17 17:00:00');
   assert.equal(dom.get('history-poll-toggle').getAttribute('aria-label'), 'Pause auto refresh');
   assert.equal(dom.get('history-refresh').getAttribute('aria-disabled'), 'false');
 });
@@ -206,7 +206,7 @@ test('the pause button and tab visibility reach the loader, and the pause is wha
   assert.equal(dom.get('history-poll-status').textContent, 'Updated 17:00:00 · auto refresh paused (tab hidden)');
   dom.document.visibilityState = 'visible'; dom.document.dispatchEvent(new Event('visibilitychange')); await settle();
   assert.equal(dom.get('history-poll-status').textContent, 'Updated 17:00:00');
-  assert.equal(dom.get('history-poll-status').title, 'Updated 17:00:00 · auto refresh on');
+  assert.equal(dom.get('history-poll-status').title, 'Auto refresh on · Observed 2026-10-17 17:00:00');
   dom.click('history-poll-toggle'); await settle();
   assert.equal(dom.get('history-poll-toggle').getAttribute('aria-label'), 'Resume auto refresh');
   assert.equal(dom.get('history-poll-status').textContent, 'Updated 17:00:00 · auto refresh paused');

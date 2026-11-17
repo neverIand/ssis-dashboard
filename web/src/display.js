@@ -95,8 +95,12 @@ export function createDisplay({ timeZone } = {}) {
   };
 }
 
+export function observationTitle(display, generatedAt) {
+  return generatedAt ? `Observed ${display.timestamp(generatedAt)}` : '';
+}
+
 export function refreshStatus(display, generatedAt, poll, ended = false) {
-  // Visible text and extra title text, matching inlineStatus's presentation arguments.
+  // Visible text and any refresh mode omitted from it.
   // An ended execution has nothing to resume: say so first, then when it was last read.
   if (ended) return [generatedAt ? `Execution ended · updated ${display.clock(generatedAt)}` : 'Execution ended', ''];
   const mode = { idle: '', scheduled: poll.failures ? 'retry scheduled' : 'auto refresh on',
@@ -104,6 +108,5 @@ export function refreshStatus(display, generatedAt, poll, ended = false) {
     updating: 'refreshing…', blocked: 'auto refresh stopped' }[poll.mode];
   const compact = poll.mode === 'updating' || poll.mode === 'scheduled' && !poll.failures;
   const text = [generatedAt ? `Updated ${display.clock(generatedAt)}` : '', compact ? '' : mode].filter(Boolean).join(' · ');
-  return [text.charAt(0).toUpperCase() + text.slice(1), compact
-    ? (poll.mode === 'updating' ? 'auto refresh on · refreshing…' : mode) : ''];
+  return [text.charAt(0).toUpperCase() + text.slice(1), compact ? 'Auto refresh on' : ''];
 }

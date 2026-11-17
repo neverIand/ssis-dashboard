@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { ApiError } from '../src/api.js';
+import { ApiError, createApi } from '../src/api.js';
 import { createDetailLoader } from '../src/detail.js';
 import { createDisplay } from '../src/display.js';
-import { parameterQuery, readParameterPage } from '../src/values.js';
+import { overrideQuery, parameterQuery, readParameterPage } from '../src/values.js';
 import { parameterTypeFamily } from '../src/render-values.js';
 import { mountDetail } from '../src/render-detail.js';
-import { deferred } from './fixtures.js';
+import { deferred, jsonResponse } from './fixtures.js';
 import { detailDOM, detailResponse, runningDetailResponse } from './detail-fixture.js';
 import { executablePage } from './executable-fixture.js';
 import { childPage } from './child-fixture.js';
@@ -31,11 +32,123 @@ function screen(t, get, options = {}) {
   t.after(() => mounted.dispose()); return { ...dom, mounted, calls };
 }
 
-test('parameters support only their section and bounded size, with no invented sort or search', () => {
+test('parameter queries validate their section, bounded size and optional scope', () => {
   assert.deepEqual(parameterQuery({ limit: 8 }, metadata), { section: 'parameters', limit: 8 });
   for (const changes of [{ limit: 0 }, { limit: 201 }, { limit: 1.5 }, { section: 'overrides' }, { sort: 'name' }, { direction: 'desc' }]) {
     assert.throws(() => parameterQuery({ ...query, ...changes }, metadata));
   }
+  for (const scope of ['project', 'package', 'system']) {
+    assert.deepEqual(parameterQuery({ ...query, scope }, metadata), { ...query, scope });
+    assert.throws(() => overrideQuery({ limit: 50, scope }, metadata));
+  }
+  for (const scope of ['', 'all', 'Project', 'unknown', '20', null]) {
+    assert.throws(() => parameterQuery({ ...query, scope }, metadata));
+  }
+});
+
+test('parameter requests send scope only for a filtered page and keep opaque cursors encoded', async () => {
+  const urls = [], api = createApi('/api/v1/', { origin: 'https://example.test', fetchImpl: async url => {
+    urls.push(url);
+    return jsonResponse(parameterPage());
+  } });
+  for (const scope of [undefined, 'package']) {
+    await api.get('executions/17/values', { params: { ...parameterQuery({ ...query, scope }, metadata), cursor: '+/%' } });
+  }
+  assert.deepEqual(urls.map(url => url.pathname + url.search), [
+    '/api/v1/executions/17/values?section=parameters&limit=50&cursor=%2B%2F%25',
+    '/api/v1/executions/17/values?section=parameters&limit=50&scope=package&cursor=%2B%2F%25',
+  ]);
+});
+
+test('a scoped response rejects rows from another or unknown scope', () => {
+  const packagePage = parameterPage();
+  assert.equal(readParameterPage(packagePage, '17', { ...query, scope: 'package' }, metadata, display), packagePage);
+  assert.throws(() => readParameterPage(packagePage, '17', { ...query, scope: 'project' }, metadata, display), ApiError);
+  const unknown = parameterPage([parameterRow('1', { object_type: { code: 32767, name: 'unknown' } })]);
+  assert.equal(readParameterPage(unknown, '17', query, metadata, display), unknown);
+  assert.throws(() => readParameterPage(unknown, '17', { ...query, scope: 'system' }, metadata, display), ApiError);
+});
+
+test('Parameters renders the scope presets before the table with All initially pressed', () => {
+  const template = readFileSync(new URL('../../dashboard/templates/app/execution.html', import.meta.url), 'utf8');
+  const group = template.match(/<div[^>]+role="group" aria-label="Parameter scope">([\s\S]*?)<\/div>/);
+  assert.ok(group);
+  assert.ok(group.index < template.indexOf('data-parameters-table'));
+  assert.deepEqual([...group[1].matchAll(/data-parameters-scope-(\w+) aria-pressed="(true|false)">([^<]+)/g)]
+    .map(match => match.slice(1)), [['all', 'true', 'All'], ['project', 'false', 'Project'],
+    ['package', 'false', 'Package'], ['system', 'false', 'System']]);
+});
+
+const click = node => node.dispatchEvent(new Event('click'));
+const scopeButton = (dom, scope) => dom.get(`parameters-scope-${scope}`);
+
+test('selecting a parameter scope resets the page, updates the presets, and uses its own empty message', async t => {
+  const dom = screen(t, async (resource, { params }) => resource.endsWith('/values') ? parameterPage(params.scope ? [] : [parameterRow()],
+    { has_more: !params.scope && !params.cursor, next_cursor: params.scope || params.cursor ? null : 'all-next' }) : response(resource));
+  await flush(); click(dom.get('parameters-toggle')); await flush();
+  assert.equal(scopeButton(dom, 'all').getAttribute('aria-pressed'), 'true');
+  click(dom.get('parameters-next')); await flush();
+  assert.deepEqual(dom.calls.at(-1).params, { ...query, cursor: 'all-next' });
+  for (const scope of ['project', 'package', 'system']) {
+    const button = scopeButton(dom, scope);
+    button.focus(); click(button); await flush();
+    assert.deepEqual(dom.calls.at(-1).params, { ...query, scope });
+    assert.equal(dom.get('parameters-previous').getAttribute('aria-disabled'), 'true');
+    assert.equal(dom.get('parameters-status').textContent, 'Page 1 · 0 parameters');
+    assert.equal(dom.parameterBody.textContent, `No ${scope} parameters.`);
+    assert.equal(dom.document.activeElement, button);
+    for (const preset of ['all', 'project', 'package', 'system']) {
+      assert.equal(scopeButton(dom, preset).getAttribute('aria-pressed'), String(preset === scope));
+    }
+    const count = dom.calls.length;
+    click(button); await flush();
+    assert.equal(dom.calls.length, count);
+  }
+  click(scopeButton(dom, 'all')); await flush();
+  assert.deepEqual(dom.calls.at(-1).params, query);
+  assert.equal(dom.window.location.hash, '#parameters');
+  assert.equal(dom.window.location.search, '');
+});
+
+test('parameter scope and cursor restore with the tab and a fresh read without putting either in the URL', async t => {
+  const get = async (resource, { params }) => resource.endsWith('/values')
+    ? parameterPage([parameterRow(params.cursor ? '2' : '1')], { has_more: !params.cursor, next_cursor: params.cursor ? null : 'next' })
+    : response(resource);
+  const dom = screen(t, get);
+  await flush(); click(dom.get('parameters-toggle')); await flush();
+  click(scopeButton(dom, 'package')); await flush(); click(dom.get('parameters-next')); await flush();
+  click(dom.get('executables-toggle')); await flush(); click(dom.get('parameters-toggle')); await flush();
+  assert.deepEqual(dom.calls.at(-1).params, { ...query, scope: 'package', cursor: 'next' });
+  scopeButton(dom, 'package').focus();
+  const saved = dom.mounted.checkpoint();
+  const restored = screen(t, get, { restoreView: saved }); await flush();
+  assert.deepEqual(restored.calls.at(-1).params, { ...query, scope: 'package', cursor: 'next' });
+  assert.equal(restored.parameterBody.firstChild.dataset.parameterId, '2');
+  assert.equal(scopeButton(restored, 'package').getAttribute('aria-pressed'), 'true');
+  assert.equal(restored.document.activeElement, scopeButton(restored, 'package'));
+  assert.equal(restored.window.location.hash, '#parameters');
+  assert.equal(restored.window.location.search, '');
+  click(dom.get('executables-toggle')); await flush();
+  const inactive = screen(t, get, { restoreView: dom.mounted.checkpoint() }); await flush();
+  assert.equal(inactive.calls.some(call => call.resource.endsWith('/values')), false);
+  click(inactive.get('parameters-toggle')); await flush();
+  assert.deepEqual(inactive.calls.at(-1).params, { ...query, scope: 'package', cursor: 'next' });
+});
+
+test('selecting All during an in-flight scoped request aborts it and ignores a late response', async t => {
+  const slow = deferred();
+  const dom = screen(t, async (resource, { params }) => resource.endsWith('/values')
+    ? params.scope ? slow.promise : parameterPage() : response(resource));
+  await flush(); click(dom.get('parameters-toggle')); await flush();
+  click(scopeButton(dom, 'package')); await flush();
+  const pending = dom.calls.at(-1);
+  assert.equal(dom.parameterBody.textContent, 'Loading parameters…');
+  click(scopeButton(dom, 'all')); await flush();
+  assert.equal(pending.signal.aborted, true);
+  assert.deepEqual(dom.calls.at(-1).params, query);
+  slow.resolve(parameterPage([parameterRow('2', { value: 'late-scope-canary' })])); await flush();
+  assert.doesNotMatch(dom.parameterBody.textContent, /late-scope-canary/);
+  assert.equal(dom.parameterBody.firstChild.dataset.parameterId, '1');
 });
 
 test('parameter DTO keeps BIGINT order, exact names/types/value strings, NULL, empty and both redaction reasons', () => {

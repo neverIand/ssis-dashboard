@@ -23,12 +23,11 @@ test('a running detail keeps its update clock during refresh and its observation
   t.after(screen.dispose); await settle();
   const status = dom.get('detail-poll-status');
   assert.equal(status.textContent, 'Updated 17:00:00');
-  assert.match(status.title, /auto refresh on/);
+  assert.equal(status.title, 'Auto refresh on · Observed 2026-10-17 17:00:00');
   delayed = true;
   dom.get('detail-refresh').dispatchEvent(new Event('click'));
   assert.equal(status.textContent, 'Updated 17:00:00');
-  assert.match(status.title, /auto refresh on/);
-  assert.ok(status.title.includes(runningDetailResponse('17').meta.generated_at));
+  assert.equal(status.title, 'Auto refresh on · Observed 2026-10-17 17:00:00 · Previous observation shown.');
   pending.reject(new ApiError('http', { status: 503, requestId })); await settle();
   assert.equal(status.textContent, '⚠ Refresh failed · Updated 17:00:00 · retry scheduled');
   assert.match(status.title, /Previous observation shown/);
@@ -60,7 +59,7 @@ test('detail bootstrap needs no overview controls and requests metadata, detail 
   assert.equal(dom.field('created').textContent, '2026-10-17 17:00:00');
   assert.equal(dom.field('created').getAttribute('title'), response.data.created_at);
   assert.equal(dom.get('detail-poll-status').textContent, 'Execution ended · updated 17:00:00');
-  assert.ok(dom.get('detail-poll-status').title.includes(detailResponse('17').meta.generated_at));
+  assert.equal(dom.get('detail-poll-status').title, 'Observed 2026-10-17 17:00:00');
   dispose();
   assert.equal(dom.get('execution-detail').hidden, true);
   assert.equal(dom.field('package').textContent, 'Execution 9223372036854775807');
@@ -170,7 +169,7 @@ test('transient refresh is labeled with its old observation time; denial clears 
   assert.equal(dom.get('execution-detail').hidden, false);
   assert.equal(dom.get('detail-status').textContent, '⚠ Refresh failed · Execution ended · updated 17:00:00');
   assert.match(dom.get('detail-status').title, /Previous observation shown/);
-  assert.ok(dom.get('detail-poll-status').title.includes(detailResponse('17').meta.generated_at));
+  assert.match(dom.get('detail-poll-status').title, /^Observed 2026-10-17 17:00:00 ·/);
   assert.ok(dom.get('detail-poll-status').title.includes(requestId));
   failure = new ApiError('http', { status: 403, requestId });
   dom.get('detail-refresh').dispatchEvent(new Event('click'));

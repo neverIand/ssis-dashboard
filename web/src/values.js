@@ -3,14 +3,26 @@ import { formatId } from './display.js';
 import { codePointCount, observationText, readObservationMeta } from './observation-page.js';
 
 const identities = { parameters: 'execution_parameter_id', overrides: 'property_id' };
+const parameterTypes = { 20: 'project', 30: 'package', 50: 'system' };
+export const parameterScopes = Object.values(parameterTypes);
+
 function valueQuery(value, metadata, section) {
   if ((value.section !== undefined && value.section !== section) || value.sort !== undefined
       || value.direction !== undefined || !Number.isSafeInteger(value.limit)
       || value.limit < 1 || value.limit > metadata.limits.max_limit) throw new TypeError();
   return { section, limit: value.limit };
 }
-export const parameterQuery = (value, metadata) => valueQuery(value, metadata, 'parameters');
-export const overrideQuery = (value, metadata) => valueQuery(value, metadata, 'overrides');
+export function parameterQuery(value, metadata) {
+  const query = valueQuery(value, metadata, 'parameters');
+  if (value.scope === undefined) return query;
+  if (!parameterScopes.includes(value.scope)) throw new TypeError();
+  return { ...query, scope: value.scope };
+}
+
+export function overrideQuery(value, metadata) {
+  if (value.scope !== undefined) throw new TypeError();
+  return valueQuery(value, metadata, 'overrides');
+}
 
 function readValuePage(response, query, metadata, display, section) {
   try {
@@ -30,7 +42,8 @@ function readValuePage(response, query, metadata, display, section) {
       if (section === 'parameters') {
         const code = row.object_type?.code;
         if (!Number.isSafeInteger(code) || code < -32768 || code > 32767
-            || row.object_type.name !== ({ 20: 'project', 30: 'package', 50: 'system' }[code] ?? 'unknown')) throw new TypeError();
+            || row.object_type.name !== (parameterTypes[code] ?? 'unknown')
+            || query.scope !== undefined && row.object_type.name !== query.scope) throw new TypeError();
         if (code < previousType || code === previousType && id <= previous) throw new TypeError();
         previousType = code;
         for (const field of ['name', 'sql_type']) {

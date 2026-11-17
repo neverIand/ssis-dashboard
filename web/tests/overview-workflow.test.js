@@ -168,7 +168,7 @@ test('unavailable events keep overview count links on the execution without a ca
   const applied = selection('?folder=Old&project=Old&status=2');
   await view.apply(applied);
   const cells = dom.body.firstChild.children;
-  for (const [index, count] of [[7, '2'], [8, '3']]) {
+  for (const [index, count] of [[6, '2'], [7, '3']]) {
     const link = cells[index].firstChild, url = new URL(link.href, navigation.origin);
     assert.equal(link.textContent, count);
     assert.equal(url.hash, ''); assert.equal(link.href, cells[0].firstChild.href);
@@ -194,7 +194,7 @@ test('summary cards include Other, apply exact statuses and clear with Total; ro
   }
   const cells = dom.body.firstChild.children;
   assert.equal(cells[2].firstChild.href, cells[0].firstChild.href);
-  for (const [index, kind] of [[7,'warnings'],[8,'errors']]) {
+  for (const [index, kind] of [[6,'warnings'],[7,'errors']]) {
     const url = new URL(cells[index].firstChild.href, navigation.origin);
     assert.equal(url.hash, `#events/${kind}`);
     assert.deepEqual(readOverviewReturn(url.search, navigation).selection, selection('?folder=Old&project=Old&status=2'));

@@ -79,6 +79,14 @@ class APIContractTests(unittest.TestCase):
                 self.assertEqual(len(keys), len(set(keys)))
         self.assertEqual(len(operations), len(set(operations)))
 
+    def test_values_has_an_optional_parameter_scope_without_an_all_token(self):
+        operation = self.spec['paths']['/api/v1/executions/{id}/values']['get']
+        parameters = [self.resolve(p['$ref']) for p in operation['parameters']]
+        scope = next(p for p in parameters if p['name'] == 'scope')
+        self.assertEqual((scope['in'], scope['required']), ('query', False))
+        self.assertEqual(scope['schema'], {'type': 'string', 'enum': ['project', 'package', 'system']})
+        self.assertIn('400', operation['responses'])
+
     def test_the_browser_test_copy_of_the_examples_is_current(self):
         # web/tests/openapi-examples.test.js runs this copy through the browser readers.
         from tests.export_openapi_examples import TARGET, examples

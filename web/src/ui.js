@@ -72,7 +72,7 @@ export function mountThemeChoice(root) {
 
 export function inlineStatus(node, text, detail = '') {
   node.textContent = text;
-  node.title = [text, detail].filter(Boolean).join(' · ');
+  node.title = detail;
 }
 
 // Fixed top-layer panels share viewport clamping; CSS anchors are beyond Baseline 2025.

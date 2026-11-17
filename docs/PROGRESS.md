@@ -1,6 +1,6 @@
 # Implementation progress
 
-Updated 16 November 2026. Development base: `dev-next`. [Roadmap](roadmap.md) owns scope and priorities; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns current status, the work queue and open acceptance gates. Completed work is kept as short receipts. The full implementation journals are in Git: through 15 November 2026 at `6180174` (`git show 6180174:docs/PROGRESS.md`), through 25 October at `864ec53`, and before the 17 October consolidation at `36b48f8`.
+Updated 17 November 2026. Development base: `dev-next`. [Roadmap](roadmap.md) owns scope and priorities; [the plan](MODERNIZATION_PLAN.md) owns architecture. This file owns current status, the work queue and open acceptance gates. Completed work is kept as short receipts. The full implementation journals are in Git: through 15 November 2026 at `6180174` (`git show 6180174:docs/PROGRESS.md`), through 25 October at `864ec53`, and before the 17 October consolidation at `36b48f8`.
 
 ## Current status
 
@@ -16,6 +16,18 @@ Updated 16 November 2026. Development base: `dev-next`. [Roadmap](roadmap.md) ow
 **Verification at `6180174`, 15 November 2026:** the production build passes; 531 Node tests pass; Python discovery runs 498 tests, 473 pass and 25 opt-in native SQL tests are skipped; the native SQL suites (25 tests) pass against the local SSISDB. Authored JS+CSS is 318,692 of 327,680 bytes and packaged gzip-9 JS+CSS 54,437 of 65,536 ([roadmap budgets](roadmap.md#acceptance-budgets)). This is local evidence, not reader, latency or production acceptance.
 
 ## Next actions
+
+- [x] **26. Office feedback, 17 November.** The office run of 17 November is in the [office receipts](#remaining-browser-acceptance). Codex implements the requested tweaks as one batch and Claude reviews them in the browser.
+
+  | Item | Requested change | Status |
+  | --- | --- | --- |
+  | F1 | Executables: the Result label is not aligned with the other cells | Table badges use the first text line height and alignment. Browser check: badge centre within 0.5 px of the first text line in Overview, and 1.2–1.3 px in Executables; Overview row height unchanged. Complete |
+  | F2 | Overview: Warn and Err get the same fixed width; Status moves to the end, as in the other tables; one column order for every run table (identity, times, duration, counts or estimate, outcome last) | Status is last in Overview and History. Warn and Err share a fixed width. Browser check: Overview Warn and Err 66 px each, 49 px rows; History reads `19 · current` with Status last. Complete |
+  | F3 | Shorter hover text on the refresh status, without repeated information | Refresh and section titles show the observation time and retain error details. Browser check: Overview `Auto refresh on · Observed 2026-11-17 20:56:37`; ended detail `Observed …`. Complete |
+  | F4 | No "SQL" prefix on the server name label | The server name is shown with SQL Server in its accessible label. Complete |
+  | F5 | Parameters: a scope filter above the table, like the History status presets | Scope presets reset paging and bind server cursors to scope. Claude ran the native suites (26 tests) against the local SSISDB; [SQL record](API_ACCEPTANCE.md#parameter-scope-filter-17-november-2026). Browser check: System shows 6 system rows through `scope=system` and survives a tab switch; `scope` on overrides and an unknown scope return 400. Complete |
+  | F6 | Shorter hover text on the History estimate cells | Estimate titles show the expected end when it is absent from the cell. Complete |
+  | F7 | Shorter chart hover text (History chart and Overview timeline) | Compact titles for History runs and Timeline buckets; Claude also removed the raw-ISO title of the timeline bucket list, because its text already shows the range with offsets. Build, Node 599/599, Python 509 with the native suites, size budgets pass (authored 326,058 of 327,680 B: 1,622 B headroom). Complete |
 
 - [ ] **24. Office feedback, 16 November.** The user tested `/app/` in the office environment; the [office receipt](#remaining-browser-acceptance) records the confirmed subcases. The [next office run](FRONTEND_ACCEPTANCE.md#next-office-run) excludes those completed checks and gives the remaining steps. The requested changes are grouped in five batches, simplest first. Codex implements each batch and Claude reviews it in the browser.
 
@@ -194,16 +206,18 @@ Original design and filter results: `.local/reports/frontend/20261018-stage-d-re
 
 Unavailable-environment checks remain parked under the 18 October instruction. Start with [the next office run](FRONTEND_ACCEPTANCE.md#next-office-run) for the remaining steps. Frontend acceptance owns the procedures; this table owns status.
 
-**Office receipt, 16 November 2026 (user report):** sensitive parameter values were redacted; native popovers opened one at a time and their keyboard shortcuts worked; Copy succeeded through the Clipboard API; the pinned `pyodbc` 5.3.0 worked with ODBC Driver 17. These subcases are complete for the reported run and removed from the next-office worksheet. The office policy requires the latest Edge, but the full tested browser version, OS/profile, deployed revision and SQL identity were not recorded. This receipt does not complete the broader browser/reader matrix or the held `pyodbc` update (R-23).
+**Office receipt, 16 November 2026 (user report):** sensitive parameter values were redacted; native popovers opened one at a time and their keyboard shortcuts worked; Copy succeeded through the Clipboard API; the pinned `pyodbc` 5.3.0 worked with ODBC Driver 17. These subcases are complete for the reported run and removed from the next-office worksheet.
+
+**Office receipt, 17 November 2026 (user report):** steps 1–3 of the [next office run](FRONTEND_ACCEPTANCE.md#next-office-run) were completed on Windows 10 22H2. Step 1: the environment was recorded; Windows 11 is to be tested later. Step 2: the whole screen walkthrough, including the keyboard shortcuts, real interaction with the native date/time calendar popup and 125% browser zoom. Step 3: real tab switches; the refresh behaviour works as intended after batch C (`153fc79`). The report does not say which VIS-02/VIS-03 delay or denial fixtures were available, so those subcases are not claimed. Browser zoom does not establish 150% system scaling. The office policy requires the latest Edge, but the full tested browser version, OS/profile, deployed revision and SQL identity were not recorded. This receipt does not complete the broader browser/reader matrix or the held `pyodbc` update (R-23).
 
 | Check | Status | Required evidence |
 | --- | --- | --- |
-| Actual hidden-tab return | Deferred — NOT RUN | VIS-01–03 after batch C: real hidden/visible events; no new hidden polling; an early return preserves the existing due time without a request; an overdue idle return starts exactly one cycle; active work finishes without an extra resync. Preserve pause/denial and one timer; manual Refresh remains immediate. Dispatched visibility events do not count. |
+| Actual hidden-tab return | Observed in office, 17 November (user report); fixture subcases unconfirmed | VIS-01–03 after batch C: real hidden/visible events; no new hidden polling; an early return preserves the existing due time without a request; an overdue idle return starts exactly one cycle; active work finishes without an extra resync. Preserve pause/denial and one timer; manual Refresh remains immediate. Dispatched visibility events do not count. |
 | Cached-document return | Deferred — NOT RUN | CACHE-01–02: prove a retained document returned, then observe metadata/page revalidation, pause/view restoration and one expired-cursor reset. Ordinary Back is insufficient. The shells are served `no-store`, and the in-app browser rebuilt the page on Back (Q2). |
-| Corporate/cross-browser | Partly observed in office; remainder NOT RUN | Record the full tested Edge version and environment, then finish BROWSER-01 navigation/selection/paging, remaining keyboard/layout/failure and actual lifecycle checks. Popover mutual dismissal/shortcuts and Clipboard API Copy are already in the office receipt. Include Firefox/Safari only when used. |
-| Accessibility and zoom | NOT RUN | Real 150% system zoom, Windows high contrast, screen readers (also needed for N-10) and reduced motion. |
+| Corporate/cross-browser | Office walkthrough complete on Windows 10 22H2, 17 November (user report); Windows 11 and failure paths NOT RUN | Record the full tested Edge version and environment, then finish BROWSER-01 navigation/selection/paging, remaining keyboard/layout/failure and actual lifecycle checks. Popover mutual dismissal/shortcuts and Clipboard API Copy are already in the office receipt. Include Firefox/Safari only when used. |
+| Accessibility and zoom | NOT RUN (125% browser zoom observed in office, 17 November) | Real 150% system zoom, Windows high contrast, screen readers (also needed for N-10) and reduced motion. |
 | A running execution in the browser | NOT RUN | The current-page change highlight (O10), live estimate rendering, a status change during a read (N-01) and elapsed time on a later page (R-01). The local fixture runs end within seconds. |
-| Native calendar popup | NOT RUN | Date/time field entry and timezone conversion are observed; native popup interaction still needs its own browser check. |
+| Native calendar popup | Observed in office, 17 November (user report) | Real popup interaction in the office browser, with date/time entry and timezone conversion already observed. |
 | Complete enabled-resource/reader matrix | Incomplete | Finish the remaining populated event/value cases, real policy/visibility changes and independent-reader matrix. Sensitive-parameter redaction is already in the office receipt for its reported scope; the SQL identity and other matrix cases remain unrecorded. |
 
 ## Phase 4 / native execution workflows

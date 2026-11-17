@@ -1,4 +1,4 @@
-import { createDisplay } from './display.js';
+import { createDisplay, observationTitle } from './display.js';
 import { mountTableOrder } from './table-order.js';
 import { reserveLoadingSpace } from './loading-space.js';
 import { mountTableViewport } from './table-viewport.js';
@@ -134,12 +134,12 @@ export function mountSectionTable(root, { metadata, actions, restoreView = null 
             rendered = page;
             renderedStart = executionStart;
           }
-          status.title = page ? `Observed ${display.timestamp(page.meta.generated_at)} · ${page.meta.generated_at}` : '';
+          status.title = panel.hidden ? ''
+            : [observationTitle(display, page?.meta.generated_at), errorText].filter(Boolean).join(' · ');
           const info = page ? view.pageInfo(page, state) : '';
           status.textContent = panel.hidden ? '' : error
             ? `${errorText}${state.stale ? ` ${view.previousPage} ` : ' '}${info}`
             : state.stale ? `Refreshing… ${view.previousPage} ${info}` : state.phase === 'loading' ? view.loading : info;
-          status.title = [status.textContent, status.title].filter(Boolean).join(' · ');
           // Errors wrap instead of truncating, so the request ID stays readable and selectable.
           if (error && !panel.hidden) status.dataset.error = ''; else delete status.dataset.error;
           view.afterStatus?.();

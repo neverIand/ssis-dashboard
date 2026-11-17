@@ -134,12 +134,12 @@ test('display text is independent of zh-CN and non-Latin default locales', t => 
 
 for (const [mode, failures, visibleMode, detail] of [
   ['idle', 0, '', ''],
-  ['scheduled', 0, '', 'auto refresh on'],
+  ['scheduled', 0, '', 'Auto refresh on'],
   ['scheduled', 1, 'retry scheduled', ''],
   ['paused', 0, 'auto refresh paused', ''],
   ['hidden', 0, 'auto refresh paused (tab hidden)', ''],
-  ['updating', 0, '', 'auto refresh on · refreshing…'],
-  ['updating', 1, '', 'auto refresh on · refreshing…'],
+  ['updating', 0, '', 'Auto refresh on'],
+  ['updating', 1, '', 'Auto refresh on'],
   ['blocked', 0, 'auto refresh stopped', ''],
 ]) {
   test(`refresh indicator: ${mode}, failures ${failures}, with and without an observation`, () => {

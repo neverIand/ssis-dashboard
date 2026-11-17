@@ -24,7 +24,7 @@ test('duration chart uses only the loaded history page; opening, selecting and c
   const dom=screen(t,async()=>historyPage([historyRow('3'),historyRow('2')]));await flush();assert.equal(dom.calls.length,2);
   assert.equal(dom.get('history-chart-toggle').disabled,true);click(dom,'history-toggle');await flush();assert.equal(dom.calls.length,3);
   assert.equal(groups(dom).length,0);click(dom,'history-chart-toggle');assert.equal(groups(dom).length,2);
-  choose(dom,'2');assert.match(dom.get('history-chart-selected').textContent,/Execution 2/);
+  choose(dom,'2');assert.match(dom.get('history-chart-selected').textContent,/#2 ·/);
   assert.match(dom.get('history-status').textContent,/Page 1 · 2 executions/);
   group(dom,selected(dom)).focus();click(dom,'history-chart-toggle');assert.equal(groups(dom).length,0);
   assert.equal(dom.document.activeElement,dom.get('history-chart-toggle'));assert.equal(dom.calls.length,3);
@@ -36,9 +36,11 @@ test('missing actual duration never becomes observed elapsed or estimate, while 
   const dom=screen(t,async()=>historyPage(rows));await open(dom);
   assert.equal(group(dom,'3').children[1].getAttribute('height'),'0');assert.equal(group(dom,'3').children[3].getAttribute('display'),'inline');
   assert.equal(group(dom,'2').children[1].getAttribute('display'),'none');assert.equal(group(dom,'2').children[3].getAttribute('display'),'none');
-  choose(dom,'2');assert.match(dom.get('history-chart-selected').textContent,/Actual duration: Unavailable.*Elapsed \(observed\): 2 min 03 s.*Estimated duration: 10 s.*Mean of 1 prior successful run/);
-  choose(dom,'1');assert.match(dom.get('history-chart-selected').textContent,/Actual duration: Unavailable · Estimated duration: Unavailable/);
-  assert.doesNotMatch(dom.get('history-chart-selected').textContent,/Elapsed|Mean of/);
+  choose(dom,'2');
+  assert.equal(group(dom,'2').firstChild.textContent, '#2 · 2026-10-17 17:00:00 · Running · 2 min 03 s elapsed');
+  assert.equal(dom.get('history-chart-selected').textContent, group(dom,'2').firstChild.textContent);
+  choose(dom,'1');
+  assert.equal(dom.get('history-chart-selected').textContent, '#1 · 2026-10-17 17:00:00 · Succeeded · Unavailable');
 });
 
 test('finite huge and sub-millisecond durations keep finite plot geometry and separate exact returned estimates',async t=>{
@@ -49,7 +51,7 @@ test('finite huge and sub-millisecond durations keep finite plot geometry and se
     for(const key of ['x1','x2','y1','y2'])assert.ok(Number.isFinite(Number(row.children[2].getAttribute(key))));
   }
   assert.equal(group(dom,'3').children[1].getAttribute('height'),'150');choose(dom,'2');
-  assert.match(dom.get('history-chart-selected').textContent,/Actual duration: <1 ms.*Estimated duration: <1 ms/);
+  assert.equal(dom.get('history-chart-selected').textContent, '#2 · 2026-10-17 17:00:00 · Succeeded · <1 ms (estimate <1 ms)');
   assert.equal(group(dom,'2').children[3].getAttribute('display'),'none');
 });
 
@@ -67,7 +69,7 @@ test('live estimate removal updates keyed chart values while current choice, tab
   choose(dom,'2');const selectedGroup=group(dom,'2');group(dom,selected(dom)).focus();dom.get('history-scroll').scrollLeft=120;
   changed=true;click(dom,'detail-refresh');await flush();assert.equal(group(dom,'2'),selectedGroup);assert.equal(selected(dom),'2');
   assert.equal(dom.document.activeElement,group(dom,selected(dom)));assert.equal(dom.get('history-scroll').scrollLeft,120);
-  assert.match(dom.get('history-chart-selected').textContent,/Estimated duration: Unavailable/);assert.doesNotMatch(plot(dom).textContent,/Mean of/);
+  assert.equal(dom.get('history-chart-selected').textContent, '#2 · 2026-10-17 17:00:00 · Succeeded · 0 ms');
   assert.equal(selectedGroup.children[2].getAttribute('display'),'none');assert.equal(selectedGroup.children[2].getAttribute('y1'),'160');
   dom.get('legacy-detail-link').focus();click(dom,'detail-refresh');await flush();assert.equal(dom.document.activeElement,dom.get('legacy-detail-link'));
   assert.equal(dom.calls.length,7);
@@ -106,7 +108,7 @@ test('maximum history page renders all 200 execution pairs; disposal and late cl
   assert.equal(groups(dom).length,50);
   dom.get('history-limit').value='200';dom.get('history-limit').dispatchEvent(new Event('change'));await flush();
   assert.equal(groups(dom).length,200);assert.equal(groups(dom).length,200);
-  choose(dom,'1');assert.match(dom.get('history-chart-selected').textContent,/Execution 1 ·/);slow=true;click(dom,'detail-refresh');await flush();
+  choose(dom,'1');assert.match(dom.get('history-chart-selected').textContent,/#1 ·/);slow=true;click(dom,'detail-refresh');await flush();
   click(dom,'executables-toggle');assert.equal(groups(dom).length,0);wait.resolve(historyPage(rows,{limit:200}));await flush();assert.equal(groups(dom).length,0);
   dom.view.dispose();const count=dom.calls.length;click(dom,'history-chart-toggle');assert.equal(dom.calls.length,count);assert.equal(dom.get('history-chart-panel').hidden,true);
 });

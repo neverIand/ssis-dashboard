@@ -253,7 +253,7 @@ test('B3 a deferred reveal is cancelled by a subsequent load, restore, selection
 
 test('B1/B2/B6 CSS keeps detail times intact, gates sticky headers by fit, and shares the Reset row with the tip', () => {
   const wide = css.match(/@media \(min-width: 66\.67rem\) \{([\s\S]*?)\n\}/)[1];
-  assert.match(wide, /\[data-execution-table\] th:not\(:nth-child\(2\), :nth-child\(3\)\) \{ width: 1%; \}/);
+  assert.match(wide, /\[data-execution-table\] th:not\(:nth-child\(2\), :nth-child\(3\), \.count-cell\) \{ width: 1%; \}/);
   assert.match(wide, /\.time-cell \{ min-width: 0; max-width: 11\.5rem; \}/);
   assert.match(wide, /\[data-history-table\] col:is\(:nth-child\(1\), :nth-child\(6\)\) \{ width: auto; \}/);
   assert.doesNotMatch(wide, /executables|children/);
@@ -264,4 +264,23 @@ test('B1/B2/B6 CSS keeps detail times intact, gates sticky headers by fit, and s
   assert.match(css, /\[data-sticky-table\]\[data-fits\] thead th \{[^}]*top: var\(--sd-list-toolbar-height,[^}]*background: var\(--sd-subtle\)/);
   assert.match(css, /\.filter-meta \{[^}]*flex: 1; justify-content: end;/);
   assert.doesNotMatch(css, /\.filter-meta \{[^}]*flex-basis: 100%/);
+});
+
+test('Overview sorts in run column order and History has a separate trailing Status header', () => {
+  const template = name => readFileSync(new URL(`../../dashboard/templates/app/${name}.html`, import.meta.url), 'utf8');
+  const overview = template('index').match(/<table data-execution-table>[\s\S]*?<thead>([\s\S]*?)<\/thead>/)[1];
+  assert.deepEqual([...overview.matchAll(/\('([a-z_]+)','([^']+)'\)/g)].map(match => match.slice(1)), [
+    ['execution_id', 'ID'], ['project_name', 'Project'], ['package_name', 'Entry package'],
+    ['created_at', 'Created'], ['started_at', 'Started'], ['duration_seconds', 'Duration'],
+    ['warning_count', 'Warn'], ['error_count', 'Err'], ['status', 'Status'],
+  ]);
+  assert.match(overview, /key in \('warning_count', 'error_count'\) %\} class="number-cell count-cell"/);
+  assert.match(overview, /<th scope="col" aria-sort="none"[^\n]+<button type="button" data-sort="\{\{ key \}\}" disabled>/);
+  assert.match(css, /\.count-cell \{ width: (\d+(?:\.\d+)?rem); min-width: \1; max-width: \1;/);
+  assert.match(css, /tr:is\(\[data-status="4"\], \[data-status="6"\]\) > td:first-child/);
+  const history = template('history-panel');
+  assert.deepEqual([...history.matchAll(/<th scope="col"[^>]*>(?:<button[^>]*>)?([A-Za-z]+)/g)].map(match => match[1]),
+    ['Execution', 'Created', 'Started', 'Ended', 'Duration', 'Estimate', 'Status']);
+  assert.match(history, /<colgroup>(<col>){7}<\/colgroup>/);
+  assert.match(history, /<td colspan="7">/);
 });

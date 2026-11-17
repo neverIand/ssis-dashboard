@@ -158,8 +158,8 @@
                 <table data-execution-table>
                     <caption class="visually-hidden">Executions in the selected creation window</caption>
                     <thead><tr>
-                        {% for key, label in [('execution_id','ID'),('project_name','Project'),('package_name','Entry package'),('status','Status'),('created_at','Created'),('started_at','Started'),('duration_seconds','Duration'),('warning_count','Warn'),('error_count','Err')] %}
-                        <th scope="col" aria-sort="none"{% if loop.index > 6 %} class="number-cell"{% endif %}>{% if key == 'project_name' %}Folder / {% endif %}<button type="button" data-sort="{{ key }}" disabled>{{ label }}</button></th>
+                        {% for key, label in [('execution_id','ID'),('project_name','Project'),('package_name','Entry package'),('created_at','Created'),('started_at','Started'),('duration_seconds','Duration'),('warning_count','Warn'),('error_count','Err'),('status','Status')] %}
+                        <th scope="col" aria-sort="none"{% if key in ('warning_count', 'error_count') %} class="number-cell count-cell"{% elif key == 'duration_seconds' %} class="number-cell"{% endif %}>{% if key == 'project_name' %}Folder / {% endif %}<button type="button" data-sort="{{ key }}" disabled>{{ label }}</button></th>
                         {% endfor %}
                     </tr></thead>
                     <tbody><tr><td class="empty-state" colspan="9">No data loaded.</td></tr></tbody>

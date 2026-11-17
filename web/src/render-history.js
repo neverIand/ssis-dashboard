@@ -10,7 +10,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
   notLoaded = 'No history loaded.', rememberChart = false }) {
   const view = mountSectionTable(root, { metadata, actions, restoreView }, {
     resource: 'history',
-    columns: 6,
+    columns: 7,
     identity: 'execution_id',
     focusMode: 'removed',
     controlNames: [
@@ -60,7 +60,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
     choices.set(input.value, input);
     controls[`status-${input.value}`] = input;
   }
-  function time(node, value, created = null) {
+  function time(node, value, created = null, exactTitle = true) {
     const key = `${value ?? ''}/${created ?? ''}`;
     if (node.getAttribute('data-time') === key) return;
     node.setAttribute('data-time', key);
@@ -69,7 +69,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
       const full = display.timestamp(value), sameDay = created !== null && full.slice(0, 10) === display.timestamp(created).slice(0, 10);
       const stamp = element('time', sameDay ? full.slice(11) : full);
       stamp.setAttribute('datetime', value);
-      stamp.title = value;
+      if (exactTitle) stamp.title = value;
       node.replaceChildren(stamp);
     }
   }
@@ -78,13 +78,13 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
     if (!row) {
       const node = element('tr');
       node.dataset.historyId = id;
-      const cells = Array.from({ length: 6 }, () => element('td'));
+      const cells = Array.from({ length: 7 }, () => element('td'));
       const link = element('a', id), badge = element('span', undefined, 'status-badge');
       link.href = navigation.historySelection ? historyExecutionHref(id, navigation.historySelection, navigation)
         : executionHref(id, navigation.selection, navigation);
       node.dataset.current = String(id === executionId);
       if (id === executionId) link.setAttribute('aria-current', 'page');
-      cells[0].append(link, document.createTextNode(' '), badge);
+      cells[0].append(link);
       if (id === executionId) cells[0].append(element('span', ' · current', 'current-execution'));
       if (showIdentity) {
         const identity = element('span', `${item.folder_name} / ${item.project_name} / ${item.package_name}`, 'history-identity');
@@ -100,6 +100,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
       const estimate = element('span'), end = element('span'), samples = element('span');
       const deviation = element('span', undefined, 'deviation');
       cells[5].append(estimate, end, samples, deviation);
+      cells[6].append(badge);
       node.append(...cells);
       row = { node, link, badge, times, duration, elapsed, estimate, end, samples, deviation };
       rows.set(id, row);
@@ -111,8 +112,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
     text(row.duration, display.duration(item.duration_seconds));
     row.elapsed.hidden = item.ended_at !== null || item.elapsed_seconds === null;
     text(row.elapsed, row.elapsed.hidden ? '' : ` · elapsed ${display.duration(item.elapsed_seconds)}`);
-    row.duration.parentElement.title = row.elapsed.hidden ? ''
-      : `Running for ${display.duration(item.elapsed_seconds)} as of the last update`;
+    row.duration.parentElement.title = row.elapsed.hidden ? '' : 'Elapsed at last update';
     // Running rows need the expected end; ended rows need how far the actual run was from the estimate.
     const ended = item.ended_at !== null;
     const change = ended && item.estimate !== null && item.duration_seconds !== null && item.estimate.duration_seconds > 0
@@ -122,20 +122,18 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
     row.samples.hidden = item.estimate === null;
     row.end.hidden = item.estimate === null || ended;
     if (ended) { row.end.replaceChildren(); row.end.removeAttribute('data-time'); }
-    else time(row.end, item.estimate?.ended_at ?? null, item.created_at);
+    else time(row.end, item.estimate?.ended_at ?? null, item.created_at, false);
     text(row.samples, item.estimate === null ? '' : ` · avg of ${display.count(item.estimate.sample_count)}`);
     const rounded = change === null ? null : Math.round(change);
     text(row.deviation, rounded === null ? '' : ` · ${rounded > 0 ? '+' : rounded < 0 ? '−' : ''}${Math.abs(rounded)}%`);
     row.deviation.hidden = rounded === null;
     // Only a much slower run is flagged; a short failed run is not "better", so nothing is coloured for faster runs.
     row.deviation.dataset.level = rounded !== null && rounded >= 50 ? 'warning' : 'quiet';
-    row.deviation.title = rounded === null ? '' : `Actual ${display.duration(item.duration_seconds)} is ${
-      rounded === 0 ? 'the same as' : `${Math.abs(rounded)}% ${rounded > 0 ? 'longer' : 'shorter'} than`} the estimate`;
-    row.estimate.parentElement.title = item.estimate === null ? 'Estimate unavailable'
-      : `Estimated duration: ${display.duration(item.estimate.duration_seconds)}`
-        + ` · Estimated end: ${display.timestamp(item.estimate.ended_at)}`
-        + ` · Mean of ${display.count(item.estimate.sample_count)} prior successful runs`
-      + (rounded === null ? '' : ` · Actual vs estimate: ${row.deviation.textContent.slice(3)}`);
+    const estimateCell = row.estimate.parentElement;
+    const estimatedEnd = item.estimate && display.timestamp(item.estimate.ended_at);
+    if (estimatedEnd && (ended || row.end.textContent !== estimatedEnd)) {
+      estimateCell.setAttribute('title', `Estimated end ${estimatedEnd}`);
+    } else estimateCell.removeAttribute('title');
     return row;
   }
   const restoreChoices = () => {

@@ -88,10 +88,10 @@ test('shared status preserves error request IDs, stale wording, observation titl
   run.view.render(state([{ id: '1' }], { stale: true,
     error: { message: 'Unavailable.', requestId: 'req-1' } }), false, true);
   assert.equal(status.textContent, 'Unavailable. Request ID: req-1 Previous row page shown. Page 1 · 1 rows');
-  assert.match(status.title, /^Unavailable\. Request ID: req-1 Previous row page shown\. Page 1 · 1 rows · Observed /);
-  assert.ok(status.title.endsWith(wireTime));
+  assert.equal(status.title, 'Observed 2026-10-17 17:00:00 · Unavailable. Request ID: req-1');
   run.view.render(state([], { page: null, phase: 'loading' }), true, true);
   assert.equal(status.textContent, 'Loading rows…');
+  assert.equal(status.title, '');
   assert.equal(run.eventBody.firstChild.firstChild.colSpan, 3);
   assert.equal(run.eventBody.textContent, 'Loading rows…');
   run.view.render(state([], { pageNumber: 2 }), false, true);

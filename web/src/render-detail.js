@@ -1,4 +1,4 @@
-import { createDisplay, refreshStatus } from './display.js';
+import { createDisplay, observationTitle, refreshStatus } from './display.js';
 import { transient } from './api.js';
 import { createDetailLoader, detailFields } from './detail.js';
 import { readOverviewReturn, readDetailFragment, detailFragment } from './detail-navigation.js';
@@ -98,7 +98,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   const eventView = mountEvents(root, { metadata, restoreView: returning?.eventView,
     actions: { ...actionsFor('events'), apply: query => { void loader.section('events').applyEvents(query); } } });
   const parameterView = mountParameters(root, { metadata, restoreView: returning?.parameterView,
-    actions: actionsFor('parameters') });
+    actions: { ...actionsFor('parameters'), scope: scope => { void loader.section('parameters').applyScope(scope); } } });
   const overrideView = mountOverrides(root, { metadata, restoreView: returning?.overrideView,
     actions: actionsFor('overrides') });
   const historyView = mountHistory(root, { metadata, executionId, restoreView: returning?.historyView,
@@ -172,14 +172,14 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     refresh.setAttribute('aria-disabled', String(state.busy));
     autoPaused = state.poll.paused;
     pollingButton(toggle, autoPaused, state.terminal);
-    const observed = state.response
-      ? `Observed ${display.timestamp(state.response.meta.generated_at)} · ${state.response.meta.generated_at}` : '';
+    const generatedAt = state.response?.meta.generated_at;
+    const observed = observationTitle(display, generatedAt);
     const error = state.error ? `${state.error.message}${state.error.requestId ? ` · Request ID: ${state.error.requestId}` : ''}` : '';
-    const [refreshText, refreshDetail] = refreshStatus(display, state.response?.meta.generated_at, state.poll, state.terminal);
+    const [refreshText, refreshDetail] = refreshStatus(display, generatedAt, state.poll, state.terminal);
     const pageStatus = state.phase === 'error' ? [state.response ? '⚠ Refresh failed'
       : `⚠ Execution unavailable · ${state.error.message}`, refreshText].filter(Boolean).join(' · ')
       : state.response ? refreshText : 'Loading execution…';
-    inlineStatus(pollStatus, pageStatus, [observed, error, refreshDetail,
+    inlineStatus(pollStatus, pageStatus, [refreshDetail, observed, error,
       state.stale ? 'Previous observation shown.' : ''].filter(Boolean).join(' · '));
     if (!state.response) clear();
     else if (state.response !== rendered) {

@@ -40,7 +40,7 @@ test('detail observations use the execution date while history keeps creation an
     const status = dom.get(`${section}-status`);
     assert.match(status.textContent, /^Page 1 ·/);
     assert.doesNotMatch(status.textContent, /Observed|Live results|Updated/);
-    assert.ok(status.title.includes(wireTime));
+    assert.equal(status.title, 'Observed 2026-10-17 17:00:00');
     if (section === 'executables') {
       exact(stamp(dom.body.children[0].children[2]), wireTime, '17:00:00.123');
       exact(stamp(dom.body.children[1].children[2]), tomorrow, '2026-10-18 17:00:00.987');
@@ -65,7 +65,11 @@ test('detail observations use the execution date while history keeps creation an
   // Ended rows compare with the estimate instead of repeating its end time (UX batch B2, H3).
   assert.equal(dom.historyBody.children[0].children[5].children[1].hidden, true);
   assert.equal(dom.historyBody.children[0].children[5].children[1].textContent, '');
-  exact(dom.historyBody.children[2].children[5].children[1].firstChild, wireTime, '17:00:00');
+  const runningEstimate = dom.historyBody.children[2].children[5], estimatedEnd = runningEstimate.children[1].firstChild;
+  assert.equal(estimatedEnd.getAttribute('datetime'), wireTime);
+  assert.equal(estimatedEnd.textContent, '17:00:00');
+  assert.equal(estimatedEnd.getAttribute('title'), null);
+  assert.equal(runningEstimate.getAttribute('title'), 'Estimated end 2026-10-17 17:00:00');
   dom.get('detail-refresh').dispatchEvent(new Event('click')); await settle();
   assert.equal(calls.length, 7, 'Refresh reads base detail and the active history tab only');
 });

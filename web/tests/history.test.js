@@ -135,11 +135,35 @@ test('history generation, deadlines and disposal reject late responses after A t
 test('history UI keeps actual and estimated timing separate, preserves lexical identity and links only valid selection',async t=>{
   const rows=[historyRow('3',{status:{code:2,name:'running'},ended_at:null,duration_seconds:null,estimate:estimate()}),historyRow('2'),historyRow('1',{estimate:estimate({sample_count:1,duration_seconds:10,ended_at:'2026-10-17T16:00:10.1234567Z'})})];
   const dom=screen(t,async(resource,options)=>resource==='history'?historyPage(rows):response(resource,options));await flush();click(dom,'history-toggle');await flush();
-  const first=dom.historyBody.children[0];assert.equal(first.children.length,6);assert.match(first.children[4].textContent,/— · elapsed/);
+  const first=dom.historyBody.children[0];assert.equal(first.children.length,7);assert.match(first.children[4].textContent,/— · elapsed/);
   assert.equal(first.children[3].textContent,'—');assert.match(first.children[5].textContent,/ends .* · avg of 5$/);
   assert.equal(first.children[5].children[1].children[0].getAttribute('datetime'),wireTime);assert.equal(first.children[0].children[0].href,'/ops/app/executions/3');
   assert.equal(dom.historyBody.children[1].children[5].children[0].textContent,'Unavailable');assert.equal(dom.get('history-custom').getAttribute('aria-pressed'),'false');
   assert.match(dom.get('history-status').textContent,/3 executions on this page/);
+});
+
+test('history estimate titles contain the additional estimated end and disappear when it is visible or unavailable', async t => {
+  const end = '2026-10-17T16:00:07.0000000Z', nextDay = '2026-10-18T16:00:07.0000000Z';
+  const live = { status: { code: 2, name: 'running' }, ended_at: null, duration_seconds: null, elapsed_seconds: 65 };
+  const rows = [
+    historyRow('4', { duration_seconds: 65, estimate: estimate({ duration_seconds: 65 / 9.25, ended_at: end }) }),
+    historyRow('3', { ...live, estimate: estimate({ duration_seconds: 80, ended_at: end }) }),
+    historyRow('2', { ...live, estimate: estimate({ duration_seconds: 86407, ended_at: nextDay }) }),
+    historyRow('1'),
+  ];
+  const dom = screen(t, async resource => resource === 'history' ? historyPage(rows) : response(resource));
+  await flush(); click(dom, 'history-toggle'); await flush();
+  const [ended, running, crossDay, unavailable] = dom.historyBody.children.map(row => row.children[5]);
+  assert.equal(ended.textContent, '7 s · avg of 5 · +825%');
+  assert.equal(ended.getAttribute('title'), 'Estimated end 2026-10-17 17:00:07');
+  assert.equal(ended.children.at(-1).getAttribute('title'), null);
+  assert.equal(ended.children.at(-1).title, undefined);
+  assert.equal(running.getAttribute('title'), 'Estimated end 2026-10-17 17:00:07');
+  assert.equal(dom.historyBody.children[1].children[4].title, 'Elapsed at last update');
+  assert.match(crossDay.textContent, /ends 2026-10-18 17:00:07/);
+  assert.equal(crossDay.getAttribute('title'), null);
+  assert.equal(unavailable.children[0].textContent, 'Unavailable');
+  assert.equal(unavailable.getAttribute('title'), null);
 });
 
 test('history status drafts survive order changes and refresh; Apply validates nonempty scope without inheriting dates',async t=>{
@@ -154,6 +178,7 @@ test('live estimate loss clears previous estimate text while keyed link focus, d
   let changed=false;const dom=screen(t,async(resource,options)=>resource==='history'?historyPage([historyRow('1',{estimate:changed?null:estimate()})]):response(resource,options));
   await flush();click(dom,'history-toggle');await flush();const row=dom.historyBody.children[0],link=row.children[0].children[0];dom.get('history-scroll').scrollLeft=120;
   changed=true;click(dom,'detail-refresh');link.focus();await flush();assert.equal(dom.historyBody.children[0],row);assert.equal(dom.document.activeElement,link);
+  assert.equal(row.children[5].getAttribute('title'), null);
   assert.equal(dom.get('history-scroll').scrollLeft,120);assert.doesNotMatch(row.children[5].textContent,/Mean of|Estimated duration/);assert.equal(row.children[5].children[1].textContent,'');assert.equal(row.children[5].children[1].hidden,true);
   const checkpoint=dom.mounted.checkpoint();assert.doesNotMatch(JSON.stringify(checkpoint),/Main\.dtsx|Folder|estimate|duration_seconds/);dom.mounted.dispose();
   const restored=screen(t,undefined,{restoreView:checkpoint});await flush();assert.equal(restored.calls.at(-1).resource,'history');assert.equal(restored.document.activeElement,restored.historyBody.children[0].children[0].children[0]);

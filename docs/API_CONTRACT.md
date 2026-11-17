@@ -42,7 +42,7 @@ Folder/project/environment names allow 128 UTF-16 units and packages 260. OpenAP
 | `/executions/{id}/executables` | `limit,cursor,sort,direction`; default started time/ascending |
 | `/executions/{id}/children` | `limit,cursor,sort,direction`; default started time/ascending |
 | `/executions/{id}/events` | `limit,cursor,sort,direction,kind,q`; default message time/ascending, kind all |
-| `/executions/{id}/values` | `section=parameters|overrides` (default parameters), `limit,cursor`; parameters fixed `object_type,execution_parameter_id` ascending, overrides fixed `property_id` ascending |
+| `/executions/{id}/values` | `section=parameters|overrides` (default parameters), `limit,cursor`, optional `scope=project|package|system` for parameters only. Omit scope for all parameter types. Parameters sort by `object_type,execution_parameter_id`, overrides by `property_id`, both ascending. |
 | `/history` | Required `folder,project,package`; optional `match,status,limit,cursor,sort,direction`; exact by default, explicit `match=like` accepts SQL LIKE patterns; default statuses 2/7 and execution ID/descending; no overview dates |
 | `/server` | No query parameters; one read of the legacy display label (`@@SERVERNAME`, or `DEMO` for its SQL Azure edition branch), driver login/query caps at five seconds. No login/service/connection/credential fields; metadata remains database-free. |
 
@@ -78,7 +78,7 @@ All sorts are global, with unique ID tie-breakers in the selected direction. NUL
 | Children | `started_at,observation_id` |
 | Events | `message_time,event_id` |
 | History | `execution_id` |
-| Values | Parameters: fixed `object_type` then `execution_parameter_id` (`meta.sort=object_type`); overrides: fixed `property_id`; ascending only |
+| Values | Parameters use fixed `object_type` then `execution_parameter_id` (`meta.sort=object_type`) and bind the selected scope into the cursor. Overrides use fixed `property_id`. Both sort ascending. |
 
 Ordinary execution keys select the bounded page before counts/logging enrichment. The four calculated sorts require global keys before paging; duration sorts by actual end−start, never elapsed time. Exact raw keys retain 100-ns ordering and avoid whole-duration nanosecond overflow. Materialized/output limits do not imply bounded source reads.
 
@@ -107,6 +107,8 @@ Events and children cannot page records without public numeric IDs. Report `has_
 Event messages preserve NULL, empty and HTML-like text. SQL projects a bounded 32,770 UTF-16-unit prefix with a safe surrogate edge; serialization emits at most 16,384 Unicode characters and marks `truncated` from actual character count. Full-message search/heuristics include suffixes beyond this display cap. Oversized metadata fails safely; no partial path identity is returned. Unknown SMALLINT message/source codes and nullable source types are retained.
 
 Value sections have separate ID upper-bound fences, queries and cursors. Parameters order by numeric `object_type` then `execution_parameter_id`, both ascending: 20 project, 30 package, 50 execution/system; unknown codes sort numerically. `meta.sort=object_type` denotes this pair. The bounded keys are selected before value conversion; the fence remains `execution_parameter_id <= upper_id`, even across scope boundaries. Parameter cursor keys are `[last_type, last_id]` (a strict smallint JSON integer and a positive BIGINT decimal string), with two false NULL flags and the section order bound into the selection; old ID-only parameter cursors are invalid and the browser resets once to page one. Parameters retain the catalog `parameter_data_type` label and explicit flags. Overrides retain ascending `property_id` order, property path and sensitivity. Missing required ID/sensitivity columns are unsupported compatibility, not permission to invent identities. Cursor state contains only numeric codes/IDs, never names/paths/values. Policy changes invalidate old cursors.
+
+Parameter scope accepts the exact tokens `project`, `package` and `system`. Omitting `scope` includes all types, including unknown codes. Unsupported tokens or any scope with `section=overrides` return 400 `invalid_input`. A continuation must use the same scope as page one. Scope filters the bounded keys under the existing section-wide fence. A visible execution with no matches returns an empty page with the usual metadata.
 
 Return a display-safe string/NULL rather than arbitrary sql_variant JSON. Parameters use precision-preserving float/real conversion, hexadecimal binary, style 126 date/time/decimal conversion, and decimal integer/bit strings. Preserve unknown type labels and decimal scale. Override text uses the same bounded Unicode prefix/wire cap as events. Metadata widths remain 128 UTF-16 units for names/types and 4000 for property paths. Sensitive/policy masking precedes conversion and is independently enforced by the serializer; invalid flags/required metadata fail closed.
 

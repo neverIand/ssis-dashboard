@@ -43,7 +43,7 @@ test('O2/O9: overview rows expose status for the failed-row marker and render br
   const packageLink = dom.body.children[0].children[2].firstChild;
   assert.equal(packageLink.textContent, 'Load_Fact.dtsx');
   assert.ok(packageLink.children.some(child => child.tag === 'wbr'));
-  const created = dom.body.children[0].children[4].firstChild;
+  const created = dom.body.children[0].children[3].firstChild;
   assert.equal(created.tag, 'time');
   assert.deepEqual(created.children.map(child => child.tag), ['span', '#text', 'span'], 'date and time wrap as whole parts');
   assert.equal(created.textContent.split(' ').length, 2);

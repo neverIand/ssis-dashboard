@@ -556,16 +556,17 @@ tbody tr:hover { background: var(--sd-subtle); }
 [data-overrides-table] col:nth-child(3) { width: 14%; }
 [data-history-table] { min-width: 72rem; table-layout: auto; }
 [data-history-table] col:nth-child(1) { width: 17%; }
-[data-history-table] col:nth-child(2) { width: 19%; }
+[data-history-table] col:nth-child(2) { width: 17%; }
 [data-history-table] col:nth-child(3), [data-history-table] col:nth-child(4) { width: 12%; }
 [data-history-table] col:nth-child(5) { width: 10%; }
-[data-history-table] col:nth-child(6) { width: 30%; }
+[data-history-table] col:nth-child(6) { width: 20%; }
+[data-history-table] col:nth-child(7) { width: 12%; }
 [data-history-table] th, [data-history-table] td { white-space: nowrap; }
 [data-history-table] .status-badge { font-size: 0.8rem; }
 .history-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.2rem 1rem; margin: 0.4rem 0; }
-.history-presets { gap: 0.3rem; }
-.history-presets button { padding-inline: 0.5rem; }
-.history-presets [aria-pressed="true"], [data-history-chart-toggle][aria-expanded="true"], [data-timeline-toggle][aria-expanded="true"] { background: var(--sd-action-soft); border-color: var(--sd-action); color: var(--sd-action); }
+.filter-presets { gap: 0.3rem; }
+.filter-presets button { padding-inline: 0.5rem; }
+.filter-presets [aria-pressed="true"], [data-history-chart-toggle][aria-expanded="true"], [data-timeline-toggle][aria-expanded="true"] { background: var(--sd-action-soft); border-color: var(--sd-action); color: var(--sd-action); }
 .history-status-popover { width: 26.6667rem; }
 .history-status-popover form { max-height: min(24rem, 60vh); overflow: auto; }
 [data-history-table] tr[data-current="true"] { background: var(--sd-action-soft); }
@@ -624,6 +625,8 @@ tbody tr:hover { background: var(--sd-subtle); }
 .result-badge[data-result="0"] { background: var(--sd-success-soft); color: var(--sd-success); }
 .result-badge[data-result="1"] { background: var(--sd-error-soft); color: var(--sd-error); }
 .result-badge[data-result="3"] { background: var(--sd-warning-soft); color: var(--sd-warning); }
+/* The badge starts at the same line-box edge and uses the cell's line height. */
+td > :is(.status-badge, .result-badge) { vertical-align: top; line-height: 1lh; padding-block: 0; }
 
 .empty-state {
   padding: 0.8rem 0.6rem;
@@ -692,17 +695,18 @@ tbody tr:hover { background: var(--sd-subtle); }
 [data-execution-table] td { font-size: 0.9333rem; line-height: 1.4; }
 [data-execution-table] .cell-detail { font-size: 0.8rem; line-height: 1.25; }
 [data-execution-table] .time-cell { white-space: nowrap; }
+[data-execution-table] .count-cell { width: 4.4rem; min-width: 4.4rem; max-width: 4.4rem; overflow-wrap: anywhere; }
 @media (min-width: 66.67rem) {
   /* Auto-width name/estimate columns absorb the spare space; other columns keep their content width. */
-  [data-execution-table] th:not(:nth-child(2), :nth-child(3)) { width: 1%; }
+  [data-execution-table] th:not(:nth-child(2), :nth-child(3), .count-cell) { width: 1%; }
   [data-execution-table] .time-cell { min-width: 0; max-width: 11.5rem; }
-  [data-execution-table] td.number-cell, [data-history-table] td:nth-child(5) { white-space: nowrap; }
+  [data-execution-table] td.number-cell:not(.count-cell), [data-history-table] td:nth-child(5) { white-space: nowrap; }
   [data-history-table] col:is(:nth-child(1), :nth-child(6)) { width: auto; }
-  [data-history-table] col:is(:nth-child(2), :nth-child(3), :nth-child(4), :nth-child(5)) { width: 1%; }
+  [data-history-table] col:not(:nth-child(1), :nth-child(6)) { width: 1%; }
   [data-history-table] :is(th, td):is(:nth-child(2), :nth-child(3), :nth-child(4)) { max-width: 11.5rem; }
 }
 @media (max-width: 66.6667rem) {
-  /* Keep Status/Duration/Warn/Err in view near 768-1000 px: dates wrap above times. */
+  /* Dates wrap above times so the fixed counts and final Status column can fit. */
   [data-execution-table] { min-width: 44rem; }
   [data-execution-table] .time-cell { min-width: 5.6rem; white-space: normal; }
   [data-execution-table] .time-cell span { white-space: nowrap; }
@@ -722,7 +726,7 @@ tbody tr:hover { background: var(--sd-subtle); }
   .table-toolbar > .toolbar-meta { flex-basis: 100%; }
   .toolbar-filters { flex-wrap: wrap; }
   .toolbar-filters > label { max-width: 100%; }
-  .history-presets, [data-history-presets] { flex-wrap: wrap; }
+  [data-history-presets] { flex-wrap: wrap; }
   .timeline-choice { max-width: 100%; }
   /* The table scrolls on phones anyway; give names room to wrap at separators. */
   [data-execution-table] .name-cell { min-width: 10rem; }
@@ -735,7 +739,6 @@ tbody tr:hover { background: var(--sd-subtle); }
 /* Connection context reads as one labelled group, separate from the navigation links. */
 .header-meta { display: flex; align-items: center; gap: 0.5rem; min-width: 0; padding: 0.1rem 0.5rem; border: 1px solid var(--sd-border); border-radius: 4px; color: var(--sd-secondary); font-size: 0.8667rem; }
 .header-meta:not(:has(> p:not([hidden]))) { display: none; }
-.server-label::before { content: "SQL "; color: var(--sd-secondary); }
 .header-meta .server-label { color: var(--sd-text); }
 /* History: deviation from the estimate, chart scope and mixed-package note. */
 .deviation[data-level="warning"] { color: var(--sd-warning); font-weight: 600; }

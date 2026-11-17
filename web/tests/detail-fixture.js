@@ -97,6 +97,11 @@ export function detailDOM() {
   }
   get('events-panel').append(get('events-filters'));
   get('events-filters').append(...['kind','q','apply','reset'].map(key => get(`events-${key}`)));
+  for (const scope of ['all', 'project', 'package', 'system']) {
+    const button = new Node(document, 'button');
+    nodes.set(`[data-parameters-scope-${scope}]`, button);
+    get('parameters-toolbar').append(button);
+  }
   get('history-panel').append(get('history-presets'),get('history-custom'),get('history-status-options'));
   get('history-status-options').append(get('history-close'),get('history-filters'));
   installPopover(get('history-status-options'), get('history-custom'), () => get('history-choices').firstChild?.firstChild);

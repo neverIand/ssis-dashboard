@@ -48,19 +48,19 @@ test('C4: running rows compare elapsed with the typical duration, flag an overru
     api: { get: async resource => resource === 'executions' ? page(rows) : summary() } });
   t.after(() => view.dispose());
   await view.apply(defaultSelection(settings));
-  const detail = index => dom.body.children[index].children[6].children.at(-1);
+  const detail = index => dom.body.children[index].children[5].children.at(-1);
   assert.equal(detail(0).textContent, nb('Elapsed: 10 min 00 s · typical 25 min 00 s'));
   assert.equal(detail(0).dataset.estimate, 'within');
   assert.equal(detail(0).title, 'Typical: mean of 5 earlier successful runs · expected end 2026-10-17 17:25:00');
   assert.equal(detail(1).dataset.estimate, 'over');
   assert.equal(detail(2).textContent, nb('Elapsed: 10 min 00 s'));
   assert.equal(detail(2).dataset.estimate, undefined);
-  for (const index of [0, 1, 2]) assert.doesNotMatch(dom.body.children[index].children[6].textContent, /%/);
+  for (const index of [0, 1, 2]) assert.doesNotMatch(dom.body.children[index].children[5].textContent, /%/);
   // A refresh that changes only the estimate redraws the cell; an ended row shows its duration without a comparison.
   rows = [item('3', { estimate: estimate({ duration_seconds: 300 }) }), item('2', { status: { code: 7, name: 'succeeded' },
     ended_at: wireTime, duration_seconds: 1800, elapsed_seconds: 1800, estimate: null }), item('1', { estimate: null })];
   await view.apply(defaultSelection(settings), { restore: true });
   assert.equal(detail(0).textContent, nb('Elapsed: 10 min 00 s · typical 5 min 00 s'));
   assert.equal(detail(0).dataset.estimate, 'over');
-  assert.equal(dom.body.children[1].children[6].textContent, '30 min 00 s');
+  assert.equal(dom.body.children[1].children[5].textContent, '30 min 00 s');
 });

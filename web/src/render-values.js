@@ -1,6 +1,7 @@
 import { formatBoolean, formatCode, formatId } from './display.js';
 import { clippedText } from './observation-page.js';
 import { mountSectionTable } from './section-table.js';
+import { parameterScopes } from './values.js';
 
 const typeFamilies = {
   String: 'text', Byte: 'integer', SByte: 'integer', Int16: 'integer', Int32: 'integer', Int64: 'integer',
@@ -28,6 +29,14 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
     focusFallback: ['valueFocus', 'pathFocus', 'flagFocus']
   });
   const { get, rows, element, text, display } = view;
+  const presets = parameter ? [undefined, ...parameterScopes].map(scope => {
+    const key = `scope-${scope ?? 'all'}`, button = get(key);
+    view.controls[key] = button;
+    view.listen(button, 'click', () => {
+      if (!view.panel.hidden && view.state?.open && scope !== view.state.query.scope) actions.scope(scope);
+    });
+    return { scope, button };
+  }) : [];
   const flags = [
     ['sensitive', 'Sensitive'],
     ['required', 'Required'],
@@ -133,7 +142,15 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
     loading: `Loading ${resource}…`,
     notLoaded: `No ${resource} loaded.`,
     previousPage: `Previous ${parameter ? 'parameter' : 'override'} page shown.`,
-    emptyMessage: (page, number) => number > 1 ? `No ${resource} remain on this page. Use Previous or First page.` : `No ${resource}.`,
+    disabled: presets.map(({ button }) => button),
+    filters(state) {
+      for (const { scope, button } of presets) button.setAttribute('aria-pressed', String(scope === state.query.scope));
+    },
+    emptyMessage(_page, number) {
+      const scope = view.state.query.scope;
+      const label = scope === undefined ? resource : `${scope} parameters`;
+      return number > 1 ? `No ${label} remain on this page. Use Previous or First page.` : `No ${label}.`;
+    },
     availability() {
       if (!parameter) get('policy').hidden = !enabled || metadata.capabilities.override_values;
     },

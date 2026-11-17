@@ -126,9 +126,8 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       if (!record) {
         const row = element('tr');
         row.dataset.executionId = item.execution_id;
-        const cells = Array.from({ length: 9 }, (_, index) => element('td', undefined,
-          index === 0 ? 'id-cell' : index === 1 ? 'name-cell' : index === 2 ? 'name-cell package-cell'
-            : [4, 5].includes(index) ? 'time-cell' : index >= 6 ? 'number-cell' : ''));
+        const cells = ['id-cell', 'name-cell', 'name-cell package-cell', 'time-cell', 'time-cell', 'number-cell',
+          'number-cell count-cell', 'number-cell count-cell', ''].map(className => element('td', undefined, className));
         const link = element('a', formatId(item.execution_id));
         link.dataset.executionLink = ''; link.dataset.executionId = item.execution_id;
         cells[0].append(link);
@@ -140,8 +139,8 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
         // K2: same destination as the ID link, so one Tab stop per row is enough; pointer users keep it.
         packageLink.tabIndex = -1;
         cells[2].append(packageLink);
-        cells[3].append(element('span', undefined, 'status-badge'));
-        for (const index of [7, 8]) {
+        cells[8].append(element('span', undefined, 'status-badge'));
+        for (const index of [6, 7]) {
           const count = element('a');
           count.dataset.executionLink = ''; count.dataset.executionId = item.execution_id;
           cells[index].append(count);
@@ -154,27 +153,28 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
         rows.set(item.execution_id, record);
       }
       const { row, cells, item: previous } = record;
+      const [id, folderProject, entryPackage, created, started, duration, warnings, errors, status] = cells;
       const changed = refreshed && (!previous || previous.status?.code !== item.status?.code);
       if (changed) row.dataset.changed = String(changeMark); else delete row.dataset.changed;
       const href = executionHref(item.execution_id, selection, { appBase, origin: window.location.origin, metadata });
-      if (cells[0].firstChild.getAttribute('href') !== href) cells[0].firstChild.setAttribute('href', href);
-      if (cells[2].firstChild.getAttribute('href') !== href) cells[2].firstChild.setAttribute('href', href);
+      if (id.firstChild.getAttribute('href') !== href) id.firstChild.setAttribute('href', href);
+      if (entryPackage.firstChild.getAttribute('href') !== href) entryPackage.firstChild.setAttribute('href', href);
       const text = (node, value) => { if (node.textContent !== value) node.textContent = value; };
-      breakableText(cells[1].children[0], item.folder_name);
-      breakableText(cells[1].children[1], item.project_name);
-      breakableText(cells[2].firstChild, item.package_name);
-      linkSelection(cells[1].children[0], selection, { folder: item.folder_name, project: null });
-      linkSelection(cells[1].children[1], selection, { folder: item.folder_name, project: item.project_name });
-      text(cells[3].firstChild, formatCode(item.status));
-      row.dataset.status = cells[3].firstChild.dataset.status = String(item.status?.code ?? '');
-      for (const [index, key] of [[4, 'created_at'], [5, 'started_at']]) {
+      breakableText(folderProject.children[0], item.folder_name);
+      breakableText(folderProject.children[1], item.project_name);
+      breakableText(entryPackage.firstChild, item.package_name);
+      linkSelection(folderProject.children[0], selection, { folder: item.folder_name, project: null });
+      linkSelection(folderProject.children[1], selection, { folder: item.folder_name, project: item.project_name });
+      text(status.firstChild, formatCode(item.status));
+      row.dataset.status = status.firstChild.dataset.status = String(item.status?.code ?? '');
+      for (const [cell, key] of [[created, 'created_at'], [started, 'started_at']]) {
         if (previous?.[key] !== item[key] || previous?.created_at !== item.created_at) {
-          cells[index].replaceChildren(time(item[key], key === 'started_at' ? item.created_at : null));
+          cell.replaceChildren(time(item[key], key === 'started_at' ? item.created_at : null));
         }
       }
       if (!previous || ['duration_seconds', 'elapsed_seconds', 'ended_at'].some((key) => previous[key] !== item[key])
           || JSON.stringify(previous.estimate) !== JSON.stringify(item.estimate)) {
-        cells[6].replaceChildren(document.createTextNode(display.duration(item.duration_seconds)));
+        duration.replaceChildren(document.createTextNode(display.duration(item.duration_seconds)));
         if (item.ended_at === null && item.elapsed_seconds !== null) {
           // UX batch C4: elapsed beside the typical duration of earlier successful runs, never a percentage.
           // No-break spaces keep each part whole, so a narrow column wraps only between them.
@@ -187,11 +187,11 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
             detail.title = `Typical: mean of ${display.count(estimate.sample_count)} earlier successful runs`
               + ` · expected end ${display.timestamp(estimate.ended_at)}`;
           }
-          cells[6].append(detail);
+          duration.append(detail);
         }
       }
-      for (const [index, kind, count] of [[7, 'warnings', item.warning_count], [8, 'errors', item.error_count]]) {
-        const link = cells[index].firstChild;
+      for (const [cell, kind, count] of [[warnings, 'warnings', item.warning_count], [errors, 'errors', item.error_count]]) {
+        const link = cell.firstChild;
         text(link, display.count(count));
         const target = executionHref(item.execution_id, selection,
           { appBase, origin: window.location.origin, metadata,
@@ -199,8 +199,8 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
         if (link.getAttribute('href') !== target) link.setAttribute('href', target);
         link.setAttribute('aria-label', `${display.count(count)} ${kind} for execution ${item.execution_id}`);
       }
-      cells[7].dataset.level = item.warning_count > 0 ? 'warning' : 'quiet';
-      cells[8].dataset.level = item.error_count > 0 ? 'error' : 'quiet';
+      warnings.dataset.level = item.warning_count > 0 ? 'warning' : 'quiet';
+      errors.dataset.level = item.error_count > 0 ? 'error' : 'quiet';
       record.item = item;
       if (row !== cursor) body.insertBefore(row, cursor);
       cursor = row.nextSibling;
@@ -256,25 +256,25 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     }
     const pageDetails = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} rows` : '';
     const error = ['list-error', 'summary-error'].includes(state.phase) ? failure(state.error) : '';
-    const errorDetails = error ? [error, state.pageStale ? 'Previous results shown.' : '',
-      state.summaryStale ? 'Previous counts shown.' : ''].filter(Boolean).join(' ') : '';
-    listStatus.title = page ? `Observed ${display.timestamp(page.meta.generated_at)} · ${page.meta.generated_at}` : '';
+    const previousResults = error && state.pageStale ? 'Previous results shown.' : '';
+    const previousCounts = state.summaryStale ? 'Previous counts shown.' : '';
+    const pageTime = page ? display.timestamp(page.meta.generated_at) : '';
+    const observed = pageTime ? `Observed ${pageTime}` : '';
+    listStatus.title = [observed, error, previousCounts].filter(Boolean).join(' · ');
     listStatus.textContent = error
-      ? [errorDetails, pageDetails].filter(Boolean).join(' ')
+      ? [error, previousResults, previousCounts, pageDetails].filter(Boolean).join(' ')
       : state.pageStale ? `Refreshing… Previous results shown. ${pageDetails}`
       : state.phase === 'loading-list' ? 'Loading executions…' : pageDetails || 'No selection';
-    listStatus.title = [listStatus.textContent, listStatus.title].filter(Boolean).join(' · ');
     const stale = state.pageStale || state.summaryStale;
     const observation = state.phase === 'summary-error' && state.summary ? state.summary : page;
     const [refreshText, refreshDetail] = refreshStatus(display, observation?.meta.generated_at, state.poll);
     const message = error ? [stale ? '⚠ Refresh failed'
       : `⚠ ${state.phase === 'summary-error' ? 'Summary' : 'Executions'} unavailable`, refreshText].filter(Boolean).join(' · ')
       : page ? refreshText : state.selection ? 'Loading executions…' : 'No selection';
-    inlineStatus(pollStatus, message, [errorDetails, stale ? 'Previous counts shown.' : '', refreshDetail,
-      page ? `Observed ${display.timestamp(page.meta.generated_at)} · ${page.meta.generated_at}` : '',
-      state.summaryStale && state.summary
-        ? `Counts observed ${display.timestamp(state.summary.meta.generated_at)} · ${state.summary.meta.generated_at}` : ''
-    ].filter(Boolean).join(' · '));
+    const countsTime = state.summaryStale && state.summary ? display.timestamp(state.summary.meta.generated_at) : '';
+    inlineStatus(pollStatus, message, [refreshDetail, observed,
+      countsTime && countsTime !== pageTime ? `Counts observed ${countsTime}` : '',
+      error, previousResults, stale ? 'Previous counts shown.' : ''].filter(Boolean).join(' · '));
     tipWindow.textContent = page
       ? ` Window: ${display.timestamp(page.meta.from)} → ${display.timestamp(page.meta.to)} (end exclusive).` : '';
     const counts = state.summary ? Object.fromEntries(state.summary.data.by_status.map((item) => [item.code, item.count])) : null;

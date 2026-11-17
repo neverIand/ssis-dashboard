@@ -1,6 +1,6 @@
                 <div id="package-history" data-history-panel hidden>
                     <div class="table-toolbar">
-                        <div class="toolbar-filters history-presets" role="group" aria-label="History status presets"><span>Status</span><span data-history-presets></span><button type="button" data-history-custom aria-haspopup="dialog" popovertarget="history-status-picker">Custom…</button>{{ tip('history-scope-tip', 'About package history', 'All creation dates for the selected package scope. The status presets filter the executions shown.') }}</div>
+                        <div class="toolbar-filters filter-presets" role="group" aria-label="History status presets"><span>Status</span><span data-history-presets></span><button type="button" data-history-custom aria-haspopup="dialog" popovertarget="history-status-picker">Custom…</button>{{ tip('history-scope-tip', 'About package history', 'All creation dates for the selected package scope. The status presets filter the executions shown.') }}</div>
                         <div class="toolbar-meta"><span class="inline-notice" data-history-notice role="status"></span><p class="inline-status" data-history-status role="status"></p><button type="button" class="button-quiet" data-history-retry hidden>Retry</button></div>
                         <button type="button" data-history-chart-toggle disabled aria-expanded="false" aria-controls="history-duration-chart">Chart</button>
                         {{ pager('history', 'History') }}
@@ -24,9 +24,9 @@
                     <div class="table-scroll" data-history-scroll role="region" aria-label="Package history table" tabindex="0">
                         <table class="detail-table" data-history-table>
                             <caption class="visually-hidden">Executions in the selected history scope</caption>
-                            <colgroup><col><col><col><col><col><col></colgroup>
-                            <thead><tr><th scope="col" aria-sort="none"><button type="button" data-history-header-execution_id>Execution</button></th><th scope="col">Created</th><th scope="col">Started</th><th scope="col">Ended</th><th scope="col">Duration</th><th scope="col">Estimate {{ tip('estimate-tip', 'About estimates', 'Estimates are not actual timings. Mean of up to five prior visible successful runs. Unavailable without a start or usable samples, for a zero mean, or when the estimated end is out of range. Visibility and retention can change estimates. "avg of N" is the sample count. Ended rows compare the actual duration with the estimate.') }}</th></tr></thead>
-                            <tbody><tr><td colspan="6">Open this section to load package history.</td></tr></tbody>
+                            <colgroup><col><col><col><col><col><col><col></colgroup>
+                            <thead><tr><th scope="col" aria-sort="none"><button type="button" data-history-header-execution_id>Execution</button></th><th scope="col">Created</th><th scope="col">Started</th><th scope="col">Ended</th><th scope="col">Duration</th><th scope="col">Estimate {{ tip('estimate-tip', 'About estimates', 'Estimates are not actual timings. Mean of up to five prior visible successful runs. Unavailable without a start or usable samples, for a zero mean, or when the estimated end is out of range. Visibility and retention can change estimates. "avg of N" is the sample count. Ended rows compare the actual duration with the estimate.') }}</th><th scope="col">Status</th></tr></thead>
+                            <tbody><tr><td colspan="7">Open this section to load package history.</td></tr></tbody>
                         </table>
                     </div>
                 </div>

@@ -10,8 +10,9 @@ from dashboard.timestamps import parse_timestamp, utc_now
 from dashboard.validation import InvalidInput
 
 
-QUERY_PARAMETERS = ('limit', 'cursor', 'section')
+QUERY_PARAMETERS = ('limit', 'cursor', 'section', 'scope')
 SECTIONS = {'parameters': 'execution_parameter_id', 'overrides': 'property_id'}
+PARAMETER_SCOPES = {name: code for code, name in wire.PARAMETER_OBJECT_TYPES.items()}
 
 
 def _display(row, *, permitted):
@@ -49,15 +50,21 @@ def _serialize(row, section, upper, config):
 
 def value_page(value, values, config):
     now = utc_now()
+    section = values.get('section', 'parameters')
+    parameter_scope = values.get('scope')
+    if 'scope' in values and (section != 'parameters' or parameter_scope not in PARAMETER_SCOPES):
+        raise InvalidInput('Unsupported parameter scope.')
+    object_type = PARAMETER_SCOPES.get(parameter_scope)
     try:
         identifier = inputs.identifier(value)
-        section = values.get('section', 'parameters')
         if section not in SECTIONS:
             raise InvalidInput('Unsupported value section.')
         limit = inputs.integer(values['limit']) if 'limit' in values else 50
         bound_selection = {'execution_id': value, 'section': section, 'limit': limit}
         if section == 'parameters':
             bound_selection['order'] = ['object_type', 'execution_parameter_id']
+            if parameter_scope is not None:
+                bound_selection['scope'] = parameter_scope
         selection = cursors.digest(bound_selection)
         scope = cursors.scope_digest(config)
         state = None
@@ -72,7 +79,8 @@ def value_page(value, values, config):
                 raise cursors.InvalidCursor()
             if section == 'parameters':
                 last_type = key[0]
-                if type(last_type) is not int or not -32768 <= last_type <= 32767:
+                if (type(last_type) is not int or not -32768 <= last_type <= 32767
+                        or object_type is not None and last_type != object_type):
                     raise cursors.InvalidCursor()
     except cursors.InvalidCursor:
         raise
@@ -101,7 +109,7 @@ def value_page(value, values, config):
     if upper is not None:
         parameters = (identifier, limit + 1, upper)
         if section == 'parameters':
-            parameters += (last_type, last)
+            parameters += (last_type, last, object_type)
         if section == 'overrides':
             parameters += (last, int(config['API_OVERRIDE_VALUES_ENABLED']))
         rows = query('api-values-' + section + '-page.sql', parameters)
@@ -113,6 +121,8 @@ def value_page(value, values, config):
             if len(rows) != 1 or rows[0][identity] is not None:
                 raise ValueError('Unexpected empty values page.')
             rows = []
+    if object_type is not None and any(row['object_type'] != object_type for row in rows):
+        raise ValueError('Unexpected parameter scope.')
     serialized = [_serialize(row, section, upper, config) for row in rows]
     if len({row[identity] for row in serialized}) != len(serialized):
         raise ValueError('Duplicate value ID.')

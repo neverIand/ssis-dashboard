@@ -147,7 +147,14 @@ export function mountServerLabel(node, api) {
   const timer = setTimeout(() => { controller.abort(); unavailable(); }, 10000);
   void api.get('server', { signal: controller.signal }).then(({ data }) => {
     if (typeof data.server_name !== 'string' || !data.server_name || data.server_name.length > 128) throw new TypeError();
-    if (!disposed && !controller.signal.aborted) node.textContent = node.title = data.server_name;
+    if (!disposed && !controller.signal.aborted) {
+      node.textContent = node.title = data.server_name;
+      node.setAttribute('aria-label', `SQL Server ${data.server_name}`);
+    }
   }).catch(unavailable).finally(() => clearTimeout(timer));
-  return () => { disposed = true; controller.abort(); clearTimeout(timer); node.textContent = node.title = ''; node.hidden = true; };
+  return () => {
+    disposed = true; controller.abort(); clearTimeout(timer);
+    node.textContent = node.title = ''; node.hidden = true;
+    node.removeAttribute('aria-label');
+  };
 }

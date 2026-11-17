@@ -93,7 +93,8 @@ export function filtersDOM(metadata, search = '') {
   for (const key of ['sort', 'direction', 'limit']) add(`[data-order="${key}"]`, 'select', root);
   add('[data-order-notice]', 'p', root);
   add('[data-order-label]', 'p', root);
-  const headers = ['execution_id', 'project_name', 'package_name', 'status', 'created_at', 'started_at', 'duration_seconds', 'warning_count', 'error_count'].map(key => {
+  const headers = ['execution_id', 'project_name', 'package_name', 'created_at', 'started_at', 'duration_seconds',
+    'warning_count', 'error_count', 'status'].map(key => {
     const button = add(`[data-sort="${key}"]`, 'button', root); button.dataset.sort = key;
     button.parentElement = new Control(document, 'th'); return button;
   });

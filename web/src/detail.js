@@ -91,9 +91,9 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     let section = initialSection(key);
     const saved = { executables: restoreExecutables, children: restoreChildren, events: restoreEvents,
       parameters: restoreParameters, overrides: restoreOverrides, history: restoreHistory }[key];
-    if (saved?.open && allowed(key)) {
+    if (saved && allowed(key) && (saved.open || key === 'parameters')) {
       try {
-        section = { ...section, open: true, query: definitions[key].query(saved.query, metadata) };
+        section = { ...section, open: saved.open === true, query: definitions[key].query(saved.query, metadata) };
         if (saved.path) paths[key] = { ...saved.path, entries: [...saved.path.entries] };
       } catch { section = initialSection(key); paths[key] = emptyPath(); }
     }
@@ -270,22 +270,22 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     paths[key] = emptyPath();
     return sectionAction(key, { index: 0, keep: false });
   }
-  function applyEvents(changes) {
-    if (disposed || !allowed('events') || !state.response || !state.events.open) return;
-    const query = eventQuery({ ...state.events.query, ...changes }, metadata);
-    if (active && (active.section === 'events' || active.queue.has('events')) && paths.events.index === 0
-        && Object.keys(query).every(key => query[key] === state.events.query[key])) return;
+  function applySection(key, changes) {
+    if (disposed || !allowed(key) || !state.response || !state[key].open) return;
+    const previous = state[key].query, query = definitions[key].query({ ...previous, ...changes }, metadata);
+    if (active && (active.section === key || active.queue.has(key)) && paths[key].index === 0
+        && Object.keys({ ...previous, ...query }).every(name => query[name] === previous[name])) return;
     const needsBase = state.phase === 'error' || state.stale;
     let pending = [];
-    if (active?.section === 'events') {
+    if (active?.section === key) {
       pending = [...active.queue]; cancel();
       state = { ...state, phase: 'ready', sectionBusy: null };
     }
-    paths.events = emptyPath();
-    updateSection('events', { query, page: null, error: null, stale: false, notice: '', phase: 'loading' });
+    paths[key] = emptyPath();
+    updateSection(key, { query, page: null, error: null, stale: false, notice: '', phase: 'loading' });
     loop.reset(); emit({});
-    if (active) { active.queue.add('events'); return; }
-    return needsBase ? run() : run({ base: false, only: 'events', index: 0, keep: false, pending });
+    if (active) { active.queue.add(key); return; }
+    return needsBase ? run() : run({ base: false, only: key, index: 0, keep: false, pending });
   }
   function selectTab(target) {
     if (disposed || !tabAllowed(target.tab, metadata)) return;
@@ -294,7 +294,7 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     if (!state.response) { initialTab = target; return; }
     const key = target.tab;
     if (state[key].open && state.activeTab === key) {
-      return key === 'events' && target.kind !== undefined ? applyEvents({ kind: target.kind, q: null }) : undefined;
+      return key === 'events' && target.kind !== undefined ? applySection(key, { kind: target.kind, q: null }) : undefined;
     }
     const needsBase = state.phase === 'error' || state.stale;
     if (active?.section) {
@@ -323,7 +323,8 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
     select: () => toggleSection(key), order: changes => orderSection(key, changes),
     next: () => next(key), previous: () => previous(key), latest: () => latest(key),
     retry: () => retry(key), checkpoint: () => checkpoint(key),
-    ...(key === 'events' ? { applyEvents } : {}),
+    ...(key === 'events' ? { applyEvents: changes => applySection(key, changes) }
+      : key === 'parameters' ? { applyScope: scope => applySection(key, { scope }) } : {}),
   }]));
   return { load, refresh: load, selectTab,
     section(key) {

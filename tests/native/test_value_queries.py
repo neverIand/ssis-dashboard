@@ -59,10 +59,10 @@ WHERE execution_id = ? AND execution_parameter_id <= ?
 ORDER BY object_type, execution_parameter_id;
 """, (execution_id, upper))]
 
-    def page(self, execution_id, limit, upper, last=None):
+    def page(self, execution_id, limit, upper, last=None, *, object_type=None):
         last_type, last_id = last if last is not None else (None, None)
         rows = self.rows(load_query('api-values-parameters-page.sql'),
-                         (execution_id, limit + 1, upper, last_type, last_id))
+                         (execution_id, limit + 1, upper, last_type, last_id, object_type))
         self.assertLessEqual(len(rows), limit + 1)
         self.assertEqual({row['execution_id'] for row in rows}, {execution_id})
         if rows[0]['page_empty']:
@@ -71,7 +71,24 @@ ORDER BY object_type, execution_parameter_id;
             return []
         self.assertTrue(all(not row['page_empty'] for row in rows))
         self.assertTrue(all(row['value'] is None for row in rows if row['sensitive']))
+        if object_type is not None:
+            self.assertEqual({row['object_type'] for row in rows}, {object_type})
         return rows
+
+    def assert_walk(self, execution_id, limit, fence, rows, expected, later, *, object_type):
+        actual = []
+        for _ in range(len(expected) // limit + 2):
+            actual.extend((r['object_type'], r['execution_parameter_id']) for r in rows[:limit])
+            if len(rows) <= limit:
+                break
+            rows = self.page(execution_id, limit, fence, actual[-1], object_type=object_type)
+        else:
+            self.fail('Unbounded or non-progressing parameter cursor chain.')
+        self.assertEqual(actual, expected)
+        ids = [key[1] for key in actual]
+        self.assertEqual(len(set(ids)), len(expected))
+        self.assertTrue(set(ids).isdisjoint(later))
+        self.assertEqual(self.page(execution_id, limit, fence, actual[-1], object_type=object_type), [])
 
     def test_parameter_pages_group_interleaved_scopes_and_keep_id_fence(self):
         executions = self.rows("""
@@ -85,7 +102,7 @@ WHERE status IN (3, 4, 6, 7, 9) ORDER BY execution_id DESC;
             with self.subTest(limit=limit):
                 self.cursor.execute('SAVE TRANSACTION parameter_order;')
                 try:
-                    scopes = (20, 30, 20, 30, 20, 30, 50)
+                    scopes = (20, 30, 50) * 3
                     inserted = [(scope, self.insert_parameter(execution_id, scope)) for scope in scopes]
                     self.assertEqual([key[1] for key in inserted], sorted(key[1] for key in inserted))
                     self.assertNotEqual(inserted, sorted(inserted))
@@ -93,24 +110,14 @@ WHERE status IN (3, 4, 6, 7, 9) ORDER BY execution_id DESC;
                     self.assertEqual(fence, max(key[1] for key in baseline + inserted))
                     expected = sorted(baseline + inserted)
                     self.assertEqual(self.keys(execution_id, fence), expected)
-                    rows = self.page(execution_id, limit, fence)
+                    filters = (None, 20, 30, 50) if limit == 2 else (None,)
+                    first = {code: self.page(execution_id, limit, fence, object_type=code) for code in filters}
                     later = [self.insert_parameter(execution_id, scope) for scope in (20, 30, 50)]
                     self.assertTrue(all(identifier > fence for identifier in later))
-                    actual, last = [], None
-                    for _ in range(len(expected) // limit + 2):
-                        page = rows[:limit]
-                        actual.extend((row['object_type'], row['execution_parameter_id']) for row in page)
-                        if len(rows) <= limit:
-                            break
-                        last = actual[-1]
-                        rows = self.page(execution_id, limit, fence, last)
-                    else:
-                        self.fail('Unbounded or non-progressing parameter cursor chain.')
-                    self.assertEqual(actual, expected)
-                    ids = [key[1] for key in actual]
-                    self.assertEqual(len(set(ids)), len(expected))
-                    self.assertTrue(set(ids).isdisjoint(later))
-                    self.assertEqual(self.page(execution_id, limit, fence, actual[-1]), [])
+                    for code in filters:
+                        with self.subTest(object_type=code):
+                            wanted = [key for key in expected if code is None or key[0] == code]
+                            self.assert_walk(execution_id, limit, fence, first[code], wanted, later, object_type=code)
                 finally:
                     self.cursor.execute('ROLLBACK TRANSACTION parameter_order;')
                 self.assertEqual(self.keys(execution_id, 2**63 - 1), baseline)

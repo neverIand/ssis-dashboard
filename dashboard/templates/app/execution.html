@@ -114,8 +114,14 @@
             <section class="panel detail-panel observation-section" id="detail-panel-parameters" data-detail-tab-panel="parameters" role="tabpanel" aria-labelledby="detail-tab-parameters" tabindex="0" hidden>
                 <div id="execution-parameters" data-parameters-panel hidden>
                     <div class="table-toolbar">
+                        <div class="toolbar-filters filter-presets" role="group" aria-label="Parameter scope"><span>Scope</span>
+                            <button type="button" data-parameters-scope-all aria-pressed="true">All</button>
+                            <button type="button" data-parameters-scope-project aria-pressed="false">Project</button>
+                            <button type="button" data-parameters-scope-package aria-pressed="false">Package</button>
+                            <button type="button" data-parameters-scope-system aria-pressed="false">System</button>
+                        </div>
                         <div class="toolbar-meta"><span class="inline-notice" data-parameters-notice role="status"></span><p class="inline-status" data-parameters-status role="status"></p><button type="button" class="button-quiet" data-parameters-retry hidden>Retry</button></div>
-                        {{ tip('parameters-order-tip', 'About fixed order', 'Fixed order: Parameter ID, ascending.') }}
+                        {{ tip('parameters-order-tip', 'About fixed order', 'Fixed order: Scope code, then Parameter ID, both ascending.') }}
                         {{ pager('parameters', 'Parameter') }}
                     </div>
                     <div class="table-scroll" data-parameters-scroll role="region" aria-label="Parameters table" tabindex="0">

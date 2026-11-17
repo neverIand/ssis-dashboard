@@ -4,7 +4,7 @@ import { createHistoryLoader } from './history-loader.js';
 import { historyHref, historySelection, parseHistorySelection } from './history-navigation.js';
 import { defaultSelection } from './selection.js';
 import { inlineStatus, pollingButton } from './ui.js';
-import { createDisplay, refreshStatus } from './display.js';
+import { createDisplay, observationTitle, refreshStatus } from './display.js';
 const invalid = 'Invalid history filters. Review the selection and choose Load history.';
 const idleText = 'Enter a package name and choose Load history, or open History from an execution.';
 const modeNotes = {
@@ -69,7 +69,9 @@ export function mountHistoryScreen(root, saved = null) {
     const owner = createHistoryLoader({ api, metadata, selection, paused, visible: document.visibilityState !== 'hidden',
       publish(state) {
         view.render(state, state.busy, true);
-        inlineStatus(status, ...refreshStatus(display, state.page?.meta.generated_at, state.poll));
+        const generatedAt = state.page?.meta.generated_at;
+        const [text, mode] = refreshStatus(display, generatedAt, state.poll);
+        inlineStatus(status, text, [mode, observationTitle(display, generatedAt)].filter(Boolean).join(' · '));
         pollingButton(toggle, state.poll.paused);
         paused = state.poll.paused;
         refresh.setAttribute('aria-disabled', String(state.busy));

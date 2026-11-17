@@ -1,5 +1,6 @@
 SET NOCOUNT ON;
-DECLARE @execution_id bigint = ?, @take int = ?, @upper bigint = ?, @last_type smallint = ?, @last_id bigint = ?;
+DECLARE @execution_id bigint = ?, @take int = ?, @upper bigint = ?,
+        @last_type smallint = ?, @last_id bigint = ?, @object_type smallint = ?;
 
 IF NOT EXISTS (SELECT 1 FROM catalog.executions WHERE execution_id = @execution_id)
 BEGIN
@@ -11,6 +12,7 @@ DECLARE @value_page TABLE (execution_parameter_id bigint NOT NULL PRIMARY KEY);
 INSERT @value_page
 SELECT TOP (@take) execution_parameter_id FROM catalog.execution_parameter_values
 WHERE execution_id = @execution_id AND execution_parameter_id <= @upper
+  AND (@object_type IS NULL OR object_type = @object_type)
   AND (@last_type IS NULL OR object_type > @last_type
        OR (object_type = @last_type AND execution_parameter_id > @last_id))
 ORDER BY object_type ASC, execution_parameter_id ASC;

@@ -321,6 +321,7 @@ test('new numeric and time header sorts start descending; name and category sort
     header.click();
     assert.equal(dom.applied.at(-1).sort, key);
     assert.equal(dom.applied.at(-1).direction, direction, key);
+    assert.equal(header.parentElement.getAttribute('aria-sort'), direction === 'desc' ? 'descending' : 'ascending');
     header.click();
     assert.equal(dom.applied.at(-1).direction, direction === 'desc' ? 'asc' : 'desc', key);
   }

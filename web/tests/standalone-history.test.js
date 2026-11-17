@@ -202,8 +202,12 @@ test('standalone rows show their package identity and provide a validated page-o
     navigation: { ...navigation, historySelection: defaults() }, showIdentity: true });
   view.render({ open: true, phase: 'ready', page: page(defaults()), query: defaults(), pageNumber: 1,
     hasPrevious: false, hasNext: false, error: null, stale: false, notice: '' }, false, true);
-  assert.match(dom.historyBody.textContent, /Folder 影狼 \/ Project \/ Main.dtsx/);
-  const link = dom.historyBody.children[0].children[0].children[0];
+  const cells = dom.historyBody.firstChild.children;
+  assert.equal(cells.length, 7);
+  assert.equal(cells[0].children[1].textContent, 'Folder 影狼 / Project / Main.dtsx');
+  assert.equal(cells[6].firstChild.className, 'status-badge');
+  assert.equal(cells[6].textContent, 'Succeeded');
+  const link = cells[0].firstChild;
   assert.ok(readHistoryReturn(new URL(link.href, navigation.origin).search, navigation));
   view.dispose();
   assert.equal(dom.historyBody.children.length, 0);

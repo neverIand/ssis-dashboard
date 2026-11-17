@@ -66,12 +66,12 @@ test('G4: overview Started shows only its time on the Created date, keeping the 
   } } });
   t.after(view.dispose);
   await view.apply(validateSelection(defaultSelection(settings), settings));
-  const [first, second] = dom.body.children.map(row => row.children[5].firstChild);
+  const [first, second] = dom.body.children.map(row => row.children[4].firstChild);
   assert.equal(first.textContent, '11:00:34');
   assert.equal(first.title, sameDay.started_at);
   assert.equal(second.title, nextDay.started_at);
   assert.equal(second.textContent, '2026-10-18 00:00:30', 'a run that starts after midnight keeps its date');
-  assert.equal(dom.body.children[0].children[4].firstChild.textContent, '2026-10-17 11:00:00');
+  assert.equal(dom.body.children[0].children[3].firstChild.textContent, '2026-10-17 11:00:00');
 });
 
 test('D4: executable rows name their parent container, and the package only for child packages', async t => {

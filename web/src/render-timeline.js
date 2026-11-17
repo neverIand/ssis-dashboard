@@ -1,4 +1,4 @@
-import { createDisplay, formatCode } from './display.js';
+import { createDisplay, formatCode, observationTitle } from './display.js';
 import { hourBucketsFit, timelineSeries } from './timeline.js';
 import { chartAttribute as attribute, mountChartInteraction, renderChartAxes } from './chart-view.js';
 import { reserveLoadingSpace } from './loading-space.js';
@@ -40,9 +40,13 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
   };
   const shape = (tag) => document.createElementNS('http://www.w3.org/2000/svg', tag);
   const other = (item) => item.created_count - item.succeeded_count - item.failed_count;
-  const describe = row => `${row.label} · Created: ${display.count(row.item.created_count)}`
-    + ` · Succeeded: ${display.count(row.item.succeeded_count)} · Failed: ${display.count(row.item.failed_count)}`
-    + ` · Other: ${display.count(other(row.item))} · With an actual start: ${display.count(row.item.started_count)}`;
+  function describe({ label, item }) {
+    if (item.created_count === 0) return `${label} · none created`;
+    const counts = [[item.succeeded_count, 'succeeded'], [item.failed_count, 'failed'], [other(item), 'other'],
+      [item.created_count - item.started_count, 'not started']]
+      .filter(([count]) => count > 0).map(([count, name]) => `${display.count(count)} ${name}`);
+    return `${label} · ${display.count(item.created_count)} created: ${counts.join(', ')}`;
+  }
   values.open = restoreView?.tableOpen === true;
   function clear() {
     rows.clear();
@@ -106,14 +110,14 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
       })) attribute(row.zero, key, value);
       for (const [key, value] of Object.entries({ x: index * step, y: 0, width: step, height: 170 })) attribute(row.hit, key, value);
       text(row.title, describe(row));
-      attribute(row.group, 'aria-label', describe(row));
+      attribute(row.group, 'aria-label', row.title.textContent);
       index++;
     }
     renderChartAxes(xAxis, yAxis, order.map((start) => {
       const value = label(start);
       return {
         text: current.bucket === 'day' ? value.slice(0, 10) : `${value.slice(0, 10)}\n${value.slice(11, 16)}${value.slice(19)}`,
-        title: `${value} · ${start}`
+        title: value
       };
     }), maximum, (value) => display.count(value), { counts: true });
     get('scale').textContent = 'Created executions';
@@ -153,7 +157,6 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
       if (!row.item || row.item.end !== item.end) {
         row.label = `${label(item.start)} → ${label(item.end)}`;
         text(row.option, row.label);
-        row.option.title = `${item.start} → ${item.end}`;
         for (const [index, key] of [[0, 'start'], [1, 'end']]) {
           const time = element('time', label(item[key]));
           time.setAttribute('datetime', item[key]);
@@ -249,15 +252,16 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
         else clear();
         rendered = response;
       }
-      status.title = response ? `Observed ${display.timestamp(response.meta.generated_at)} · ${response.meta.generated_at}` : '';
+      const error = state.error;
+      const errorText = error ? `${error.message}${error.requestId ? ` Request ID: ${error.requestId}` : ''}`
+        + (error.status === 400 ? ' Choose Day or adjust the creation range.' : '') : '';
+      status.title = panel.hidden ? ''
+        : [observationTitle(display, response?.meta.generated_at), errorText].filter(Boolean).join(' · ');
       status.textContent = panel.hidden ? '' : state.error
-        ? `${state.error.message}${state.error.requestId ? ` Request ID: ${state.error.requestId}` : ''}`
-          + (state.error.status === 400 ? ' Choose Day or adjust the creation range.' : '')
-          + (state.stale ? ' Previous timeline shown.' : '')
+        ? errorText + (state.stale ? ' Previous timeline shown.' : '')
         : state.stale ? `${busy ? 'Refreshing… ' : ''}Previous timeline shown.`
           : response ? `${display.count(response.data.length)} calendar ${response.data.length === 1 ? 'bucket' : 'buckets'}`
             : 'Loading timeline…';
-      status.title = [status.textContent, status.title].filter(Boolean).join(' · ');
       scope.title = panel.hidden || !page ? ''
         : `Created ${display.timestamp(page.meta.from)} → ${display.timestamp(page.meta.to)} (exclusive)`;
       scope.textContent = panel.hidden ? '' : `Counts by creation time · ${selection.status.length

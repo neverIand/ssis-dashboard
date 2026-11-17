@@ -135,14 +135,13 @@ for (const count of [1, 2]) test(`history caps the centered bar projection for $
   assert.equal(dom.calls.length, 2);
 });
 
-test('normal detail status titles include the refresh text once through pause and resume', async t => {
+test('detail status titles include the refresh mode only when the visible status omits it', async t => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
   const dom = screen(t, { response: () => runningDetailResponse('17') }); await flush();
   for (const [index, mode] of ['on', 'paused', 'on'].entries()) {
     const status = dom.get('detail-poll-status');
     assert.equal(status.textContent, `Updated 17:00:00${mode === 'paused' ? ' · auto refresh paused' : ''}`);
-    assert.equal(status.title, `${status.textContent} · Observed 2026-10-17 17:00:00 · ${detailResponse().meta.generated_at}`
-      + (mode === 'on' ? ' · auto refresh on' : ''));
+    assert.equal(status.title, (mode === 'on' ? 'Auto refresh on · ' : '') + 'Observed 2026-10-17 17:00:00');
     if (index < 2) { click(dom.get('detail-poll-toggle')); t.mock.timers.tick(0); await flush(); }
   }
   assert.equal(dom.calls.length, 4);

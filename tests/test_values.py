@@ -53,9 +53,10 @@ class ValueTests(unittest.TestCase):
             return {'upper_id':max((r[identity] for r in source), default=None)}
         _, take, upper, *seek = parameters
         if section == 'parameters':
-            last_type, last = seek
+            last_type, last, object_type = seek
             key = lambda r: (r['object_type'], r[identity])
             selected = sorted((r for r in source if r[identity] <= upper
+                               and (object_type is None or r['object_type'] == object_type)
                                and (last_type is None or key(r) > (last_type, last))), key=key)[:take]
         else:
             last, _policy = seek
@@ -92,7 +93,7 @@ class ValueTests(unittest.TestCase):
         self.assertEqual((len(page['data']), page['meta']['section'], page['meta']['sort'], page['meta']['direction']),
                          (50, 'parameters', 'object_type', 'asc'))
         self.assertEqual((page['meta']['upper_id'], page['meta']['as_of']), ('251', NOW.isoformat()))
-        self.assertEqual(self.query.call_args.args, ('api-values-parameters-page.sql', (42, 51, 251, None, None)))
+        self.assertEqual(self.query.call_args.args, ('api-values-parameters-page.sql', (42, 51, 251, None, None, None)))
         self.assertFalse(self.app.config['API_EVENTS_ENABLED'])
         self.assertFalse(self.app.config['API_OVERRIDE_VALUES_ENABLED'])
         self.visible.assert_called_once_with('42', self.app.config, as_of=NOW)
@@ -139,13 +140,65 @@ class ValueTests(unittest.TestCase):
                 self.assertEqual(self.payload(first)['sort_key'], [code, '1'])
                 second = self.page({'limit': '1', 'cursor': first['meta']['next_cursor']})
                 self.assertEqual(second['data'][0]['execution_parameter_id'], '2')
-                self.assertEqual(self.query.call_args.args[1], (42, 2, 2, code, 1))
+                self.assertEqual(self.query.call_args.args[1], (42, 2, 2, code, 1, None))
+
+    def test_parameter_scope_filters_keys_and_keeps_the_section_wide_fence(self):
+        self.rows['parameters'] = [row(identifier=i, object_type=code)
+                                   for i, code in enumerate((30, 20, 50, 20, 30, 50, 32767), 1)]
+        self.assertEqual([r['object_type']['name'] for r in self.page()['data']],
+                         ['project', 'project', 'package', 'package', 'system', 'system', 'unknown'])
+        for scope, code, expected in (('project', 20, ['2', '4']), ('package', 30, ['1', '5']), ('system', 50, ['3', '6'])):
+            with self.subTest(scope=scope):
+                values = {'limit': '1', 'scope': scope}
+                first = self.page(values)
+                self.assertEqual(self.query.call_args.args[1], (42, 2, 7, None, None, code))
+                self.rows['parameters'].append(row(identifier=8, object_type=code))
+                second = self.page({**values, 'cursor': first['meta']['next_cursor']})
+                self.rows['parameters'].pop()
+                self.assertEqual(self.query.call_args.args[1], (42, 2, 7, code, int(expected[0]), code))
+                self.assertEqual([r['execution_parameter_id'] for r in first['data'] + second['data']], expected)
+                self.assertEqual(second['meta']['upper_id'], '7')
+                self.assertFalse(second['meta']['has_more'])
+
+    def test_empty_filtered_page_uses_the_existing_visible_empty_shape(self):
+        self.rows['parameters'] = [row(object_type=32767)]
+        page = self.page({'scope': 'system'})
+        self.assertEqual((page['data'], page['meta']['upper_id'], page['meta']['next_cursor']), ([], '1', None))
+        self.assertFalse(page['meta']['has_more'])
+
+    def test_parameter_cursor_cannot_move_between_scopes_or_all(self):
+        scopes = ({}, {'scope': 'project'}, {'scope': 'package'}, {'scope': 'system'})
+        self.rows['parameters'] = [row(identifier=i, object_type=code)
+                                   for i, code in enumerate((20, 30, 50) * 2, 1)]
+        for selected in scopes:
+            first = self.page({'limit': '1', **selected})
+            for target in scopes:
+                if target != selected:
+                    self.invalid_cursor({'limit': '1', **target, 'cursor': first['meta']['next_cursor']})
+            if selected:
+                state = {**self.payload(first), 'sort_key': [0, first['data'][0]['execution_parameter_id']]}
+                self.invalid_cursor({'limit': '1', **selected, 'cursor': cursors.seal(state)})
+
+    def test_invalid_parameter_scopes_have_the_safe_input_error_without_sql(self):
+        for values in ({'scope': scope} for scope in ('', 'all', 'system ', 'Project', '20', 'unknown')):
+            with self.subTest(values=values):
+                response = self.get(values)
+                self.assertEqual((response.status_code, response.json['code']), (400, 'invalid_input'))
+                self.contract.validator('Problem').validate(response.json)
+        for values in ({'section': 'overrides', 'scope': 'project'}, {'scope': 'unknown', 'cursor': 'invalid'},
+                       [('scope', 'project'), ('scope', 'system')]):
+            response = self.get(values)
+            self.assertEqual((response.status_code, response.json['code']), (400, 'invalid_input'))
+        self.visible.assert_not_called()
+        self.query.assert_not_called()
 
     def test_old_parameter_cursor_shape_and_old_order_binding_are_rejected(self):
         payload = self.payload(self.page({'limit': '1'}))
+        selection = {'execution_id': '42', 'section': 'parameters', 'limit': 1}
+        self.assertEqual(payload['selection'], cursors.digest({**selection, 'order': ['object_type', 'execution_parameter_id']}))
         old_key = {**payload, 'sort_key': ['1'], 'sort_nulls': [False]}
         self.invalid_cursor({'limit': '1', 'cursor': cursors.seal(old_key)})
-        old_selection = cursors.digest({'execution_id': '42', 'section': 'parameters', 'limit': 1})
+        old_selection = cursors.digest(selection)
         for state in (payload, old_key):
             self.invalid_cursor({'limit': '1', 'cursor': cursors.seal({**state, 'selection': old_selection})})
 
@@ -341,7 +394,7 @@ class ValueTests(unittest.TestCase):
         from dashboard.inspection import visible_execution
         self.visible.side_effect = visible_execution
         self.query.side_effect = execute_query
-        for section in SECTIONS:
+        for section, scope in (('parameters', None), ('parameters', 'package'), ('overrides', None)):
             records = [execution(42, logging_rows=1), {'upper_id':1}, row(section)]
             connections, cursors_used = [], []
             for record in records:
@@ -352,7 +405,7 @@ class ValueTests(unittest.TestCase):
                 connections.append(ConnectionFixture(cursor, []))
                 cursors_used.append(cursor)
             self.connect.side_effect = connections
-            self.page({'section':section})
+            self.page({'section': section, **({'scope': scope} if scope else {})})
             for connection, cursor in zip(connections, cursors_used):
                 sql, parameters = cursor.execute.call_args.args
                 self.assertEqual(sql.count('?'), len(parameters))
@@ -360,7 +413,9 @@ class ValueTests(unittest.TestCase):
                 connection.add_output_converter.assert_called_once()
                 cursor.close.assert_called_once()
                 connection.close.assert_called_once()
-            expected = (42, 51, 1, pyodbc.BinaryNull)+( (0,) if section=='overrides' else (pyodbc.BinaryNull,) )
+            seek = (pyodbc.BinaryNull, 0) if section == 'overrides' else (
+                pyodbc.BinaryNull, pyodbc.BinaryNull, 30 if scope else pyodbc.BinaryNull)
+            expected = (42, 51, 1, *seek)
             self.assertEqual(cursors_used[-1].execute.call_args.args[1], expected)
 
     def test_database_failures_preserve_safe_status_and_short_circuit(self):
