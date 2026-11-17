@@ -95,6 +95,10 @@ export function createDisplay({ timeZone } = {}) {
   };
 }
 
+export function errorLabel(error, separator = ' ') {
+  return error ? `${error.message}${error.requestId ? `${separator}Request ID: ${error.requestId}` : ''}` : '';
+}
+
 export function observationTitle(display, generatedAt) {
   return generatedAt ? `Observed ${display.timestamp(generatedAt)}` : '';
 }

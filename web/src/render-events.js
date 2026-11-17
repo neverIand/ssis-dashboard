@@ -120,7 +120,6 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
       node.append(...cells);
       row = {
         node,
-        cells,
         time,
         name,
         source,

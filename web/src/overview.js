@@ -72,7 +72,7 @@ export function readExecutionPage(response, selection, metadata, display) {
       requiredCount(row.error_count, display);
       if ((row.started_at === null && (row.duration_seconds !== null || row.elapsed_seconds !== null))
           || (row.ended_at === null && row.duration_seconds !== null)) throw new TypeError();
-      // The API estimates only a started row that has not ended (UX batch C4; NULL when the capability is off).
+      // The API estimates only a started row that has not ended (NULL when the capability is off).
       if (row.estimate === undefined || (row.estimate !== null && row.ended_at !== null)) throw new TypeError();
       if (row.estimate !== null) readEstimate(row.estimate, row.started_at, display);
     }
@@ -104,10 +104,10 @@ export function readSummary(response, page, metadata, display) {
   } catch { throw badResponse(response); }
 }
 
-export function createOverview({ api, metadata, publish, timeoutMs = 30000, locale, retainedPaths = [],
+export function createOverview({ api, metadata, publish, timeoutMs = 30000, retainedPaths = [],
   autoRefresh = true, visible = true, pollIntervalMs = 30000, maxPollIntervalMs = 300000, restoreTimeline = null,
   serverTime = null, monotonicNow }) {
-  const display = createDisplay({ timeZone: metadata.display_timezone, locale });
+  const display = createDisplay({ timeZone: metadata.display_timezone });
   const clock = createServerClock(serverTime, monotonicNow);
   let state = { phase: 'idle', selection: null, page: null, summary: null, error: null, notice: '',
     operation: null, pageStale: false, summaryStale: false, timeline: {open:restoreTimeline?.open === true,

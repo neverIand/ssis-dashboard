@@ -84,7 +84,7 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
       text(record.sourceType, item.source_type === null ? '—' : String(item.source_type));
     } else {
       text(record.cells[0], formatId(item.statistics_id));
-      // D4: one secondary line naming where the step runs (its parent container), and the package only for
+      // One secondary line naming where the step runs (its parent container), and the package only for
       // a child package. IDs and full paths stay in Paths.
       const segments = (item.execution_path ?? '').split('\\').filter(Boolean);
       const parent = segments.length > 1 ? segments.at(-2) : '';

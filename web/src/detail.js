@@ -59,14 +59,14 @@ export function readExecutionDetail(response, executionId, display) {
   } catch { throw new ApiError('invalid_response', { requestId: response?.meta?.request_id }); }
 }
 
-export function createDetailLoader({ api, executionId, metadata, publish, timeoutMs = 30000, locale,
+export function createDetailLoader({ api, executionId, metadata, publish, timeoutMs = 30000,
   autoRefresh = true, visible = true, pollIntervalMs = 30000, maxPollIntervalMs = 300000,
   restoreExecutables = null, restoreChildren = null, restoreEvents = null,
   restoreParameters = null, restoreOverrides = null, restoreHistory = null,
   initialTab = null }) {
   if (executionId === null) throw new TypeError('Missing execution ID.');
   formatId(executionId);
-  const display = createDisplay({ timeZone: metadata.display_timezone, locale });
+  const display = createDisplay({ timeZone: metadata.display_timezone });
   const definitions = {
     executables: { query: executableQuery, read: readExecutablePage, label: 'executable' },
     children: { query: childQuery, read: readChildPage, label: 'child' },
@@ -144,7 +144,7 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
         definition.global ? definition.resource : `executions/${state.executionId}/${definition.resource ?? key}`,
         { ...query, ...(definition.global ? historyIdentity(state.response.data) : {}), ...(cursor === null ? {} : { cursor }) });
       if (disposed || current !== generation) return;
-      const page = definition.read(response, state.executionId, query, metadata, display, state.response.data);
+      const page = definition.read(response, state.executionId, query, metadata, display);
       if (cursor !== null && (page.meta.as_of !== path.cohort?.as_of || page.meta.upper_id !== path.cohort?.upper_id)) {
         throw new ApiError('invalid_response', { requestId: page.meta.request_id });
       }

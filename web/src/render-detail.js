@@ -1,4 +1,4 @@
-import { createDisplay, observationTitle, refreshStatus } from './display.js';
+import { createDisplay, errorLabel, observationTitle, refreshStatus } from './display.js';
 import { transient } from './api.js';
 import { createDetailLoader, detailFields } from './detail.js';
 import { readOverviewReturn, readDetailFragment, detailFragment } from './detail-navigation.js';
@@ -59,7 +59,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   const countLinks = [...root.querySelectorAll('[data-event-count-link]')];
   const countLabels = Object.fromEntries(['errors', 'warnings'].map(key =>
     [key, root.querySelector(`[data-event-count-label="${key}"]`)]));
-  // Without the events capability, counts open the legacy event lists (L06) by an explicit click only.
+  // Without the events capability, counts open the legacy event lists by an explicit click only.
   const legacyBase = root.querySelector('[data-legacy-detail-link]')?.getAttribute('href') ?? null;
   const legacyErrors = root.querySelector('[data-legacy-errors]');
   const firstError = root.querySelector('[data-first-error]');
@@ -127,7 +127,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     hideEarliestError();
     if (legacyErrors) { legacyErrors.hidden = true; legacyErrors.removeAttribute('href'); }
   };
-  // Hidden is not enough after denial or clearing: remove the text and link as well (D06).
+  // Hidden is not enough after denial or clearing: remove the text and link as well.
   function hideEarliestError() {
     earliestError = earliestSource = null;
     if (!firstError) return;
@@ -174,7 +174,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     pollingButton(toggle, autoPaused, state.terminal);
     const generatedAt = state.response?.meta.generated_at;
     const observed = observationTitle(display, generatedAt);
-    const error = state.error ? `${state.error.message}${state.error.requestId ? ` · Request ID: ${state.error.requestId}` : ''}` : '';
+    const error = errorLabel(state.error, ' · ');
     const [refreshText, refreshDetail] = refreshStatus(display, generatedAt, state.poll, state.terminal);
     const pageStatus = state.phase === 'error' ? [state.response ? '⚠ Refresh failed'
       : `⚠ Execution unavailable · ${state.error.message}`, refreshText].filter(Boolean).join(' · ')
@@ -208,10 +208,10 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
       }
       for (const node of Object.values(breadcrumb)) node.parentElement.hidden = false;
       badge.hidden = titleId.hidden = false;
-      // G2: tabs name the package, run and status, and follow status changes on refresh.
+      // Tabs name the package, run and status, and follow status changes on refresh.
       document.title = `${data.package_name} #${executionId} · ${values.status} · SSIS Dashboard`;
       elapsed.hidden = data.started_at === null || data.ended_at !== null;
-      // C3: the typical duration and expected end of an active run; never a completion percentage.
+      // The typical duration and expected end of an active run; never a completion percentage.
       estimate.hidden = elapsed.hidden || data.estimate === null;
       content.hidden = false;
     }

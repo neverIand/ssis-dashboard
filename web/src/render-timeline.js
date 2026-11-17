@@ -1,4 +1,4 @@
-import { createDisplay, formatCode, observationTitle } from './display.js';
+import { createDisplay, errorLabel, formatCode, observationTitle } from './display.js';
 import { hourBucketsFit, timelineSeries } from './timeline.js';
 import { chartAttribute as attribute, mountChartInteraction, renderChartAxes } from './chart-view.js';
 import { reserveLoadingSpace } from './loading-space.js';
@@ -253,8 +253,7 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
         rendered = response;
       }
       const error = state.error;
-      const errorText = error ? `${error.message}${error.requestId ? ` Request ID: ${error.requestId}` : ''}`
-        + (error.status === 400 ? ' Choose Day or adjust the creation range.' : '') : '';
+      const errorText = errorLabel(error) + (error?.status === 400 ? ' Choose Day or adjust the creation range.' : '');
       status.title = panel.hidden ? ''
         : [observationTitle(display, response?.meta.generated_at), errorText].filter(Boolean).join(' · ');
       status.textContent = panel.hidden ? '' : state.error

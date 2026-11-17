@@ -1,4 +1,4 @@
-import { createDisplay, formatCode, formatId, refreshStatus } from './display.js';
+import { createDisplay, errorLabel, formatCode, formatId, refreshStatus } from './display.js';
 import { executionHref } from './detail-navigation.js';
 import { createOverview } from './overview.js';
 import { selectionParams, selectionSearch } from './selection.js';
@@ -44,7 +44,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   const timelineView=mountTimeline(root,{metadata,restoreView:restoreView?.timeline,
     actions:{toggle:()=>{void owner.toggleTimeline();},retry:()=>{void owner.retryTimeline();},
       bucket:value=>{void owner.setTimelineBucket(value);},
-      // O6: a bucket becomes an explicit custom Created range through the normal selection path.
+      // A bucket becomes an explicit custom Created range through the normal selection path.
       drill:range=>{if(!appliedSelection)return;
         const fromTimeline=root.querySelector('[data-timeline-panel]')?.contains(document.activeElement);
         onSelect({created:null,from:range.from,to:range.to});if(fromTimeline)scroll.focus({preventScroll:true});}}});
@@ -70,7 +70,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     if (value === null) return document.createTextNode('—');
     // Date and time wrap as whole parts in narrow columns, never inside the date.
     const node = element('time');
-    // G4: Started repeats Created's date almost always; show only its time then. The full value stays in title.
+    // Started repeats Created's date almost always; show only its time then. The full value stays in title.
     const full = display.timestamp(value);
     const shown = created !== null && full.slice(0, 10) === display.timestamp(created).slice(0, 10) ? full.slice(11) : full;
     for (const [index, part] of shown.split(' ').entries()) {
@@ -117,7 +117,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     }
     if (!rows.size) body.replaceChildren();
     const wanted = new Set();
-    // O10: on a refresh of the same page, briefly mark rows that are new or changed status.
+    // On a refresh of the same page, briefly mark rows that are new or changed status.
     changeMark = 1 - changeMark;
     let cursor = body.firstChild;
     for (const item of page.data) {
@@ -136,7 +136,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
         cells[1].append(folder, project);
         const packageLink = element('a');
         packageLink.dataset.executionLink = ''; packageLink.dataset.executionId = item.execution_id;
-        // K2: same destination as the ID link, so one Tab stop per row is enough; pointer users keep it.
+        // Same destination as the ID link, so one Tab stop per row is enough; pointer users keep it.
         packageLink.tabIndex = -1;
         cells[2].append(packageLink);
         cells[8].append(element('span', undefined, 'status-badge'));
@@ -176,7 +176,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
           || JSON.stringify(previous.estimate) !== JSON.stringify(item.estimate)) {
         duration.replaceChildren(document.createTextNode(display.duration(item.duration_seconds)));
         if (item.ended_at === null && item.elapsed_seconds !== null) {
-          // UX batch C4: elapsed beside the typical duration of earlier successful runs, never a percentage.
+          // Elapsed beside the typical duration of earlier successful runs, never a percentage.
           // No-break spaces keep each part whole, so a narrow column wraps only between them.
           const estimate = item.estimate, whole = part => part.replaceAll(' ', '\u00a0');
           const detail = element('span', [`Elapsed: ${display.duration(item.elapsed_seconds)}`,
@@ -208,10 +208,6 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     for (const [id, record] of rows) {
       if (!wanted.has(id)) { record.row.remove(); rows.delete(id); }
     }
-  }
-
-  function failure(error) {
-    return `${error.message}${error.requestId ? ` Request ID: ${error.requestId}` : ''}`;
   }
 
   const owner = createOverview({ api, metadata, retainedPaths, serverTime, autoRefresh: !autoPaused, restoreTimeline:restoreView?.timeline,
@@ -255,7 +251,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
         : state.phase === 'list-error' ? 'Executions could not be loaded.' : 'No data loaded.');
     }
     const pageDetails = page ? `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} rows` : '';
-    const error = ['list-error', 'summary-error'].includes(state.phase) ? failure(state.error) : '';
+    const error = ['list-error', 'summary-error'].includes(state.phase) ? errorLabel(state.error) : '';
     const previousResults = error && state.pageStale ? 'Previous results shown.' : '';
     const previousCounts = state.summaryStale ? 'Previous counts shown.' : '';
     const pageTime = page ? display.timestamp(page.meta.generated_at) : '';
@@ -306,7 +302,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     otherNote.hidden = unknownCount === 0;
     otherNote.textContent = unknownCount
       ? `Other includes ${display.count(unknownCount)} executions with unknown status codes; its filter selects supported statuses.` : '';
-    // O5: the Other card names its parts from the summary already loaded.
+    // The Other card names its parts from the summary already loaded.
     const otherParts = state.summary ? state.summary.data.by_status.filter(item => ![2, 4, 7].includes(item.code) && item.count > 0)
       .map(item => `${formatCode(metadata.execution_statuses.find(status => status.code === item.code)
         ?? { code: item.code, name: 'unknown' })} ${display.count(item.count)}`) : [];

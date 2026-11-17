@@ -1,4 +1,4 @@
-import { formatCode } from './display.js';
+import { errorLabel, formatCode } from './display.js';
 import { createCatalogSearch } from './catalog-search.js';
 import { executionHref, readDetailFragment } from './detail-navigation.js';
 import { mountRangeEditor } from './range-editor.js';
@@ -160,7 +160,7 @@ export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}
         message.textContent = state.phase === 'idle'
           ? 'Choose a folder to browse projects, or enter an exact project name across all folders.'
           : state.phase === 'loading' ? (search.value ? 'Searching the catalog…' : 'Loading…')
-          : state.phase === 'error' ? `${state.error.message}${state.error.requestId ? ` Request ID: ${state.error.requestId}` : ''}`
+          : state.phase === 'error' ? errorLabel(state.error)
           : state.complete ? (state.rows.length ? `${state.rows.length} ${search.value ? 'matches' : `${key}s`}` : 'No matches.')
           : search.value ? `${state.rows.length} matches so far. Search more to continue through the catalog.` : '';
         if (state.phase === 'error' && ['invalid_cursor', 'cursor_expired'].includes(state.error.code)) {

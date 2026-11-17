@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vite';
+import { defineConfig, minifySync } from 'vite';
 
 export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),
@@ -13,10 +13,13 @@ export default defineConfig({
     name: 'packaged-static-files',
     generateBundle() {
       // A classic, render-blocking script: it must run before the stylesheet paints.
+      const themeInit = readFileSync(new URL('src/theme-init.js', import.meta.url), 'utf8');
+      const { code, errors } = minifySync('theme-init.js', themeInit, { compress: { target: 'es2015' }, mangle: true });
+      if (errors.length) this.error(`Could not minify theme-init.js\n${errors.map(error => error.codeframe ?? error.message).join('\n')}`);
       this.emitFile({
         type: 'asset',
         fileName: 'theme-init.js',
-        source: readFileSync(new URL('src/theme-init.js', import.meta.url), 'utf8'),
+        source: code,
       });
       // Served from 'self' (CSP img-src), so the browser stops requesting a missing /favicon.ico.
       this.emitFile({

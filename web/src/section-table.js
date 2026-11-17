@@ -1,4 +1,4 @@
-import { createDisplay, observationTitle } from './display.js';
+import { createDisplay, errorLabel, observationTitle } from './display.js';
 import { mountTableOrder } from './table-order.js';
 import { reserveLoadingSpace } from './loading-space.js';
 import { mountTableViewport } from './table-viewport.js';
@@ -126,7 +126,7 @@ export function mountSectionTable(root, { metadata, actions, restoreView = null 
           reserveSpace(!panel.hidden && state.phase === 'loading' && page === null, rendered !== null);
           view.beforePaint?.(page, state, busy);
           const error = state.error;
-          const errorText = error ? `${error.message}${error.requestId ? ` Request ID: ${error.requestId}` : ''}` : '';
+          const errorText = errorLabel(error);
           if (page !== rendered || page === null || executionStart !== renderedStart) {
             if (page) paint(page, executionStart, view);
             // With nothing to show, a failed read is stated in full where the rows would be.

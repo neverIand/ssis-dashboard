@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { preprocessCSS, resolveConfig } from 'vite';
 import { mountFilters } from '../src/filters.js';
 import { statusChoiceOrder } from '../src/overview-screen.js';
 import { mountThemeChoice } from '../src/ui.js';
 import { envelope, metadata } from './fixtures.js';
 import { filtersDOM } from './filters-dom.js';
 
-const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
-const css = source('../src/styles.css');
+const cssPath = fileURLToPath(new URL('../src/styles.css', import.meta.url));
+const css = readFileSync(cssPath, 'utf8');
 const settled = () => new Promise(resolve => setImmediate(resolve));
 
 function storage({ fail = false, initial = {} } = {}) {
@@ -57,28 +59,32 @@ test('F2-2: blocked storage still applies the choice for the page and never thro
   assert.equal(dom.html.getAttribute('data-theme'), 'dark');
 });
 
-test('F2-2: theme-init.js applies only a saved Light/Dark choice and tolerates blocked storage', () => {
-  const script = source('../src/theme-init.js');
-  for (const [stored, expected] of [['dark', 'dark'], ['light', 'light'], ['sepia', null], [null, null]]) {
-    const attributes = new Map();
-    vm.runInNewContext(script, { window: { localStorage: storage({ initial: stored ? { 'sd-theme': stored } : {} }) },
-      document: { documentElement: { setAttribute: (key, value) => attributes.set(key, value) } } });
-    assert.equal(attributes.get('data-theme') ?? null, expected, String(stored));
-  }
-  assert.doesNotThrow(() => vm.runInNewContext(script, { window: { localStorage: storage({ fail: true }) },
-    document: { documentElement: { setAttribute() { throw new Error('unexpected'); } } } }));
-});
+for (const [label, path] of [['source', '../src/theme-init.js'], ['packaged', '../../dashboard/static/app/theme-init.js']]) {
+  test(`F2-2: ${label} theme-init.js applies saved Light/Dark, tolerates blocked storage and flags older browsers`, t => {
+    const file = new URL(path, import.meta.url);
+    if (label === 'packaged' && !existsSync(file)) {
+      t.skip('Packaged theme-init.js is missing. Run npm --prefix web run build.');
+      return;
+    }
+    const script = readFileSync(file, 'utf8');
+    const Current = class {}, Old = class {};
+    Object.defineProperty(Current.prototype, 'command', { value: '' });
+    for (const [stored, theme] of [['dark', 'dark'], ['light', 'light'], ['sepia', null], [null, null], [undefined, null]]) {
+      const localStorage = storage({ fail: stored === undefined, initial: stored ? { 'sd-theme': stored } : {} });
+      for (const [HTMLButtonElement, unsupported] of [[Current, null], [Old, ''], [undefined, '']]) {
+        const attributes = new Map();
+        const context = { window: { localStorage, HTMLButtonElement },
+          document: { documentElement: { setAttribute: (key, value) => attributes.set(key, value) } } };
+        vm.runInNewContext(script, context, { filename: fileURLToPath(file) });
+        assert.equal(attributes.get('data-theme') ?? null, theme, String(stored));
+        assert.equal(attributes.get('data-browser-unsupported') ?? null, unsupported, String(HTMLButtonElement?.name));
+        assert.deepEqual(Object.keys(context), ['window', 'document']);
+      }
+    }
+  });
+}
 
-test('theme-init.js marks only a browser without invoker commands as below the Baseline 2025 floor', () => {
-  const script = source('../src/theme-init.js');
-  const Current = class {}, Old = class {};
-  Object.defineProperty(Current.prototype, 'command', { value: '' });
-  for (const [HTMLButtonElement, expected] of [[Current, false], [Old, true], [undefined, true]]) {
-    const attributes = new Map();
-    vm.runInNewContext(script, { window: { localStorage: storage({}), HTMLButtonElement },
-      document: { documentElement: { setAttribute: (key, value) => attributes.set(key, value) } } });
-    assert.equal(attributes.has('data-browser-unsupported'), expected, String(HTMLButtonElement?.name));
-  }
+test('the Baseline 2025 browser notice becomes visible when theme-init.js flags the browser', () => {
   const html = readFileSync(new URL('../../dashboard/templates/app/base.html', import.meta.url), 'utf8');
   assert.match(html, /<p class="browser-notice" data-browser-notice hidden>[^<]*143[^<]*146[^<]*26\.2[^<]*<\/p>/);
   // The global [hidden] rule is !important, so the notice rule must be too.
@@ -105,14 +111,50 @@ test('F2-1: each colour token is one light-dark() pair, a manual choice only fix
   assert.doesNotMatch(css, /#fff(fff)?\b|#000(000)?\b|\bwhite\b(?!-space)|\bblack\b/i);
 });
 
-test('F2-3/F2-4/F2-5: wide content cap, auto-fit summary strip, shared status tokens and lighter dense values', () => {
+function expandIs(selector) {
+  const index = selector.findIndex(part => part.type === 'pseudo-class' && part.kind === 'is');
+  if (index === -1) return [selector];
+  return selector[index].selectors.flatMap(branch => expandIs([...selector.slice(0, index), ...branch, ...selector.slice(index + 1)]));
+}
+
+test('F2-3/F2-4/F2-5: wide content cap, auto-fit summary strip, shared status tokens and lighter dense values', async () => {
   assert.match(css, /\.header-content, main \{\s*max-width: 120rem;/);
   assert.match(css, /\.detail-fields \{ display: grid; grid-template-columns: repeat\(auto-fit, minmax\(10rem, 1fr\)\);/);
-  for (const [selector, token] of [['.status-badge[data-status="2"]', 'running'], ['.chart-frame g[data-status="7"]', 'succeeded'],
-    ['[data-chart-status="4"]::before', 'failed'], ['.metric-other::before { ', 'other']]) {
-    assert.ok(css.includes(selector) && css.slice(css.indexOf(selector), css.indexOf('}', css.indexOf(selector))).includes(`--sd-status-${token}`), selector);
-  }
   assert.match(css, /\.id-cell, \.time-cell, td\.number-cell \{[^}]*font-weight: 400;/);
+  const checks = [
+    ['.status-badge', { color: 'other', background: 'other-soft' }],
+    ['.chart-frame g', { '--chart-color': 'other' }],
+    ['[data-chart-status="4"]::before', { background: 'failed' }],
+    ['.metric-other::before', { background: 'other' }],
+  ];
+  for (const [status, token] of [[2, 'running'], [7, 'succeeded'], [4, 'failed'], [6, 'failed'], [5, 'pending'], [8, 'pending']]) {
+    checks.push([`.status-badge[data-status="${status}"]`, { color: token, background: `${token}-soft` }],
+      [`.chart-frame g[data-status="${status}"]`, { '--chart-color': token }]);
+  }
+  // Parse the lookup selectors along with the stylesheet so whitespace and quoting do not affect the comparison.
+  const probes = checks.map(([selector]) => `${selector} { --probe: 1 }`).join('\n');
+  let rules;
+  const config = await resolveConfig({ configFile: false, css: { transformer: 'lightningcss', lightningcss: {
+    visitor: { StyleSheet(sheet) { rules = sheet.rules.filter(rule => rule.type === 'style').map(rule => rule.value); } },
+  } } }, 'serve');
+  await preprocessCSS(`${css}\n${probes}`, cssPath, config);
+  const probeRules = rules.splice(-checks.length);
+  const styles = new Map();
+  for (const rule of rules) {
+    for (const selector of rule.selectors.flatMap(expandIs)) {
+      const key = JSON.stringify(selector);
+      styles.set(key, [...(styles.get(key) ?? []), rule.declarations]);
+    }
+  }
+  for (const [index, [selector, expected]] of checks.entries()) {
+    const matching = styles.get(JSON.stringify(probeRules[index].selectors[0])) ?? [];
+    const declarations = [...matching.flatMap(rule => rule.declarations), ...matching.flatMap(rule => rule.importantDeclarations)];
+    for (const [property, token] of Object.entries(expected)) {
+      const declaration = declarations.findLast(({ property: kind, value }) => kind === property
+        || value?.propertyId?.property === property || (kind === 'custom' && value.name === property));
+      assert.equal(declaration?.value?.value?.[0]?.value?.name?.ident, `--sd-status-${token}`, `${selector} ${property}`);
+    }
+  }
 });
 
 test('F2-6: status choices list Running, Succeeded and Failed first, others in code order', () => {

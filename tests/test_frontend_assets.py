@@ -90,8 +90,10 @@ class PackagedFrontendTests(unittest.TestCase):
                 self.assertTrue((ASSET_ROOT / filename).is_file(), filename)
         self.assertFalse((ASSET_ROOT / 'index.html').exists())
         self.assertFalse((ASSET_ROOT / 'LICENSES.txt').exists())
-        self.assertEqual((ASSET_ROOT / 'theme-init.js').read_bytes(),
-                         (ASSET_ROOT.parents[2] / 'web/src/theme-init.js').read_bytes())
+        theme_init = (ASSET_ROOT / 'theme-init.js').read_bytes()
+        self.assertLess(len(theme_init), (SOURCE_ROOT / 'theme-init.js').stat().st_size)
+        self.assertNotRegex(theme_init, rb'//|/\*', 'Packaged theme-init.js must be comment-free')
+        self.assertNotRegex(theme_init, rb'\b(?:import|export)\b', 'Packaged theme-init.js must be a classic script')
         self.assertEqual((ASSET_ROOT / 'favicon.svg').read_bytes(),
                          (ASSET_ROOT.parents[2] / 'web/src/favicon.svg').read_bytes())
         self.connect.assert_not_called()

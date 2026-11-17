@@ -222,13 +222,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
         metadata.execution_statuses.find(item => String(item.code) === code) ?? { code: Number(code), name: 'unknown' }
       )).join(', ');
     },
-    beforePaint: (page, state, busy) => chart.render({
-      page,
-      pageNumber: state.pageNumber,
-      busy,
-      visible: !panel.hidden,
-      stale: state.stale
-    }),
+    beforePaint: (page, _state, busy) => chart.render({ page, busy, visible: !panel.hidden }),
     pageInfo: (page, state) => {
       const identities = new Set(page.data.map(item => JSON.stringify([item.folder_name, item.project_name, item.package_name]))).size;
       return `Page ${display.count(state.pageNumber)} · ${display.count(page.data.length)} executions on this page`
