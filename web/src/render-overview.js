@@ -4,6 +4,7 @@ import { createOverview } from './overview.js';
 import { selectionParams, selectionSearch } from './selection.js';
 import { mountTimeline } from './render-timeline.js';
 import { reserveLoadingSpace } from './loading-space.js';
+import { readRefreshPause, saveRefreshPause } from './refresh-pause.js';
 import { breakableText, inlineStatus, pollingButton } from './ui.js';
 import { mountTableViewport } from './table-viewport.js';
 
@@ -39,7 +40,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   let renderedPage = null;
   let returning = restoreView;
   let selectionKey = null;
-  let autoPaused = restoreView?.autoPaused === true;
+  let autoPaused = restoreView ? restoreView.autoPaused === true : readRefreshPause(window);
   let phase = 'idle';
   const timelineView=mountTimeline(root,{metadata,restoreView:restoreView?.timeline,
     actions:{toggle:()=>{void owner.toggleTimeline();},retry:()=>{void owner.retryTimeline();},
@@ -340,7 +341,10 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   const nextPage = pageAction(next, owner.next);
   const latestPage = pageAction(latest, owner.latest);
   const refreshPage = () => { void (phase === 'summary-error' ? owner.retrySummary() : owner.refresh()); };
-  const togglePolling = () => owner.togglePolling();
+  const togglePolling = () => {
+    owner.togglePolling();
+    saveRefreshPause(window, autoPaused);
+  };
   const visibilityChanged = () => owner.setVisible(document.visibilityState !== 'hidden');
   document.addEventListener('visibilitychange', visibilityChanged);
   pollToggle.addEventListener('click', togglePolling);
@@ -358,6 +362,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     },
     refresh: owner.refresh,
     effectiveWindow: owner.effectiveWindow,
+    get autoPaused() { return autoPaused; },
     checkpoint() {
       const focusId = [...rows].find(([, record]) => record.row.contains(document.activeElement))?.[0] ?? null;
       return { paths: owner.checkpoint(), view: { position: position(), focusId, selectionKey, autoPaused,

@@ -32,3 +32,27 @@ export function deferred() {
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 }
+
+export function installHistory(window, url) {
+  window.location = new URL(url);
+  const navigate = (state, href) => {
+    window.history.state = structuredClone(state);
+    window.location.href = new URL(href, window.location).href;
+  };
+  window.history = { state: null, pushes: [], replacements: [],
+    pushState(state, _title, href) { navigate(state, href); this.pushes.push(href); },
+    replaceState(state, _title, href) { navigate(state, href); this.replacements.push(href); } };
+}
+
+export function trackStorageWrites(window) {
+  const writes = [];
+  for (const name of ['localStorage', 'sessionStorage']) {
+    window[name] = {
+      getItem: () => null,
+      setItem: (...args) => writes.push([name, 'setItem', ...args]),
+      removeItem: key => writes.push([name, 'removeItem', key]),
+      clear: () => writes.push([name, 'clear']),
+    };
+  }
+  return writes;
+}

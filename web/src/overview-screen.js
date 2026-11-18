@@ -35,6 +35,7 @@ export function mountOverviewScreen(root, saved = null) {
     if (saved) { saved.paths.length = 0; saved.view = null; }
     checkpoint = overview.checkpoint;
     filters = mountFilters(root, { metadata, api, appBase: config.app_base, effectiveWindow: overview.effectiveWindow,
+      isRefreshPaused: () => overview.autoPaused,
       onApplied: (selection, options) => { void overview.apply(selection, options); } });
     return () => { filters.dispose(); overview.dispose(); };
   } });

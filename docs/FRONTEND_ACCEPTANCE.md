@@ -94,7 +94,7 @@ These cases cover the other part of D3c.2. Overview execution links now open nat
 
 **Pass for the retained path:** metadata is revalidated, one saved-page list/summary cycle completes, current data is re-fetched rather than treated as a cached snapshot, and the saved pause/view anchors are restored. The paused path performs no later automatic cycle; the enabled path creates one schedule. A removed focused row uses the table-region fallback. Browser scroll clamping is not an exact-position failure when the available range shrinks.
 
-**Fresh-document fallback:** validated URL filters/order/limit restore and loading starts at page one; in-memory pause/cursor state need not survive. Record this independently. A successful fresh return does not close CACHE-01, and failure to obtain `persisted: true` must remain `NOT RUN` for that condition.
+**Fresh-document fallback** — Validated URL filters, order and limit restore and loading starts at page one. Back and reload keep the entry's pause setting. After the initial load, a paused entry allows manual Refresh and makes no scheduled request. An enabled entry schedules auto refresh. Record this separately and leave the retained condition `NOT RUN` unless `pageshow.persisted: true` was observed.
 
 ### CACHE-02: expired saved cursor
 

@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { mountOverviewScreen } from '../src/overview-screen.js';
 import { filtersDOM } from './filters-dom.js';
-import { envelope, jsonResponse, wireTime } from './fixtures.js';
+import { envelope, jsonResponse, trackStorageWrites, wireTime } from './fixtures.js';
 import { Node, overviewDOM } from './overview-dom.js';
 import { overviewPage, timelineFrom, timelineMetadata, timelinePage, timelineSummary, timelineTo } from './timeline-fixture.js';
 
@@ -56,8 +56,9 @@ function serve(t) {
   return { calls, lists: () => calls.filter(call => call.resource === 'executions') };
 }
 
-async function mounted(t, saved, search) {
+async function mounted(t, saved, search, state = null) {
   const dom = screenDOM(search), api = serve(t);
+  dom.window.history.state = state;
   const screen = mountOverviewScreen(dom.root, saved);
   t.after(screen.dispose);
   return { dom, api, screen };
@@ -96,6 +97,55 @@ test('an address the filters reject leaves the list empty and the untouched choi
   assert.deepEqual(dom.statuses().filter(node => node.checked).map(node => node.value), ['']);
 });
 
+test('Overview records pause and resume on the current entry and carries the pause into a selection change', async t => {
+  const entry = { other: { marker: 'overview' } };
+  const { dom, screen } = await mounted(t, null, '?limit=25#main-content', entry);
+  const { history, location } = dom.window;
+  const writes = trackStorageWrites(dom.window);
+  const toggle = () => dom.list.get('poll-toggle').dispatchEvent(new Event('click'));
+  await settle();
+  const beforePause = location.href;
+  toggle();
+  assert.deepEqual(history.state, { ...entry, autoRefreshPaused: true });
+  assert.equal(history.replacements.at(-1), beforePause);
+  assert.equal(location.href, beforePause);
+  assert.deepEqual(history.pushes, []);
+  dom.header('created_at').click();
+  await settle();
+  assert.equal(screen.checkpoint().view.autoPaused, true);
+  assert.deepEqual(history.pushes, ['/dashboard/app/?sort=created_at&limit=25#main-content']);
+  assert.deepEqual(history.state, { autoRefreshPaused: true });
+  const beforeResume = location.href;
+  toggle();
+  assert.deepEqual(history.state, { autoRefreshPaused: false });
+  assert.equal(history.replacements.at(-1), beforeResume);
+  assert.equal(location.href, beforeResume);
+  assert.deepEqual(writes, []);
+});
+
+test('fresh Overview reads only a boolean entry pause and filter URL replacements preserve it', async t => {
+  for (const state of [null, { autoRefreshPaused: 'true' }, { autoRefreshPaused: 1 },
+    { autoRefreshPaused: false }, { autoRefreshPaused: true, other: 'overview' }]) {
+    const { dom, screen } = await mounted(t, null, '?limit=050#main-content', state);
+    await settle();
+    assert.equal(screen.checkpoint().view.autoPaused, state?.autoRefreshPaused === true);
+    assert.equal(dom.window.location.search, '');
+    assert.equal(dom.window.location.hash, '#main-content');
+    assert.deepEqual(dom.window.history.state, state);
+    assert.deepEqual(dom.window.history.replacements, ['/dashboard/app/#main-content']);
+    screen.dispose();
+  }
+  const state = { autoRefreshPaused: true, other: 'overview' };
+  const { dom, screen } = await mounted(t, null, '?sort=unknown', state);
+  await settle();
+  dom.filters.click('[data-recover-filters]');
+  await settle();
+  assert.equal(dom.window.location.search, '');
+  assert.deepEqual(dom.window.history.state, state);
+  assert.deepEqual(dom.window.history.pushes, []);
+  assert.equal(screen.checkpoint().view.autoPaused, true);
+});
+
 test('a filter-side change reaches the list, and a list-side change goes back through the filters', async t => {
   const { dom, api } = await mounted(t);
   await settle();
@@ -132,7 +182,7 @@ test('a saved checkpoint is handed to the list once and then emptied', async t =
   saved.view.autoPaused = true;
   saved.view.position = { x: 0, y: 240, left: 0, top: 0 };
   // The restarted document has the same address, so the filters apply it as a restore.
-  const second = await mounted(t, saved, '?sort=created_at');
+  const second = await mounted(t, saved, '?sort=created_at', { autoRefreshPaused: false });
   await settle();
   // Request paths and view state were consumed, so a later settings reload cannot replay them.
   assert.deepEqual(saved, { paths: [], view: null });
@@ -143,6 +193,15 @@ test('a saved checkpoint is handed to the list once and then emptied', async t =
   // The restarted screen only read the restored order, so the other path can only have come from what was saved.
   assert.deepEqual(second.api.lists().map(call => call.params.sort), ['created_at']);
   assert.deepEqual(again.paths.map(([key]) => key).sort(), [...keys].sort());
+  assert.deepEqual(second.dom.window.history.state, { autoRefreshPaused: false });
+  second.dom.header('created_at').click();
+  await settle();
+  assert.deepEqual(second.dom.window.history.state, { autoRefreshPaused: true }, 'new entries use the live pause');
+  second.screen.dispose();
+  again.view.autoPaused = false;
+  const third = await mounted(t, again, '?sort=created_at', { autoRefreshPaused: true });
+  await settle();
+  assert.equal(third.screen.checkpoint().view.autoPaused, false);
 });
 
 test('both sides get the API client, the application path and the server clock', async t => {

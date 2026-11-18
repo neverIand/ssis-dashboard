@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { mountHistoryScreen } from '../src/history-screen.js';
 import { detailDOM } from './detail-fixture.js';
-import { deferred, envelope, jsonResponse } from './fixtures.js';
+import { deferred, envelope, jsonResponse, trackStorageWrites } from './fixtures.js';
 import { historyMetadata, historyPage, historyRow } from './history-fixture.js';
 import { Node } from './overview-dom.js';
 
@@ -68,7 +68,7 @@ test('standalone History keeps the update clock visible during a pending refresh
 });
 
 // The standalone History page on the detail double: wiring evidence only, no browser, focus or layout claims.
-function screen(t, search, { saved = null, respond = null, hidden = false } = {}) {
+function screen(t, search, { saved = null, respond = null, hidden = false, state = null } = {}) {
   const dom = detailDOM(), extra = new Map(), calls = [], held = [];
   const node = (key, tag = 'div') => { const value = new Node(dom.document, tag); extra.set(`[data-${key}]`, value); return value; };
   const form = node('history-scope-form', 'form'), inputs = {};
@@ -81,7 +81,7 @@ function screen(t, search, { saved = null, respond = null, hidden = false } = {}
   const query = dom.root.querySelector;
   dom.root.querySelector = selector => extra.get(selector) ?? query(selector);
   Object.assign(dom.window.location, { pathname: '/ops/app/history', search });
-  dom.window.history.pushState = (state, title, href) => dom.window.history.replaceState(state, title, href);
+  dom.window.history.state = state;
   if (hidden) dom.document.visibilityState = 'hidden';
   // Every listener the screen itself adds to these targets must be removed again on disposal.
   for (const [name, target] of Object.entries({ form, refresh: extra.get('[data-history-refresh]'), toggle: extra.get('[data-history-poll-toggle]'),
@@ -213,6 +213,52 @@ test('the pause button and tab visibility reach the loader, and the pause is wha
   assert.equal(dom.mounted.checkpoint().paused, true);
 });
 
+test('standalone History records pause and resume on the current entry and copies it into new scope entries', async t => {
+  const entry = { other: 'history' };
+  const dom = screen(t, scoped, { state: entry });
+  const { history, location } = dom.window;
+  const writes = trackStorageWrites(dom.window);
+  await settle();
+  const beforePause = location.href;
+  dom.click('history-poll-toggle');
+  assert.deepEqual(history.state, { ...entry, autoRefreshPaused: true });
+  assert.equal(history.replacements.at(-1), beforePause);
+  assert.equal(location.href, beforePause);
+  assert.deepEqual(history.pushes, []);
+  const reads = dom.history().length;
+  dom.click('history-refresh'); await settle();
+  assert.equal(dom.history().length, reads + 1);
+  assert.deepEqual(history.state, { ...entry, autoRefreshPaused: true });
+  dom.inputs.package.value = 'Other.dtsx';
+  dom.form.dispatchEvent(new Event('submit', { cancelable: true }));
+  await settle();
+  assert.equal(location.searchParams.get('package'), 'Other.dtsx');
+  assert.deepEqual(history.pushes, [location.pathname + location.search]);
+  assert.deepEqual(history.state, { autoRefreshPaused: true });
+  assert.equal(dom.mounted.checkpoint().paused, true);
+  const beforeResume = location.href;
+  dom.click('history-poll-toggle');
+  assert.deepEqual(history.state, { autoRefreshPaused: false });
+  assert.equal(history.replacements.at(-1), beforeResume);
+  assert.equal(location.href, beforeResume);
+  assert.deepEqual(writes, []);
+});
+
+test('fresh standalone History reads only a boolean pause from its entry', async t => {
+  for (const state of [null, { autoRefreshPaused: 'true' }, { autoRefreshPaused: 1 },
+    { autoRefreshPaused: false }, { autoRefreshPaused: true }]) {
+    const dom = screen(t, scoped, { state });
+    await settle();
+    const paused = state?.autoRefreshPaused === true;
+    assert.equal(dom.history().length, 1);
+    assert.equal(dom.mounted.checkpoint().paused, paused);
+    assert.equal(dom.get('history-poll-toggle').getAttribute('aria-label'), paused ? 'Resume auto refresh' : 'Pause auto refresh');
+    assert.deepEqual(dom.window.history.state, state);
+    assert.deepEqual(dom.window.history.replacements, []);
+    dom.mounted.dispose();
+  }
+});
+
 test('a page opened in a hidden tab starts with refresh held', async t => {
   const dom = screen(t, scoped, { hidden: true });
   await settle();
@@ -228,7 +274,8 @@ test('a saved checkpoint restores the pause and the view, and disposal leaves no
   assert.equal(saved.view.chart.open, true);
   first.mounted.dispose();
   assert.equal(first.mounted.checkpoint(), null);
-  const second = screen(t, scoped, { saved: { paused: true, view: { ...saved.view, statusOptionsOpen: true, chart: { ...saved.view.chart, open: false } } } });
+  const second = screen(t, scoped, { state: { autoRefreshPaused: false },
+    saved: { paused: true, view: { ...saved.view, statusOptionsOpen: true, chart: { ...saved.view.chart, open: false } } } });
   await settle();
   assert.equal(second.get('history-poll-toggle').getAttribute('aria-label'), 'Resume auto refresh');
   assert.equal(second.get('history-poll-status').textContent, 'Updated 17:00:00 · auto refresh paused');
@@ -237,6 +284,13 @@ test('a saved checkpoint restores the pause and the view, and disposal leaves no
   assert.equal(again.view.statusOptionsOpen, true);
   assert.equal(again.view.chart.open, false);
   assert.equal(!second.get('history-status-options').matches(':popover-open'), false);
+  second.inputs.package.value = 'Other.dtsx';
+  second.form.dispatchEvent(new Event('submit', { cancelable: true }));
+  await settle();
+  assert.deepEqual(second.window.history.state, { autoRefreshPaused: true }, 'new entries use the live pause');
+  const resumed = screen(t, scoped, { saved, state: { autoRefreshPaused: true } });
+  await settle();
+  assert.equal(resumed.mounted.checkpoint().paused, false);
   // Without a saved checkpoint the same page starts running, with the options closed.
   const fresh = screen(t, scoped);
   await settle();

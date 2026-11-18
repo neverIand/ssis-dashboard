@@ -1,4 +1,4 @@
-import { envelope, wireTime } from './fixtures.js';
+import { envelope, installHistory, wireTime } from './fixtures.js';
 import { Node } from './overview-dom.js';
 import { installPopover } from './popover-dom.js';
 
@@ -21,17 +21,12 @@ export function runningDetailResponse(executionId = '9223372036854775807') {
 
 // DOM double for mounted startup/render behavior; no browser/layout claims.
 export function detailDOM() {
-  const window = Object.assign(new EventTarget(), { location: { origin: 'https://example.test', search: '', hash: '', pathname: '/ops/app/executions/17' },
-    innerHeight: 900, getComputedStyle: node => ({ position: node.style.position || 'static' }),
+  const window = Object.assign(new EventTarget(), { innerHeight: 900, getComputedStyle: node => ({ position: node.style.position || 'static' }),
     scrollX: 0, scrollY: 0, scrollTo(x, y) {
       this.scrollX = typeof x === 'object' ? x.left : x;
       this.scrollY = typeof x === 'object' ? x.top : y;
     } });
-  window.history = { state: null, replacements: [], replaceState(state, _title, href) {
-    this.state = state; this.replacements.push(href);
-    const url = new URL(href, window.location.origin);
-    Object.assign(window.location, { pathname: url.pathname, search: url.search, hash: url.hash });
-  } };
+  installHistory(window, 'https://example.test/ops/app/executions/17');
   const document = Object.assign(new EventTarget(), { location: window.location, defaultView: window,
     visibilityState: 'visible', activeElement: null, documentElement: { clientWidth: 1280, clientHeight: 720 } });
   document.createElement = tag => new Node(document, tag);

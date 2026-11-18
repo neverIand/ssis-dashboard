@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mountBootstrap } from '../src/bootstrap.js';
 import { mountDetail } from '../src/render-detail.js';
-import { deferred, envelope, jsonResponse, requestId } from './fixtures.js';
+import { deferred, envelope, jsonResponse, requestId, trackStorageWrites } from './fixtures.js';
 import { ApiError } from '../src/api.js';
 import { metadata } from './fixtures.js';
 import { detailDOM, detailResponse, runningDetailResponse } from './detail-fixture.js';
 import { executable, executablePage } from './executable-fixture.js';
+import { childPage } from './child-fixture.js';
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
 const observations = (id = detailResponse().data.execution_id) => executablePage([executable('1', { execution_id: id })]);
@@ -200,6 +201,7 @@ test('a retained detail checkpoint carries only pause/view state and re-fetches 
   assert.equal(checkpoint.autoPaused, true);
   assert.doesNotMatch(JSON.stringify(checkpoint), /package|cursor|event_counts|Main/);
   first.dispose();
+  dom.window.history.state = { autoRefreshPaused: false };
   dom.document.activeElement = dom.document.body;
   dom.window.scrollTo(0, 0);
   let calls = 0;
@@ -219,6 +221,66 @@ test('a retained detail checkpoint carries only pause/view state and re-fetches 
   dom.get('detail-poll-toggle').dispatchEvent(new Event('click'));
   t.mock.timers.tick(60000);
   assert.equal(calls, 2);
+  dom.window.history.state = { autoRefreshPaused: true };
+  const resumed = mountDetail(dom.root, { ...options, restoreView: { ...checkpoint, autoPaused: false },
+    api: { get: async resource => resource.endsWith('/executables') ? observations() : runningDetailResponse() } });
+  t.after(resumed.dispose);
+  await settle();
+  assert.equal(resumed.checkpoint().autoPaused, false);
+});
+
+test('running detail records pause and resume on its entry and a tab replacement keeps it', async t => {
+  const dom = detailDOM(), { history, location } = dom.window;
+  const entry = { other: 'detail' };
+  history.state = entry;
+  location.search = '?overview=%3Flimit%3D25';
+  const writes = trackStorageWrites(dom.window), calls = [];
+  const screen = mountDetail(dom.root, { metadata: metadata(), executionId: '17', appBase: '/ops/app/',
+    api: { async get(resource) {
+      calls.push(resource);
+      if (resource.endsWith('/executables')) return observations('17');
+      if (resource.endsWith('/children')) return childPage([]);
+      return runningDetailResponse('17');
+    } } });
+  t.after(screen.dispose);
+  await settle();
+  const toggle = () => dom.get('detail-poll-toggle').dispatchEvent(new Event('click'));
+  const beforePause = location.href;
+  toggle();
+  assert.deepEqual(history.state, { ...entry, autoRefreshPaused: true });
+  assert.equal(history.replacements.at(-1), beforePause);
+  assert.equal(location.href, beforePause);
+  dom.get('children-toggle').dispatchEvent(new Event('click')); await settle();
+  assert.equal(location.hash, '#children');
+  assert.deepEqual(history.state, { ...entry, autoRefreshPaused: true });
+  const beforeRefresh = calls.length;
+  dom.get('detail-refresh').dispatchEvent(new Event('click')); await settle();
+  assert.deepEqual(calls.slice(beforeRefresh), ['executions/17', 'executions/17/children']);
+  assert.equal(screen.checkpoint().autoPaused, true);
+  const beforeResume = location.href;
+  toggle();
+  assert.deepEqual(history.state, { ...entry, autoRefreshPaused: false });
+  assert.equal(history.replacements.at(-1), beforeResume);
+  assert.equal(location.href, beforeResume);
+  assert.deepEqual(history.pushes, []);
+  assert.deepEqual(writes, []);
+});
+
+test('fresh running detail reads only a boolean pause from its entry', async t => {
+  for (const state of [null, { autoRefreshPaused: 'true' }, { autoRefreshPaused: 1 },
+    { autoRefreshPaused: false }, { autoRefreshPaused: true }]) {
+    const dom = detailDOM();
+    dom.window.history.state = state;
+    const screen = mountDetail(dom.root, { metadata: metadata(), executionId: '17', appBase: '/ops/app/',
+      api: { get: async resource => resource.endsWith('/executables') ? observations('17') : runningDetailResponse('17') } });
+    t.after(screen.dispose);
+    await settle();
+    const paused = state?.autoRefreshPaused === true;
+    assert.equal(screen.checkpoint().autoPaused, paused);
+    assert.equal(dom.get('detail-poll-toggle').getAttribute('aria-label'), paused ? 'Resume auto refresh' : 'Pause auto refresh');
+    assert.deepEqual(dom.window.history.state, state);
+    screen.dispose();
+  }
 });
 
 test('detail return filters are validated after metadata and never sent to its API read', async () => {
@@ -269,6 +331,7 @@ test('ended detail disables Pause with an explanation, ignores visible return an
   assert.equal(dom.get('detail-poll-status').textContent, 'Execution ended · updated 17:00:00');
   toggle.dispatchEvent(new Event('click'));
   assert.equal(screen.checkpoint().autoPaused, false);
+  assert.equal(dom.window.history.state, null);
   for (const state of ['hidden', 'visible']) {
     dom.document.visibilityState = state;
     dom.document.dispatchEvent(new Event('visibilitychange'));

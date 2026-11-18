@@ -1,4 +1,6 @@
 // A small DOM double for renderer ownership/identity tests, not browser or layout evidence.
+import { installHistory } from './fixtures.js';
+
 export class Node extends EventTarget {
   constructor(document, tag, text = '') {
     super();
@@ -64,12 +66,13 @@ export class Node extends EventTarget {
 }
 
 export function overviewDOM() {
-  const window = Object.assign(new EventTarget(), { location: { origin: 'https://example.test' }, innerHeight: 900,
+  const window = Object.assign(new EventTarget(), { innerHeight: 900,
     getComputedStyle: node => ({ position: node.style.position || 'static' }),
     scrollX: 0, scrollY: 0, scrollTo(x, y) {
       this.scrollX = typeof x === 'object' ? x.left : x;
       this.scrollY = typeof x === 'object' ? x.top : y;
     } });
+  installHistory(window, 'https://example.test/app/');
   const document = Object.assign(new EventTarget(), { defaultView: window, activeElement: null, visibilityState: 'visible',
     createElement: tag => new Node(document, tag),
     createElementNS: (_namespace,tag) => new Node(document,tag),

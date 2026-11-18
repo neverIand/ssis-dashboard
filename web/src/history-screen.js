@@ -5,6 +5,7 @@ import { historyHref, historySelection, parseHistorySelection } from './history-
 import { defaultSelection } from './selection.js';
 import { inlineStatus, pollingButton } from './ui.js';
 import { createDisplay, observationTitle, refreshStatus } from './display.js';
+import { readRefreshPause, refreshPauseState, saveRefreshPause } from './refresh-pause.js';
 const invalid = 'Invalid history filters. Review the selection and choose Load history.';
 const idleText = 'Enter a package name and choose Load history, or open History from an execution.';
 const modeNotes = {
@@ -24,7 +25,7 @@ export function mountHistoryScreen(root, saved = null) {
     const loadButton = root.querySelector('[data-history-load]');
     const navigation = { appBase: config.app_base, origin: window.location.origin, metadata,
       selection: defaultSelection(metadata), historySelection: null };
-    let selection = parseHistorySelection('', metadata), paused = saved?.paused === true;
+    let selection = parseHistorySelection('', metadata), paused = saved ? saved.paused === true : readRefreshPause(window);
     const controls = Object.fromEntries(['match', 'folder', 'project', 'package'].map(key => [key, form.elements.namedItem(key)]));
     const show = () => { for (const [key, input] of Object.entries(controls)) input.value = selection[key]; };
     let loaded = false, persistent = '', shown = null;
@@ -55,7 +56,7 @@ export function mountHistoryScreen(root, saved = null) {
         notice.textContent = persistent = '';
         if (drafts) for (const [key, input] of Object.entries(controls)) input.value = drafts[key];
         loaded = true; showIdle(false); showTitle();
-        if (push) window.history.pushState(null, '', historyHref(selection, navigation));
+        if (push) window.history.pushState(refreshPauseState(paused), '', historyHref(selection, navigation));
         shown = window.location.search;
         describeDraft();
         void owner.select(selection);
@@ -82,6 +83,8 @@ export function mountHistoryScreen(root, saved = null) {
     };
     // Without a scope, offer an empty Exact form and wait for Load history. URLs without match= keep meaning LIKE.
     const pop = event => {
+      // The live pause outlasts scope changes; record it on the entry Back or Forward landed on.
+      if (event) saveRefreshPause(window, paused);
       const search = window.location.search;
       // A fragment-only history entry keeps the same query: nothing to reload.
       if (event && search === shown) return;
@@ -109,7 +112,11 @@ export function mountHistoryScreen(root, saved = null) {
       }
       describeDraft();
     };
-    const update = () => owner.refresh(), pause = () => owner.togglePolling();
+    const update = () => owner.refresh();
+    const pause = () => {
+      owner.togglePolling();
+      saveRefreshPause(window, paused);
+    };
     const visibility = () => owner.setVisible(document.visibilityState !== 'hidden');
     form.addEventListener('submit', submit); refresh.addEventListener('click', update); toggle.addEventListener('click', pause);
     form.addEventListener('input', describeDraft); controls.match.addEventListener('change', modeChanged);

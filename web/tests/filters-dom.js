@@ -1,4 +1,5 @@
 // Focused event/form double. Real browser checks own focus, native dates and layout.
+import { installHistory } from './fixtures.js';
 import { installPopover, popoverButton } from './popover-dom.js';
 class Control extends EventTarget {
   constructor(document, tag = 'div') {
@@ -34,10 +35,8 @@ class Control extends EventTarget {
 }
 
 export function filtersDOM(metadata, search = '') {
-  const window = Object.assign(new EventTarget(), { location: new URL(`https://example.test/dashboard/app/${search}`),
-    ResizeObserver: class { observe() {} disconnect() {} } });
-  const navigate = (_, __, url) => { window.location = new URL(url, window.location); };
-  window.history = { replaceState: navigate, pushState: navigate };
+  const window = Object.assign(new EventTarget(), { ResizeObserver: class { observe() {} disconnect() {} } });
+  installHistory(window, `https://example.test/dashboard/app/${search}`);
   const document = Object.assign(new EventTarget(), { defaultView: window,
     documentElement: { clientWidth: 1280, clientHeight: 720 } });
   document.createElement = tag => new Control(document, tag);

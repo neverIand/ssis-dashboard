@@ -11,6 +11,7 @@ import { clippedText } from './observation-page.js';
 import { defaultSelection, selectionSearch } from './selection.js';
 import { inlineStatus, pollingButton } from './ui.js';
 import { readHistoryReturn } from './history-navigation.js';
+import { readRefreshPause, saveRefreshPause } from './refresh-pause.js';
 
 export function mountDetail(root, { api, metadata, executionId, appBase, restoreView = null }) {
   const document = root.ownerDocument;
@@ -49,7 +50,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     events: root.querySelector('[data-events-toggle]'), parameters: root.querySelector('[data-parameters-toggle]'),
     overrides: root.querySelector('[data-overrides-toggle]'), history: root.querySelector('[data-history-toggle]'), main };
   let returning = restoreView?.executionId === executionId ? restoreView : null;
-  let autoPaused = returning?.autoPaused === true;
+  let autoPaused = returning ? returning.autoPaused === true : readRefreshPause(window);
   const initialPosition = position(), initialFocus = document.activeElement;
   let rendered = null, activeTab = null;
   const tabView = mountDetailTabs(root, { metadata, revealInitial: !returning,
@@ -260,7 +261,11 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     tabView.reveal();
   } });
   const load = () => { void loader.load(); };
-  const togglePolling = () => loader.togglePolling();
+  const togglePolling = () => {
+    if (toggle.disabled) return;
+    loader.togglePolling();
+    saveRefreshPause(window, autoPaused);
+  };
   const visibilityChanged = () => loader.setVisible(document.visibilityState !== 'hidden');
   refresh.addEventListener('click', load);
   toggle.addEventListener('click', togglePolling);

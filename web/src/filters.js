@@ -2,6 +2,7 @@ import { errorLabel, formatCode } from './display.js';
 import { createCatalogSearch } from './catalog-search.js';
 import { executionHref, readDetailFragment } from './detail-navigation.js';
 import { mountRangeEditor } from './range-editor.js';
+import { readRefreshPause, refreshPauseState, saveRefreshPause } from './refresh-pause.js';
 import { catalogName, createSelectionSession, packageNameUnits, SelectionError, selectionSearch, validateSelection }
   from './selection.js';
 import { rangeLabel } from './time-range.js';
@@ -10,7 +11,8 @@ import { positionPopover } from './ui.js';
 // Enter that confirms an input-method candidate (isComposing, or keyCode 229) is not a submit.
 const submitKey = event => event.key === 'Enter' && !event.isComposing && event.keyCode !== 229;
 
-export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}, effectiveWindow = () => null }) {
+export function mountFilters(root, { metadata, api, appBase, onApplied = () => {}, effectiveWindow = () => null,
+  isRefreshPaused }) {
   const document = root.ownerDocument, window = document.defaultView;
   const form = root.querySelector('#overview-filters');
   const get = selector => form.querySelector(selector);
@@ -108,8 +110,10 @@ export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}
   }
   function writeUrl(selection, replace = false) {
     const url = appBase + selectionSearch(selection, metadata) + window.location.hash;
-    if (replace) window.history.replaceState(null, '', url);
-    else if (url !== window.location.pathname + window.location.search + window.location.hash) window.history.pushState(null, '', url);
+    if (replace) window.history.replaceState(window.history.state, '', url);
+    else if (url !== window.location.pathname + window.location.search + window.location.hash) {
+      window.history.pushState(refreshPauseState(isRefreshPaused?.() ?? readRefreshPause(window)), '', url);
+    }
   }
   function chooseScope(key, name) {
     try {
@@ -344,9 +348,11 @@ export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}
       onApplied(null);
     }
   }
-  listen(recover, 'click', () => { window.history.replaceState(null, '', appBase); restore({ reusePage: false }); });
+  listen(recover, 'click', () => { window.history.replaceState(window.history.state, '', appBase); restore({ reusePage: false }); });
   // A fragment-only history entry leaves the applied selection in place: nothing to restore or reload.
   listen(window, 'popstate', () => {
+    // The live pause outlasts selection changes; record it on the entry Back or Forward landed on.
+    if (isRefreshPaused) saveRefreshPause(window, isRefreshPaused());
     if (session.applied === null || window.location.search !== selectionSearch(session.applied, metadata)) restore();
   });
   restore();
