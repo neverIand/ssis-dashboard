@@ -43,6 +43,37 @@ test('both pickers use metadata max_limit for term searches and retain default_l
   }
 });
 
+test('clearing folder and project searches restores the list and leaves the applied scope alone', async t => {
+  await Promise.all(['folder', 'project'].map(async key => {
+    const dom = setup(t, search(folder, project)), selector = `#${key}-search`, input = dom.get(selector);
+    const clear = dom.get(`[data-clear-picker="${key}"]`), exact = dom.get(`[data-exact-scope="${key}"]`);
+    const choices = dom.get(`[data-catalog-choices="${key}"]`), all = dom.get(`[data-all-scope="${key}"]`);
+    dom.open(key); await settled();
+    assert.equal(input.value, ''); assert.equal(clear.hidden, true);
+    assert.equal(all.getAttribute('aria-pressed'), 'false');
+    dom.edit(selector, 'No match');
+    assert.equal(clear.hidden, false); assert.equal(exact.hidden, false);
+    input.dispatchEvent(Object.assign(new Event('keydown'), { key: 'Enter' })); await settled();
+    assert.equal(choices.children.length, 0);
+    assert.equal(dom.calls.at(-1).limit, settings.limits.max_limit);
+
+    clear.focus(); clear.click();
+    assert.equal(input.value, ''); assert.equal(clear.hidden, true); assert.equal(exact.hidden, true);
+    assert.equal(dom.document.activeElement, input);
+    await new Promise(resolve => setTimeout(resolve, 275));
+    assert.equal(choices.children.length, 1);
+    assert.equal(dom.calls.at(-1).limit, settings.limits.default_limit);
+    assert.equal(dom.calls.at(-1).folder, key === 'project' ? folder : null);
+    assert.equal(dom.applied.length, 1);
+    assert.equal(dom.applied.at(-1)[key], key === 'folder' ? folder : project);
+
+    dom.edit(selector, 'Another search'); dom.close(); dom.open(key);
+    assert.equal(input.value, ''); assert.equal(clear.hidden, true);
+    all.click();
+    assert.equal(dom.applied.at(-1)[key], null);
+  }));
+});
+
 test('max-limit Search more preserves moved focus and otherwise focuses the first new choice', async t => {
   for (const moveFocus of [false, true]) {
     const custom = metadata(); custom.limits.default_limit = 1; custom.limits.max_limit = 4;
@@ -85,7 +116,7 @@ test('status closes into one applied selection; range and scope changes preserve
   dom.open('status');
   const status = dom.get('#status'); status.children[1].checked = true; status.dispatchEvent(new Event('change'));
   assert.deepEqual(dom.applied.at(-1).status, []);
-  dom.close(); assert.deepEqual(dom.applied.at(-1).status, [1]);
+  dom.click('[data-status-done]'); assert.deepEqual(dom.applied.at(-1).status, [1]);
   dom.open('created'); dom.click('[data-created-preset="custom"]');
   dom.edit('#from', '2026-10-17T00:00:00.0000001Z'); dom.click('[data-use-range]');
   dom.open('folder'); await settled();
@@ -134,7 +165,9 @@ test('calendar dates become inclusive days in the configured zone; Cancel and ex
   dom.restore(exact); dom.open('created'); dom.click('[data-use-range]'); dom.submit();
   assert.equal(dom.applied.at(-1).from, '2026-10-17T00:00:00.0000001+01:00');
   assert.equal(dom.applied.at(-1).to, '2026-10-18T00:00:00.0000002+01:00');
-  dom.open('created'); dom.edit('#from-date', '2026-01-01'); dom.close(); dom.submit();
+  dom.open('created'); dom.edit('#from-date', '2026-01-01'); dom.click('[data-cancel-range]');
+  assert.equal(dom.document.activeElement, dom.get('[data-open-filter="created"]'));
+  dom.submit();
   assert.equal(dom.applied.at(-1).from, '2026-10-17T00:00:00.0000001+01:00');
 });
 
@@ -236,11 +269,12 @@ test('unchanged closes send nothing; status Done, outside pointer and keyboard f
     dom.open('status');
     const status = dom.get('#status'), box = status.children[1];
     box.checked = !box.checked; status.dispatchEvent(new Event('change'));
-    const before = dom.applied.length;
-    if (via === 'done') dom.close();
+    const before = dom.applied.length, outside = dom.document.createElement('button');
+    if (via === 'done') dom.click('[data-status-done]');
     else if (via === 'pointer') dom.get('[data-filter-panel="status"]').hidePopover();
-    else dom.document.dispatchEvent(new Event('focusin'));
+    else { outside.focus(); dom.document.dispatchEvent(eventAt('focusin', outside)); }
     assert.equal(dom.applied.length, before + 1, via);
+    assert.equal(dom.document.activeElement, via === 'focus' ? outside : dom.get('[data-open-filter="status"]'), via);
     dom.close(); assert.equal(dom.applied.length, before + 1, 'Second close is inert');
   }
 });
@@ -398,7 +432,7 @@ test('a single timeline click keeps the Status draft visible and cancellable or 
       assert.equal(dom.window.location.search, '');
       assert.equal(status.children[1].checked, false);
     } else {
-      if (finish === 'Done') dom.close();
+      if (finish === 'Done') dom.click('[data-status-done]');
       else dom.document.dispatchEvent(eventAt('focusin', bar));
       assert.equal(dom.applied.length, 2);
       assert.deepEqual(dom.applied.at(-1).status, [1]);

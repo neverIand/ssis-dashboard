@@ -1,6 +1,6 @@
 # Local development on dev-next
 
-Use a fresh standard CPython 3.14 environment. The recorded native baseline is Windows x64 / CPython 3.14.8 / pyodbc 5.3.0 / ODBC Driver 17.10.0006 / SQL Server 2022 16.0.1000.6. Other SQL/driver/platform combinations require their own validation; the README's legacy compatibility list is historical. The native API SQL uses `DATEDIFF_BIG`, so it needs SQL Server 2016 or later. Production hosting is deferred. See [the documentation index](README.md) for API use and validation.
+Use a fresh standard CPython 3.14 environment. The recorded native baseline is Windows x64 / CPython 3.14.8 / pyodbc 5.3.0 / ODBC Driver 17.10.0006 / SQL Server 2022 16.0.1000.6. The pin is now pyodbc 5.5.0 (18 November 2026): a clean offline install, `pip check`, the full test suite with the native SQL suites and the native API diagnostic passed on that driver and server; 5.3.0 is the version the office ran with ODBC Driver 17. Other SQL/driver/platform combinations require their own validation; the README's legacy compatibility list is historical. The native API SQL uses `DATEDIFF_BIG`, so it needs SQL Server 2016 or later. Production hosting is deferred. See [the documentation index](README.md) for API use and validation.
 
 ## Create an environment
 

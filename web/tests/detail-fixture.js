@@ -1,6 +1,6 @@
 import { envelope, wireTime } from './fixtures.js';
 import { Node } from './overview-dom.js';
-import { installPopover, popoverButton } from './popover-dom.js';
+import { installPopover } from './popover-dom.js';
 
 export function detailResponse(executionId = '9223372036854775807') {
   return envelope({
@@ -44,7 +44,7 @@ export function detailDOM() {
   for (const key of ['app-status', 'retry', 'request-id', 'display-timezone', 'server-name', 'execution-detail',
     'active-elapsed', 'active-estimate', 'detail-id', 'tab-notes', 'legacy-errors', 'first-error', 'first-error-link', 'first-error-message',
     'detail-refresh', 'detail-poll-toggle', 'detail-poll-status', 'overview-link', 'legacy-detail-link',
-    'overview-return-notice', 'history-return', 'parameters-unavailable', 'overrides-unavailable', 'overrides-policy', ...['toggle','panel','plot','selected','scale','empty','x-axis','y-axis','count','mixed'].map(key=>`history-chart-${key}`), ...['filters','choices','apply','custom','close','presets','status-options'].map(key => `history-${key}`), ...['unavailable','filters','apply','reset','kind','q','copy-status'].map(key => `events-${key}`), ...['toggle', 'panel', 'status', 'notice', 'retry', 'sort',
+    'overview-return-notice', 'history-return', 'parameters-unavailable', 'overrides-unavailable', 'overrides-policy', ...['toggle','panel','plot','selected','scale','empty','x-axis','y-axis','count','mixed'].map(key=>`history-chart-${key}`), ...['filters','choices','apply','custom','presets','status-options'].map(key => `history-${key}`), ...['unavailable','filters','apply','reset','kind','q','copy-status'].map(key => `events-${key}`), ...['toggle', 'panel', 'status', 'notice', 'retry', 'sort',
       'limit', 'previous', 'next', 'latest', 'scroll', 'table', 'order-label'].flatMap(name => ['executables', 'children', 'events', 'parameters', 'overrides', 'history'].map(section => `${section}-${name}`))]) {
     const node = new Node(document, /-(limit|sort|direction|kind)$/.test(key) ? 'select' : key === 'events-q' ? 'input'
       : key.includes('retry') || /toggle|previous|next|latest|refresh$/.test(key) ? 'button' : 'div');
@@ -103,9 +103,8 @@ export function detailDOM() {
     get('parameters-toolbar').append(button);
   }
   get('history-panel').append(get('history-presets'),get('history-custom'),get('history-status-options'));
-  get('history-status-options').append(get('history-close'),get('history-filters'));
+  get('history-status-options').append(get('history-filters'));
   installPopover(get('history-status-options'), get('history-custom'), () => get('history-choices').firstChild?.firstChild);
-  popoverButton(get('history-close'), get('history-status-options'), 'hide');
   get('history-filters').append(get('history-choices'),get('history-apply'));
   get('history-panel').append(get('history-chart-toggle'),get('history-chart-panel'));
   get('history-chart-panel').append(...['plot','selected','scale','empty','x-axis','y-axis'].map(key=>get(`history-chart-${key}`)));

@@ -279,7 +279,8 @@ test('Overview sorts in run column order and History has a separate trailing Sta
   assert.match(css, /\.count-cell \{ width: (\d+(?:\.\d+)?rem); min-width: \1; max-width: \1;/);
   assert.match(css, /tr:is\(\[data-status="4"\], \[data-status="6"\]\) > td:first-child/);
   const history = template('history-panel');
-  assert.deepEqual([...history.matchAll(/<th scope="col"[^>]*>(?:<button[^>]*>)?([A-Za-z]+)/g)].map(match => match[1]),
+  assert.deepEqual([...history.matchAll(/<th scope="col"[^>]*>(?:<button[^>]*>|<span class="info-label">)?([A-Za-z]+)/g)]
+    .map(match => match[1]),
     ['Execution', 'Created', 'Started', 'Ended', 'Duration', 'Estimate', 'Status']);
   assert.match(history, /<colgroup>(<col>){7}<\/colgroup>/);
   assert.match(history, /<td colspan="7">/);

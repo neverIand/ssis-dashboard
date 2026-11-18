@@ -22,7 +22,6 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
       'limit',
       'apply',
       'custom',
-      'close',
       'scroll'
     ],
     sorts: [{ key: 'execution_id', label: 'Execution ID', header: true, initialDirection: 'desc' }],
@@ -30,7 +29,7 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
     focusFallback: ['executionFocus']
   });
   const { document, get, controls, rows, panel, notice, display, element, text, listen } = view;
-  const { apply, custom, close } = controls;
+  const { apply, custom } = controls;
   const form = get('filters'), presets = new Map(), choices = new Map(), statusOptions = get('status-options');
   const chart = mountHistoryChart(root, { metadata, restoreView: restoreView?.chart, remember: rememberChart,
     openExecution: id => { const href = rows.get(id)?.link.getAttribute('href'); if (href) document.defaultView.location.assign(href); } });
@@ -198,7 +197,6 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
     disabled: [
       apply,
       custom,
-      close,
       ...choices.values(),
       ...[...presets.values()].map((item) => item.button)
     ],

@@ -171,6 +171,7 @@ test('history status drafts survive order changes and refresh; Apply validates n
   click(dom,'history-custom');const inputs=dom.get('history-choices').children.map(label=>label.children[0]);for(const input of inputs)input.checked=['2','4','7'].includes(input.value);
   dom.get('history-header-execution_id').dispatchEvent(new Event('click'));await flush();assert.ok(inputs[3].checked);assert.equal(dom.calls.at(-1).params.status,allQuery.status);
   dom.get('history-filters').dispatchEvent(new Event('submit'));await flush();assert.equal(dom.calls.at(-1).params.status,'2,4,7');
+  assert.equal(dom.document.activeElement, dom.get('history-custom'));
   click(dom,'history-custom');for(const input of inputs)input.checked=false;const count=dom.calls.length;dom.get('history-filters').dispatchEvent(new Event('submit'));assert.equal(dom.calls.length,count);assert.match(dom.get('history-notice').textContent,/Choose at least one/);
 });
 

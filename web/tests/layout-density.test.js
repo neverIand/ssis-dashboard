@@ -42,7 +42,7 @@ test('Custom status popover applies exactly once on close; Escape cancels and re
   click(dom.get('history-custom')); chooseStatuses(dom, ['4', '7']);
   assert.equal(String(dom.get('history-status-options').matches(':popover-open')), 'true');
   assert.equal(dom.calls.length, count);
-  click(dom.get('history-close')); await flush();
+  dom.get('history-status-options').hidePopover(); await flush();
   assert.equal(dom.calls.length, count + 1);
   assert.equal(dom.calls.at(-1).params.status, '4,7');
   assert.equal(dom.get('history-custom').getAttribute('aria-pressed'), 'true');
@@ -51,6 +51,7 @@ test('Custom status popover applies exactly once on close; Escape cancels and re
   const event = dispatch(dom.get('history-status-options'), 'keydown', dom.document.activeElement, 'Escape');
   assert.equal(event.defaultPrevented, true); assert.equal(dom.calls.length, count + 1);
   assert.equal(!dom.get('history-status-options').matches(':popover-open'), true);
+  assert.equal(dom.document.activeElement, dom.get('history-custom'));
   assert.deepEqual(dom.get('history-choices').children.filter(label => label.firstChild.checked).map(label => label.firstChild.value), ['4', '7']);
 });
 
@@ -88,7 +89,7 @@ test('busy refresh preserves icon names/focus, and closing Custom cannot dispatc
   const count = dom.calls.length;
   assert.equal(refresh.getAttribute('aria-disabled'), 'true'); assert.equal(dom.document.activeElement, refresh);
   assert.equal(dom.get('detail-poll-toggle').getAttribute('aria-label'), 'Pause auto refresh');
-  click(dom.get('history-close')); click(dom.get('history-custom'));
+  dom.get('history-status-options').hidePopover(); click(dom.get('history-custom'));
   assert.equal(dom.calls.length, count); assert.equal(!dom.get('history-status-options').matches(':popover-open'), true);
   wait.resolve(historyPage()); await flush();
   assert.equal(refresh.getAttribute('aria-disabled'), 'false');

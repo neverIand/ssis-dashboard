@@ -39,14 +39,13 @@ test('C2: package names use 260 UTF-16 units and round-trip through the URL afte
     '?package_pattern=*']) assert.throws(() => parseSelection(bad, settings), SelectionError, bad);
 });
 
-test('C2: the Package panel applies an exact name, shows it, keeps it across scope changes and clears it', t => {
+test('C2: the Package panel applies an exact name and keeps it across scope changes', t => {
   const dom = setup(t, '?folder=F');
   const trigger = dom.get('[data-open-filter="package"]'), input = dom.get('#package-name');
   assert.equal(dom.get('[data-filter-label="package"]').textContent, 'All packages');
   dom.open('package');
   assert.equal(dom.get('[data-filter-panel="package"]').matches(':popover-open'), true);
   assert.equal(dom.document.activeElement, input);
-  assert.equal(dom.get('[data-all-scope="package"]').getAttribute('aria-pressed'), 'true');
   dom.edit('#package-name', 'Load Journals.dtsx');
   input.dispatchEvent(key('Enter'));
   assert.equal(dom.applied.at(-1).package, 'Load Journals.dtsx');
@@ -60,7 +59,6 @@ test('C2: the Package panel applies an exact name, shows it, keeps it across sco
   // Reopening prefills the applied name; the Apply button commits the edited text.
   dom.open('package');
   assert.equal(input.value, 'Load Journals.dtsx');
-  assert.equal(dom.get('[data-all-scope="package"]').getAttribute('aria-pressed'), 'false');
   dom.edit('#package-name', 'Other.dtsx'); dom.click('[data-apply-package]');
   assert.equal(dom.applied.at(-1).package, 'Other.dtsx');
 
@@ -70,17 +68,37 @@ test('C2: the Package panel applies an exact name, shows it, keeps it across sco
   dom.select({ folder: 'G', project: 'P' }); dom.select({ sort: 'created_at', direction: 'asc' });
   dom.click('[data-reset-filters]');
   assert.equal(dom.applied.at(-1).package, 'Other.dtsx');
-
-  // All packages clears it; an empty Apply does the same.
-  dom.open('package'); dom.click('[data-all-scope="package"]');
-  assert.equal(dom.applied.at(-1).package, null);
-  assert.equal(new URLSearchParams(dom.window.location.search).has('package'), false);
-  assert.equal(dom.get('[data-filter-label="package"]').textContent, 'All packages');
-  dom.select({ package: 'X.dtsx' }); dom.open('package'); dom.edit('#package-name', ''); dom.click('[data-apply-package]');
-  assert.equal(dom.applied.at(-1).package, null);
 });
 
-test('C2: invalid package text stays in the panel with a message; Escape and Close apply nothing', t => {
+test('G4: clear restores input focus; empty package Apply and Enter both remove the package filter', t => {
+  for (const method of ['Apply', 'Enter']) {
+    const dom = setup(t, '?folder=F&package=Keep.dtsx');
+    const input = dom.get('#package-name'), clear = dom.get('[data-clear-picker="package"]');
+    const trigger = dom.get('[data-open-filter="package"]');
+    dom.open('package');
+    assert.equal(input.value, 'Keep.dtsx'); assert.equal(clear.hidden, false);
+    dom.edit('#package-name', 'p'.repeat(261)); dom.click('[data-apply-package]');
+    assert.notEqual(dom.get('[data-package-status]').textContent, '');
+    clear.focus(); clear.click();
+    assert.equal(input.value, ''); assert.equal(clear.hidden, true);
+    assert.equal(dom.document.activeElement, input);
+    assert.equal(dom.get('[data-package-status]').textContent, '');
+    assert.equal(dom.applied.length, 1, 'Clearing is a draft edit');
+    if (method === 'Apply') dom.click('[data-apply-package]');
+    else input.dispatchEvent(key('Enter'));
+    assert.equal(dom.applied.at(-1).package, null);
+    assert.equal(dom.applied.at(-1).folder, 'F');
+    assert.equal(dom.window.location.searchParams.has('package'), false);
+    assert.equal(dom.get('[data-filter-label="package"]').textContent, 'All packages');
+    assert.equal(dom.document.activeElement, trigger);
+    dom.open('package');
+    assert.equal(clear.hidden, true);
+    dom.edit('#package-name', 'Typed.dtsx'); assert.equal(clear.hidden, false);
+    dom.edit('#package-name', ''); assert.equal(clear.hidden, true);
+  }
+});
+
+test('C2: invalid package text stays in the panel with a message; Escape and light dismiss apply nothing', t => {
   const dom = setup(t, '?package=Keep.dtsx');
   const count = dom.applied.length, search = dom.window.location.search;
   dom.open('package'); dom.edit('#package-name', 'p'.repeat(261)); dom.click('[data-apply-package]');
@@ -135,7 +153,7 @@ test('C2 r1: Enter that confirms an input-method candidate does not apply the pa
 });
 
 test('C2 r1: an unedited Apply keeps CR/LF in the applied package name; an edit replaces it', t => {
-  for (const name of ['A\r\nB.dtsx', '\n', 'C\rD.dtsx']) {
+  for (const name of ['A\r\nB.dtsx', 'C\rD.dtsx']) {
     const dom = setup(t, '?' + new URLSearchParams({ package: name }));
     assert.equal(dom.applied.at(-1).package, name);
     dom.open('package'); dom.click('[data-apply-package]');
@@ -146,4 +164,14 @@ test('C2 r1: an unedited Apply keeps CR/LF in the applied package name; an edit 
     dom.open('package'); dom.edit('#package-name', 'New.dtsx'); dom.click('[data-apply-package]');
     assert.equal(dom.applied.at(-1).package, 'New.dtsx');
   }
+});
+
+test('G4: a CR/LF-only name displays as empty and applying the empty field removes it', t => {
+  const dom = setup(t, '?package=%0D%0A');
+  assert.equal(dom.applied.at(-1).package, '\r\n');
+  dom.open('package');
+  assert.equal(dom.get('#package-name').value, '');
+  assert.equal(dom.get('[data-clear-picker="package"]').hidden, true);
+  dom.click('[data-apply-package]');
+  assert.equal(dom.applied.at(-1).package, null);
 });

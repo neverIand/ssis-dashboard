@@ -42,9 +42,12 @@
                     </div>
                     {% for kind in ['folder', 'project'] %}
                     <div id="{{ kind }}-picker" class="filter-popover" data-filter-panel="{{ kind }}" role="dialog" aria-labelledby="{{ kind }}-heading" popover="auto">
-                        <div class="popover-heading"><h2 id="{{ kind }}-heading">{{ kind|capitalize }}</h2><button type="button" class="button-quiet" data-close-filter popovertarget="{{ kind }}-picker" popovertargetaction="hide" aria-label="Close {{ kind }} picker">×</button></div>
+                        <div class="popover-heading"><h2 id="{{ kind }}-heading">{{ kind|capitalize }}</h2></div>
                         <label for="{{ kind }}-search" class="visually-hidden">Search {{ kind }}s</label>
-                        <input id="{{ kind }}-search" type="search" placeholder="Search {{ kind }}s" autocomplete="off" maxlength="128" aria-describedby="{{ kind }}-search-status" autofocus>
+                        <div class="picker-field">
+                            <input id="{{ kind }}-search" type="text" role="searchbox" enterkeyhint="search" placeholder="Search {{ kind }}s" autocomplete="off" maxlength="128" aria-describedby="{{ kind }}-search-status" autofocus>
+                            <button type="button" data-clear-picker="{{ kind }}" aria-label="Clear search" hidden>×</button>
+                        </div>
                         <button type="button" class="catalog-choice" data-all-scope="{{ kind }}">All {{ kind }}s</button>
                         <div class="catalog-choices" data-catalog-choices="{{ kind }}"></div>
                         <p id="{{ kind }}-search-status" class="resource-status" data-catalog-status="{{ kind }}" role="status"></p>
@@ -56,22 +59,24 @@
                     </div>
                     {% endfor %}
                     <div id="package-picker" class="filter-popover" data-filter-panel="package" role="dialog" aria-labelledby="package-heading" popover="auto">
-                        <div class="popover-heading"><h2 id="package-heading">Package</h2><button type="button" class="button-quiet" data-close-filter popovertarget="package-picker" popovertargetaction="hide" aria-label="Close package picker">×</button></div>
+                        <div class="popover-heading"><h2 id="package-heading">Package</h2></div>
                         <label for="package-name" class="visually-hidden">Exact package name</label>
-                        <input id="package-name" type="text" placeholder="Exact package name" autocomplete="off" spellcheck="false" maxlength="260" aria-describedby="package-status" autofocus>
-                        <button type="button" class="catalog-choice" data-all-scope="package">All packages</button>
+                        <div class="picker-field">
+                            <input id="package-name" type="text" placeholder="Exact package name" autocomplete="off" spellcheck="false" maxlength="260" aria-describedby="package-status" autofocus>
+                            <button type="button" data-clear-picker="package" aria-label="Clear package name" hidden>×</button>
+                        </div>
                         <p id="package-status" class="resource-status" data-package-status role="status"></p>
                         <div class="popover-actions"><button type="button" data-apply-package>Apply</button></div>
                     </div>
                     <div id="status-picker" class="filter-popover status-popover" data-filter-panel="status" role="dialog" aria-labelledby="status-heading" popover="auto">
-                        <div class="popover-heading"><h2 id="status-heading">Status</h2><button type="button" class="button-quiet" data-close-filter popovertarget="status-picker" popovertargetaction="hide" aria-label="Close status picker">×</button></div>
+                        <div class="popover-heading"><h2 id="status-heading">Status</h2></div>
                         <fieldset id="status" class="status-options"><legend class="visually-hidden">Execution statuses</legend>
                             <div data-status-choices><label><input type="checkbox" name="status" value="" checked autofocus>All statuses</label></div>
                         </fieldset>
-                        <div class="popover-actions"><button type="button" data-close-filter popovertarget="status-picker" popovertargetaction="hide">Done</button></div>
+                        <div class="popover-actions"><button type="button" data-status-done popovertarget="status-picker" popovertargetaction="hide">Done</button></div>
                     </div>
                     <div id="created-picker" class="filter-popover created-popover" data-filter-panel="created" role="dialog" aria-labelledby="created-heading" popover="auto">
-                        <div class="popover-heading"><h2 id="created-heading">Created</h2><button type="button" class="button-quiet" data-close-filter popovertarget="created-picker" popovertargetaction="hide" aria-label="Close time picker">×</button></div>
+                        <div class="popover-heading"><h2 id="created-heading">Created</h2></div>
                         <div class="creation-presets" role="group" aria-label="Creation window">
                             {% for value, label in [('today', 'Today'), ('24h', 'Last 24 hours'), ('7d', 'Last 7 days'), ('30d', 'Last 30 days'), ('180d', 'Last 180 days'), ('custom', 'Custom range')] %}
                             <button type="button" class="catalog-choice" data-created-preset="{{ value }}" aria-pressed="false"{% if loop.first %} autofocus{% endif %}>{{ label }}</button>
@@ -99,7 +104,7 @@
                             </details>
                         </div>
                         <p class="resource-status" data-time-notice role="status"></p>
-                        <div class="popover-actions"><button type="button" data-close-filter popovertarget="created-picker" popovertargetaction="hide">Cancel</button><button type="button" class="button-primary" data-use-range>Use range</button></div>
+                        <div class="popover-actions"><button type="button" data-cancel-range popovertarget="created-picker" popovertargetaction="hide">Cancel</button><button type="button" class="button-primary" data-use-range>Use range</button></div>
                     </div>
                 </fieldset>
                 <button type="button" data-recover-filters hidden>Reset invalid filters</button>

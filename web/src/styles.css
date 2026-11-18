@@ -176,7 +176,9 @@ main {
 [data-execution-scroll][data-loading] { min-height: 48rem; }
 .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 2.2rem; min-width: 2.2rem; height: 2.2rem; padding: 0; }
 .icon-button svg, .info-trigger svg { display: block; flex-shrink: 0; }
-.info-tip { display: inline-flex; align-items: center; flex: 0 0 auto; vertical-align: middle; }
+.info-tip, .info-label { display: inline-flex; align-items: center; flex: 0 0 auto; }
+.info-tip { vertical-align: middle; }
+.info-label { white-space: pre; }
 .info-trigger { display: inline-flex; align-items: center; justify-content: center; width: 1.6rem; min-height: 1.6rem; padding: 0; border: 0; background: transparent; color: var(--sd-secondary); }
 .info-text { position: fixed; inset: auto; margin: 0; width: min(24rem, calc(100vw - 1.0667rem)); padding: 0.6rem 0.8rem; border: 1px solid var(--sd-control-border); border-radius: 4px; background: var(--sd-surface); color: var(--sd-text); font-size: 0.8667rem; font-weight: 400; line-height: 1.5; white-space: normal; text-align: left; overflow-wrap: anywhere; box-shadow: var(--sd-shadow-small); }
 
@@ -275,8 +277,13 @@ main {
 .creation-presets > button { white-space: nowrap; }
 .status-popover { width: 23rem; }
 .popover-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; margin-bottom: 0.6rem; }
-.popover-heading button { font-size: 1.2rem; padding: 0 0.6rem; }
-.filter-popover > input { width: 100%; margin-bottom: 0.5rem; }
+.picker-field { position: relative; margin-bottom: 0.5rem; }
+.picker-field > input { width: 100%; padding-inline-end: 2.5rem; }
+.picker-field > [data-clear-picker] {
+  position: absolute; inset-block: 1px; inset-inline-end: 1px; width: 2.1333rem; min-height: 0;
+  padding: 0; border: 0; background: transparent; color: var(--sd-secondary); font-size: 1.2rem;
+}
+.picker-field > button:focus-visible { outline-offset: -2px; }
 .catalog-choice { display: block; width: 100%; text-align: left; border-color: transparent; background: transparent; overflow-wrap: anywhere; white-space: pre-wrap; }
 .catalog-choice[aria-pressed="true"] { background: var(--sd-action-soft); color: var(--sd-action); }
 .catalog-choices { margin-bottom: 0.5rem; }
@@ -316,7 +323,7 @@ input, select, button, textarea {
 }
 
 select { width: 100%; }
-button { padding-inline: 0.8rem; cursor: default; }
+button { padding-inline: 0.8rem; cursor: default; user-select: none; }
 
 button:hover:enabled:not([aria-disabled="true"]) { background: var(--sd-subtle); }
 
@@ -455,7 +462,8 @@ tbody tr:hover { background: var(--sd-subtle); }
 [data-events-table] tr[data-severity="error"] .event-name { color: var(--sd-error); font-weight: 600; }
 [data-events-table] tr[data-severity="warning"] .event-name { color: var(--sd-warning); font-weight: 600; }
 .detail-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.5rem; }
-.detail-title .info-tip { align-self: center; }
+/* The ID and status badge sit on the heading's baseline, below its line-box centre; the tip follows them. */
+.detail-title .info-tip { align-self: center; translate: 0 0.36rem; }
 .detail-title h1 { min-width: 0; overflow-wrap: anywhere; }
 .detail-title > span { white-space: nowrap; }
 .detail-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.8rem; }
@@ -710,6 +718,7 @@ td > :is(.status-badge, .result-badge) { vertical-align: top; line-height: 1lh; 
   .summary-card:nth-child(odd) { border-left: 0; }
   .summary-card:nth-child(n+3) { border-top: 1px solid var(--sd-border); }
   .detail-title h1 { flex-basis: 100%; }
+  .detail-title .info-tip { translate: none; }
   .history-choices { grid-template-columns: minmax(0, 1fr); }
   main { padding: 1rem; }
   .header-content nav { gap: 0.5rem; }

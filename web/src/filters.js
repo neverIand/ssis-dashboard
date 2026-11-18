@@ -122,15 +122,29 @@ export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}
       if (key === 'package') packageStatus.textContent = message; else notice.textContent = message;
     }
   }
+  function mountClearButton(key, input) {
+    const button = get(`[data-clear-picker="${key}"]`);
+    const sync = () => { button.hidden = !input.value; };
+    listen(input, 'input', sync);
+    listen(button, 'click', () => {
+      input.value = '';
+      input.focus();
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    return value => { input.value = value; sync(); };
+  }
 
   // Package has no catalog list operation, so its panel takes an exact name only.
   // Folder and project changes keep it: the same name may need narrowing to one project.
   const packageName = get('#package-name'), packageStatus = get('[data-package-status]');
-  // A single-line box drops CR/LF, so an unedited Apply keeps the applied name exactly.
+  const setPackageName = mountClearButton('package', packageName);
+  // A single-line box drops CR/LF. Keep the exact name on an unedited, nonempty Apply.
   let packageEdited = false;
-  const applyPackage = () => chooseScope('package', packageEdited ? packageName.value || null : session.applied.package);
+  function applyPackage() {
+    const name = packageEdited ? packageName.value : session.applied.package;
+    chooseScope('package', packageName.value ? name : null);
+  }
   listen(get('[data-apply-package]'), 'click', applyPackage);
-  listen(get('[data-all-scope="package"]'), 'click', () => chooseScope('package', null));
   listen(packageName, 'keydown', event => { if (submitKey(event)) { event.preventDefault(); applyPackage(); } });
   listen(packageName, 'input', () => { packageEdited = true; packageStatus.textContent = ''; });
 
@@ -138,6 +152,7 @@ export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}
     const search = get(`#${key}-search`), choices = get(`[data-catalog-choices="${key}"]`);
     const message = get(`[data-catalog-status="${key}"]`), more = get(`[data-catalog-more="${key}"]`);
     const retry = get(`[data-catalog-retry="${key}"]`), exact = get(`[data-exact-scope="${key}"]`);
+    const all = get(`[data-all-scope="${key}"]`), setSearch = mountClearButton(key, search);
     const owner = createCatalogSearch({ api, kind: `${key}s`, limit: metadata.limits.default_limit,
       maxLimit: metadata.limits.max_limit,
       publish(state) {
@@ -173,8 +188,15 @@ export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}
           (state.phase === 'error' ? retry : choices.children[previousCount] ?? (more.hidden ? search : more)).focus();
         }
       } });
-    pickers.set(key, owner);
     const searchNow = () => { void owner.search(search.value, key === 'project' ? session.applied.folder : null); };
+    pickers.set(key, {
+      cancel: owner.cancel, dispose: owner.dispose,
+      open() {
+        setSearch(''); exact.hidden = true;
+        all.setAttribute('aria-pressed', String(session.applied[key] === null));
+        searchNow();
+      }
+    });
     listen(search, 'input', () => {
       owner.cancel(); clearTimeout(searchTimer);
       choices.replaceChildren(); more.hidden = true; retry.hidden = true;
@@ -197,7 +219,7 @@ export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}
     listen(more, 'click', () => { void owner.more(); });
     listen(retry, 'click', () => { void owner.retry(); });
     listen(exact, 'click', () => chooseScope(key, search.value));
-    listen(get(`[data-all-scope="${key}"]`), 'click', () => chooseScope(key, null));
+    listen(all, 'click', () => chooseScope(key, null));
   }
 
   const range = mountRangeEditor(form, { metadata, listen, onChoose(bounds) {
@@ -207,6 +229,7 @@ export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}
   for (const trigger of form.querySelectorAll('[data-open-filter]')) {
     const key = trigger.dataset.openFilter;
     const panel = get(`[data-filter-panel="${key}"]`);
+    const picker = pickers.get(key);
     geometry.observe(panel);
     listen(panel, 'beforetoggle', event => {
       if (event.newState === 'closed') {
@@ -218,14 +241,9 @@ export function mountFilters(root,{ metadata, api, appBase, onApplied = () => {}
       if (opened?.panel === panel) return;
       close();
       opened = { key, trigger, panel, activation: null };
-      if (pickers.has(key)) {
-        const search = get(`#${key}-search`);
-        search.value = ''; get(`[data-exact-scope="${key}"]`).hidden = true;
-        get(`[data-all-scope="${key}"]`).setAttribute('aria-pressed', String(session.applied[key] === null));
-        void pickers.get(key).search('', key === 'project' ? session.applied.folder : null);
-      } else if (key === 'package') {
-        packageName.value = session.applied.package ?? ''; packageStatus.textContent = ''; packageEdited = false;
-        get('[data-all-scope="package"]').setAttribute('aria-pressed', String(session.applied.package === null));
+      if (picker) picker.open();
+      else if (key === 'package') {
+        setPackageName(session.applied.package ?? ''); packageStatus.textContent = ''; packageEdited = false;
       } else if (key === 'created') range.open(session.draft, effectiveWindow());
     });
     listen(panel, 'toggle', position);
