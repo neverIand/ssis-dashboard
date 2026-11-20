@@ -30,6 +30,8 @@ def execution(identifier, **updates):
            'started_at': parse_timestamp('2026-10-15T11:59:30.1234567Z'), 'ended_at': None,
            'warning_count': 0, 'error_count': 0}
     row.update(updates)
+    # Every list batch returns the count of system LOGGING_LEVEL rows beside the value.
+    row.setdefault('logging_rows', 0 if row['logging_level'] is None else 1)
     return row
 
 

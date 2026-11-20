@@ -97,14 +97,13 @@ class ExecutionSortingTests(unittest.TestCase):
                 else:
                     row['sort_text1']=key[0]
                     if sort=='environment': row['sort_text2']=key[1]
-            if resource=='api-executions-sort.sql':
-                row['logging_rows']=self.logging_rows.get(row['execution_id'], 0 if row['logging_level'] is None else 1)
+            row['logging_rows']=self.logging_rows.get(row['execution_id'], 0 if row['logging_level'] is None else 1)
             result.append(row)
         return result
 
-    def test_calculated_sorts_reject_unexpected_logging_row_counts(self):
-        # Two system LOGGING_LEVEL rows cannot repeat a row in this batch, so the batch reports the count.
-        for sort in sorted(CALCULATED_SORTS):
+    def test_every_sort_rejects_unexpected_logging_row_counts(self):
+        # Two system LOGGING_LEVEL rows cannot repeat a row in any list batch, so each batch reports the count.
+        for sort in sorted(EXECUTION_SORTS):
             for identifier, count in ((3, 2), (3, None), (3, True), (3, 0), (2, -1)):
                 with self.subTest(sort=sort, count=count):
                     self.logging_rows = {identifier: count}
@@ -115,8 +114,14 @@ class ExecutionSortingTests(unittest.TestCase):
         self.logging_rows = {2: 2}
         self.assertEqual(self.get({**pages.WINDOW, 'sort': 'logging_level', 'limit': '7'}).status_code, 500)
         self.assertEqual(self.get({**pages.WINDOW, 'sort': 'logging_level', 'limit': '6'}).status_code, 200)
-        # The ID and ordinary-column lists do not carry the count.
-        self.assertEqual(self.get({**pages.WINDOW, 'sort': 'created_at', 'limit': '200'}).status_code, 200)
+        # So is the look-ahead row of the ID and ordinary-column lists (R-07 of the 19 November review).
+        for sort in ('execution_id', 'created_at'):
+            with self.subTest(sort=sort, look_ahead=True):
+                self.logging_rows = {}
+                ordered = [row['execution_id'] for row in self.get({**pages.WINDOW, 'sort': sort, 'limit': '200'}).json['data']]
+                self.logging_rows = {int(ordered[3]): 2}
+                self.assertEqual(self.get({**pages.WINDOW, 'sort': sort, 'limit': '3'}).status_code, 500)
+                self.assertEqual(self.get({**pages.WINDOW, 'sort': sort, 'limit': '2'}).status_code, 200)
 
     def get(self, values):
         return self.client.get('/api/v1/executions',query_string=values)

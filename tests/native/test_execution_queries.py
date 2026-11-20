@@ -143,10 +143,10 @@ class ExecutionSQLTests(unittest.TestCase):
             seek = seek_values({'last_id': str(last), 'sort_key': key, 'sort_nulls': nulls}, sort)
         self.fail('Unbounded or non-progressing cursor chain')
 
-    def test_calculated_sorts_count_system_logging_rows(self):
+    def test_every_sort_counts_system_logging_rows(self):
         self.cursor.execute('SELECT TOP (1) execution_id FROM #sample_parameters WHERE object_type=50 ORDER BY execution_id;')
         duplicated = self.cursor.fetchone()[0]
-        for sort in sorted(CALCULATED_SORTS):
+        for sort in EXECUTION_SORTS:
             with self.subTest(sort=sort):
                 self.cursor.execute('SAVE TRANSACTION logging_rows;')
                 try:

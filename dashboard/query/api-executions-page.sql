@@ -58,11 +58,14 @@ LEFT JOIN catalog.event_messages AS m ON m.operation_id = p.execution_id AND m.e
 GROUP BY p.execution_id
 OPTION (RECOMPILE, FORCE ORDER);
 
-SELECT p.*, loglevel.logging_level, recorded.warning_count, recorded.error_count
+-- One value and a row count per execution, as in the calculated sorts, detail and History: a second system
+-- LOGGING_LEVEL row must not repeat the execution or pick a level by row order.
+SELECT p.*, loglevel.logging_level, loglevel.logging_rows, recorded.warning_count, recorded.error_count
 FROM #execution_page AS p
 INNER JOIN #page_counts AS recorded ON recorded.execution_id = p.execution_id
 OUTER APPLY (
-    SELECT CONVERT(int, CASE WHEN v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL' THEN v.parameter_value END) AS logging_level
+    SELECT COUNT_BIG(*) AS logging_rows,
+           MAX(CONVERT(int, CASE WHEN v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL' THEN v.parameter_value END)) AS logging_level
     FROM catalog.execution_parameter_values AS v
     WHERE v.execution_id = p.execution_id AND v.object_type = 50 AND v.parameter_name = N'LOGGING_LEVEL'
 ) AS loglevel
