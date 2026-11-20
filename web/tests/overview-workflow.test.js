@@ -51,25 +51,30 @@ test('server clock advances precise server instants using elapsed monotonic time
 });
 
 function rolling(t, options = {}) {
-  let elapsed = 0, state, asOf = wireTime;
-  const calls = [];
-  const serverNow = () => new Date(Date.parse(wireTime) + elapsed).toISOString().replace('.123Z', '.1234567Z');
-  const owner = createOverview({ metadata, serverTime: wireTime, monotonicNow: () => elapsed,
+  let elapsed = 0, state;
+  const calls = [], start = options.serverTime ?? wireTime, zone = (options.metadata ?? metadata).display_timezone;
+  let asOf = start;
+  // Elapsed milliseconds plus the start's four sub-millisecond digits.
+  const serverNow = () => new Date(Date.parse(start) + elapsed).toISOString().replace(/Z$/, `${start.slice(23, 27)}Z`);
+  const owner = createOverview({ metadata, serverTime: start, monotonicNow: () => elapsed,
     autoRefresh: false, ...options, publish: value => { state = value; }, api: {
       async get(resource, { params }) {
         calls.push({ resource, params });
-        const bounds = { from: params.from, to: params.to, generated_at: serverNow() };
+        // The API answers with canonical seven-digit UTC bounds.
+        const canonical = value => value?.replace(/:(\d{2})Z$/, ':$1.0000000Z');
+        const bounds = { from: canonical(params.from), to: canonical(params.to), generated_at: serverNow() };
         if (resource === 'executions') {
           if (!params.cursor) asOf = serverNow();
-          return overviewPage({ ...bounds, limit: params.limit,
+          const page = overviewPage({ ...bounds, limit: params.limit,
             as_of: asOf, has_more: !params.cursor, next_cursor: params.cursor ? null : 'page-two' });
+          return page;
         }
         if (resource === 'metrics/summary') return timelineSummary(bounds);
         const buckets = [];
-        let date = projectTime(params.from, metadata.display_timezone).date;
-        while (calendarBound(date, '', metadata.display_timezone) < params.to) {
+        let date = projectTime(params.from, zone).date;
+        while (calendarBound(date, '', zone) < params.to) {
           const next = nextDate(date);
-          buckets.push(timelineBucket(calendarBound(date, '', metadata.display_timezone), calendarBound(next, '', metadata.display_timezone)));
+          buckets.push(timelineBucket(calendarBound(date, '', zone), calendarBound(next, '', zone)));
           date = next;
         }
         // The API uses canonical seven-digit UTC bounds for calendar buckets.
@@ -80,6 +85,17 @@ function rolling(t, options = {}) {
   t.after(owner.dispose);
   return { owner, calls, advance(ms) { elapsed += ms; }, get state() { return state; } };
 }
+
+test('Today starts at the first real instant when local midnight is skipped (R-05)', async t => {
+  // America/Santiago, 6 September 2026: clocks jump from 00:00 to 01:00, so the day starts at 04:00 UTC.
+  const santiago = { ...metadata, display_timezone: 'America/Santiago' };
+  const run = rolling(t, { metadata: santiago, serverTime: '2026-09-06T15:00:00.1234567Z' });
+  await run.owner.apply(parseSelection('?created=today', santiago));
+  assert.equal(run.state.error, null);
+  const list = run.calls.find(call => call.resource === 'executions');
+  assert.deepEqual([list.params.from, list.params.to], ['2026-09-06T04:00:00Z', '2026-09-06T15:00:00.1234567Z']);
+  assert.equal(run.state.page.meta.from, '2026-09-06T04:00:00.0000000Z');
+});
 
 test('relative page one rolls on refresh, Previous and First page; deeper cursors replay exact bounds', async t => {
   const run = rolling(t), value = selection('?created=24h');

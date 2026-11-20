@@ -1,5 +1,5 @@
 import { presetHours, SelectionError, validateSelection } from './selection.js';
-import { calendarBound, defaultRangePreset, localCandidates, nextDate, projectTime } from './time-range.js';
+import { calendarBound, defaultRangePreset, localCandidates, projectTime } from './time-range.js';
 
 export function mountRangeEditor(form, { metadata, listen, onChoose }) {
   const get = selector => form.querySelector(selector);
@@ -37,8 +37,8 @@ export function mountRangeEditor(form, { metadata, listen, onChoose }) {
       field.exact.value = '';
       if (!field.date.value) continue;
       try {
-        const candidates = localCandidates(key === 'to' && !include.checked ? nextDate(field.date.value) : field.date.value,
-          include.checked ? field.time.value : '00:00:00', zone);
+        // Whole dates start at the day's first real instant, so only an entered time can be repeated.
+        const candidates = include.checked ? localCandidates(field.date.value, field.time.value, zone) : [];
         field.occurrenceLabel.hidden = candidates.length < 2;
         if (candidates.length === 2) {
           for (let index = 0; index < 2; index += 1) {

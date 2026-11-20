@@ -183,6 +183,21 @@ test('DST duplicate time requires a choice and nonexistent time does not apply',
   assert.match(dom.get('[data-time-notice]').textContent, /skipped/);
 });
 
+test('a whole date at a repeated midnight applies without an occurrence choice; an entered midnight asks', t => {
+  const azores = { ...settings, display_timezone: 'Atlantic/Azores' };
+  const dom = setup(t, '', () => null, azores); dom.open('created'); dom.click('[data-created-preset="custom"]');
+  dom.edit('#from-date', '2026-10-25'); dom.edit('#to-date', '2026-10-25');
+  assert.equal(dom.get('[data-occurrence-label="from"]').hidden, true);
+  dom.click('[data-use-range]'); dom.submit();
+  assert.deepEqual([dom.applied.at(-1).from, dom.applied.at(-1).to], ['2026-10-25T00:00:00Z', '2026-10-26T01:00:00Z']);
+  dom.open('created');
+  dom.get('#include-time').checked = true; dom.get('#include-time').dispatchEvent(new Event('change'));
+  dom.edit('#from-date', '2026-10-25'); dom.edit('#from-time', '00:00'); dom.edit('#to-date', '2026-10-25'); dom.edit('#to-time', '12:00');
+  assert.equal(dom.get('[data-occurrence-label="from"]').hidden, false);
+  dom.edit('#from-occurrence', '1', 'change'); dom.click('[data-use-range]'); dom.submit();
+  assert.equal(dom.applied.at(-1).from, '2026-10-25T01:00:00Z');
+});
+
 test('each relative preset applies in one click without another metadata request', t => {
   const dom = setup(t);
   for (const token of ['24h','7d','30d','today']) {

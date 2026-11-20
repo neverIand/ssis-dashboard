@@ -5,21 +5,25 @@ const pad = value => String(value).padStart(2, '0');
 const formatters = new Map();
 const repeatedDates = new Map();
 
-function parts(date, timeZone) {
+// `iso` gives signed ISO years for date arithmetic just outside 0001–9999 (1 BC is 0000, 10000 is +010000).
+// Displayed and edited dates keep the unsigned year, at least four digits, as before.
+function parts(date, timeZone, iso = false) {
   if (!formatters.has(timeZone)) formatters.set(timeZone, new Intl.DateTimeFormat('en-GB', {
     timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit',
-    minute: '2-digit', second: '2-digit', hourCycle: 'h23', calendar: 'gregory', numberingSystem: 'latn',
+    minute: '2-digit', second: '2-digit', hourCycle: 'h23', calendar: 'gregory', numberingSystem: 'latn', era: 'short',
   }));
   const values = Object.fromEntries(formatters.get(timeZone).formatToParts(date).map(part => [part.type, part.value]));
-  return { date: `${values.year.padStart(4, '0')}-${values.month}-${values.day}`,
-    time: `${values.hour}:${values.minute}:${values.second}` };
+  const year = values.era === 'BC' ? 1 - Number(values.year) : Number(values.year);
+  const text = !iso ? values.year.padStart(4, '0') : year < 0 ? `-${String(-year).padStart(6, '0')}`
+    : year > 9999 ? `+${String(year).padStart(6, '0')}` : String(year).padStart(4, '0');
+  return { date: `${text}-${values.month}-${values.day}`, time: `${values.hour}:${values.minute}:${values.second}` };
 }
 
-export function projectTime(value, timeZone) {
+export function projectTime(value, timeZone, iso = false) {
   const ticks = timestampTicks(value);
   const milliseconds = Number((ticks - epochTicks) / 10000n);
   // Floor negative instants too; projection never replaces the original wire value.
-  return parts(new Date(milliseconds - (ticks < epochTicks && (ticks - epochTicks) % 10000n ? 1 : 0)), timeZone);
+  return parts(new Date(milliseconds - (ticks < epochTicks && (ticks - epochTicks) % 10000n ? 1 : 0)), timeZone, iso);
 }
 
 export function nextDate(value) {
@@ -35,7 +39,7 @@ function nearbyOffsets(wall, timeZone) {
   const offsets = new Set();
   for (const hours of [-36, -12, 0, 12, 36]) {
     const sample = new Date(wall + hours * 3600000);
-    const local = parts(sample, timeZone);
+    const local = parts(sample, timeZone, true);
     offsets.add(Date.parse(`${local.date}T${local.time}Z`) - Math.floor(sample.valueOf() / 1000) * 1000);
   }
   return offsets;
@@ -52,7 +56,7 @@ export function localCandidates(date, time, timeZone) {
   const matches = [];
   for (const offset of offsets) {
     const instant = new Date(wall - offset);
-    const local = parts(instant, timeZone);
+    const local = parts(instant, timeZone, true);
     if (local.date === date && local.time === clock.slice(0, 8)) {
       const value = instant.toISOString().slice(0, 19) + (clock.includes('.') ? `.${clock.split('.')[1]}` : '') + 'Z';
       timestampTicks(value);
@@ -62,6 +66,34 @@ export function localCandidates(date, time, timeZone) {
     }
   }
   return matches.sort((a, b) => a.value.localeCompare(b.value));
+}
+
+// The first instant whose local date is `date` or later, as the API's day buckets choose a day's start: the earlier
+// of a repeated midnight, or the clock change itself when midnight is skipped (America/Santiago on 6 September 2026
+// starts at 01:00). A date skipped entirely (Pacific/Apia, 30 December 2011) resolves to the next day's start.
+const dateValue = date => Date.parse(`${date}T00:00:00Z`);
+function dateBoundary(date, timeZone) {
+  const midnight = localCandidates(date, '00:00:00', timeZone);
+  if (midnight.length) return { value: midnight[0].value, date };
+  // Search the 26 hours before the earliest instant at or after the date for the instant the date changes.
+  const wall = Date.parse(`${date}T00:00:00Z`);
+  let late = Math.min(...[...nearbyOffsets(wall, timeZone)].map(offset => wall - offset)
+    .filter(instant => dateValue(parts(new Date(instant), timeZone, true).date) >= wall));
+  if (!Number.isFinite(late)) throw new SelectionError('The start of this day is unavailable. Choose another date.');
+  let early = late - 26 * 3600000;
+  while (late - early > 1) {
+    const middle = Math.floor((early + late) / 2);
+    if (dateValue(parts(new Date(middle), timeZone, true).date) < wall) early = middle; else late = middle;
+  }
+  const value = new Date(late).toISOString().replace(/\.000Z$/, 'Z');
+  timestampTicks(value);
+  return { value, date: parts(new Date(late), timeZone, true).date };
+}
+
+export function dayStart(date, timeZone) {
+  const boundary = dateBoundary(date, timeZone);
+  if (boundary.date !== date) throw new SelectionError('This date was skipped by a time zone change. Choose another date.');
+  return boundary.value;
 }
 
 export function repeatedTimeOffset(value, timeZone, local = projectTime(value, timeZone)) {
@@ -80,8 +112,9 @@ export function repeatedTimeOffset(value, timeZone, local = projectTime(value, t
 
 export function calendarBound(date, time, timeZone, { end = false, includeTime = false, occurrence = '' } = {}) {
   if (!date) return null;
-  const candidates = localCandidates(end && !includeTime ? nextDate(date) : date,
-    includeTime ? time : '00:00:00', timeZone);
+  // An inclusive end date runs to the next day's start, even when the next date itself was skipped.
+  if (!includeTime) return end ? dateBoundary(nextDate(date), timeZone).value : dayStart(date, timeZone);
+  const candidates = localCandidates(date, time, timeZone);
   if (!candidates.length) throw new SelectionError('This local time is skipped by the clock change. Choose another time.');
   if (candidates.length > 1 && occurrence === '') {
     throw new SelectionError('This local time occurs twice. Choose the first or second occurrence.');
@@ -94,10 +127,9 @@ export function calendarBound(date, time, timeZone, { end = false, includeTime =
 export function presetRange(preset, serverTime, timeZone) {
   const now = timestampTicks(serverTime);
   if (preset === 'today') {
-    const { date } = projectTime(serverTime, timeZone);
-    const candidates = localCandidates(date, '00:00:00', timeZone);
-    if (!candidates.length) throw new SelectionError('The start of today is unavailable. Choose a custom range.');
-    return { from: candidates[0].value, to: serverTime };
+    try {
+      return { from: dayStart(projectTime(serverTime, timeZone, true).date, timeZone), to: serverTime };
+    } catch { throw new SelectionError('The start of today is unavailable. Choose a custom range.'); }
   }
   const hours = presetHours[preset];
   if (!hours) throw new SelectionError('Choose a creation window.');
