@@ -66,7 +66,8 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   const firstError = root.querySelector('[data-first-error]');
   const firstErrorLink = root.querySelector('[data-first-error-link]');
   const firstErrorMessage = root.querySelector('[data-first-error-message]');
-  let earliestError = null, earliestSource = null;
+  // Keep only the header's label and excerpt; pages are remembered weakly so an inactive Events page can be freed.
+  let earliestError = null, inspected = new WeakSet();
   const followErrors = event => {
     if ((event.button ?? 0) !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
@@ -130,31 +131,39 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   };
   // Hidden is not enough after denial or clearing: remove the text and link as well.
   function hideEarliestError() {
-    earliestError = earliestSource = null;
+    earliestError = null; inspected = new WeakSet();
+    clearEarliestError();
+  }
+  function clearEarliestError() {
     if (!firstError) return;
     firstError.hidden = true;
     firstErrorLink.textContent = firstErrorMessage.textContent = '';
     firstErrorLink.removeAttribute('href');
   }
-  // Only a successfully read, unsearched, time-ascending first Errors page names the earliest recorded error.
+  // Only a successfully read, unsearched, time-ascending first Errors page names the earliest recorded error,
+  // and only when it covers every matching error: unpageable matches may be earlier, so the summary stays hidden.
   // A page is judged once, when it arrives, so a stale page under a reset page number never qualifies.
   function showEarliestError(events, counts) {
     const query = events.query, page = events.page;
     const denied = events.phase === 'error' && page === null && events.error !== null && !transient(events.error);
     if (!counts?.errors || denied) { hideEarliestError(); return; }
-    if (page && page !== earliestSource && events.phase === 'ready' && events.error === null) {
-      earliestSource = page;
+    if (page && !inspected.has(page) && events.phase === 'ready' && events.error === null) {
+      inspected.add(page);
       if (query.kind === 'errors' && query.q === null && query.sort === 'message_time' && query.direction === 'asc'
-          && events.pageNumber === 1) earliestError = page.data[0] ?? null;
+          && events.pageNumber === 1) {
+        const row = page.meta.has_unidentified_events ? null : page.data[0] ?? null;
+        // Array.from copies the clipped text, so the excerpt does not keep the full message string alive.
+        earliestError = row && {
+          label: [row.source_name, row.subcomponent_name].filter(Boolean).join(' › ') || row.event_name || 'Error',
+          excerpt: row.message === null ? '' : Array.from(`— ${clippedText(row.message, 200) ?? row.message}`).join('') };
+      }
     }
     if (!firstError) return;
-    if (earliestError === null) { firstError.hidden = true; return; }
+    if (earliestError === null) { clearEarliestError(); return; }
     firstError.hidden = false;
-    const source = [earliestError.source_name, earliestError.subcomponent_name].filter(Boolean).join(' › ');
-    firstErrorLink.textContent = source || earliestError.event_name || 'Error';
+    firstErrorLink.textContent = earliestError.label;
     firstErrorLink.href = detailFragment({ tab: 'events', kind: 'errors' }, metadata);
-    firstErrorMessage.textContent = earliestError.message === null ? '' : `— ${clippedText(earliestError.message, 200)
-      ?? earliestError.message}`;
+    firstErrorMessage.textContent = earliestError.excerpt;
   }
   const loader = createDetailLoader({ api, metadata, executionId, autoRefresh: !autoPaused,
     initialTab: readDetailFragment(window.location.hash, metadata) ?? returning?.activeTab ?? {},

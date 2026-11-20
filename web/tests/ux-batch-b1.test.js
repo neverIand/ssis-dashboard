@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { ApiError } from '../src/api.js';
 import { mountDetail } from '../src/render-detail.js';
 import { detailDOM, detailResponse } from './detail-fixture.js';
@@ -241,4 +243,46 @@ test('R2 advisory: disposal clears a running feedback timer, and a clipboard res
   pending.shift()(); await flush();
   assert.equal(active.size, 0, 'no timer after disposal');
   assert.equal(late.get('events-copy-status').textContent, '');
+});
+
+// Full review of 19 November 2026, batch C (R-03, R-04).
+const partial = params => ({ ...params, has_unidentified_events: true, availability: 'unknown' });
+test('R-04: errors without a public ID hide the earliest-error summary, also after a complete page', async t => {
+  let coverage = 'partial';
+  const dom = mounted(t, { events: params => eventPage([errorRow('9')], coverage === 'partial' ? partial(params) : params) });
+  await flush(); await flush();
+  assert.equal(dom.calls.filter(call => call.resource.endsWith('/events')).length, 1, 'no extra request');
+  assert.equal(dom.get('first-error').hidden, true);
+  assert.equal(dom.get('first-error-link').textContent, '');
+  coverage = 'complete';
+  dom.get('detail-refresh').dispatchEvent(new Event('click')); await flush(); await flush();
+  assert.equal(dom.get('first-error').hidden, false);
+  assert.match(dom.get('first-error-message').textContent, /^— Error 9:/);
+  coverage = 'partial';
+  dom.get('detail-refresh').dispatchEvent(new Event('click')); await flush(); await flush();
+  assert.equal(dom.get('first-error').hidden, true);
+  assert.equal(dom.get('first-error-link').textContent, '');
+  assert.equal(dom.get('first-error-message').textContent, '');
+  assert.equal(dom.get('first-error-link').getAttribute('href'), null);
+  assert.match(dom.get('events-status').textContent, /no public numeric ID/);
+});
+
+test('R-04: from page two, the header link returns to page one with one cursorless request', async t => {
+  const dom = mounted(t, { events: params => eventPage([errorRow(params.cursor ? '7' : '1')], { ...params,
+    has_more: !params.cursor, next_cursor: params.cursor ? null : 'event-next' }) });
+  await flush(); await flush();
+  dom.get('events-next').dispatchEvent(new Event('click')); await flush(); await flush();
+  assert.equal(dom.calls.at(-1).params.cursor, 'event-next');
+  const before = dom.calls.length;
+  dom.get('first-error-link').dispatchEvent(new Event('click', { cancelable: true })); await flush(); await flush();
+  assert.deepEqual(dom.calls.slice(before).map(call => [call.resource, call.params.cursor ?? null]),
+    [['executions/17/events', null]]);
+  assert.match(dom.get('first-error-message').textContent, /^— Error 1:/);
+});
+
+test('R-03: an inactive 50-row Warnings page and the full error message can be collected; the excerpt stays', () => {
+  // A separate process started with --expose-gc, so no V8 flag changes after startup in this test process.
+  const result = spawnSync(process.execPath, ['--expose-gc', fileURLToPath(new URL('./header-retention-gc.mjs', import.meta.url))],
+    { encoding: 'utf8', timeout: 60000 });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
 });
