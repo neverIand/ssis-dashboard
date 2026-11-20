@@ -14,6 +14,7 @@ SQL_SS_TIMESTAMPOFFSET = -155
 TICKS_PER_SECOND = 10_000_000
 _TICKS_PER_DAY = 86_400 * TICKS_PER_SECOND
 _MAX_TICKS = date.max.toordinal() * _TICKS_PER_DAY - 1
+WIRE_TICKS = _MAX_TICKS + 1   # 0001-01-01T00:00Z to 10000-01-01T00:00Z
 _NATIVE_TIMESTAMP = struct.Struct('<6hI2h')
 _INPUT = re.compile(
     r'([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})'

@@ -41,10 +41,10 @@ Set `CONNECTION_STRING['main']` to the approved SSISDB connection using an insta
 | `TRUSTED_HOSTS` | `['localhost', '127.0.0.1']` | Non-empty list of accepted Host names (ports ignored; IPv6 literals unsupported). Other hosts get 400, blocking DNS rebinding. Add a name only for a reviewed proxy/host that serves it |
 | `DISPLAY_TIMEZONE` | `Europe/London` | Loadable IANA zone for API buckets and offset-free fixed dates; Python looks in its zone search path first (`PYTHONTZPATH`, empty by default on Windows) and then in the pinned `tzdata` package, which a default Windows environment therefore relies on. The browser formats times with its own zone data, so the two can disagree for a zone whose rules changed between their releases |
 | `AS_OF_DATE` | `NOW` | Default API upper creation bound; a fixed date/time must resolve to one instant |
-| `HOUR_SPAN` | `24` | Default elapsed-hour window for the API and legacy pages; positive and no larger than `API_MAX_RANGE_HOURS` |
+| `HOUR_SPAN` | `24` | Default elapsed-hour window for the API and legacy pages; a positive integer no larger than `API_MAX_RANGE_HOURS`. Subtracted from `AS_OF_DATE` resolved to UTC, or from the current UTC time for `NOW`, it must not reach before `0001-01-01T00:00:00Z`; startup checks this |
 | `EXECUTION_COUNT` | `1000` | Legacy list limit; API pages use their own 50/200 limits |
 | `DB_LOGIN_TIMEOUT_SECONDS` / `DB_QUERY_TIMEOUT_SECONDS` | `10` / `30` | Positive 32-bit integer driver limits; not an overall HTTP deadline |
-| `API_MAX_RANGE_HOURS` | `744` | Maximum API creation-window span (project setting, not an SSIS limit; SSISDB keeps history for its `RETENTION_WINDOW`, 365 days by default). Raise it, for example to 4392 (about 6 months) or 8784 (a year), for longer ranges |
+| `API_MAX_RANGE_HOURS` | `744` | Maximum API creation-window span (project setting, not an SSIS limit; SSISDB keeps history for its `RETENTION_WINDOW`, 365 days by default). Raise it, for example to 4392 (about 6 months) or 8784 (a year), for longer ranges. An integer from 1 to 87,649,416 (the wire calendar, 0001–9999) |
 | `API_MAX_TIMELINE_BUCKETS` | `1000` | Allowed range 1–1000 |
 | `API_READINESS_TIMEOUT_SECONDS` | `2` | Allowed 1–2; caps both readiness driver timeouts without increasing lower global limits |
 | `API_EVENTS_ENABLED` | `False` | Permit API event text/search for the configured SQL scope |

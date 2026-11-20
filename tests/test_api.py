@@ -337,6 +337,38 @@ class APIConfigurationTests(unittest.TestCase):
                     create_app(config)
             connect.assert_not_called()
 
+    def test_creation_window_settings_must_fit_the_wire_calendar_and_browser_integers(self):
+        # Full review of 19 November 2026, R-10: these started, then failed every default request or the browser.
+        from dashboard.api import WINDOW_HOURS
+        self.assertEqual(WINDOW_HOURS, 87_649_416)   # 0001-01-01 to 10000-01-01
+        invalid = [
+            {'AS_OF_DATE': '0001-01-01T12:00:00Z'},                       # 24-hour default starts in year 0
+            {'HOUR_SPAN': 20_000_000, 'API_MAX_RANGE_HOURS': 20_000_000},  # reaches before 0001 from today
+            {'API_MAX_RANGE_HOURS': 9_007_199_254_740_992},                # above JavaScript's safe integers
+            {'API_MAX_RANGE_HOURS': WINDOW_HOURS + 1},
+            {'HOUR_SPAN': WINDOW_HOURS + 1, 'API_MAX_RANGE_HOURS': WINDOW_HOURS + 1},
+        ]
+        with patch('pyodbc.connect') as connect:
+            for config in invalid:
+                with self.subTest(config=config), self.assertRaises(ValueError):
+                    create_app({'LOG_LEVEL': 'ERROR', **config})
+            connect.assert_not_called()
+        valid = [
+            ({'AS_OF_DATE': '0001-01-02T00:00:00Z'}, '0001-01-01T00:00:00.0000000Z'),
+            ({'AS_OF_DATE': '2026-06-12T12:00:00Z', 'API_MAX_RANGE_HOURS': WINDOW_HOURS}, '2026-06-11T12:00:00.0000000Z'),
+        ]
+        for config, start in valid:
+            with self.subTest(config=config), patch('dashboard.executions.execute_query', return_value={'upper_id': None}):
+                client = create_app({'LOG_LEVEL': 'ERROR', **config}).test_client()
+                limits = client.get('/api/v1/meta').json['data']['limits']
+                self.assertTrue(all(value <= 2**53 - 1 for value in limits.values() if type(value) is int))
+                response = client.get('/api/v1/executions')
+                self.assertEqual(response.status_code, 200, response.json)
+                self.assertEqual(response.json['meta']['from'], start)
+                explicit = client.get('/api/v1/executions', query_string={'from': '2026-05-01T00:00:00Z',
+                                                                            'to': '2026-05-02T00:00:00Z'})
+                self.assertEqual(explicit.status_code, 200, explicit.json)
+
     def test_metadata_reports_effective_settings_per_app(self):
         first = create_app({'LOG_LEVEL': 'ERROR', 'API_EVENTS_ENABLED': True, 'API_VALUES_ENABLED': True,
                             'API_OVERRIDE_VALUES_ENABLED': True, 'API_ACTIVE_ESTIMATES_ENABLED': True, 'DISPLAY_TIMEZONE': 'UTC',

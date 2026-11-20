@@ -22,9 +22,12 @@ from dashboard.navigation import QUERY_PARAMETERS as NAVIGATION_PARAMETERS, navi
 from dashboard.db import execute_query
 from dashboard.observability import record_query, request_id
 from dashboard import cursors
+from dashboard.timestamps import TICKS_PER_SECOND, Timestamp, WIRE_TICKS, utc_now
 from dashboard import serialization as wire
 from dashboard.validation import EVENT_QUERIES, InvalidInput
 from dashboard.version import APP_VERSION
+
+WINDOW_HOURS = WIRE_TICKS // (3600 * TICKS_PER_SECOND)   # 87,649,416
 
 
 blueprint = Blueprint('api', __name__, url_prefix='/api/v1')
@@ -53,7 +56,9 @@ def validate_config(config):
             raise ValueError(f'{name} must be a Boolean.')
     if config['API_OVERRIDE_VALUES_ENABLED'] and not config['API_VALUES_ENABLED']:
         raise ValueError('API_OVERRIDE_VALUES_ENABLED requires API_VALUES_ENABLED.')
-    for name, upper in (('HOUR_SPAN', None), ('API_MAX_RANGE_HOURS', None),
+    # No window can be longer than the wire calendar (0001-01-01 to 9999-12-31), which also keeps the
+    # advertised limits well inside JavaScript's safe integers.
+    for name, upper in (('HOUR_SPAN', WINDOW_HOURS), ('API_MAX_RANGE_HOURS', WINDOW_HOURS),
                         ('API_MAX_TIMELINE_BUCKETS', 1000), ('API_READINESS_TIMEOUT_SECONDS', 2)):
         value = config[name]
         if type(value) is not int or value < 1 or (upper is not None and value > upper):
@@ -63,6 +68,15 @@ def validate_config(config):
     if config['API_CURSOR_SECRET_KEY'] is not None:
         cursors.signing_key(config['API_CURSOR_SECRET_KEY'])
     estimates.validate_config(config)
+
+
+def default_window_start(config, fixed_to):
+    """Fail startup when the default window would start before 0001-01-01: every default request would be a 400."""
+    end = fixed_to or utc_now()
+    try:
+        return Timestamp(end.utc_ticks - config['HOUR_SPAN'] * 3600 * TICKS_PER_SECOND)
+    except ValueError:
+        raise ValueError('HOUR_SPAN must not reach before 0001-01-01 from AS_OF_DATE or the current time.') from None
 
 
 def capabilities():
@@ -270,6 +284,7 @@ def readiness():
 def register_api(app):
     cursors.configure(app)
     app.extensions['api_fixed_as_of'] = fixed_as_of(app.config['AS_OF_DATE'], app.config['DISPLAY_TIMEZONE'])
+    default_window_start(app.config, app.extensions['api_fixed_as_of'])
     estimates.register(app)
     app.register_blueprint(blueprint)
     app.add_url_rule('/healthz', 'healthz', liveness, methods=['GET'], merge_slashes=False)
