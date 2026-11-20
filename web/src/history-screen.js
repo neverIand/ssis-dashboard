@@ -1,12 +1,12 @@
 import { mountBootstrap } from './bootstrap.js';
 import { mountHistory } from './render-history.js';
 import { createHistoryLoader } from './history-loader.js';
-import { historyHref, historySelection, parseHistorySelection } from './history-navigation.js';
+import { historyHref, historySelection, parseHistorySelection, scopedHistorySelection } from './history-navigation.js';
 import { defaultSelection } from './selection.js';
 import { inlineStatus, pollingButton } from './ui.js';
 import { createDisplay, observationTitle, refreshStatus } from './display.js';
 import { readRefreshPause, refreshPauseState, saveRefreshPause } from './refresh-pause.js';
-const invalid = 'Invalid history filters. Review the selection and choose Load history.';
+const invalid = 'Invalid history link. Enter names or patterns and choose Load history.';
 const idleText = 'Enter a package name and choose Load history, or open History from an execution.';
 const modeNotes = {
   exact: 'Exact names: each field must match the catalog name exactly. All creation dates.',
@@ -81,7 +81,7 @@ export function mountHistoryScreen(root, saved = null) {
       event.preventDefault(); select({ ...selection, ...Object.fromEntries(Object.entries(controls).map(([key, input]) =>
         [key, input.value])) });
     };
-    // Without a scope, offer an empty Exact form and wait for Load history. URLs without match= keep meaning LIKE.
+    // Without a valid scope, offer an empty Exact form and wait for Load history. URLs without match= keep meaning LIKE.
     const pop = event => {
       // The live pause outlasts scope changes; record it on the entry Back or Forward landed on.
       if (event) saveRefreshPause(window, paused);
@@ -90,18 +90,18 @@ export function mountHistoryScreen(root, saved = null) {
       if (event && search === shown) return;
       shown = search;
       persistent = '';
-      try { selection = parseHistorySelection(search, metadata); }
-      catch { selection = parseHistorySelection('', metadata); persistent = invalid; }
+      let scoped = null;
+      try { scoped = scopedHistorySelection(search, metadata); } catch { persistent = invalid; }
+      selection = scoped ?? parseHistorySelection('', metadata);
       navigation.historySelection = selection; show();
-      loaded = search.length > 1 && !persistent;
+      loaded = scoped !== null;
       showTitle();
       if (loaded) { showIdle(false); void owner.select(selection); }
       else {
+        // An invalid link is not shown as a wildcard draft: an unedited Load history must not search every package.
         showIdle(true); owner.clear();
-        if (!persistent) {
-          controls.match.value = 'exact';
-          for (const key of ['folder', 'project', 'package']) controls[key].value = '';
-        }
+        controls.match.value = 'exact';
+        for (const key of ['folder', 'project', 'package']) controls[key].value = '';
       }
       describeDraft();
     };

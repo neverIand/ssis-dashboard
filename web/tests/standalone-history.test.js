@@ -44,9 +44,14 @@ test('history URLs reject duplicate/unknown inputs, malformed encoding, wide tex
     '?limit=201', '?status=1,1', '?package=%FF', '?folder=%', '?folder=' + '界'.repeat(513)]) {
     assert.throws(() => parseHistorySelection(search, metadata), undefined, search);
   }
-  for (const search of ['?history=https://evil.invalid', '?history=?cursor=secret', '?history=?folder=x&overview=?']) {
-    assert.equal(readHistoryReturn(search, navigation), null);
+  for (const search of ['?history=https://evil.invalid', '?history=?cursor=secret', '?history=?folder=x&overview=?',
+    '?history=?', '?history=?%26', '?history=' + encodeURIComponent('?status=4&limit=5'),
+    '?history=' + encodeURIComponent('?folder=%0A*'), '?history=' + encodeURIComponent('?package=%0D*')]) {
+    assert.equal(readHistoryReturn(search, navigation), null, search);
   }
+  const legacy = readHistoryReturn('?history=' + encodeURIComponent('?folder=Sales'), navigation);
+  assert.deepEqual([legacy.selection.match, legacy.selection.folder, legacy.selection.project, legacy.selection.package],
+    ['like', 'Sales', '*', '*']);
 });
 
 test('independent history pages refresh the current cursor; first-page reset and expired cursors stay bounded', async t => {
@@ -279,6 +284,68 @@ test('a scoped or invalid History URL loads or reports it on entry and on Back/F
   dom.window.dispatchEvent(new Event('popstate'));
   await settle();
   assert.equal(dom.history().length, 1);
-  assert.match(dom.notice.textContent, /Invalid history filters/);
+  assert.match(dom.notice.textContent, /Invalid history link/);
   assert.equal(dom.historyBody.textContent, 'Enter a package name and choose Load history, or open History from an execution.');
+});
+
+const scopeOf = call => Object.fromEntries(['match', 'folder', 'project', 'package']
+  .map(key => [key, new URL(call, navigation.origin).searchParams.get(key)]));
+const formValues = dom => Object.fromEntries(Object.entries(dom.inputs).map(([key, input]) => [key, input.value]));
+const submit = async dom => { dom.form.dispatchEvent(new Event('submit', { cancelable: true })); await settle(); };
+
+test('empty, scope-less or malformed History links never become an all-package search', async t => {
+  const idle = 'Enter a package name and choose Load history, or open History from an execution.';
+  for (const [search, notice] of [['?&', ''], ['?', ''], ['?status=4&limit=5', ''], ['?package=%FF', /Invalid history link/],
+    ['?folder=%', /Invalid history link/], ['?folder=', /Invalid history link/], ['?match=other&folder=x', /Invalid history link/],
+    ['?folder=%0A*', /Invalid history link/], ['?package=Main%0D*', /Invalid history link/]]) {
+    await t.test(search, async t => {
+      const dom = screenDOM(t, search);
+      const screen = mountHistoryScreen(dom.root);
+      t.after(screen.dispose);
+      await settle();
+      assert.equal(dom.history().length, 0);
+      assert.deepEqual(formValues(dom), { match: 'exact', folder: '', project: '', package: '' });
+      if (notice) assert.match(dom.notice.textContent, notice); else assert.equal(dom.notice.textContent, '');
+      assert.equal(dom.historyBody.textContent, idle);
+      assert.equal(dom.extra.get('[data-history-refresh]').hidden, true);
+      // Load history without corrections reads nothing and keeps the URL.
+      const entered = dom.window.location.search;
+      await submit(dom);
+      assert.equal(dom.history().length, 0);
+      assert.equal(dom.window.location.search, entered);
+      assert.match(dom.notice.textContent, /Enter valid history names/);
+      dom.inputs.folder.value = 'Folder'; dom.inputs.project.value = 'Project'; dom.inputs.package.value = 'Main.dtsx';
+      await submit(dom);
+      assert.equal(dom.history().length, 1);
+      assert.deepEqual(scopeOf(dom.history()[0]), { match: 'exact', folder: 'Folder', project: 'Project', package: 'Main.dtsx' });
+      assert.equal(dom.notice.textContent, '');
+      assert.match(dom.window.location.search, /match=exact&folder=Folder&project=Project&package=Main.dtsx/);
+      // Refresh keeps the corrected scope.
+      dom.extra.get('[data-history-refresh]').dispatchEvent(new Event('click'));
+      await settle();
+      assert.equal(dom.history().length, 2);
+      assert.deepEqual(scopeOf(dom.history()[1]), scopeOf(dom.history()[0]));
+    });
+  }
+});
+
+test('named legacy links keep LIKE for unnamed fields and explicit wildcard links still search', async t => {
+  for (const [search, scope] of [
+    ['?folder=Sales', { match: 'like', folder: 'Sales', project: '*', package: '*' }],
+    ['?match=like&folder=*&project=*&package=*', { match: 'like', folder: '*', project: '*', package: '*' }]]) {
+    await t.test(search, async t => {
+      const dom = screenDOM(t, search);
+      const screen = mountHistoryScreen(dom.root);
+      t.after(screen.dispose);
+      await settle();
+      assert.equal(dom.history().length, 1);
+      assert.deepEqual(scopeOf(dom.history()[0]), scope);
+      assert.deepEqual(formValues(dom), scope);
+      assert.equal(dom.notice.textContent, '');
+      dom.extra.get('[data-history-refresh]').dispatchEvent(new Event('click'));
+      await settle();
+      assert.equal(dom.history().length, 2);
+      assert.deepEqual(scopeOf(dom.history()[1]), scope);
+    });
+  }
 });

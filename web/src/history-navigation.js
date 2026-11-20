@@ -26,7 +26,15 @@ export function parseHistorySelection(search, metadata) {
     defaults[key] = key === 'limit' ? Number(value) : value;
   }
   for (const part of search.replace(/^\?/, '').split('&')) decodeURIComponent(part.replace(/\+/g, ' '));
+  // A text field drops CR/LF, so a bookmarked line break would turn into a wider draft such as a bare *.
+  if (['folder', 'project', 'package'].some(key => /[\r\n]/.test(defaults[key]))) throw new TypeError('Invalid history selector.');
   return historySelection(defaults, metadata);
+}
+// Only a URL that names a folder, project or package selects a scope; ?& or a bare status/order link stays unscoped.
+// Older links that name one field keep LIKE with * for the others, and explicit * patterns remain a deliberate search.
+export function scopedHistorySelection(search, metadata) {
+  const selection = parseHistorySelection(search, metadata), params = new URLSearchParams(search);
+  return ['folder', 'project', 'package'].some(key => params.has(key)) ? selection : null;
 }
 export function historySearch(selection, metadata) {
   const value = historySelection(selection, metadata);
@@ -51,7 +59,7 @@ export function readHistoryReturn(search, options) {
   try {
     const params = new URLSearchParams(search);
     if ([...params.keys()].length !== 1 || !params.has('history') || !params.get('history').startsWith('?')) return null;
-    const selection = parseHistorySelection(params.get('history'), options.metadata);
-    return { selection, href: historyHref(selection, options) };
+    const selection = scopedHistorySelection(params.get('history'), options.metadata);
+    return selection && { selection, href: historyHref(selection, options) };
   } catch { return null; }
 }

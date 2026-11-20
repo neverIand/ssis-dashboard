@@ -166,7 +166,7 @@ test('R1 (Codex): while idle, header sort, an open Custom popover and an invalid
   invalid.get('history-header-execution_id').dispatchEvent(new Event('click'));
   await settle();
   assert.equal(invalid.history().length, 0);
-  assert.match(invalid.get('history-scope-notice').textContent, /^Invalid history filters/);
+  assert.match(invalid.get('history-scope-notice').textContent, /^Invalid history link/);
 });
 
 test('B4 R1-3: the History tab title follows direct URLs, Back/Forward and the idle page', async t => {
