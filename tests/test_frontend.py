@@ -372,6 +372,55 @@ class FrontendShellTests(unittest.TestCase):
                 self.assertEqual(self.client.get('/api/v1/meta').status_code, 200)
         self.connect.assert_not_called()
 
+    def test_builds_without_a_stylesheet_or_with_mistyped_assets_are_unavailable_on_every_shell(self):
+        (self.output / 'assets/shared.js').write_text('// shared', encoding='utf-8')
+        (self.output / 'assets/image.svg').write_text('<svg/>', encoding='utf-8')
+        entry = {key: value for key, value in self.entry.items() if key != 'css'}
+        invalid_builds = {
+            'no css field': {'src/main.js': entry},
+            'empty css list': {'src/main.js': {**self.entry, 'css': []}},
+            'stylesheet as entry': {'src/main.js': {**self.entry, 'file': 'assets/main.css'}},
+            'script as stylesheet': {'src/main.js': {**self.entry, 'css': ['assets/main.js']}},
+            'image as stylesheet': {'src/main.js': {**self.entry, 'css': ['assets/image.svg']}},
+            'stylesheet as import': {'src/main.js': {**self.entry, 'imports': ['_style']},
+                                     '_style': {'file': 'assets/main.css'}},
+            'image as import': {'src/main.js': {**self.entry, 'imports': ['_image']},
+                                '_image': {'file': 'assets/image.svg'}},
+        }
+        mounted = Client(DispatcherMiddleware(Flask('mount'), {'/ops/monitor': self.app}), Response)
+        routes = ['/app/', '/app/executions/17', '/app/history']
+        for label, manifest in invalid_builds.items():
+            self.write_manifest(manifest)
+            for client, prefix in [(self.client, ''), (mounted, '/ops/monitor')]:
+                for path in routes:
+                    with self.subTest(build=label, prefix=prefix, path=path):
+                        response = client.get(prefix + path)
+                        self.assertEqual(response.status_code, 503)
+                        html = response.get_data(as_text=True)
+                        self.assertIn('Application unavailable', html)
+                        self.assertNotIn('type="module"', html)
+        self.write_manifest({'src/main.js': {**entry, 'imports': ['_shared']},
+                             '_shared': {'file': 'assets/shared.js', 'css': ['assets/main.css']}})
+        for client, prefix in [(self.client, ''), (mounted, '/ops/monitor')]:
+            for path in routes:
+                with self.subTest(build='stylesheet from an imported chunk', prefix=prefix, path=path):
+                    response = client.get(prefix + path)
+                    self.assertEqual(response.status_code, 200)
+                    html = response.get_data(as_text=True)
+                    self.assertIn(f'<link rel="stylesheet" href="{prefix}/static/app/assets/main.css">', html)
+                    self.assertIn(f'<script type="module" src="{prefix}/static/app/assets/main.js">', html)
+                    hrefs = re.findall(rf'(?:href|src)="({re.escape(prefix)}/static/app/[^"]+)"', html)
+                    self.assertEqual(sorted(Path(href).name for href in hrefs),
+                                     ['favicon.svg', 'main.css', 'main.js', 'shared.js', 'theme-init.js'])
+                    for href in hrefs:
+                        asset = client.get(href)
+                        self.assertEqual(asset.status_code, 200)
+                        expected = {'.js': ['text/javascript', 'application/javascript'], '.css': ['text/css'],
+                                    '.svg': ['image/svg+xml']}
+                        self.assertIn(asset.mimetype, expected[Path(href).suffix])
+                        asset.close()
+        self.connect.assert_not_called()
+
     def test_build_can_be_added_or_repaired_without_recreating_the_application(self):
         self.manifest_path.unlink()
         self.assertEqual(self.client.get('/app/').status_code, 503)

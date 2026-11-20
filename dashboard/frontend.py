@@ -16,6 +16,8 @@ NATIVE_CSP = (
     "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; "
     "connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 )
+# Static files are typed by extension, so the suffix decides whether a link can execute or style the page.
+SCRIPT_SUFFIXES = ('.js',)
 
 
 def _entry_assets():
@@ -25,12 +27,14 @@ def _entry_assets():
         raise ValueError('Invalid build manifest')
     styles, preloads, seen = [], [], set()
 
-    def asset(filename):
+    def asset(filename, suffixes):
         if not isinstance(filename, str) or not filename:
             raise ValueError('Invalid asset name')
         path = PurePosixPath(filename)
         if path.is_absolute() or '..' in path.parts or '\\' in filename or ':' in filename:
             raise ValueError('Invalid asset path')
+        if path.suffix.lower() not in suffixes:
+            raise ValueError('Invalid asset type')
         if not (root / filename).is_file():
             raise ValueError('Missing build asset')
         return url_for('static', filename=f'app/{filename}')
@@ -44,12 +48,12 @@ def _entry_assets():
         chunk = manifest[key]
         if not isinstance(chunk, dict):
             raise ValueError('Invalid build chunk')
-        script = asset(chunk['file'])
+        script = asset(chunk['file'], SCRIPT_SUFFIXES)
         css, imports = chunk.get('css', []), chunk.get('imports', [])
         if not isinstance(css, list) or not isinstance(imports, list):
             raise ValueError('Invalid chunk dependencies')
         for filename in css:
-            stylesheet = asset(filename)
+            stylesheet = asset(filename, ('.css',))
             if stylesheet not in styles:
                 styles.append(stylesheet)
         for dependency in imports:
@@ -61,8 +65,11 @@ def _entry_assets():
     entry = manifest['src/main.js']
     if not isinstance(entry, dict) or entry.get('isEntry') is not True:
         raise ValueError('Missing build entry')
-    return {'script': visit('src/main.js'), 'styles': styles, 'preloads': preloads, 'theme': asset('theme-init.js'),
-            'icon': asset('favicon.svg')}
+    script = visit('src/main.js')
+    if not styles:
+        raise ValueError('Missing build stylesheet')
+    return {'script': script, 'styles': styles, 'preloads': preloads,
+            'theme': asset('theme-init.js', SCRIPT_SUFFIXES), 'icon': asset('favicon.svg', ('.svg',))}
 
 
 def _shell(template, **config):
