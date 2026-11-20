@@ -23,9 +23,10 @@ The purpose of this project is to provide a web-based, user-friendly, useful and
 
 ## Development on dev-next
 
-Create and activate a fresh standard CPython 3.14 virtual environment, then install the runtime dependencies and run locally:
+Create and activate a fresh virtual environment from standard CPython 3.14.10 or a later 3.14 maintenance release (see [installation](docs/installation.md#create-an-environment)), upgrade pip, then install the runtime dependencies and run locally:
 
 ```sh
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 python -m flask --app dashboard:create_app run --host=127.0.0.1
 ```
@@ -37,7 +38,7 @@ python -m pip install -r requirements-dev.txt
 python -m unittest discover -s tests -v
 ```
 
-See [installation](docs/installation.md) for configuration and environment setup. Python 3.14.8 on Windows x64 passes the database-free suite and recorded local SSISDB checks. Remaining API workload/reader acceptance and deferred production hosting are tracked in progress.
+See [installation](docs/installation.md) for configuration and environment setup. Python 3.14.10 on Windows x64 passes the database-free suite and recorded local SSISDB checks. Remaining API workload/reader acceptance and deferred production hosting are tracked in progress.
 
 ## Legacy Platforms & Tools
 

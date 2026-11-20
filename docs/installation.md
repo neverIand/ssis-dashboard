@@ -1,19 +1,21 @@
 # Local development on dev-next
 
-Use a fresh standard CPython 3.14 environment. The recorded native baseline is Windows x64 / CPython 3.14.8 / pyodbc 5.3.0 / ODBC Driver 17.10.0006 / SQL Server 2022 16.0.1000.6. The pin is now pyodbc 5.5.0 (18 November 2026): a clean offline install, `pip check`, the full test suite with the native SQL suites and the native API diagnostic passed on that driver and server; 5.3.0 is the version the office ran with ODBC Driver 17. Other SQL/driver/platform combinations require their own validation; the README's legacy compatibility list is historical. The native API SQL uses `DATEDIFF_BIG`, so it needs SQL Server 2016 or later. Production hosting is deferred. See [the documentation index](README.md) for API use and validation.
+Use a fresh environment from standard CPython 3.14.10 or a later 3.14 maintenance release. The current native baseline (20 November 2026) is Windows x64 / CPython 3.14.10 / pip 26.3 / pyodbc 5.5.0 / ODBC Driver 17.10.0006 / SQL Server 2022 16.0.1000.6: the offline wheel install, `pip check`, the full test suite with the native SQL suites and the native API diagnostic passed. CPython 3.14.9 and 3.14.10 are security releases for the eMudhra CA incident; 3.14.10 also distrusts the compromised intermediate keys in `ssl`, which upgrading pip alone does not provide. The October baseline was CPython 3.14.8 with pyodbc 5.3.0, and 5.3.0 is the version the office ran with ODBC Driver 17; pyodbc 5.5.0 is pinned since 18 November 2026. Other SQL/driver/platform combinations require their own validation; the README's legacy compatibility list is historical. The native API SQL uses `DATEDIFF_BIG`, so it needs SQL Server 2016 or later. Production hosting is deferred. See [the documentation index](README.md) for API use and validation.
 
 ## Create an environment
 
-From the repository root in PowerShell, select the intended Python interpreter explicitly:
+From the repository root in PowerShell, select the intended interpreter by its path and confirm that it reports 3.14.10 or later. The example assumes `.venv` does not exist; to rebuild an existing environment, remove it first or use a new ignored path for both creation and activation:
 
 ```powershell
-python -m venv .venv
+& 'C:\Path\To\Python314\python.exe' --version
+& 'C:\Path\To\Python314\python.exe' -m venv .venv
 .\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 python -m pip check
 ```
 
-On a POSIX shell, activate with `. .venv/bin/activate`. Recreate the environment when changing Python minor versions. `requirements.txt` applies the exact runtime pins in `constraints.txt`; development tools have separate requirements/constraints. Pins cover Python packages, not interpreter/OS/ODBC versions or artifact hashes. Dependency updates require a clean install, `pip check`, tests, entry-point discovery and affected native checks.
+On a POSIX shell, activate with `. .venv/bin/activate`. Recreate the environment whenever its base interpreter changes, including a 3.14 maintenance update. `requirements.txt` applies the exact runtime pins in `constraints.txt`; development tools have separate requirements/constraints. Pins cover Python packages, not interpreter/OS/ODBC versions or artifact hashes. Dependency updates require a clean install, `pip check`, tests, entry-point discovery and affected native checks.
 
 For offline installation, download wheels with the target interpreter/platform while online, then install them into the fresh environment:
 
@@ -165,7 +167,7 @@ All private tools, evidence and configuration stay ignored. Commit sanitized res
 
 | Material | Location and retention |
 | --- | --- |
-| Python runtime and environment | `.local/python-3.14.8/` (CPython 3.14.8 x64) and the single `.local/venv314/` built from it with `requirements-dev.txt`. Rebuild that environment instead of adding another. |
+| Python runtime and environment | `.local/python-3.14.10/` (CPython 3.14.10 x64) and the single `.local/venv314/` built from it with `requirements-dev.txt`, pip upgraded first. Rebuild that environment instead of adding another. |
 | Working configuration, SSIS fixture and workstation recovery kits | `.local/backend-validation/dashboard.cfg`, `.local/ssis-fixture/` and `.local/recovery/<kit>/`. Keep their paths; they are not cleanup targets. |
 | Offline npm cache | `.local/npm-cache/`, used by the frontend build verifier's `npm ci --offline`. Repopulate it from the lockfile instead of letting it accumulate. |
 | Reusable helpers | `.local/tools/`; related native probes stay together in `.local/backend-validation/tools/` for shared imports. |
