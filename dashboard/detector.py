@@ -178,7 +178,8 @@ class Detector:
         with self._changed:
             for event in events:
                 self._sequence += 1
-                self._log.append((self._sequence, event))
+                # The log keeps its own copy: the polling caller owns the events poll_once returns.
+                self._log.append((self._sequence, dict(event)))
             self._changed.notify_all()
 
     def _sequence_of(self, cursor):
@@ -202,7 +203,8 @@ class Detector:
                 oldest = self._log[0][0] if self._log else self._sequence + 1
                 if sequence is None or sequence > self._sequence or sequence < oldest - 1:
                     return {'events': [], 'next': cursor, 'resync': True}
-                events = [event for number, event in self._log if number > sequence]
+                # Each reader gets its own copies, so one subscriber's changes never reach another's replay.
+                events = [dict(event) for number, event in self._log if number > sequence]
                 remaining = deadline - self._clock()
                 if events or remaining <= 0 or self._stop.is_set():
                     return {'events': events, 'next': cursor, 'resync': False}

@@ -106,9 +106,29 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(seq(cursor), 2)
         self.assertEqual(new.read(cursor), {'events': [], 'next': at(new, 3), 'resync': True})
         generation = cursor.split(':')[0]
-        for bad in (0, 2, '2', 'x:1', generation + ':-1', generation.upper() + ':1', generation + ':' + '9' * 19):
+        # 'A' * 16: an uppercase generation is rejected even when a random one has no letters to uppercase.
+        for bad in (0, 2, '2', 'x:1', generation + ':-1', 'A' * 16 + ':1', generation + ':' + '9' * 19):
             with self.assertRaises(ValueError):
                 old.read(bad)
+
+    def test_poll_results_and_each_read_are_independent_of_the_replay_log(self):
+        # Full review of 19 November 2026, R-06: an in-process consumer may annotate the events it receives.
+        fake = Fake({1: (2, None)})
+        d = detector(fake)
+        start = d.read(None)['next']
+        d.poll_once()
+        fake.ops[1] = (7, None)
+        polled, _ = d.poll_once()
+        polled[0]['client'] = 'poller'
+        polled[0]['status'] = 99
+        first = d.read(start)['events']
+        first[-1]['client'] = 'first reader'
+        first[-1].pop('kind')
+        second = d.read(start)['events']
+        self.assertEqual([e['kind'] for e in second], ['resync', 'changed'])
+        self.assertEqual(second[-1], {'kind': 'changed', 'execution_id': '1', 'status': 7, 'ended_at': None})
+        self.assertIsNot(second[-1], first[-1])
+        self.assertIsNot(second[-1], polled[0])
 
     def test_a_trimmed_log_tells_slow_readers_to_resync(self):
         fake = Fake({1: (2, None)})
