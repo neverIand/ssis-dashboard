@@ -33,8 +33,12 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   const rows = new Map();
   const cards = Object.fromEntries(['total', 'running', 'succeeded', 'failed', 'other']
     .map((key) => [key, root.querySelector(`[data-count="${key}"]`)]));
-  const statusSets = { total: [], running: [2], succeeded: [7], failed: [4],
-    other: metadata.execution_statuses.map(item => item.code).filter(code => ![2,4,7].includes(code)).sort((a,b) => a-b) };
+  // Failed also counts status 6 (ended unexpectedly), which would otherwise hide under Other. Counts,
+  // links and Other share these sets, so a code the server does not list stays under Other everywhere.
+  const failedCodes = [4, 6].filter(code => metadata.execution_statuses.some(item => item.code === code));
+  const carded = [2, 7, ...failedCodes];
+  const statusSets = { total: [], running: [2], succeeded: [7], failed: failedCodes,
+    other: metadata.execution_statuses.map(item => item.code).filter(code => !carded.includes(code)).sort((a,b) => a-b) };
   const cardLinks = Object.fromEntries(Object.keys(cards).map(key => [key, root.querySelector(`[data-status-card="${key}"]`)]));
   let appliedSelection = null, summaryAvailable = false;
   let renderedPage = null;
@@ -275,8 +279,9 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     tipWindow.textContent = page
       ? ` Window: ${display.timestamp(page.meta.from)} → ${display.timestamp(page.meta.to)} (end exclusive).` : '';
     const counts = state.summary ? Object.fromEntries(state.summary.data.by_status.map((item) => [item.code, item.count])) : null;
-    const values = state.summary ? { total: state.summary.data.total, running: counts[2], succeeded: counts[7], failed: counts[4],
-      other: state.summary.data.by_status.filter(item => ![2,4,7].includes(item.code)).reduce((total,item) => total + item.count,
+    const values = state.summary ? { total: state.summary.data.total, running: counts[2], succeeded: counts[7],
+      failed: failedCodes.reduce((total, code) => total + (counts[code] ?? 0), 0),
+      other: state.summary.data.by_status.filter(item => !carded.includes(item.code)).reduce((total,item) => total + item.count,
         0) } : null;
     summaryAvailable = values !== null;
     for (const [key, node] of Object.entries(cards)) {
@@ -290,7 +295,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       // guard above prevents activation until fresh counts are available.
       if (state.selection && (key === 'total' || statusSets[key].length)) linkSelection(link, state.selection, { status: statusSets[key] });
       else link.removeAttribute('href');
-      if (state.selection &&
+      if (state.selection && (key === 'total' || statusSets[key].length) &&
         JSON.stringify(state.selection.status) === JSON.stringify(statusSets[key])) link.setAttribute('aria-current', 'true');
       else link.removeAttribute('aria-current');
     }
@@ -304,7 +309,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     otherNote.textContent = unknownCount
       ? `Other includes ${display.count(unknownCount)} executions with unknown status codes; its filter selects supported statuses.` : '';
     // The Other card names its parts from the summary already loaded.
-    const otherParts = state.summary ? state.summary.data.by_status.filter(item => ![2, 4, 7].includes(item.code) && item.count > 0)
+    const otherParts = state.summary ? state.summary.data.by_status.filter(item => !carded.includes(item.code) && item.count > 0)
       .map(item => `${formatCode(metadata.execution_statuses.find(status => status.code === item.code)
         ?? { code: item.code, name: 'unknown' })} ${display.count(item.count)}`) : [];
     cardLinks.other.title = (otherParts.length ? `Other: ${otherParts.join(', ')}. ` : '')

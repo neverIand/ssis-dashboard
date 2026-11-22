@@ -39,10 +39,12 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
     if (node.textContent !== value) node.textContent = value;
   };
   const shape = (tag) => document.createElementNS('http://www.w3.org/2000/svg', tag);
-  const other = (item) => item.created_count - item.succeeded_count - item.failed_count;
+  // Failed includes status 6 (ended unexpectedly, halted_count), as on the Failed card.
+  const failed = (item) => item.failed_count + item.halted_count;
+  const other = (item) => item.created_count - item.succeeded_count - failed(item);
   function describe({ label, item }) {
     if (item.created_count === 0) return `${label} · none created`;
-    const counts = [[item.succeeded_count, 'succeeded'], [item.failed_count, 'failed'], [other(item), 'other'],
+    const counts = [[item.succeeded_count, 'succeeded'], [failed(item), 'failed'], [other(item), 'other'],
       [item.created_count - item.started_count, 'not started']]
       .filter(([count]) => count > 0).map(([count, name]) => `${display.count(count)} ${name}`);
     return `${label} · ${display.count(item.created_count)} created: ${counts.join(', ')}`;
@@ -95,7 +97,7 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
       let cumulative = 0;
       for (const [bar, value] of [
         [row.bars[0], row.item.succeeded_count],
-        [row.bars[1], row.item.failed_count],
+        [row.bars[1], failed(row.item)],
         [row.bars[2], other(row.item)]
       ]) {
         cumulative += value;
@@ -164,7 +166,8 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
           row.cells[index].replaceChildren(time);
         }
       }
-      Object.keys(timelineSeries).forEach((key, index) => text(row.cells[index + 2], display.count(item[key])));
+      Object.keys(timelineSeries).forEach((key, index) => text(row.cells[index + 2],
+        display.count(key === 'failed_count' ? failed(item) : item[key])));
       row.item = item;
       text(row.cells[6], display.count(other(item)));
       for (const [node, parent, anchor] of [

@@ -38,10 +38,11 @@ export function mountHistory(root, { metadata, actions, navigation, executionId,
   for (const [key, label, status] of [
     ['all', 'All', allHistoryStatuses(metadata)],
     ['succeeded', 'Succeeded', '7'],
-    ['failed', 'Failed', '4'],
+    // Failed includes status 6 (ended unexpectedly) when the server lists it.
+    ['failed', 'Failed', ['4', '6'].filter(code => metadata.execution_statuses.some(item => String(item.code) === code)).join(',')],
     ['running', 'Running', '2']
   ]) {
-    if (status.split(',').some((code) => !metadata.execution_statuses.some((item) => String(item.code) === code))) continue;
+    if (!status || status.split(',').some((code) => !metadata.execution_statuses.some((item) => String(item.code) === code))) continue;
     const button = element('button', label);
     button.type = 'button';
     button.dataset.historyPreset = key;

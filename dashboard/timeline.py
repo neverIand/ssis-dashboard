@@ -12,7 +12,7 @@ from dashboard.validation import InvalidInput
 
 
 _EPOCH = datetime(1, 1, 1, tzinfo=timezone.utc)
-_COUNTS = ('created_count', 'started_count', 'succeeded_count', 'failed_count')
+_COUNTS = ('created_count', 'started_count', 'succeeded_count', 'failed_count', 'halted_count')
 
 
 def _datetime(instant):
@@ -124,7 +124,7 @@ def execution_timeline(values, config, *, fixed_to):
             raise ValueError('Unexpected timeline bucket identity.')
         counts = {key: wire.count(row[key]) for key in _COUNTS}
         if (counts['started_count'] > counts['created_count']
-                or counts['succeeded_count'] + counts['failed_count'] > counts['created_count']):
+                or counts['succeeded_count'] + counts['failed_count'] + counts['halted_count'] > counts['created_count']):
             raise ValueError('Inconsistent timeline counts.')
         data.append({'start': left.isoformat(), 'end': right.isoformat(), **counts})
     return data, {'from': selection['from'], 'to': selection['to'], 'timezone': config['DISPLAY_TIMEZONE'],

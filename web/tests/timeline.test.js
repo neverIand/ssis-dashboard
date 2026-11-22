@@ -39,7 +39,8 @@ test('timeline fails closed on scope/timezone/bucket mismatches, gaps, overlaps,
   const mutations=[p=>{p.meta.from=timelineTo;},p=>{p.meta.timezone='UTC';},p=>{p.meta.bucket='hour';},p=>{p.meta.selected_statuses=[2];},
     p=>{p.data=[];},p=>{p.data[0].start=timelineTo;},p=>{p.data[0].end=timelineFrom;},p=>{p.data[0].start=null;},
     p=>{p.data[0].created_count=null;},p=>{p.data[0].started_count=11;},p=>{p.data[0].failed_count=8;},p=>{p.data[0].created_count=0.1;},
-    p=>{p.data[0].created_count=Number.MAX_SAFE_INTEGER+1;},p=>{p.data[0].created_count=-1;},p=>{p.data.push(p.data[0]);}];
+    p=>{p.data[0].created_count=Number.MAX_SAFE_INTEGER+1;},p=>{p.data[0].created_count=-1;},p=>{p.data.push(p.data[0]);},
+    p=>{p.data[0].halted_count=null;},p=>{delete p.data[0].halted_count;},p=>{p.data[0].halted_count=6;}];
   for(const mutate of mutations){const page=timelinePage();mutate(page);assert.throws(()=>readTimeline(page,selection(),overviewPage(),'day',metadata,display),e=>e.kind==='invalid_response');}
   assert.throws(()=>readTimeline(timelinePage(),selection(),overviewPage(),'day',{...metadata,limits:{...metadata.limits,max_timeline_buckets:0}},display));
   const rows=[timelineBucket('2026-10-17T00:00:00.0000000Z','2026-10-17T01:00:00.0000000Z'),timelineBucket('2026-10-17T02:00:00.0000000Z','2026-10-18T00:00:00.0000000Z')];

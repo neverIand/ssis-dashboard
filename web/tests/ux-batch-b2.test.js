@@ -77,7 +77,7 @@ test('N1: a status preset applies to the loaded scope, keeps the unapplied draft
   await settle();
   const sent = new URL(dom.history().at(-1), 'https://example.test').searchParams;
   assert.equal(sent.get('package'), 'Main.dtsx');
-  assert.equal(sent.get('status'), '4');
+  assert.equal(sent.get('status'), '4,6', 'Failed includes ended unexpectedly');
   assert.equal(dom.inputs.package.value, 'Draft.dtsx', 'the draft survives');
   assert.match(dom.get('history-scope-notice').textContent, /not applied yet/);
 });

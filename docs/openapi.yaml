@@ -1271,7 +1271,7 @@ components:
     TimelineBucket:
       type: object
       additionalProperties: false
-      required: [start, end, created_count, started_count, succeeded_count, failed_count]
+      required: [start, end, created_count, started_count, succeeded_count, failed_count, halted_count]
       properties:
         start: {$ref: '#/components/schemas/UtcTimestamp'}
         end: {$ref: '#/components/schemas/UtcTimestamp'}
@@ -1279,8 +1279,9 @@ components:
         started_count: {type: integer, minimum: 0, maximum: 9007199254740991}
         succeeded_count: {type: integer, minimum: 0, maximum: 9007199254740991}
         failed_count: {type: integer, minimum: 0, maximum: 9007199254740991}
+        halted_count: {type: integer, minimum: 0, maximum: 9007199254740991}
       description: Group by created_time, with current status/start observations; started_count means a non-NULL
-        actual start regardless of its date, succeeded_count uses status 7 and failed_count uses status 4.
+        actual start regardless of its date, succeeded_count uses status 7, failed_count status 4 and halted_count status 6 (ended unexpectedly).
         Edge bucket counts are clipped to effective bounds. Complete UTC edges may span partial/non-24-hour local periods.
     Executable:
       type: object
@@ -2406,9 +2407,9 @@ components:
       value:
         data:
         - {start: '2026-10-13T23:00:00.0000000Z', end: '2026-10-14T23:00:00.0000000Z', created_count: 0, started_count: 0, succeeded_count: 0,
-          failed_count: 0}
+          failed_count: 0, halted_count: 0}
         - {start: '2026-10-14T23:00:00.0000000Z', end: '2026-10-15T23:00:00.0000000Z', created_count: 1, started_count: 1, succeeded_count: 0,
-          failed_count: 0}
+          failed_count: 0, halted_count: 0}
         meta:
           request_id: 0123456789abcdef0123456789abcdef
           generated_at: '2026-10-15T11:00:00.1234567Z'

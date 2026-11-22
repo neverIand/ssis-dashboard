@@ -3,7 +3,7 @@ import { detailResponse } from './detail-fixture.js';
 
 export function historyMetadata() {
   const value = metadata();
-  value.execution_statuses = ['created','running','canceled','failed','pending','ended_unexpectedly','succeeded','stopping','completed'].map((name,index)=>({code:index+1,name}));
+  value.execution_statuses = ['created','running','cancelled','failed','pending','halted','succeeded','stopping','completed'].map((name,index)=>({code:index+1,name}));
   return value;
 }
 export const historyRow = (id = '1', changes = {}) => {

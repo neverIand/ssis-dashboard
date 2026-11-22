@@ -53,7 +53,7 @@ test('history presets apply once, reset checkbox drafts, and leave estimates to 
   const rows=[historyRow('17',{status:{code:4,name:'failed'},estimate:estimate({duration_seconds:12})}),historyRow('16'),
     historyRow('15',{status:{code:2,name:'running'},ended_at:null,duration_seconds:null})];
   const dom=historyScreen(t,rows);await openHistory(dom);const choices=dom.get('history-choices').children.map(label=>label.firstChild);
-  for(const [key,status] of [['succeeded','7'],['failed','4'],['running','2'],['all',all]]){
+  for(const [key,status] of [['succeeded','7'],['failed','4,6'],['running','2'],['all',all]]){
     for(const input of choices)input.checked=false;
     const count=dom.calls.length;click(preset(dom,key));await flush();
     assert.equal(dom.calls.length,count+1);assert.equal(dom.calls.at(-1).params.status,status);
@@ -80,7 +80,7 @@ test('secondary history choices and a preset focus restore after fresh reads wit
   click(dom.get('history-custom'));dom.get('history-choices').children[0].firstChild.focus();
   const saved=dom.view.checkpoint();assert.doesNotMatch(JSON.stringify(saved),/Main\.dtsx|duration_seconds|sample_count/);dom.view.dispose();
   const restored=historyScreen(t,rows,{restoreView:saved});await flush();
-  assert.equal(restored.calls.length,2);assert.equal(restored.calls.at(-1).params.status,'4');
+  assert.equal(restored.calls.length,2);assert.equal(restored.calls.at(-1).params.status,'4,6');
   assert.equal(!restored.get('history-status-options').matches(':popover-open'),false);assert.equal(restored.document.activeElement,restored.get('history-choices').children[0].firstChild);
 });
 
@@ -101,6 +101,16 @@ test('history plots chronological creation order independently of table order, w
   assert.equal(groups[1].getAttribute('aria-label'), groups[1].firstChild.textContent);
   assert.equal(dom.get('history-chart-scale').textContent,'Duration');
   assert.equal(groups.filter(row=>row.getAttribute('tabindex')==='0').length,1);
+});
+
+test('a status 6 history row reads Ended unexpectedly in the table and the chart',async t=>{
+  const rows=[historyRow('19',{status:{code:6,name:'halted'},duration_seconds:10})];
+  const dom=historyScreen(t,rows);await openHistory(dom,true);
+  const row=dom.historyBody.children[0],group=dom.get('history-chart-plot').children[0];
+  assert.ok(row.children.some(cell=>cell.textContent.includes('Ended unexpectedly')));
+  assert.match(group.firstChild.textContent,/ · Ended unexpectedly · /);
+  assert.equal(group.getAttribute('aria-label'),group.firstChild.textContent);
+  assert.equal(group.getAttribute('data-status'),'6');
 });
 
 test('history chart x labels show creation dates once seven executions give the axis room',async t=>{
@@ -165,6 +175,14 @@ test('timeline shows succeeded/failed/other stacks, chronological labels and the
   assert.equal(groups[2].getAttribute('aria-label'), groups[2].firstChild.textContent);
   assert.match(groups[1].firstChild.textContent, / · 10 created: 6 succeeded, 3 failed, 1 other, 1 not started$/);
   assert.equal(dom.get('timeline-series'),undefined);
+});
+
+test('timeline counts ended-unexpectedly runs (halted_count) with Failed in the bar, table and description',async t=>{
+  const rows=[timelineBucket(stamp(15),stamp(16),{created_count:10,started_count:10,succeeded_count:6,failed_count:1,halted_count:2})];
+  const dom=await timelineScreen(t,rows),group=dom.get('timeline-chart').children[0];
+  assert.deepEqual(group.children.slice(1,4).map(node=>Number(node.getAttribute('height'))),[90,45,15],'failed 1 + halted 2');
+  assert.equal(dom.timelineBody.children[0].children[5].textContent,'3');
+  assert.match(group.firstChild.textContent,/ · 10 created: 6 succeeded, 3 failed, 1 other$/);
 });
 
 test('timeline hover and keyboard select complete bucket values locally and keep focused keyed groups on refresh',async t=>{

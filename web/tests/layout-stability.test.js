@@ -185,7 +185,7 @@ for (const scenario of ['empty retained start', 'non-empty retained start', 'all
     const bounds = { from: hour(0), to: hour(24) };
     const rows = Array.from({ length: 24 }, (_, index) => timelineBucket(hour(index), hour(index + 1), {
       created_count: scenario === 'all zero' ? 0 : index === (scenario === 'non-empty retained start' ? 0 : 17) ? 5 : 0,
-      started_count: 0, succeeded_count: 0, failed_count: 0,
+      started_count: 0, succeeded_count: 0, failed_count: 0, halted_count: 0,
     }));
     const view = mountOverview(dom.root, { metadata, appBase: '/app/', api: { async get(resource, options) {
       calls.push({ resource, ...options });
@@ -218,7 +218,7 @@ test('timeline grain fallback survives a failed intermediate grain without claim
     if (resource === 'metrics/summary') return timelineSummary(bounds);
     if (options.params.bucket === 'hour') throw new ApiError('invalid_request', { status: 400 });
     return timelinePage([0, 1].map(index => timelineBucket(day(index), day(index + 1), {
-      created_count: index === (changed ? 1 : 0) ? 5 : 0, started_count: 0, succeeded_count: 0, failed_count: 0,
+      created_count: index === (changed ? 1 : 0) ? 5 : 0, started_count: 0, succeeded_count: 0, failed_count: 0, halted_count: 0,
     })), bounds);
   } } });
   t.after(view.dispose);

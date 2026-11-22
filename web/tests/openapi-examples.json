@@ -349,7 +349,8 @@
     "created_count": 0,
     "started_count": 0,
     "succeeded_count": 0,
-    "failed_count": 0
+    "failed_count": 0,
+    "halted_count": 0
    },
    {
     "start": "2026-10-14T23:00:00.0000000Z",
@@ -357,7 +358,8 @@
     "created_count": 1,
     "started_count": 1,
     "succeeded_count": 0,
-    "failed_count": 0
+    "failed_count": 0,
+    "halted_count": 0
    }
   ],
   "meta": {

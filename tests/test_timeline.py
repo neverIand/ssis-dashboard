@@ -42,7 +42,7 @@ class TimelineTests(unittest.TestCase):
         self.client = self.app.test_client()
 
     def zero_rows(self, resource, parameters, **settings):
-        return [{'bucket_id':int(b.get('i')), 'created_count':0,'started_count':0,'succeeded_count':0,'failed_count':0}
+        return [{'bucket_id':int(b.get('i')), 'created_count':0,'started_count':0,'succeeded_count':0,'failed_count':0,'halted_count':0}
                 for b in ET.fromstring(parameters[0])]
 
     def page(self, **values):
@@ -199,7 +199,8 @@ class TimelineTests(unittest.TestCase):
         bad = [[],[zero,zero],[{**zero,'bucket_id':True}],[{**zero,'bucket_id':1}],
                [{**zero,'created_count':-1}],[{**zero,'created_count':2**53}],
                [{**zero,'started_count':True}],[{**zero,'failed_count':1}],
-               [{**zero,'started_count':1}],[{**zero,'created_count':1,'succeeded_count':1,'failed_count':1}]]
+               [{**zero,'started_count':1}],[{**zero,'created_count':1,'succeeded_count':1,'failed_count':1}],
+               [{**zero,'halted_count':1}],[{**zero,'created_count':1,'failed_count':1,'halted_count':1}]]
         self.query.side_effect = None
         for rows in bad:
             with self.subTest(rows=rows):
@@ -213,8 +214,9 @@ class TimelineTests(unittest.TestCase):
         from dashboard.db import execute_query
         self.query.side_effect = execute_query
         cursor = Mock()
-        cursor.description = [('bucket_id',),('created_count',),('started_count',),('succeeded_count',),('failed_count',)]
-        cursor.fetchall.return_value = [(0,2,1,1,0),(1,0,0,0,0)]
+        cursor.description = [('bucket_id',),('created_count',),('started_count',),('succeeded_count',),('failed_count',),
+                              ('halted_count',)]
+        cursor.fetchall.return_value = [(0,2,1,1,0,0),(1,0,0,0,0,0)]
         connection = ConnectionFixture(cursor,[])
         self.connect.side_effect = [connection]
         result = self.page(**WINDOW,bucket='hour',folder="x' OR 1=1 --",status='7,5')

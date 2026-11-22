@@ -34,6 +34,7 @@ test('code labels use their supplied vocabulary and retain unknown numeric codes
   assert.equal(formatCode({ code: 0, name: 'none' }), 'None');
   assert.equal(formatCode({ code: 2, name: 'running' }), 'Running');
   assert.equal(formatCode({ code: 2, name: 'completion' }), 'Completion');
+  assert.equal(formatCode({ code: 6, name: 'halted' }), 'Ended unexpectedly', 'SSISDB status 6, as SSMS names it');
   assert.equal(formatCode({ code: -32768, name: 'unknown' }), 'Unknown (-32768)');
   assert.equal(formatCode({ code: 42, name: 'unknown' }), 'Unknown (42)');
   assert.equal(formatCode(null), '—');

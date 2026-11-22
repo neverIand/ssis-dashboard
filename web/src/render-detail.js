@@ -41,6 +41,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   const title = fields.find(field => field.dataset.detailField === 'package');
   const badge = fields.find(field => field.dataset.detailField === 'status');
   const titleId = root.querySelector('[data-detail-id]');
+  const endedNote = root.querySelector('[data-ended-unexpectedly]');
   const position = () => ({ x: window.scrollX, y: window.scrollY });
   const restorePosition = value => {
     if (window.scrollX !== value.x || window.scrollY !== value.y) window.scrollTo(value.x, value.y);
@@ -125,7 +126,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     // Denied, missing or disposed data must not linger in the browser tab either.
     document.title = `Execution ${executionId} · SSIS Dashboard`;
     badge.textContent = '';
-    badge.hidden = titleId.hidden = true;
+    badge.hidden = titleId.hidden = endedNote.hidden = true;
     hideEarliestError();
     if (legacyErrors) { legacyErrors.hidden = true; legacyErrors.removeAttribute('href'); }
   };
@@ -226,6 +227,8 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
       content.hidden = false;
     }
     rendered = state.response;
+    // SSISDB status 6 records no outcome of its own: say why the run may have no error messages.
+    endedNote.hidden = state.response?.data.status.name !== 'halted';
     executableView.setEntryPackage(state.response?.data.package_name);
     executableView.render(state.executables, state.busy, state.response !== null, state.response?.data.started_at);
     childView.render(state.children, state.busy, state.response !== null, state.response?.data.started_at);

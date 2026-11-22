@@ -30,6 +30,8 @@ export function formatCode(value) {
     throw new TypeError('Invalid catalog code.');
   }
   if (value.name === 'unknown') return `Unknown (${value.code})`;
+  // SSISDB status 6, the API's 'halted': SSMS and the catalog documentation call it this.
+  if (value.name === 'halted') return 'Ended unexpectedly';
   const name = value.name.replaceAll(/[_-]/g, ' ');
   return name.charAt(0).toUpperCase() + name.slice(1);
 }

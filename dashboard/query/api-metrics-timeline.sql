@@ -22,7 +22,8 @@ FROM @bounds.nodes('/buckets/b') AS intervals(b);
 SELECT bucket.bucket_id, COUNT_BIG(*) AS created_count,
        SUM(CONVERT(bigint, CASE WHEN e.start_time IS NOT NULL THEN 1 ELSE 0 END)) AS started_count,
        SUM(CONVERT(bigint, CASE WHEN e.status = 7 THEN 1 ELSE 0 END)) AS succeeded_count,
-       SUM(CONVERT(bigint, CASE WHEN e.status = 4 THEN 1 ELSE 0 END)) AS failed_count
+       SUM(CONVERT(bigint, CASE WHEN e.status = 4 THEN 1 ELSE 0 END)) AS failed_count,
+       SUM(CONVERT(bigint, CASE WHEN e.status = 6 THEN 1 ELSE 0 END)) AS halted_count
 INTO #timeline_counts
 FROM catalog.executions AS e
 CROSS APPLY (
@@ -42,7 +43,7 @@ GROUP BY bucket.bucket_id;
 
 SELECT b.bucket_id, COALESCE(c.created_count, 0) AS created_count,
        COALESCE(c.started_count, 0) AS started_count, COALESCE(c.succeeded_count, 0) AS succeeded_count,
-       COALESCE(c.failed_count, 0) AS failed_count
+       COALESCE(c.failed_count, 0) AS failed_count, COALESCE(c.halted_count, 0) AS halted_count
 FROM #timeline_buckets AS b
 LEFT JOIN #timeline_counts AS c ON c.bucket_id = b.bucket_id
 ORDER BY b.bucket_start;

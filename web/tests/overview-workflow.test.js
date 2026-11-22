@@ -192,6 +192,59 @@ test('unavailable events keep overview count links on the execution without a ca
   }
 });
 
+test('Failed counts and selects ended-unexpectedly runs (status 6) instead of hiding them under Other', async t => {
+  const dom = overviewDOM(), changes = [];
+  const withHalted = structuredClone(metadata);
+  withHalted.execution_statuses.splice(3, 0, { code: 6, name: 'halted' });
+  const summary = timelineSummary();
+  summary.data.by_status.splice(3, 0, { code: 6, name: 'halted', count: 4 });
+  summary.data.total += 4;
+  const view = mountOverview(dom.root, { metadata: withHalted, appBase: '/ops/app/', onSelect: value => changes.push(value),
+    api: { get: async resource => resource === 'executions' ? overviewPage() : summary } });
+  t.after(view.dispose);
+  await view.apply(selection('?folder=Old'));
+  const card = key => dom.root.querySelector(`[data-status-card="${key}"]`);
+  assert.equal(dom.root.querySelector('[data-count="failed"]').textContent, '6', '2 failed + 4 ended unexpectedly');
+  assert.equal(card('other').hidden, true, 'nothing else is left for Other');
+  card('failed').dispatchEvent(new Event('click', { cancelable: true }));
+  assert.deepEqual(changes.at(-1), { status: [4, 6] });
+  assert.deepEqual(parseSelection(new URL(card('failed').href, navigation.origin).search, withHalted).status, [4, 6]);
+});
+
+test('without status 6 in the metadata, Failed counts and selects only 4 and Other keeps the rest', async t => {
+  const dom = overviewDOM(), changes = [];
+  const summary = timelineSummary();
+  summary.data.by_status.splice(3, 0, { code: 6, name: 'unknown', count: 1 });
+  summary.data.total += 1;
+  const view = mountOverview(dom.root, { metadata, appBase: '/ops/app/', onSelect: value => changes.push(value),
+    api: { get: async resource => resource === 'executions' ? overviewPage() : summary } });
+  t.after(view.dispose);
+  await view.apply(selection('?folder=Old'));
+  const card = key => dom.root.querySelector(`[data-status-card="${key}"]`);
+  assert.equal(dom.root.querySelector('[data-count="failed"]').textContent, '2');
+  assert.equal(dom.root.querySelector('[data-count="other"]').textContent, '1');
+  card('failed').dispatchEvent(new Event('click', { cancelable: true }));
+  assert.deepEqual(changes.at(-1), { status: [4] });
+});
+
+test('a Failed card with no listed failure codes is never marked current', async t => {
+  const dom = overviewDOM();
+  const bare = structuredClone(metadata);
+  bare.execution_statuses = bare.execution_statuses.filter(item => item.code !== 4);
+  const summary = timelineSummary();   // status 4 keeps its bucket (count 0), which the summary reader requires
+  summary.data.by_status.find(item => item.code === 4).count = 0;
+  summary.data.total -= 2;
+  const view = mountOverview(dom.root, { metadata: bare, appBase: '/ops/app/', onSelect: () => {},
+    api: { get: async resource => resource === 'executions' ? overviewPage() : summary } });
+  t.after(view.dispose);
+  await view.apply(parseSelection('?folder=Old', bare));
+  const card = key => dom.root.querySelector(`[data-status-card="${key}"]`);
+  assert.equal(dom.root.querySelector('[data-count="total"]').textContent, '8', 'the summary loaded');
+  assert.equal(card('total').getAttribute('aria-current'), 'true');
+  assert.equal(card('failed').getAttribute('aria-disabled'), 'true');
+  assert.equal(card('failed').getAttribute('aria-current'), null);
+});
+
 test('summary cards include Other, apply exact statuses and clear with Total; row links retain selection', async t => {
   const dom = overviewDOM(), changes = [];
   const enabled = structuredClone(metadata); enabled.capabilities.events = true;

@@ -86,6 +86,28 @@ test('a document that is not retained saves nothing and an ordinary pageshow doe
   assert.deepEqual(app.log.at(-1), ['mount', 'overview2', null]);
 });
 
+test('the detail page explains status 6 (ended unexpectedly) and only for that status', async t => {
+  for (const [status, label, hidden] of [[{ code: 6, name: 'halted' }, 'Ended unexpectedly', false],
+    [{ code: 4, name: 'failed' }, 'Failed', true]]) {
+    const dom = detailDOM();
+    const id = JSON.parse(dom.document.getElementById('app-config').textContent).execution_id;
+    const response = detailResponse(id);
+    response.data.status = status;
+    t.mock.method(globalThis, 'fetch', async url => {
+      if (url.pathname.endsWith('/meta')) return jsonResponse(envelope(metadata()));
+      if (url.pathname.endsWith('/server')) return jsonResponse(envelope({ server_name: 'Server' }));
+      return jsonResponse(response);
+    });
+    const view = mountDetailScreen(dom.root);
+    await settle();
+    assert.equal(dom.field('status').textContent, label);
+    assert.equal(dom.get('ended-unexpectedly').hidden, hidden);
+    view.dispose();
+    assert.equal(dom.get('ended-unexpectedly').hidden, true, 'a disposed page (e.g. before a failed restore) keeps no note');
+    t.mock.restoreAll();
+  }
+});
+
 test('the detail screen checkpoints only after settings load and restores under the detail key', async t => {
   const dom = detailDOM(), calls = [];
   const id = JSON.parse(dom.document.getElementById('app-config').textContent).execution_id;
