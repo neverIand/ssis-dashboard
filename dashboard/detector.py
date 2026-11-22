@@ -6,8 +6,9 @@ between polls or per subscriber. A cycle reads at most MAX_PAGES pages and publi
 goes; a backlog continues on the next cycle without waiting. Events go into a bounded log with
 increasing sequence numbers. Subscribers hold an opaque cursor, `<generation>:<sequence>`, where the
 generation is random per detector instance; they read the events after it, or are told to resync
-when it is from another instance or has been trimmed. Disabled by default; nothing streams the log
-yet (P5.2 transport is deferred).
+when it is from another instance or has been trimmed. Health (running, stopping, seeded, complete
+and the time of the last poll since the latest seed) is published with the log under the same lock,
+so a stream sees it together with the cursor (P5.2a). Disabled by default.
 """
 
 from collections import deque
@@ -39,7 +40,7 @@ def default_limits(interval):
 
 class Detector:
     def __init__(self, config, *, app=None, limits=None, interval=None, max_interval=60.0, log_size=1000,
-                 read_seed=changes.read_seed, read_poll=changes.read_poll, clock=time.monotonic):
+                 freshness=None, read_seed=changes.read_seed, read_poll=changes.read_poll, clock=time.monotonic):
         self.config = config
         self._app = app  # the thread logs through this application's logger
         self.interval = float(interval if interval is not None else config['CHANGE_DETECTION_INTERVAL_SECONDS'])
@@ -47,6 +48,10 @@ class Detector:
         if self.limits.gap_seconds < 2 * self.interval:
             raise ValueError('gap_seconds must cover at least two poll intervals.')
         self.max_interval = max(self.interval, float(max_interval))
+        # Healthy only while a poll has succeeded this recently (a prototype budget, P5.2).
+        self.freshness = float(freshness if freshness is not None else max(15.0, 3 * self.interval))
+        if self.freshness < self.interval:
+            raise ValueError('freshness must cover at least one poll interval.')
         # While incomplete (an overflow), reseed at most this often to regain an exact state.
         self.reseed_seconds = max(60.0, self.limits.gap_seconds)
         self._last_seed = None
@@ -65,6 +70,12 @@ class Detector:
         self._bad_polls = 0
         self._last_success = None
         self._lifecycle = threading.Lock()
+        # Published health, guarded by _changed like the log and the cursor.
+        self._stopping = False
+        self._seeded = False
+        self._complete = False
+        self._valid_poll = None  # monotonic time of the last successful poll since the latest seed
+        self._runs = 0           # counts start() calls, so a stream can tell that its run has ended
 
     # --- lifecycle -------------------------------------------------------------------------------
     def start(self):
@@ -77,7 +88,11 @@ class Detector:
                 self._thread.join(self._join_seconds())
                 if self._thread.is_alive():
                     return False
-            self._stop.clear()
+            with self._changed:
+                self._stop.clear()
+                self._stopping = False
+                self._valid_poll = None
+                self._runs += 1
             self._thread = threading.Thread(target=self._run, name='ssis-change-detector', daemon=True)
             self._thread.start()
             return True
@@ -86,8 +101,11 @@ class Detector:
         """Ask the thread to stop and wait for it. Returns True once it has exited."""
         with self._lifecycle:
             thread = self._thread
-            self._stop.set()
             with self._changed:
+                # Readers see the stop and its health together; a restart needs a new poll to be healthy.
+                self._stop.set()
+                self._stopping = True
+                self._valid_poll = None
                 self._changed.notify_all()
             if thread is None:
                 return True
@@ -101,7 +119,8 @@ class Detector:
 
     @property
     def running(self):
-        return self._thread is not None and self._thread.is_alive()
+        thread = self._thread  # stop() may clear it concurrently: read it once
+        return thread is not None and thread.is_alive()
 
     # --- polling ---------------------------------------------------------------------------------
     def poll_once(self):
@@ -125,13 +144,14 @@ class Detector:
                 fresh = changes.ChangeState(self.limits)
                 events = fresh.seed(self._read_seed(self.config, self.limits, sorted(carry)), now, previous)
                 self._state, self._previous, self._last_seed = fresh, None, now
-                self._publish(events)
+                # A seed proves nothing about the next poll: health waits for one.
+                self._publish(events, state=fresh, polled=False)
                 published += events
             else:
                 for _ in range(MAX_PAGES):
                     rows, requested = self._read_poll(self.config, state, self.limits)
                     events, more = state.apply(rows, requested, now)
-                    self._publish(events)
+                    self._publish(events, state=state, polled=True)
                     published += events
                     if not more or self._stop.is_set():
                         break
@@ -141,6 +161,7 @@ class Detector:
                 # Unexpected rows, whatever their shape: restart from a seed rather than trust the state, keeping its gaps.
                 self._previous = state
                 self._state = changes.ChangeState(self.limits)
+                self._publish([], state=self._state, polled=False)
                 # The reseed that follows proves nothing about the next poll. Count bad polls until one succeeds, so
                 # the wait after each one doubles and a persistent fault cannot reseed (a catalog scan) every cycle.
                 self._bad_polls += 1
@@ -172,15 +193,32 @@ class Detector:
             self._stop.wait(delay)
 
     # --- subscribers -----------------------------------------------------------------------------
-    def _publish(self, events):
-        if not events:
-            return
+    def _publish(self, events, *, state, polled):
+        """Append events and update the published health in one step, so a reader never sees a cursor
+        with health from another moment. `polled` marks a successful poll; a seed clears it."""
         with self._changed:
             for event in events:
                 self._sequence += 1
                 # The log keeps its own copy: the polling caller owns the events poll_once returns.
                 self._log.append((self._sequence, dict(event)))
-            self._changed.notify_all()
+            self._seeded, self._complete = state.seeded, state.complete
+            # A poll that finishes after stop() proves nothing about the next run.
+            self._valid_poll = self._clock() if polled and state.seeded and not self._stopping else None
+            if events:
+                self._changed.notify_all()
+
+    def _health(self):
+        """Published health; the caller holds _changed."""
+        running = self.running
+        age = None if self._valid_poll is None else max(0.0, self._clock() - self._valid_poll)
+        healthy = (running and not self._stopping and self._seeded and self._complete
+                   and age is not None and age <= self.freshness)
+        return {'healthy': healthy, 'running': running, 'stopping': self._stopping, 'seeded': self._seeded,
+                'complete': self._complete, 'poll_age': age, 'run': self._runs}
+
+    def health(self):
+        with self._changed:
+            return self._health()
 
     def _sequence_of(self, cursor):
         """The sequence in a cursor from this instance; None for no cursor or another instance."""
@@ -195,6 +233,13 @@ class Detector:
         """Events after the cursor `after`. Waits up to `timeout` seconds for new ones; never touches
         the database. `resync` is True for no cursor (a new subscriber: load, then follow `next`), a
         cursor from another detector instance, or one older than the log."""
+        return self._read(after, timeout, False)
+
+    def read_with_health(self, after, timeout=0.0):
+        """As read(), plus `health` taken under the same lock as `next`."""
+        return self._read(after, timeout, True)
+
+    def _read(self, after, timeout, with_health):
         sequence = self._sequence_of(after)
         deadline = self._clock() + max(0.0, float(timeout))
         with self._changed:
@@ -202,13 +247,18 @@ class Detector:
                 cursor = f'{self._generation}:{self._sequence}'
                 oldest = self._log[0][0] if self._log else self._sequence + 1
                 if sequence is None or sequence > self._sequence or sequence < oldest - 1:
-                    return {'events': [], 'next': cursor, 'resync': True}
+                    result = {'events': [], 'next': cursor, 'resync': True}
+                    break
                 # Each reader gets its own copies, so one subscriber's changes never reach another's replay.
                 events = [dict(event) for number, event in self._log if number > sequence]
                 remaining = deadline - self._clock()
                 if events or remaining <= 0 or self._stop.is_set():
-                    return {'events': events, 'next': cursor, 'resync': False}
+                    result = {'events': events, 'next': cursor, 'resync': False}
+                    break
                 self._changed.wait(remaining)
+            if with_health:
+                result['health'] = self._health()
+            return result
 
     def status(self):
         return {'running': self.running, 'seeded': self._state.seeded, 'complete': self._state.complete,

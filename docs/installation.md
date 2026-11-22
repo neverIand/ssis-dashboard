@@ -54,8 +54,11 @@ Set `CONNECTION_STRING['main']` to the approved SSISDB connection using an insta
 | `API_OVERRIDE_VALUES_ENABLED` | `False` | Permit nonsensitive override values; requires values enabled |
 | `API_ACTIVE_ESTIMATES_ENABLED` | `False` | Show a typical duration and expected end for running executions on the detail page and overview rows. Each new running execution costs one read of every visible execution (no catalog index covers names or end times) |
 | `API_ESTIMATE_CACHE_SECONDS` | `300` | 1–3600; how long the process keeps each running execution's estimate before reading it again |
-| `CHANGE_DETECTION_ENABLED` | `False` | Local SSISDB change detection (P5.1): one background poller, started only by `runserver.py` and never in the debug reloader's watcher process. Nothing serves its events yet |
+| `CHANGE_DETECTION_ENABLED` | `False` | Local SSISDB change detection (P5.1): one background poller, started only by `runserver.py` and never in the debug reloader's watcher process. Only the stream prototype below serves its events |
 | `CHANGE_DETECTION_INTERVAL_SECONDS` | `5` | Poll interval, 1–300 seconds; after failures the wait doubles, up to 60 seconds or the interval if longer |
+| `CHANGE_STREAM_ENABLED` | `False` | P5.2 prototype: `GET /api/v1/changes` as Server-Sent Events for loopback peers, served only when `runserver.py` starts the app; requires `CHANGE_DETECTION_ENABLED`. `wsgi.py` never serves it. Not for shared hosting |
+| `CHANGE_STREAM_NAMES_IDS` | `False` | Let `changes` frames name execution IDs; otherwise a frame for a batch with events asks for a refresh of everything shown |
+| `CHANGE_STREAM_MAX_STREAMS` / `_LIFETIME_SECONDS` / `_HEARTBEAT_SECONDS` | `4` / `300` / `15` | Streams per process (1–64; more get 503 `stream_capacity`), stream lifetime (10–3600 s) and heartbeat (1–300 s, shorter than the lifetime) |
 | `API_CURSOR_SECRET_KEY` | `None` | Paging-cursor signing secret, at least 32 bytes; keep it private like the connection string. `None` uses a random key per process, so cursors fail across workers and after restart |
 | `LOG_LEVEL` | `INFO` | Safe request/query events; validated Python logger level |
 

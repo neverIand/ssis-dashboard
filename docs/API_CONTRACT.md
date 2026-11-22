@@ -132,10 +132,16 @@ Errors use RFC 9457 `application/problem+json`: `type: about:blank`, standard ti
 | 404 | `not_found`, including hidden/absent executions |
 | 405 | `method_not_allowed`, preserving `Allow` |
 | 500 | `internal_error`, including unexpected types, unsupported data shapes and SQL permission/conversion failures |
-| 503 | `database_unavailable`, connection/login/driver unavailable |
+| 503 | `database_unavailable`, connection/login/driver unavailable; `stream_capacity` when every change-stream slot is in use (with `Retry-After`) |
 | 504 | `database_timeout`, native HYT00/HYT01 |
 | 500 / 503 | `database_configuration` replaces the code above when the driver is not installed or loadable (IM002/IM003, 503) or a catalog object is missing because the connection names another database (42S02, 500). The status is unchanged; clients must not retry it automatically. Permission failures cannot be told apart without reading driver text and stay `internal_error` |
 
 `/healthz` uses no database. `/readyz` performs a zero-row read in SSISDB, answering 503 without that read when the connection is not in SSISDB or the catalog view is absent, with login/query limits individually capped at 1–2 seconds; this is not a total HTTP deadline. Empty visibility may be ready. Successful cleanup or readiness does not establish workload, reader-login, host or stream acceptance.
 
 Contract/schema tests run with `python -m unittest discover -s tests -v` after installing development requirements. The browser readers are tested against the OpenAPI response examples through a generated copy, `web/tests/openapi-examples.json`; after changing an example, run `python -m tests.export_openapi_examples` (the contract tests fail while the copy is stale). Native comparisons and open gates are maintained in [acceptance](API_ACCEPTANCE.md) and [progress](PROGRESS.md), without repeating their status here.
+
+## Change-stream prototype
+
+`GET /api/v1/changes` exists only when the development entry point `runserver.py` starts with `CHANGE_STREAM_ENABLED` (which requires `CHANGE_DETECTION_ENABLED`); otherwise, and always under `dashboard/wsgi.py`, it is an ordinary 404. It is a P5.2 prototype for loopback peers and is outside the Stage C OpenAPI document until client integration adds the `/meta` flag. For GET, HEAD and OPTIONS, a peer other than 127.0.0.1 or ::1 gets 404, then a request whose `Sec-Fetch-Site` is present and not `same-origin` gets 403, before any other input check; query parameters then get 400. HEAD returns 200 `text/event-stream` with `Cache-Control` and the request ID but no body, and neither HEAD nor OPTIONS takes a stream slot. Over the per-process slot limit the response is 503 `stream_capacity` before any frame.
+
+A GET 200 response is `text/event-stream` (UTF-8, `Cache-Control: no-store`, `X-Accel-Buffering: no`, request ID). It never reads SQL itself; a failure of the opening detector read is an ordinary Problem response. Frames follow the table in [the P5.2 record](MODERNIZATION_PLAN.md#production-live-updates): `stale` (`{"reason":"detector"}`, empty `id`, then the stream ends), `resync` (`{"reason":"subscribe"|"cursor"|"detector"}`), `changes` (for a batch with events `{"ids":[...]}`, decimal-string IDs, or `{"ids":null}`; `{"ids":[]}` only as the opening acknowledgement of a valid `Last-Event-ID`), comment heartbeats, and `retry: 1000` before the stream ends at its lifetime or output cap; no frame takes the output past 256 KiB. IDs are named only with `CHANGE_STREAM_NAMES_IDS`.

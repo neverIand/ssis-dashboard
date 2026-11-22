@@ -9,6 +9,7 @@ from flask.helpers import get_debug_flag
 
 from dashboard import create_app
 from dashboard.detector import start_for_process
+from dashboard.stream import enable_stream
 
 app = create_app()
 
@@ -25,6 +26,8 @@ def serve(app, env=environ, run=None, register_exit=atexit.register):
     except ValueError:
         port = 5555
     debug = get_debug_flag() if 'FLASK_DEBUG' in env else app.debug
+    # The change-stream prototype is served only from this development entry point.
+    enable_stream(app)
     detector = start_for_process(app, reloader=debug, environ=env)
     if detector is not None:
         register_exit(detector.stop)

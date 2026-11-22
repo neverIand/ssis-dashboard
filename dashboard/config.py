@@ -46,9 +46,19 @@ API_MAX_TIMELINE_BUCKETS = 1000
 API_READINESS_TIMEOUT_SECONDS = 2
 
 # Local SSISDB change detection (P5.1): one owned background poller per application, started only by
-# runserver.py. Disabled by default; no stream serves its events yet. Interval: 1-300 seconds.
+# runserver.py. Disabled by default; CHANGE_STREAM_ENABLED serves its events. Interval: 1-300 seconds.
 CHANGE_DETECTION_ENABLED = False
 CHANGE_DETECTION_INTERVAL_SECONDS = 5
+
+# P5.2 change-stream prototype: GET /api/v1/changes (Server-Sent Events) for loopback peers, added
+# only when runserver.py starts the app. Requires CHANGE_DETECTION_ENABLED; not for shared hosting.
+# Frames name execution IDs only with CHANGE_STREAM_NAMES_IDS. Streams per process 1-64, lifetime
+# 10-3600 s, heartbeat 1-300 s and shorter than the lifetime.
+CHANGE_STREAM_ENABLED = False
+CHANGE_STREAM_NAMES_IDS = False
+CHANGE_STREAM_MAX_STREAMS = 4
+CHANGE_STREAM_LIFETIME_SECONDS = 300
+CHANGE_STREAM_HEARTBEAT_SECONDS = 15
 
 # Paging-cursor signing secret: None or at least 32 bytes (str or bytes), kept out
 # of Git like CONNECTION_STRING. None uses a random key per process, so cursors

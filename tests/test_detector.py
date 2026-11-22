@@ -1,5 +1,6 @@
 """P5.1c owned detector: lifecycle, publication, subscriber reads, failures and process guard."""
 import threading
+import time
 import unittest
 
 from dashboard import create_app
@@ -360,6 +361,149 @@ class DetectorTests(unittest.TestCase):
         self.assertIs(start_for_process(app, reloader=False, environ={}), d)
         self.assertTrue(d.stop(timeout=5))
         self.assertIsNone(start_for_process(create_app({}), reloader=False, environ={}))
+
+
+class Running(Detector):
+    """A detector whose thread counts as running, so health can be driven by poll_once and a fake clock."""
+    running = property(lambda self: True)
+
+
+class HealthTests(unittest.TestCase):
+    """P5.2a: health is published with the cursor; only a poll after the latest seed makes it healthy."""
+
+    def make(self, fake, clock, **kwargs):
+        kwargs.setdefault('limits', Limits(gap_seconds=30))
+        return Running(CONFIG, read_seed=fake.read_seed, read_poll=fake.read_poll, clock=clock, **kwargs)
+
+    def test_a_seed_alone_is_not_healthy_and_a_poll_stays_fresh_for_the_bound(self):
+        fake, clock = Fake({1: (2, None)}), Clock()
+        d = self.make(fake, clock, freshness=10)
+        self.assertEqual(d.health(), {'healthy': False, 'running': True, 'stopping': False, 'seeded': False,
+                                      'complete': False, 'poll_age': None, 'run': 0})
+        d.poll_once()
+        self.assertEqual((d.health()['seeded'], d.health()['complete'], d.health()['healthy']), (True, True, False))
+        clock.now = 1
+        d.poll_once()
+        self.assertTrue(d.health()['healthy'])
+        clock.now = 11
+        self.assertEqual((d.health()['healthy'], d.health()['poll_age']), (True, 10))
+        clock.now = 11.5
+        self.assertFalse(d.health()['healthy'], 'no poll within the freshness bound')
+        d.poll_once()
+        self.assertTrue(d.health()['healthy'])
+        with self.assertRaises(ValueError):
+            Detector(CONFIG, interval=5, freshness=4)
+
+    def test_a_reseed_after_a_bad_poll_waits_for_a_good_poll(self):
+        fake, clock = Fake({1: (2, None)}), Clock()
+        d = self.make(fake, clock)
+        d.poll_once()
+        d.poll_once()
+        self.assertTrue(d.health()['healthy'])
+        fake.fail = OSError('network')
+        with self.assertRaises(OSError):
+            d.poll_once()
+        self.assertTrue(d.health()['healthy'], 'a transient failure ages out by the freshness bound only')
+        fake.fail = ValueError('bad row')
+        with self.assertRaises(ValueError):
+            d.poll_once()
+        self.assertEqual((d.health()['seeded'], d.health()['healthy']), (False, False))
+        fake.fail = None
+        d.poll_once()
+        self.assertEqual((d.status()['failures'], d.health()['seeded'], d.health()['healthy']), (0, True, False),
+                         'the reseed clears failures but proves nothing about the next poll')
+        d.poll_once()
+        self.assertTrue(d.health()['healthy'])
+
+    def test_an_incomplete_state_is_unhealthy_until_a_reseed_and_a_poll(self):
+        fake, clock = Fake({1: (2, None)}), Clock()
+        d = self.make(fake, clock, limits=Limits(tracked=1, gap_seconds=30))
+        d.poll_once()
+        d.poll_once()
+        fake.ops[2] = (2, None)
+        events, _ = d.poll_once()
+        self.assertEqual(events[-1], {'kind': 'resync', 'reason': 'active-limit'})
+        self.assertEqual((d.health()['complete'], d.health()['healthy']), (False, False))
+        fake.ops.update({1: (7, None), 2: (7, None)})
+        clock.now += d.reseed_seconds
+        d.poll_once()
+        self.assertEqual((d.health()['complete'], d.health()['healthy']), (True, False), 'reseeded, no poll yet')
+        d.poll_once()
+        self.assertTrue(d.health()['healthy'])
+
+    def test_read_with_health_returns_the_cursor_and_health_together(self):
+        fake, clock = Fake({1: (2, None)}), Clock()
+        d = self.make(fake, clock)
+        start = d.read_with_health(None)
+        self.assertEqual((start['resync'], start['health']['healthy']), (True, False))
+        d.poll_once()
+        d.poll_once()
+        result = d.read_with_health(start['next'])
+        self.assertEqual(([e['kind'] for e in result['events']], seq(result['next']), result['health']['healthy']),
+                         (['resync'], 1, True))
+        self.assertNotIn('health', d.read(start['next']), 'read() keeps its shape')
+
+    def test_a_stop_in_progress_is_unhealthy_and_reads_return_at_once(self):
+        # Codex round 2 of the P5.2 record: a stop that times out while a poll is in flight must not look healthy.
+        fake, entered, release = Fake({1: (2, None)}), threading.Event(), threading.Event()
+        d = Detector(CONFIG, interval=1, read_seed=fake.read_seed, read_poll=fake.read_poll)
+        self.assertTrue(d.start())
+        for _ in range(200):
+            if d.health()['healthy']:
+                break
+            threading.Event().wait(0.02)
+        self.assertTrue(d.health()['healthy'])
+        cursor = d.read(None)['next']
+
+        def block():
+            entered.set()
+            release.wait(10)
+        fake.on_poll = block
+        self.assertTrue(entered.wait(5))
+        self.assertFalse(d.stop(timeout=0))
+        began = time.monotonic()
+        result = d.read_with_health(cursor, timeout=2)
+        self.assertLess(time.monotonic() - began, 1)
+        self.assertEqual((result['events'], result['health']['running'], result['health']['stopping'],
+                          result['health']['healthy']), ([], True, True, False))
+        release.set()
+        self.assertTrue(d.stop(timeout=5))
+        self.assertEqual((d.health()['running'], d.health()['healthy'], d.health()['poll_age']), (False, False, None),
+                         'the poll that finished after stop() is not counted')
+        run = d.health()['run']
+        fake.on_poll = lambda: time.sleep(0.3)
+        self.assertTrue(d.start())
+        self.assertEqual((d.health()['run'], d.health()['poll_age'], d.health()['healthy']), (run + 1, None, False))
+        self.assertTrue(d.stop(timeout=5))
+
+    def test_stop_wakes_a_waiting_reader_and_a_restart_needs_a_new_poll(self):
+        fake = Fake({1: (2, None)})
+        d = Detector(CONFIG, interval=1, read_seed=fake.read_seed, read_poll=fake.read_poll)
+        self.assertTrue(d.start())
+        for _ in range(200):
+            if d.health()['healthy']:
+                break
+            time.sleep(0.02)
+        cursor = d.read(None)['next']
+        result, waiting = {}, threading.Event()
+
+        def reader():
+            waiting.set()
+            result.update(d.read_with_health(cursor, timeout=10))
+        thread = threading.Thread(target=reader)
+        thread.start()
+        waiting.wait(5)
+        time.sleep(0.2)                                    # the reader is inside the condition wait
+        began = time.monotonic()
+        self.assertTrue(d.stop(timeout=5))
+        thread.join(5)
+        self.assertLess(time.monotonic() - began, 3)
+        self.assertEqual((result['events'], result['health']['stopping'], result['health']['healthy']), ([], True, False))
+        fake.on_poll = lambda: time.sleep(0.3)
+        self.assertTrue(d.start())
+        self.assertEqual((d.health()['stopping'], d.health()['poll_age'], d.health()['healthy']), (False, None, False),
+                         'a restart is not healthy on the previous run\'s poll')
+        self.assertTrue(d.stop(timeout=5))
 
 
 class RunserverTests(unittest.TestCase):

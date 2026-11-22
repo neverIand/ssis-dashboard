@@ -118,7 +118,7 @@ def resource_response(data, *, meta=None):
     }})
 
 
-def problem_response(status, *, response=None, cursor_error=None, configuration=False):
+def problem_response(status, *, response=None, cursor_error=None, configuration=False, capacity=False):
     if status not in _PROBLEMS:
         # The contract fixes the status/code set. Keep an unlisted HTTP error in its
         # class rather than reporting (and logging) a client error as a server fault.
@@ -131,6 +131,10 @@ def problem_response(status, *, response=None, cursor_error=None, configuration=
         # A missing driver or catalog will not fix itself: clients must not retry it as an outage.
         code = 'database_configuration'
         detail = 'The monitoring database connection is not configured correctly. Check the server configuration.'
+    if capacity and status == 503:
+        # Change-stream prototype (P5.2): every stream slot is in use; the database may be fine.
+        code = 'stream_capacity'
+        detail = 'Too many change streams are open. Try again later.'
     return _json({'type': 'about:blank', 'title': HTTPStatus(status).phrase, 'status': status,
                   'detail': detail, 'code': code, 'request_id': request_id()},
                  status=status, response=response, mimetype='application/problem+json')

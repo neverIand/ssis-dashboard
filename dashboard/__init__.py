@@ -76,10 +76,13 @@ def create_app(config_overrides=None, *, config_path=None):
     from dashboard.views import register_views
     from dashboard.frontend import register_frontend
     from dashboard.legacy_navigation import register_legacy_navigation
+    from dashboard.stream import register_stream
 
     register_views(app)
     register_frontend(app)
     register_observability(app)
+    # The change-stream admission runs before the Fetch Metadata and API input checks (P5.2 prototype).
+    register_stream(app)
     # Before API input checks and every route's SQL; after request timing starts.
     register_browser_policy(app)
     register_legacy_navigation(app)

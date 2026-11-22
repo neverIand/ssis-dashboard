@@ -171,6 +171,27 @@ Record revision/source hashes, interpreter/driver/catalog scope, timestamps, exa
 
 Each record keeps its date, candidate, method, decision-relevant figures, limits and evidence path. The full text of every record up to 15 November 2026, with all intermediate tables, is at `6180174:docs/API_ACCEPTANCE.md`. Timings are local observations, not p95 targets or capacity claims, unless a record says otherwise.
 
+### P5.2 stream prototype: 22 November 2026
+
+Development server (Werkzeug, threaded) on 127.0.0.1 with `GET /api/v1/changes`; the detector read an in-memory catalog so changes could be injected, and data reads used the local SSISDB. Harness and measurements: `.local/tools/stream-prototype/`. HTTP rows are from the run after the first review round; unit tests, not these runs, cover every way a stream ends.
+
+| Check | Result |
+| --- | --- |
+| Opening frame, 60 opens over HTTP | p50 15 ms, p95 26 ms; no cursor opens `resync`/`subscribe`, a valid cursor opens `changes {"ids":[]}` |
+| Heartbeat 2 s, lifetime 12 s | comments 2.00–2.01 s apart; `retry: 1000` and the end at 12.0 s |
+| Change to frame (poll interval 1 s), 10 changes | p50 1,004 ms, max 1,012 ms |
+| Python client closed after reading `id:` and `data:`, before the blank line | it kept the earlier cursor; its reconnect replayed both changes in one larger batch; a reconnect with the newer cursor opened `{"ids":[]}` |
+| `removed`, log overflow (20 entries), new generation | `{"ids":null}`; `resync`/`cursor`; `resync`/`cursor` |
+| Bad poll during an open stream | `stale` with an empty `id`; new streams opened `stale` for 2.2 s, then `resync`/`detector` after the reseed and a poll |
+| Slots (only the slot counter was sampled) | the 9th of 8 got 503 `stream_capacity` with `Retry-After: 5`; a client that closed its socket freed the slot within one heartbeat (1–2 s); a client that kept its socket but stopped reading kept it until the lifetime (12 s) |
+| Admission | `Sec-Fetch-Site` `same-site`, `cross-site`, `none`: 403; HEAD 200 without a slot |
+| Browser, 1 tab | opening frame 3 ms; one snapshot (`/api/v1/executions`, 15 October window) 340 ms before and one 839 ms with the stream open |
+| Browser, 6 tabs | all six opened in 3–4 ms; one snapshot from the sixth tab was aborted at 15 s without a connection, and one new-tab navigation to the origin failed; after one stream closed, a snapshot took 717 ms |
+| Browser, 7 tabs | a 7th stream, opened for the first time, stayed `CONNECTING` (the server saw six) and opened after 31 s, when another stream reached its 120 s lifetime |
+| Real SSISDB detector | healthy 3.4 s after start (seed and first poll, interval 2 s); `resync` then `{"ids":[]}` on reconnect |
+
+The browser was the desktop app's Chromium pane over HTTP/1.1, one sample per case. Six streams in that browser left no connection for other requests to the origin, so the client design needs one stream shared between tabs, fewer streams, or HTTP/2 before integration. A client that stopped reading kept its slot until the lifetime, about 12 s; write stalls, buffered bytes, threads and sockets were not sampled, and automatic `EventSource` reconnection after a normal end was not observed. NOT RUN: Waitress, a proxy, HTTP/2, the native pages, reader identities. Evidence: `.local/reports/backend/20261122-p52-prototype/`.
+
 ### Ordinary-sort logging lookup: 20 November 2026
 
 R-07 of the 19 November review. `api-executions-page.sql` and `api-executions-ordered-page.sql` read the system `LOGGING_LEVEL` value through an `OUTER APPLY` that returned one row per matching parameter row. A native run with the temporary-table fixture and a second system row on one execution confirmed the review: both files returned the execution twice. Served as the last page row it carried whichever level came first; as the first of two rows the API answered 500; as the look-ahead row it moved to the next page. Both files now aggregate inside the apply, with `COUNT_BIG(*)` and `MAX` of the value per execution, return the count as `logging_rows`, and the API checks every fetched row, including the look-ahead, for every sort. With the same 20 boundary cases (ID and `created_at` order, both directions, limits one and two, the duplicate in each position) the SQL now returns each execution once with a count of two; replaying those rows through the adapter gives 500 in all 20, where the old adapter gave 16 pages and four 500s.
