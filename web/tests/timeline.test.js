@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {ApiError} from '../src/api.js';
 import {readMetadata} from '../src/bootstrap.js';
@@ -224,4 +225,257 @@ test('a timeline deadline retains only its current cohort and exposes a safe tim
   await run.owner.apply(selection());await run.owner.toggleTimeline();slow=true;const refreshing=run.owner.refresh();await flush();t.mock.timers.tick(20);
   assert.equal(run.calls.at(-1).signal.aborted,true);wait.resolve(timelinePage());await refreshing;
   assert.equal(run.state.timeline.error.kind,'timeout');assert.equal(run.state.timeline.stale,true);assert.ok(run.state.page);
+});
+
+const drillMetadata = timelineMetadata();
+const drillSelection = () => validateSelection(defaultSelection(drillMetadata), drillMetadata);
+function drillScreen(t, { list = () => overviewPage(), summary = () => timelineSummary(), timeline = () => timelinePage() } = {}) {
+  const dom = overviewDOM(), selected = [], calls = [];
+  const view = mountOverview(dom.root, { metadata: drillMetadata, appBase: '/ops/app/', onSelect: changes => selected.push(changes),
+    api: { async get(resource, options) {
+      calls.push(resource);
+      return resource === 'executions' ? list(options) : resource === 'metrics/summary' ? summary(options) : timeline(options);
+    } } });
+  t.after(view.dispose);
+  return { ...dom, view, selected, calls };
+}
+const fire = (svg, type, target, key) => {
+  const event = new Event(type, { cancelable: true });
+  Object.defineProperty(event, 'target', { value: target });
+  if (key) Object.defineProperty(event, 'key', { value: key });
+  svg.dispatchEvent(event);
+};
+
+test('O6: Enter, double click or the button filter the list to a bucket, clamped to the applied window', async t => {
+  // The day bucket starts before and ends after the applied window, so both edges must be clamped.
+  const dom = drillScreen(t, { timeline: () => timelinePage([timelineBucket('2026-10-16T23:00:00.0000000Z', '2026-10-17T23:00:00.0000000Z')]) });
+  await dom.view.apply(drillSelection());
+  dom.get('timeline-toggle').dispatchEvent(new Event('click')); await flush();
+  const svg = dom.get('timeline-chart'), bar = svg.children[0];
+  assert.equal(dom.get('timeline-drill').hidden, false);
+  const reads = dom.calls.length;
+  fire(svg, 'keydown', bar, 'ArrowRight');
+  assert.equal(dom.selected.length, 0, 'arrows only select');
+  fire(svg, 'keydown', bar, 'Enter');
+  fire(svg, 'dblclick', bar);
+  dom.get('timeline-drill').dispatchEvent(new Event('click'));
+  const expected = { created: null, from: timelineFrom, to: timelineTo };
+  assert.deepEqual(dom.selected, [expected, expected, expected]);
+  assert.equal(dom.calls.length, reads, 'the drill itself reads nothing; the selection change does');
+});
+
+test('O6: an inner bucket keeps its own server bounds', async t => {
+  const from = '2026-10-15T23:00:00.0000000Z', to = '2026-10-18T23:00:00.0000000Z';
+  const day = (start, end) => timelineBucket(start, end, { created_count: 1, started_count: 1, succeeded_count: 1, failed_count: 0 });
+  const buckets = [day(from, '2026-10-16T23:00:00.0000000Z'), day('2026-10-16T23:00:00.0000000Z', '2026-10-17T23:00:00.0000000Z'),
+    day('2026-10-17T23:00:00.0000000Z', to)];
+  const dom = drillScreen(t, { list: () => overviewPage({ from, to }), summary: () => timelineSummary({ from, to }),
+    timeline: () => timelinePage(buckets, { from, to }) });
+  await dom.view.apply(validateSelection({ ...defaultSelection(drillMetadata), from, to }, drillMetadata));
+  dom.get('timeline-toggle').dispatchEvent(new Event('click')); await flush();
+  const svg = dom.get('timeline-chart');
+  assert.equal(svg.children.length, 3);
+  fire(svg, 'keydown', svg.children[1], 'Enter');
+  assert.deepEqual(dom.selected.at(-1), { created: null, from: buckets[1].start, to: buckets[1].end });
+});
+
+test('R1-3/5: Enter drill moves keyboard focus to the list; a cleared chart hides Show this bucket', async t => {
+  let broken = false;
+  const dom = drillScreen(t, { timeline: () => { if (broken) throw new ApiError('http', { status: 400 }); return timelinePage(); } });
+  await dom.view.apply(drillSelection());
+  dom.get('timeline-toggle').dispatchEvent(new Event('click')); await flush();
+  const svg = dom.get('timeline-chart'), bar = svg.children[0];
+  bar.focus();
+  fire(svg, 'keydown', bar, 'Enter');
+  assert.equal(dom.document.activeElement, dom.scroll, 'focus follows the filtered list');
+  dom.get('timeline-drill').focus();
+  broken = true;
+  await dom.view.refresh(); await flush();
+  assert.equal(dom.get('timeline-drill').hidden, true);
+  assert.notEqual(dom.document.activeElement, dom.get('timeline-drill'));
+});
+
+const clickNode=node=>node.dispatchEvent(new Event('click'));
+const stamp=day=>`2026-10-${String(day).padStart(2,'0')}T00:00:00.0000000Z`;
+function interaction(svg,type,target,key){
+  const event=new Event(type,{cancelable:true});Object.defineProperty(event,'target',{value:target});
+  if(key!==undefined)Object.defineProperty(event,'key',{value:key});
+  svg.dispatchEvent(event);return event;
+}
+async function timelineScreen(t,rows,metadata=timelineMetadata()){
+  const dom=overviewDOM(),calls=[],bounds={from:rows[0].start,to:rows.at(-1).end};
+  const view=mountOverview(dom.root,{metadata,appBase:'/app/',api:{async get(resource,options){
+    calls.push({resource,...options});return resource==='executions'?overviewPage(bounds):resource==='metrics/summary'?timelineSummary(bounds):timelinePage(rows,{...bounds,bucket:options.params.bucket});
+  }}});t.after(view.dispose);await view.apply(defaultSelection(metadata));clickNode(dom.get('timeline-toggle'));await flush();
+  return {...dom,calls,view};
+}
+const emptyBucket=(day)=>timelineBucket(stamp(day),stamp(day+1),{created_count:0,started_count:0,succeeded_count:0,failed_count:0});
+
+test('zero markers show up to 31 buckets and stop at 32',async t=>{
+  const at=i=>new Date(Date.UTC(2026,9,1+i)).toISOString().replace('.000Z','.0000000Z');
+  const rows=n=>Array.from({length:n},(_,i)=>timelineBucket(at(i),at(i+1),i?{created_count:0,started_count:0,succeeded_count:0,failed_count:0}:{}));
+  const markers=dom=>[...dom.get('timeline-chart').children].map(group=>[...group.children].find(node=>node.dataset.zero).getAttribute('display'));
+  const month=markers(await timelineScreen(t,rows(31)));assert.equal(month.length,31);assert.equal(month.filter(value=>value==='inline').length,30);
+  const wide=timelineMetadata();wide.limits.max_range_hours=2000;
+  const longer=markers(await timelineScreen(t,rows(32),wide));assert.equal(longer.length,32);assert.ok(longer.every(value=>value==='none'));
+});
+
+test('timeline shows succeeded/failed/other stacks, chronological labels and the latest non-empty default',async t=>{
+  const rows=[emptyBucket(14),timelineBucket(stamp(15),stamp(16),{created_count:10,started_count:9,succeeded_count:6,failed_count:3}),
+    timelineBucket(stamp(16),stamp(17),{created_count:3,started_count:3,succeeded_count:2,failed_count:1}),emptyBucket(17)];
+  const dom=await timelineScreen(t,rows),groups=dom.get('timeline-chart').children;
+  assert.deepEqual(groups.map(row=>row.dataset.bucketStart),rows.map(row=>row.start));assert.equal(dom.get('timeline-choice').value,stamp(16));
+  assert.deepEqual(groups[1].children.slice(1,4).map(node=>node.dataset.chartStatus),['7','4','other']);
+  assert.deepEqual(groups[1].children.slice(1,4).map(node=>Number(node.getAttribute('height'))),[90,45,15]);
+  assert.deepEqual(groups[1].children.slice(1,4).map(node=>Number(node.getAttribute('y'))),[70,25,10]);
+  assert.equal(dom.timelineBody.children[1].children[6].textContent,'1');assert.equal(dom.timelineBody.children[2].children[6].textContent,'0');
+  assert.deepEqual(dom.get('timeline-y-axis').children.map(node=>node.textContent),['10','5','0']);
+  assert.match(dom.get('timeline-x-axis').textContent,/2026-10-14.*2026-10-17/s);
+  assert.equal(dom.get('timeline-x-axis').firstChild.title, '2026-10-14 01:00:00');
+  assert.equal(dom.get('timeline-status').title, 'Observed 2026-10-17 17:00:00');
+  assert.equal(dom.get('timeline-selected').textContent, '2026-10-16 01:00:00 → 2026-10-17 01:00:00 · 3 created: 2 succeeded, 1 failed');
+  assert.equal(groups[2].firstChild.textContent, dom.get('timeline-selected').textContent);
+  assert.equal(groups[2].getAttribute('aria-label'), groups[2].firstChild.textContent);
+  assert.match(groups[1].firstChild.textContent, / · 10 created: 6 succeeded, 3 failed, 1 other, 1 not started$/);
+  assert.equal(dom.get('timeline-series'),undefined);
+});
+
+test('timeline counts ended-unexpectedly runs (halted_count) with Failed in the bar, table and description',async t=>{
+  const rows=[timelineBucket(stamp(15),stamp(16),{created_count:10,started_count:10,succeeded_count:6,failed_count:1,halted_count:2})];
+  const dom=await timelineScreen(t,rows),group=dom.get('timeline-chart').children[0];
+  assert.deepEqual(group.children.slice(1,4).map(node=>Number(node.getAttribute('height'))),[90,45,15],'failed 1 + halted 2');
+  assert.equal(dom.timelineBody.children[0].children[5].textContent,'3');
+  assert.match(group.firstChild.textContent,/ · 10 created: 6 succeeded, 3 failed, 1 other$/);
+});
+
+test('timeline click and keyboard select complete bucket values locally and keep focused keyed groups on refresh',async t=>{
+  const rows=[timelineBucket(stamp(15),stamp(16)),timelineBucket(stamp(16),stamp(17),{created_count:20,started_count:10})];
+  const dom=await timelineScreen(t,rows),plot=dom.get('timeline-chart'),first=plot.children[0],last=plot.children[1],count=dom.calls.length;
+  interaction(plot,'click',first.children[2]);assert.equal(dom.get('timeline-choice').value,stamp(15));
+  interaction(plot,'mouseover',last.children[2]);assert.equal(dom.get('timeline-choice').value,stamp(15)); // hover keeps the clicked bucket
+  assert.match(dom.get('timeline-selected').textContent,/ · 10 created: 3 succeeded, 2 failed, 5 other, 2 not started$/);
+  first.focus();interaction(plot,'focusin',first);interaction(plot,'keydown',first,'ArrowRight');
+  assert.equal(dom.document.activeElement,last);assert.equal(last.getAttribute('aria-selected'),'true');
+  interaction(plot,'keydown',last,' ');assert.equal(dom.calls.length,count);
+  await dom.view.refresh();assert.equal(plot.children[1],last);assert.equal(dom.document.activeElement,last);
+  assert.equal(dom.calls.length,count+3,'One serial list-summary-timeline refresh remains');
+  assert.equal(dom.view.checkpoint().view.timeline.focus,'plot');
+});
+
+test('all-zero timeline selects the latest loaded bucket with one zero tick and no invented outcome',async t=>{
+  const dom=await timelineScreen(t,[emptyBucket(15),emptyBucket(16)]);
+  assert.equal(dom.get('timeline-choice').value,stamp(16));assert.equal(dom.get('timeline-zero').hidden,false);
+  assert.deepEqual(dom.get('timeline-y-axis').children.map(node=>node.textContent),['0']);
+  assert.equal(dom.get('timeline-selected').textContent, '2026-10-16 01:00:00 → 2026-10-17 01:00:00 · none created');
+  for(const group of dom.get('timeline-chart').children){
+    assert.ok(group.children.slice(1,4).every(node=>node.getAttribute('height')==='0'));
+    assert.equal(group.children[4].getAttribute('display'),'inline');
+  }
+});
+
+test('timeline single-count and maximum-safe outlier scales have finite geometry and integer ticks',async t=>{
+  for(const total of [1,Number.MAX_SAFE_INTEGER]){
+    const dom=await timelineScreen(t,[timelineBucket(stamp(15),stamp(16),{created_count:total,started_count:total,succeeded_count:total,failed_count:0})]);
+    const group=dom.get('timeline-chart').firstChild;
+    for(const bar of group.children.slice(1,4))for(const key of ['x','y','width','height'])assert.ok(Number.isFinite(Number(bar.getAttribute(key))));
+    assert.equal(group.children[1].getAttribute('height'),'150');
+    if(total===1)assert.deepEqual(dom.get('timeline-y-axis').children.map(node=>node.textContent),['1','0']);
+  }
+});
+
+const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
+
+test('H-07: the timeline opens between the Executions toolbar and its table', () => {
+  const html = source('../../dashboard/templates/app/index.html');
+  const section = html.indexOf('<section class="executions panel"'), toggle = html.indexOf('data-timeline-toggle');
+  const panel = html.indexOf('data-timeline-panel'), table = html.indexOf('data-execution-scroll');
+  assert.ok(section < toggle && toggle < panel && panel < table);
+  assert.doesNotMatch(html, /class="panel timeline-panel"/);
+});
+
+test('rolling refresh with moved bounds clears old timeline counts inside a reserved panel whose data-table row stays put', async t => {
+  const dom = overviewDOM(), metadata = timelineMetadata(), timeline = deferred(), nextFrom = '2026-10-17T00:00:00.0000002Z';
+  let moved = false;
+  const view = mountOverview(dom.root, { metadata, appBase: '/app/', api: { async get(resource) {
+    if (resource === 'executions') return overviewPage(moved ? { from: nextFrom } : {});
+    if (resource === 'metrics/summary') return timelineSummary(moved ? { from: nextFrom } : {});
+    return moved ? timeline.promise : timelinePage();
+  } } });
+  t.after(view.dispose);
+  await view.apply(defaultSelection(metadata)); clickNode(dom.get('timeline-toggle')); await flush();
+  const panel = dom.get('timeline-panel'), values = dom.get('timeline-values');
+  panel.layoutHeight = 299.2;
+  moved = true; const refresh = view.refresh(); await flush();
+  assert.equal(dom.get('timeline-chart').children.length, 0, 'Counts from the previous bounds are not shown as current');
+  assert.equal(dom.get('timeline-selected').textContent, '');
+  assert.equal(panel.style.minHeight, '300px');
+  assert.equal(panel.getAttribute('data-loading'), '');
+  assert.ok(panel.children.includes(values));
+  const choiceBox = dom.get('timeline-choice').parentElement;
+  assert.equal(dom.get('timeline-choice').children.length, 0);
+  assert.equal(choiceBox.style.minWidth, 'min(800px, 100%)', 'Emptied bucket options keep their former width, capped by the line');
+  timeline.resolve(timelinePage(undefined, { from: nextFrom })); await refresh;
+  assert.equal(panel.style.minHeight, '');
+  assert.equal(choiceBox.style.minWidth, '');
+  assert.equal(panel.getAttribute('data-loading'), null);
+  assert.notEqual(dom.get('timeline-chart').children.length, 0);
+  const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /\.timeline-panel\[data-loading\]:not\(\[hidden\]\) \{ display: flex; flex-direction: column; \}/);
+  assert.match(css, /\.timeline-panel\[data-loading\] > details \{ margin-top: auto; \}/);
+});
+
+for (const scenario of ['empty retained start', 'non-empty retained start', 'all zero']) {
+  test(`timeline grain change: ${scenario} uses the correct fallback with one owned read`, async t => {
+    const dom = overviewDOM(), metadata = timelineMetadata(), calls = [];
+    const hour = index => new Date(Date.UTC(2026, 9, 17, index)).toISOString().replace('.000Z', '.0000000Z');
+    const bounds = { from: hour(0), to: hour(24) };
+    const rows = Array.from({ length: 24 }, (_, index) => timelineBucket(hour(index), hour(index + 1), {
+      created_count: scenario === 'all zero' ? 0 : index === (scenario === 'non-empty retained start' ? 0 : 17) ? 5 : 0,
+      started_count: 0, succeeded_count: 0, failed_count: 0, halted_count: 0,
+    }));
+    const view = mountOverview(dom.root, { metadata, appBase: '/app/', api: { async get(resource, options) {
+      calls.push({ resource, ...options });
+      return resource === 'executions' ? overviewPage(bounds) : resource === 'metrics/summary' ? timelineSummary(bounds)
+        : timelinePage(options.params.bucket === 'day' ? [timelineBucket(hour(0), hour(24))] : rows,
+          { ...bounds, bucket: options.params.bucket });
+    } } });
+    t.after(view.dispose);
+    await view.apply(defaultSelection(metadata)); clickNode(dom.get('timeline-toggle')); await flush();
+    assert.equal(dom.get('timeline-choice').value, hour(0));
+    const before = calls.length;
+    dom.get('timeline-bucket').value = 'hour'; dom.get('timeline-bucket').dispatchEvent(new Event('change')); await flush();
+    assert.equal(calls.length, before + 1);
+    assert.equal(calls.at(-1).params.bucket, 'hour');
+    assert.equal(dom.get('timeline-choice').value, hour(scenario === 'all zero' ? 23 : scenario === 'empty retained start' ? 17 : 0));
+    dom.get('timeline-choice').value = hour(0); dom.get('timeline-choice').dispatchEvent(new Event('change'));
+    await view.refresh();
+    assert.equal(dom.get('timeline-choice').value, hour(0), 'Same-grain refresh retains an intentionally selected empty bucket');
+    assert.equal(calls.length, before + 4);
+  });
+}
+
+test('timeline grain fallback survives a failed intermediate grain without claiming a hidden panel is expanded', async t => {
+  const dom = overviewDOM(), metadata = timelineMetadata();
+  const day = index => `2026-10-${17 + index}T00:00:00.0000000Z`;
+  const bounds = { from: day(0), to: day(2) };
+  let changed = false;
+  const view = mountOverview(dom.root, { metadata, appBase: '/app/', api: { async get(resource, options) {
+    if (resource === 'executions') return overviewPage(bounds);
+    if (resource === 'metrics/summary') return timelineSummary(bounds);
+    if (options.params.bucket === 'hour') throw new ApiError('invalid_request', { status: 400 });
+    return timelinePage([0, 1].map(index => timelineBucket(day(index), day(index + 1), {
+      created_count: index === (changed ? 1 : 0) ? 5 : 0, started_count: 0, succeeded_count: 0, failed_count: 0, halted_count: 0,
+    })), bounds);
+  } } });
+  t.after(view.dispose);
+  await view.apply(defaultSelection(metadata)); clickNode(dom.get('timeline-toggle')); await flush();
+  assert.equal(dom.get('timeline-choice').value, day(0));
+  dom.get('timeline-bucket').value = 'hour'; dom.get('timeline-bucket').dispatchEvent(new Event('change')); await flush();
+  assert.equal(dom.get('timeline-chart').children.length, 0);
+  changed = true;
+  dom.get('timeline-bucket').value = 'day'; dom.get('timeline-bucket').dispatchEvent(new Event('change')); await flush();
+  assert.equal(dom.get('timeline-choice').value, day(1));
+  clickNode(dom.get('timeline-toggle'));
+  assert.equal(dom.get('timeline-panel').hidden, true);
+  assert.equal(dom.get('timeline-toggle').getAttribute('aria-expanded'), 'false');
 });

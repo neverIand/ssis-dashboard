@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mountSectionTable } from '../src/section-table.js';
-import { detailDOM } from './detail-fixture.js';
-import { eventMetadata } from './event-fixture.js';
+import { detailDOM, detailResponse } from './detail-fixture.js';
+import { eventMetadata, eventPage, eventRow } from './event-fixture.js';
 import { wireTime } from './fixtures.js';
+import { ApiError } from '../src/api.js';
+import { mountDetail } from '../src/render-detail.js';
+import { executablePage } from './executable-fixture.js';
+import { childPage } from './child-fixture.js';
+import { timelineMetadata } from './timeline-fixture.js';
 
 function mount(t, { restoreView = null, ...options } = {}) {
   const dom = detailDOM(), calls = [];
@@ -209,4 +214,156 @@ test('shared disposal removes toolbar and adapter listeners, clears state and re
   assert.equal(run.scroll.style.minHeight, '');
   assert.equal(run.owner.state, null);
   for (const control of Object.values(run.owner.controls)) assert.equal(control.disabled, true);
+});
+
+const flush = () => new Promise(resolve => setImmediate(resolve));
+const failed = (errors = 2) => {
+  const response = detailResponse('17');
+  response.data.status = { code: 4, name: 'failed' };
+  response.data.error_count = errors;
+  response.data.event_counts = { ...response.data.event_counts, all: 3 + errors, errors };
+  return response;
+};
+const errorRow = (id, changes = {}) => eventRow(id, { event_name: 'OnError', message_type: 120,
+  source_name: 'Data Flow Task', subcomponent_name: 'OLE DB Destination',
+  message: `Error ${id}: ${'x'.repeat(300)} TAIL-${id}`, ...changes });
+function mounted(t, { metadata = eventMetadata(), hash = '', legacy = '/ops/execution/17', detail = failed(),
+  events = params => eventPage([errorRow('1'), errorRow('2')], params), prepare = () => {} } = {}) {
+  const dom = detailDOM(), calls = [];
+  dom.window.location.hash = hash;
+  if (legacy !== null) dom.get('legacy-detail-link').setAttribute('href', legacy);
+  prepare(dom);
+  const screen = mountDetail(dom.root, { metadata, executionId: '17', appBase: '/ops/app/', api: {
+    async get(resource, { params = {} } = {}) {
+      calls.push({ resource, params });
+      return resource.endsWith('/events') ? events(params) : resource.endsWith('/executables') ? executablePage()
+        : resource.endsWith('/children') ? childPage() : detail;
+    } } });
+  let disposed = false;
+  const dispose = () => { if (!disposed) { disposed = true; screen.dispose(); } };
+  t.after(dispose);
+  return { ...dom, calls, dispose };
+}
+
+test('D7: a failed section read with nothing shown states the error and request ID in the table and wraps the status', async t => {
+  const dom = mounted(t, { hash: '#events', events: () => { throw new ApiError('http', { status: 500, requestId: '0123456789abcdef0123456789abcdef' }); } });
+  await flush(); await flush();
+  assert.match(dom.eventBody.textContent, /Request ID: 0123456789abcdef0123456789abcdef/);
+  assert.equal('error' in dom.get('events-status').dataset, true);
+  assert.match(dom.get('events-status').textContent, /Request ID: 0123456789abcdef0123456789abcdef/);
+});
+
+const click = node => { node.focus(); node.dispatchEvent(new Event('click')); };
+// Deliberate geometry, not a browser/layout claim. A sticky toolbar's natural document top is 460 px.
+function geometry(window, table, scroll, toolbar) {
+  const header = { top: -150, bottom: -120 }, calls = [];
+  window.scrollY = 700;
+  window.scrollX = 13;
+  scroll.clientWidth = 900;
+  scroll.style.setProperty = (key, value) => { scroll.style[key] = value; };
+  scroll.style.removeProperty = key => { delete scroll.style[key]; };
+  toolbar.style.position = 'sticky';
+  toolbar.getBoundingClientRect = () => {
+    const natural = 460 - window.scrollY;
+    const top = toolbar.style.position === 'static' ? natural : Math.max(0, natural);
+    return { top, bottom: top + 40, height: 40, width: 800 };
+  };
+  table.querySelector('thead').getBoundingClientRect = () => ({ ...header, height: header.bottom - header.top });
+  window.scrollTo = (x, y) => {
+    const request = typeof x === 'object' ? x : { left: x, top: y };
+    calls.push(request);
+    window.scrollX = request.left;
+    window.scrollY = request.top;
+  };
+  return { header, calls };
+}
+const emptyPage = () => ({ data: [], meta: { generated_at: wireTime } });
+const readyState = changes => ({ open: true, query: { limit: 50 }, phase: 'ready',
+  page: emptyPage(), pageNumber: 1, hasPrevious: true, hasNext: true, error: null, stale: false, notice: '', ...changes });
+
+for (const resource of ['executables', 'children', 'events', 'parameters', 'overrides', 'history']) {
+  test(`B2/B3 ${resource}: sticky fit, explicit paging and Rows reveal only an obscured header after loading`, async t => {
+    const dom = detailDOM(), table = dom.get(`${resource}-table`), scroll = dom.get(`${resource}-scroll`);
+    const toolbar = dom.get(`${resource}-toolbar`), measured = geometry(dom.window, table, scroll, toolbar);
+    const actions = Object.fromEntries(['toggle', 'retry', 'previous', 'next', 'latest', 'order'].map(key => [key, () => {}]));
+    const owner = mountSectionTable(dom.root, { metadata: timelineMetadata(), actions }, { resource, columns: 1, identity: 'id' });
+    const view = owner.mount({ loading: 'Loading…', notLoaded: 'Not loaded.', previousPage: 'Previous page shown.',
+      emptyMessage: () => 'Empty.', pageInfo: () => 'Page loaded.' });
+    t.after(view.dispose);
+    view.render(readyState(), false, true);
+    assert.equal(measured.calls.length, 0, 'initial load leaves the window alone');
+    assert.equal(toolbar.dataset.stickyToolbar, '');
+    assert.equal(scroll.dataset.stickyTable, '');
+    assert.equal(scroll.dataset.fits, '');
+    assert.equal(scroll.style['--sd-list-toolbar-height'], '40px');
+    scroll.clientWidth = 799.4;
+    dom.window.dispatchEvent(new Event('resize'));
+    assert.equal(scroll.dataset.fits, undefined, 'sideways scrolling remains available');
+    scroll.clientWidth = 799.5;
+    dom.window.dispatchEvent(new Event('resize'));
+    assert.equal(scroll.dataset.fits, '', 'half-pixel fit tolerance matches Overview');
+
+    const next = dom.get(`${resource}-next`);
+    click(next);
+    view.render(readyState({ page: null, phase: 'loading' }), true, true);
+    assert.equal(measured.calls.length, 0, 'loading does not scroll');
+    view.render(readyState({ pageNumber: 2 }), false, true);
+    await Promise.resolve();
+    assert.deepEqual(measured.calls, [{ left: 13, top: 460, behavior: 'instant' }]);
+    assert.equal(dom.document.activeElement, next, 'pager focus stays put');
+    assert.equal(toolbar.style.position, 'sticky');
+
+    Object.assign(measured.header, { top: 40, bottom: 70 });
+    click(dom.get(`${resource}-previous`));
+    view.render(readyState(), false, true);
+    await Promise.resolve();
+    assert.equal(measured.calls.length, 1, 'a fully visible header does not scroll');
+    Object.assign(measured.header, { top: 25, bottom: 55 });
+    click(dom.get(`${resource}-latest`));
+    view.render(readyState(), false, true);
+    await Promise.resolve();
+    assert.equal(measured.calls.length, 2, 'a header partly behind the sticky toolbar is revealed');
+
+    const limit = dom.get(`${resource}-limit`);
+    limit.focus(); limit.value = '25'; limit.dispatchEvent(new Event('change'));
+    view.render(readyState({ query: { limit: 25 } }), false, true);
+    await Promise.resolve();
+    assert.equal(measured.calls.length, 3);
+    assert.equal(dom.document.activeElement, limit);
+    view.render(readyState({ query: { limit: 25 } }), false, true);
+    await Promise.resolve();
+    assert.equal(measured.calls.length, 3, 'automatic/manual refresh has no paging intent');
+    limit.dispatchEvent(new Event('change'));
+    view.render(readyState({ query: { limit: 25 } }), false, true);
+    await Promise.resolve();
+    assert.equal(measured.calls.length, 3, 'the unchanged Rows value is not a page change');
+
+    click(next);
+    view.render(readyState({ phase: 'error', error: { message: 'Failed.' } }), false, true);
+    view.render(readyState(), false, true);
+    await Promise.resolve();
+    assert.equal(measured.calls.length, 3, 'an error consumes paging intent; a later refresh cannot reveal it');
+    view.dispose();
+    assert.equal(scroll.dataset.stickyTable, undefined);
+    assert.equal(toolbar.dataset.stickyToolbar, undefined);
+    dom.window.dispatchEvent(new Event('resize'));
+    assert.equal(scroll.dataset.fits, undefined, 'resize ownership ends on disposal');
+  });
+}
+
+test('B3 shared restoration and rejected busy paging preserve the saved position', t => {
+  const dom = detailDOM(), table = dom.get('history-table'), scroll = dom.get('history-scroll');
+  const measured = geometry(dom.window, table, scroll, dom.get('history-toolbar'));
+  const actions = Object.fromEntries(['toggle', 'retry', 'previous', 'next', 'latest', 'order'].map(key => [key, () => {}]));
+  const owner = mountSectionTable(dom.root, { metadata: timelineMetadata(), actions,
+    restoreView: { left: 28, top: 16, focus: 'next' } }, { resource: 'history', columns: 1, identity: 'id' });
+  const view = owner.mount({ emptyMessage: () => 'Empty.', pageInfo: () => 'Page loaded.' });
+  t.after(view.dispose);
+  view.render(readyState({ page: null, phase: 'loading' }), true, true);
+  click(dom.get('history-next'));
+  view.render(readyState(), false, true);
+  assert.equal(measured.calls.length, 0);
+  assert.equal(scroll.scrollLeft, 28);
+  assert.equal(scroll.scrollTop, 16);
+  assert.equal(dom.document.activeElement, dom.get('history-next'));
 });

@@ -4,7 +4,7 @@ import { ApiError } from '../src/api.js';
 import { createDisplay } from '../src/display.js';
 import { createDetailLoader, detailFields, readExecutionDetail } from '../src/detail.js';
 import { deferred, metadata, requestId, wireTime } from './fixtures.js';
-import { detailResponse } from './detail-fixture.js';
+import { detailResponse, runningDetailResponse } from './detail-fixture.js';
 
 const id = '9223372036854775807';
 const display = createDisplay({ timeZone: 'Europe/London', locale: 'en-GB' });
@@ -144,5 +144,44 @@ test('invalid shell IDs never start transport', () => {
   const api = { get() { assert.fail('No request for invalid ID'); } };
   for (const executionId of [null, undefined, '0', '01', '-1', '1e3', 42, '9223372036854775808']) {
     assert.throws(() => createDetailLoader({ api, executionId, metadata: metadata(), publish() {} }));
+  }
+});
+
+const londonDisplay = createDisplay({ timeZone: 'Europe/London', locale: 'en-GB' });
+const nb = text => text.replaceAll(' ', ' ');
+// wireTime is 2026-10-17T16:00:00Z; a 25-minute mean ends 16:25.
+const estimate = (changes = {}) => ({ method: 'mean_last_5_successful', sample_count: 5, duration_seconds: 1500,
+  ended_at: '2026-10-17T16:25:00.0000000Z', ...changes });
+const running = (value = estimate()) => {
+  const response = runningDetailResponse(id);
+  response.data.estimate = value;
+  return response;
+};
+
+test('C3: detail accepts a null or valid active estimate and projects typical duration, end and sample count', () => {
+  assert.equal(readExecutionDetail(detailResponse(id), id, londonDisplay).data.estimate, null);
+  const response = running();
+  assert.equal(readExecutionDetail(response, id, londonDisplay), response);
+  // Same local day: the end shows the clock only; each part keeps no-break spaces so wrapping falls between parts.
+  const text = detailFields(response, londonDisplay).estimate;
+  assert.equal(text, nb('25 min 00 s') + ' · ' + nb('ends 17:25:00') + ' · ' + nb('avg of 5'));
+  // An end on another local day keeps its date.
+  const late = running(estimate({ duration_seconds: 32400, ended_at: '2026-10-18T01:00:00.0000000Z' }));
+  assert.equal(detailFields(late, londonDisplay).estimate, nb('9 h 00 min') + ' · ' + nb('ends 2026-10-18 02:00:00') + ' · ' + nb('avg of 5'));
+  assert.equal(detailFields(running(null), londonDisplay).estimate, '—');
+  assert.equal(readExecutionDetail(running(estimate({ sample_count: 1, ended_at: wireTime, duration_seconds: 1e-7 })),
+    id, londonDisplay).data.estimate.sample_count, 1);
+});
+
+test('C3: detail rejects a missing, ended, unstarted or malformed estimate', () => {
+  const missing = running(); delete missing.data.estimate;
+  const ended = detailResponse(id); ended.data.estimate = estimate();
+  const unstarted = running(); Object.assign(unstarted.data, { started_at: null, elapsed_seconds: null });
+  const cases = [missing, ended, unstarted, ...[{ method: 'median' }, { sample_count: 0 }, { sample_count: 6 },
+    { sample_count: 2.5 }, { duration_seconds: 0 }, { duration_seconds: -1 }, { ended_at: null },
+    { ended_at: '2026-10-17T15:59:59.9999999Z' }, { ended_at: 'soon' }].map(changes => running(estimate(changes)))];
+  for (const response of cases) {
+    assert.throws(() => readExecutionDetail(response, id, londonDisplay),
+      error => error instanceof ApiError && error.kind === 'invalid_response', JSON.stringify(response.data.estimate));
   }
 });

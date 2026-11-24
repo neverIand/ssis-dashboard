@@ -5,6 +5,7 @@ import { mountDetail } from '../src/render-detail.js';
 import { deferred, metadata } from './fixtures.js';
 import { detailDOM, detailResponse } from './detail-fixture.js';
 import { executable, executablePage } from './executable-fixture.js';
+import { childPage } from './child-fixture.js';
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
 const paths = row => row.children[1].children[2];
@@ -104,4 +105,48 @@ test('retained open section restores only current path/view anchors after new re
   next.screen.dispose(); next.click('toggle'); await settle();
   assert.equal(next.calls.length, 2);
   assert.equal(next.dom.body.children.length, 0);
+});
+
+const flush = () => new Promise(resolve => setImmediate(resolve));
+function detail(t, response, executables = () => executablePage()) {
+  const dom = detailDOM();
+  dom.window.location.hash = '#executables';
+  const view = mountDetail(dom.root, { metadata: metadata(), executionId: '17', appBase: '/app/', api: {
+    async get(resource) {
+      return resource.endsWith('/executables') ? executables() : resource.endsWith('/children') ? childPage() : response;
+    } } });
+  t.after(view.dispose);
+  return dom;
+}
+
+test('D4: executable rows name their parent container, and the package only for child packages', async t => {
+  const dom = detail(t, detailResponse('17'), () => executablePage([
+    executable('3', { execution_path: '\\Main', name: 'Main' }),
+    executable('2', { execution_path: '\\Main\\Load City Dimension\\Get Lineage Key', name: 'Get Lineage Key' }),
+    executable('1', { execution_path: '\\Main\\Run Child\\Probe\\ProbeWork', name: 'ProbeWork', package_name: 'Probe.dtsx' })]));
+  await flush(); await flush();
+  const lines = dom.body.children.map(row => row.children[1].children[1].textContent);
+  assert.deepEqual(lines, ['', 'in Load City Dimension', 'in Probe · package Probe.dtsx']);
+  assert.ok(dom.body.children.every(row => !/Executable ID: /.test(row.children[1].children[1].textContent)));
+});
+
+test('R1-1: a NULL execution path renders a row without a parent line instead of clearing the page', async t => {
+  const dom = detail(t, detailResponse('17'), () => executablePage([executable('1', { execution_path: null })]));
+  await flush(); await flush();
+  assert.equal(dom.body.children.length, 1);
+  assert.equal(dom.body.children[0].children[1].children[1].textContent, '');
+  assert.equal(dom.get('execution-detail').hidden, false);
+});
+
+function mountWithSettings(dom, settings, get) {
+  return mountDetail(dom.root, { metadata: settings, executionId: '17', appBase: '/app/', api: { get } });
+}
+const reply = resource => resource.endsWith('/executables') ? executablePage()
+  : resource.endsWith('/children') ? childPage() : detailResponse('17');
+
+test('H-12: a first page without observations has a compact message without "on this page"', async t => {
+  const dom = detailDOM(), view = mountWithSettings(dom, metadata(), async resource =>
+    resource.endsWith('/executables') ? executablePage([], { availability: 'available' }) : reply(resource));
+  t.after(view.dispose); await flush();
+  assert.equal(dom.body.textContent, 'No executable observations.');
 });

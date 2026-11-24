@@ -17,6 +17,7 @@ Updated 20 November 2026. Development base: `dev-next`. [Roadmap](roadmap.md) ow
 
 ## Next actions
 
+- [x] **35. Web tests grouped by module, 24 November.** The 138 tests of the 16 files named after review batches or office rounds (`ux-batch-*`, `office-*`, `small-details`, `layout-density`, `layout-stability`, `ux-display`, `ux-history-charts`) moved to the module files they exercise. The chart-axis test also moved, from `browser-policy` to `chart-view`. New: `detail-event-summary`, `table-viewport`, `chart-view`. Renamed: `skip-link` → `ui`, `ux-batch-c2` → `package-filter`. Test bodies are unchanged apart from recorded helper renames. Objects such as `metadata` are copied, not shared. Titles keep their review IDs until a tracked ID map exists. Python tests were already grouped by module. Checks against `3d5c34a`: moved statements match apart from the renames; imports bind the same modules; the `node:test` inventory (file, title, result) matches the move list; Node 649/649; Python 551, 26 skipped. Codex reviewed the plan and the diff. Evidence: `.local/tmp/test-consolidation-20261124-01/`.
 - [x] **34. Office feedback, 24 November.** The report is in the [office receipts](#remaining-browser-acceptance). Claude implements and a Codex gpt-6.2-sol review at max effort checks each change (the user's instruction of 24 November).
 
   | Item | Requested change | Status |

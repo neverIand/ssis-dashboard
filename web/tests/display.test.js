@@ -158,3 +158,11 @@ test('an ended execution has a compact status independent of pause, visibility a
     assert.deepEqual(refreshStatus(display, null, { mode }, true), ['Execution ended', '']);
   }
 });
+
+test('G4: whole-second table times drop ".000"; any nonzero fraction keeps it', () => {
+  const display = createDisplay({ timeZone: 'Europe/London' });
+  const start = '2026-10-18T23:00:00.0000000Z';
+  assert.equal(display.tableTimestamp('2026-10-18T23:05:00.0000000Z', start), '00:05:00');
+  assert.equal(display.tableTimestamp('2026-10-18T23:05:00.0000001Z', start), '00:05:00.000');
+  assert.equal(display.tableTimestamp('2026-10-18T23:05:00.1230000Z', start), '00:05:00.123');
+});

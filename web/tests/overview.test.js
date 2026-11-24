@@ -692,3 +692,32 @@ test('disposal aborts a pending refresh, clears stale state and ignores late com
   await owner.refresh();
   assert.equal(states.length, length);
 });
+
+const estimateSettings = metadata();
+const estimateDisplay = createDisplay({ timeZone: estimateSettings.display_timezone, locale: 'en-GB' });
+// wireTime is 2026-10-17T16:00:00Z; a 25-minute typical run ends 16:25.
+const estimate = (changes = {}) => ({ method: 'mean_last_5_successful', sample_count: 5, duration_seconds: 1500,
+  ended_at: '2026-10-17T16:25:00.0000000Z', ...changes });
+const item = (id, changes = {}) => ({ execution_id: id, folder_name: 'Folder', project_name: 'Project',
+  package_name: 'Probe.dtsx', status: { code: 2, name: 'running' }, created_at: wireTime, started_at: wireTime,
+  ended_at: null, duration_seconds: null, elapsed_seconds: 600, estimate: estimate(), warning_count: 0, error_count: 0,
+  ...changes });
+const estimatePage = rows => ({ ...envelope(rows), meta: { ...envelope().meta, from, to, as_of: wireTime,
+  upper_id: '99', consistency: 'live', sort: 'execution_id', direction: 'desc', limit: 50,
+  has_more: false, next_cursor: null } });
+const estimateSelection = validateSelection(defaultSelection(estimateSettings), estimateSettings);
+
+test('C4: list rows accept a null or valid active estimate and reject missing, ended or malformed ones', () => {
+  const ok = estimatePage([item('3'), item('2', { estimate: null }),
+    item('1', { status: { code: 7, name: 'succeeded' }, ended_at: wireTime, duration_seconds: 0, estimate: null })]);
+  assert.equal(readExecutionPage(ok, estimateSelection, estimateSettings, estimateDisplay), ok);
+  const missing = item('1'); delete missing.estimate;
+  const cases = [missing, item('1', { status: { code: 7, name: 'succeeded' }, ended_at: wireTime, duration_seconds: 0 }),
+    item('1', { started_at: null, elapsed_seconds: null }),
+    ...[{ method: 'mean' }, { sample_count: 0 }, { sample_count: 6 }, { duration_seconds: 0 },
+      { ended_at: '2026-10-17T15:59:59.9999999Z' }].map(changes => item('1', { estimate: estimate(changes) }))];
+  for (const row of cases) {
+    assert.throws(() => readExecutionPage(estimatePage([row]), estimateSelection, estimateSettings, estimateDisplay),
+      error => error instanceof ApiError && error.kind === 'invalid_response', JSON.stringify(row.estimate));
+  }
+});

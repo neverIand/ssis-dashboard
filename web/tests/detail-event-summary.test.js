@@ -8,8 +8,8 @@ import { detailDOM, detailResponse } from './detail-fixture.js';
 import { executablePage } from './executable-fixture.js';
 import { childPage } from './child-fixture.js';
 import { eventMetadata, eventPage, eventRow } from './event-fixture.js';
+import { historyMetadata, historyPage } from './history-fixture.js';
 
-// UX review 2026-11-05, batch B1: the failure path on the execution page. No new request kinds.
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const failed = (errors = 2) => {
   const response = detailResponse('17');
@@ -38,6 +38,7 @@ function mounted(t, { metadata = eventMetadata(), hash = '', legacy = '/ops/exec
   t.after(dispose);
   return { ...dom, calls, dispose };
 }
+const partial = params => ({ ...params, has_unidentified_events: true, availability: 'unknown' });
 
 test('G1: with events disabled, counts and a visible link open legacy event lists by an explicit click only', async t => {
   const dom = mounted(t, { metadata: eventMetadata(false) });
@@ -97,83 +98,6 @@ test('D2: a later qualifying page replaces the line, and executions without erro
   assert.equal(quiet.get('first-error').hidden, true);
 });
 
-test('D1: error rows show the whole returned message in a keyboard-scrollable region; others keep the preview', async t => {
-  const dom = mounted(t, { hash: '#events', events: params => eventPage([errorRow('1'),
-    eventRow('2', { message: 'w'.repeat(300) })], params) });
-  await flush(); await flush();
-  const [error, warning] = dom.eventBody.children;
-  const errorPreview = error.children[2].children[0], warningPreview = warning.children[2].children[0];
-  assert.match(errorPreview.textContent, /TAIL-1$/);
-  assert.equal(errorPreview.dataset.full, 'true');
-  assert.equal(errorPreview.getAttribute('tabindex'), '0');
-  assert.equal(errorPreview.getAttribute('role'), 'region');
-  assert.equal(error.children[2].children[2].hidden, true, 'no View message disclosure for whole text');
-  assert.match(warningPreview.textContent, /…$/);
-  assert.equal(warningPreview.dataset.full, 'false');
-  assert.equal(warningPreview.getAttribute('tabindex'), null);
-  assert.equal(error.children[1].children[1].textContent, 'Data Flow Task › OLE DB Destination');
-  assert.equal(warning.children[1].children[1].hidden, true, 'empty source names are not shown');
-});
-
-test('Copy buttons are absent without clipboard.writeText', async t => {
-  for (const navigator of [undefined, {}, { clipboard: {} }]) {
-    const dom = mounted(t, { hash: '#events', prepare: target => { target.window.navigator = navigator; } });
-    await flush(); await flush();
-    for (const row of dom.eventBody.children) assert.equal(row.children[2].children.length, 3);
-    assert.equal(dom.get('events-copy-status').textContent, '');
-  }
-});
-
-test('Copy writes the exact returned text and resets success feedback after two seconds', async t => {
-  const written = [], timers = [];
-  const message = '  Error\r\n\tmessage  ';
-  const dom = mounted(t, { hash: '#events', events: params => eventPage([
-    errorRow('1', { message }), eventRow('2', { event_name: 'OnInformation' }), errorRow('3', { message: null })], params),
-    prepare: target => Object.assign(target.window, {
-    navigator: { clipboard: { writeText: async value => { written.push(value); } } },
-    setTimeout: (callback, delay) => { timers.push({ callback, delay }); return 1; }, clearTimeout: () => {} }) });
-  await flush(); await flush();
-  const copy = dom.eventBody.firstChild.children[2].children[3];
-  assert.equal(copy.hidden, false);
-  assert.equal(dom.eventBody.children[1].children[2].children[3].hidden, true, 'no Copy on information rows');
-  assert.equal(dom.eventBody.children[2].children[2].children[3].hidden, true, 'no Copy on missing messages');
-  copy.dispatchEvent(new Event('click')); await flush();
-  assert.deepEqual(written, [message]);
-  assert.equal(copy.textContent, 'Copied');
-  assert.equal(dom.get('events-copy-status').textContent, 'Message copied.');
-  assert.equal(timers.length, 1);
-  assert.equal(timers[0].delay, 2000);
-  timers[0].callback();
-  assert.equal(copy.textContent, 'Copy');
-});
-
-test('a rejected clipboard write reports failure for two seconds and leaves the message disclosure alone', async t => {
-  const timers = [];
-  const dom = mounted(t, { hash: '#events', events: params => eventPage([
-    eventRow('1', { message: 'warning '.repeat(40) })], params), prepare: target => Object.assign(target.window, {
-    navigator: { clipboard: { writeText: async () => { throw new Error('Denied'); } } },
-    setTimeout: (callback, delay) => { timers.push({ callback, delay }); return 1; }, clearTimeout: () => {} }) });
-  await flush(); await flush();
-  const cell = dom.eventBody.firstChild.children[2], copy = cell.children[3], open = cell.children[2].open;
-  copy.dispatchEvent(new Event('click')); await flush();
-  assert.equal(copy.textContent, 'Copy failed');
-  assert.equal(dom.get('events-copy-status').textContent, 'Message not copied.');
-  assert.equal(cell.children[2].open, open);
-  assert.equal(timers.length, 1);
-  assert.equal(timers[0].delay, 2000);
-  timers[0].callback();
-  assert.equal(copy.textContent, 'Copy');
-});
-
-test('D7: a failed section read with nothing shown states the error and request ID in the table and wraps the status', async t => {
-  const dom = mounted(t, { hash: '#events', events: () => { throw new ApiError('http', { status: 500, requestId: '0123456789abcdef0123456789abcdef' }); } });
-  await flush(); await flush();
-  assert.match(dom.eventBody.textContent, /Request ID: 0123456789abcdef0123456789abcdef/);
-  assert.equal('error' in dom.get('events-status').dataset, true);
-  assert.match(dom.get('events-status').textContent, /Request ID: 0123456789abcdef0123456789abcdef/);
-});
-
-// Codex review round 1 (2026-11-05) regressions.
 test('R1-1: event denial removes the earliest-error text and link, not just hides them', async t => {
   let denied = false;
   const dom = mounted(t, { events: params => {
@@ -205,48 +129,6 @@ test('R1-2: a failed return to the first page keeps the earliest error from page
   assert.match(dom.get('first-error-message').textContent, /^— Error 1:/);
 });
 
-test('a clipboard completion after the copied row disconnects changes no feedback and sets no timer', async t => {
-  const timers = [], pending = []; let read = 0;
-  const late = mounted(t, { hash: '#events', events: params => eventPage([errorRow(String(++read))], params), prepare: target => Object.assign(target.window, {
-    navigator: { clipboard: { writeText: () => new Promise(resolve => pending.push(resolve)) } },
-    setTimeout: () => timers.push(2), clearTimeout: () => {} }) });
-  await flush(); await flush();
-  const row = late.eventBody.firstChild, copy = row.children[2].children[3];
-  copy.dispatchEvent(new Event('click'));
-  const count = timers.length;
-  late.get('detail-refresh').dispatchEvent(new Event('click')); await flush();
-  assert.equal(row.isConnected, false);
-  pending[0](); await flush();
-  assert.equal(timers.length, count, 'no feedback timer after the copied row was replaced');
-  assert.equal(copy.textContent, 'Copy');
-  assert.equal(late.get('events-copy-status').textContent, '');
-});
-
-test('R2 advisory: disposal clears a running feedback timer, and a clipboard result after disposal does nothing', async t => {
-  const active = new Set(); let next = 0;
-  const environment = target => Object.assign(target.window, {
-    setTimeout: () => { active.add(++next); return next; }, clearTimeout: id => { active.delete(id); },
-    navigator: { clipboard: { writeText: () => new Promise(resolve => pending.push(resolve)) } } });
-  const pending = [];
-  const running = mounted(t, { hash: '#events', prepare: environment });
-  await flush(); await flush();
-  running.eventBody.firstChild.children[2].children[3].dispatchEvent(new Event('click'));
-  pending.shift()(); await flush();
-  assert.equal(active.size, 1, 'feedback timer running');
-  running.dispose();
-  assert.equal(active.size, 0, 'disposal cleared it');
-  const late = mounted(t, { hash: '#events', prepare: environment });
-  await flush(); await flush();
-  const copy = late.eventBody.firstChild.children[2].children[3];
-  copy.dispatchEvent(new Event('click'));
-  late.dispose();
-  pending.shift()(); await flush();
-  assert.equal(active.size, 0, 'no timer after disposal');
-  assert.equal(late.get('events-copy-status').textContent, '');
-});
-
-// Full review of 19 November 2026, batch C (R-03, R-04).
-const partial = params => ({ ...params, has_unidentified_events: true, availability: 'unknown' });
 test('R-04: errors without a public ID hide the earliest-error summary, also after a complete page', async t => {
   let coverage = 'partial';
   const dom = mounted(t, { events: params => eventPage([errorRow('9')], coverage === 'partial' ? partial(params) : params) });
@@ -285,4 +167,47 @@ test('R-03: an inactive 50-row Warnings page and the full error message can be c
   const result = spawnSync(process.execPath, ['--expose-gc', fileURLToPath(new URL('./header-retention-gc.mjs', import.meta.url))],
     { encoding: 'utf8', timeout: 60000 });
   assert.equal(result.status, 0, result.stderr || result.stdout);
+});
+
+const click = node => node.dispatchEvent(new Event('click'));
+function screen(t, { tab = 'history', read = () => historyPage(), response = () => detailResponse('17') } = {}) {
+  const dom = detailDOM(), calls = [], metadata = historyMetadata();
+  metadata.capabilities.events = true;
+  metadata.event_kinds = ['all', 'errors', 'warnings'];
+  dom.window.location.hash = `#${tab}`;
+  const view = mountDetail(dom.root, { metadata, executionId: '17', appBase: '/app/', api: {
+    async get(resource, options) {
+      calls.push({ resource, ...options });
+      return resource === 'history' || resource.endsWith('/events') ? read(resource, options) : response();
+    },
+  } });
+  t.after(view.dispose);
+  return { ...dom, calls, view };
+}
+
+test('event count wording follows zero, one and many while preserving links, levels and focus', async t => {
+  let count = 0;
+  const dom = screen(t, { response: () => {
+    const result = detailResponse('17');
+    Object.assign(result.data, { warning_count: count, error_count: count });
+    Object.assign(result.data.event_counts, { all: count * 2, errors: count, warnings: count,
+      duplicate_warnings: 0, memory_warnings: 0 });
+    return result;
+  } });
+  await flush();
+  const link = dom.field('errors'); link.focus();
+  for (count = 0; count <= 2; count++) {
+    if (count) { click(dom.get('detail-refresh')); await flush(); }
+    for (const key of ['errors', 'warnings']) {
+      const label = count === 1 ? key.slice(0, -1) : key;
+      assert.equal(dom.root.querySelector(`[data-event-count-label="${key}"]`).textContent, label);
+      assert.equal(dom.field(key).textContent, String(count));
+      assert.equal(dom.field(key).getAttribute('aria-label'), `${count} ${label} for this execution`);
+      assert.equal(dom.field(key).href, `#events/${key}`);
+      assert.equal(dom.field(key).dataset.level, count === 0 ? 'quiet' : key === 'errors' ? 'error' : 'warning');
+    }
+    assert.equal(dom.field('all').getAttribute('aria-label'), `${count * 2} events for this execution`);
+    assert.equal(dom.field('errors'), link); assert.equal(dom.document.activeElement, link);
+    assert.equal(dom.calls.length, (count + 1) * 2);
+  }
 });

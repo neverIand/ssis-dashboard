@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
@@ -182,4 +182,120 @@ test('F2-6: ArrowDown/ArrowUp move from the folder search through its choices an
   key(choices, 'ArrowDown', choices.children[1]); assert.equal(dom.document.activeElement, choices.children[1], 'The last choice stays focused');
   key(choices, 'ArrowUp', choices.children[1]); key(choices, 'ArrowUp', choices.children[0]);
   assert.equal(dom.document.activeElement, search);
+});
+
+const templates = new URL('../../dashboard/templates/app/', import.meta.url);
+const readTemplate = name => readFileSync(new URL(name, templates), 'utf8');
+const overview = readTemplate('index.html'), historyPanel = readTemplate('history-panel.html');
+
+test('G2: the selection rule applies to buttons and leaves text inputs, links, cells and status text selectable', () => {
+  const nonSelectable = [...css.matchAll(/([^{}]+)\{[^{}]*\buser-select:\s*none\b[^{}]*\}/g)];
+  assert.deepEqual(nonSelectable.map(rule => rule[1].trim()), ['button']);
+});
+
+test('G3: auto popovers have headings without close buttons and keep their named actions', () => {
+  for (const file of readdirSync(templates).filter(name => name.endsWith('.html'))) {
+    const html = readTemplate(file);
+    const autoPopovers = html.match(/\bpopover="auto"/g) ?? [];
+    const headings = [...html.matchAll(/popover="auto"[^>]*>\s*<div class="popover-heading">([^]*?)<\/div>/g)];
+    assert.equal(headings.length, autoPopovers.length, file);
+    for (const [, heading] of headings) assert.match(heading, /^<h2\b[^>]*>[^<]+<\/h2>$/);
+    assert.doesNotMatch(html, /data-(?:close-filter|history-close)|aria-label="Close [^"]*picker"/);
+  }
+  assert.match(overview, /data-status-done popovertarget="status-picker" popovertargetaction="hide">Done<\/button>/);
+  assert.match(overview, /data-cancel-range popovertarget="created-picker" popovertargetaction="hide">Cancel<\/button>/);
+  assert.match(overview, /data-use-range>Use range<\/button>/);
+  assert.match(historyPanel, /<button type="submit" data-history-apply>Done<\/button>/);
+});
+
+test('B1/B2/B6 CSS keeps detail times intact, gates sticky headers by fit, and shares the Reset row with the tip', () => {
+  const wide = css.match(/@media \(min-width: 66\.67rem\) \{([\s\S]*?)\n\}/)[1];
+  assert.match(wide, /\[data-execution-table\] th:not\(:nth-child\(2\), :nth-child\(3\), \.count-cell\) \{ width: 1%; \}/);
+  assert.match(wide, /\.time-cell \{ min-width: 0; max-width: 11\.5rem; \}/);
+  assert.match(wide, /\[data-history-table\] col:is\(:nth-child\(1\), :nth-child\(6\)\) \{ width: auto; \}/);
+  assert.doesNotMatch(wide, /executables|children/);
+  assert.match(css, /\[data-children-table\] col:nth-child\(3\) \{ width: 12\.5rem; \}/);
+  assert.match(css, /@media \(max-width: 66\.6667rem\)[\s\S]*?\.time-cell \{ min-width: 5\.6rem; white-space: normal; \}/);
+  assert.match(css, /@media \(min-width: 49\.4rem\)[\s\S]*?\[data-sticky-toolbar\] \{ position: sticky; top: 0;/);
+  assert.match(css, /\[data-sticky-table\]\[data-fits\] \{ overflow-x: clip; \}/);
+  assert.match(css, /\[data-sticky-table\]\[data-fits\] thead th \{[^}]*top: var\(--sd-list-toolbar-height,[^}]*background: var\(--sd-subtle\)/);
+  assert.match(css, /\.filter-meta \{[^}]*flex: 1; justify-content: end;/);
+  assert.doesNotMatch(css, /\.filter-meta \{[^}]*flex-basis: 100%/);
+});
+
+test('Overview sorts in run column order and History has a separate trailing Status header', () => {
+  const template = name => readFileSync(new URL(`../../dashboard/templates/app/${name}.html`, import.meta.url), 'utf8');
+  const overview = template('index').match(/<table data-execution-table>[\s\S]*?<thead>([\s\S]*?)<\/thead>/)[1];
+  assert.deepEqual([...overview.matchAll(/\('([a-z_]+)','([^']+)'\)/g)].map(match => match.slice(1)), [
+    ['execution_id', 'ID'], ['project_name', 'Project'], ['package_name', 'Entry package'],
+    ['created_at', 'Created'], ['started_at', 'Started'], ['duration_seconds', 'Duration'],
+    ['warning_count', 'Warn'], ['error_count', 'Err'], ['status', 'Status'],
+  ]);
+  assert.match(overview, /key in \('warning_count', 'error_count'\) %\} class="number-cell count-cell"/);
+  assert.match(overview, /<th scope="col" aria-sort="none"[^\n]+<button type="button" data-sort="\{\{ key \}\}" disabled>/);
+  assert.match(css, /\.count-cell \{ width: (\d+(?:\.\d+)?rem); min-width: \1; max-width: \1;/);
+  assert.match(css, /tr:is\(\[data-status="4"\], \[data-status="6"\]\) > td:first-child/);
+  const history = template('history-panel');
+  assert.deepEqual([...history.matchAll(/<th scope="col"[^>]*>(?:<button[^>]*>|<span class="info-label">)?([A-Za-z]+)/g)]
+    .map(match => match[1]),
+    ['Execution', 'Created', 'Started', 'Ended', 'Duration', 'Estimate', 'Status']);
+  assert.match(history, /<colgroup>(<col>){7}<\/colgroup>/);
+  assert.match(history, /<td colspan="7">/);
+});
+
+const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
+
+test('H-03, H-09–H-11, H-14: compact toolbar controls, inline Retry, aligned titles and grouped pagers', () => {
+  const css = source('../src/styles.css');
+  assert.match(css, /\.toolbar-meta > \.inline-status \{ flex: 0 1 auto;/);
+  assert.match(css, /\.table-toolbar > button, \.toolbar-filters button:not\(\.info-trigger\), \.table-toolbar select, \.table-toolbar input \{\s*height: 2\.2rem; min-height: 2\.2rem;/);
+  assert.match(css, /\.detail-title \{ display: flex; align-items: baseline;/);
+  assert.match(css, /\.detail-table th button \{ min-height: 0;/);
+  assert.match(css, /\.table-paging \{ display: flex;[^}]*margin-left: auto; \}/);
+  const controls = source('../../dashboard/templates/app/controls.html');
+  assert.match(controls, /<div class="table-paging">\s*<label class="page-size">/);
+});
+
+test('the page reserves its scrollbar gutter and disclosure styles follow expanded state', () => {
+  const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /:root\s*\{[^}]*scrollbar-gutter:\s*stable\s*;/);
+  for (const key of ['history-chart', 'timeline']) {
+    assert.ok(css.includes(`[data-${key}-toggle][aria-expanded="true"]`));
+    assert.ok(!css.includes(`[data-${key}-toggle][aria-pressed=`));
+  }
+});
+
+test('native templates retain only row/timeline disclosures and one pager per toolbar', () => {
+  const read = name => readFileSync(new URL(`../../dashboard/templates/app/${name}.html`, import.meta.url), 'utf8');
+  const overview = read('index'), detail = read('execution').replace('{% include "app/history-panel.html" %}',
+    read('history-panel')), controls = read('controls');
+  assert.equal((overview.match(/<details/g) ?? []).length, 2); assert.match(overview, /<details data-timeline-values>/);
+  // UX batch B3 (O7): the only other disclosure is Advanced exact timestamps inside the Created popover.
+  assert.match(overview, /<details class="exact-times"><summary>Advanced: exact timestamps<\/summary>/);
+  assert.ok(overview.indexOf('<details class="exact-times"') > overview.indexOf('id="created-picker"')
+    && overview.indexOf('<details class="exact-times"') < overview.indexOf('data-use-range'));
+  assert.doesNotMatch(detail, /<details|data-history-chart-choice|data-history-direction|data-events-scope/);
+  assert.equal((detail.match(/{{ pager\(/g) ?? []).length, 6);
+  assert.match(controls, /class="info-trigger" aria-label="{{ label }}" aria-describedby="{{ id }}"/);
+  assert.match(controls, /role="tooltip"/); assert.match(controls, /aria-hidden="true" focusable="false"/);
+  assert.doesNotMatch(overview + detail, /resource-feedback|status-slot|table-footer|More sort options|How estimates work/);
+});
+
+const bodyKeys = { executables: 'body', children: 'childBody', events: 'eventBody',
+  parameters: 'parameterBody', overrides: 'overrideBody', history: 'historyBody' };
+
+test('native templates put live feedback in existing toolbars and a single page status', () => {
+  const template = name => readFileSync(new URL(`../../dashboard/templates/app/${name}.html`, import.meta.url), 'utf8');
+  const detail = template('execution').replace('{% include "app/history-panel.html" %}', template('history-panel'));
+  const overview = template('index');
+  assert.doesNotMatch(detail + overview, /resource-feedback|status-slot|detail-state|More sort options|Choose statuses|Chart key/);
+  for (const resource of Object.keys(bodyKeys)) {
+    assert.match(detail, new RegExp(`class="toolbar-meta"><span[^>]*data-${resource}-notice role="status"></span><p[^>]*data-${resource}-status role="status"></p><button[^>]*data-${resource}-retry hidden>Retry</button>`));
+  }
+  assert.match(detail, /data-detail-poll-status data-detail-status role="status"/);
+  assert.doesNotMatch(detail, /data-detail-retry|data-detail-request-id|event-search-hint|data-events-scope/);
+  assert.doesNotMatch(overview, /data-cohort-window/);
+  assert.match(overview, /data-cohort-tip-window/);
+  assert.match(overview, /data-execution-scroll data-loading/);
+  assert.match(overview, /data-poll-status data-summary-status role="status"/);
 });

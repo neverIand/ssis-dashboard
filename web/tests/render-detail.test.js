@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { mountBootstrap } from '../src/bootstrap.js';
 import { mountDetail } from '../src/render-detail.js';
@@ -8,6 +9,11 @@ import { metadata } from './fixtures.js';
 import { detailDOM, detailResponse, runningDetailResponse } from './detail-fixture.js';
 import { executable, executablePage } from './executable-fixture.js';
 import { childPage } from './child-fixture.js';
+import { timelineMetadata } from './timeline-fixture.js';
+import { historyMetadata, historyPage } from './history-fixture.js';
+import { eventMetadata, eventPage } from './event-fixture.js';
+import { parameterPage } from './parameter-fixture.js';
+import { overridePage } from './override-fixture.js';
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
 const observations = (id = detailResponse().data.execution_id) => executablePage([executable('1', { execution_id: id })]);
@@ -429,3 +435,249 @@ test('ended cache return and fresh reload each refetch once without retaining a 
     screen.dispose();
   }
 });
+
+const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
+
+test('D6/G5/G6: summary fields follow the run timeline; header groups connection context and ends with Theme', () => {
+  const detail = source('../../dashboard/templates/app/execution.html');
+  const order = ['"created"', '"started"', '"ended"', '"duration"', '>Running for<', '"logging"', '"environment"', '"lsn"']
+    .map(marker => detail.indexOf(marker));
+  assert.ok(order.every((position, index) => position > 0 && (index === 0 || position > order[index - 1])), String(order));
+  assert.ok(!detail.includes('Active elapsed (observed)'));
+  const base = source('../../dashboard/templates/app/base.html');
+  const nav = ['>History<', '{% block navigation %}', 'class="header-meta"', 'data-server-name', 'data-display-timezone', 'data-theme-choice']
+    .map(marker => base.indexOf(marker));
+  assert.ok(nav.every((position, index) => position > 0 && (index === 0 || position > nav[index - 1])), String(nav));
+  assert.ok(!source('../src/render-observations.js').includes('recording: recorded'));
+});
+
+const flush = () => new Promise(resolve => setImmediate(resolve));
+function detail(t, response, executables = () => executablePage()) {
+  const dom = detailDOM();
+  dom.window.location.hash = '#executables';
+  const view = mountDetail(dom.root, { metadata: metadata(), executionId: '17', appBase: '/app/', api: {
+    async get(resource) {
+      return resource.endsWith('/executables') ? executables() : resource.endsWith('/children') ? childPage() : response;
+    } } });
+  t.after(view.dispose);
+  return dom;
+}
+
+test('G2: the tab title names package, run and status; a favicon is linked and emitted', async t => {
+  const dom = detail(t, detailResponse('17'));
+  await flush(); await flush();
+  assert.equal(dom.document.title, 'Main.dtsx #17 · Succeeded · SSIS Dashboard');
+  assert.match(source('../../dashboard/templates/app/base.html'), /<link rel="icon" type="image\/svg\+xml" href="{{ assets\.icon }}">/);
+  assert.match(source('../vite.config.js'), /fileName: 'favicon\.svg'/);
+  assert.match(source('../src/favicon.svg'), /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+});
+
+test('G3: an ended execution hides Pause and says when it was read; a running one keeps it', async t => {
+  const ended = detail(t, detailResponse('17'));
+  await flush(); await flush();
+  assert.equal(ended.get('detail-poll-toggle').hidden, true);
+  assert.equal(ended.get('detail-poll-status').textContent, 'Execution ended · updated 17:00:00');
+  const running = detail(t, runningDetailResponse('17'));
+  await flush(); await flush();
+  assert.equal(running.get('detail-poll-toggle').hidden, false);
+});
+
+test('R1-2: denial and disposal reset the tab title to the bare execution ID', async t => {
+  let denied = false;
+  const dom = detailDOM();
+  const view = mountDetail(dom.root, { metadata: metadata(), executionId: '17', appBase: '/app/', api: {
+    async get(resource) {
+      if (denied) throw new ApiError('http', { status: 403 });
+      return resource.endsWith('/executables') ? executablePage() : resource.endsWith('/children') ? childPage() : detailResponse('17');
+    } } });
+  await flush(); await flush();
+  assert.match(dom.document.title, /^Main\.dtsx #17/);
+  denied = true;
+  dom.get('detail-refresh').dispatchEvent(new Event('click')); await flush(); await flush();
+  assert.equal(dom.document.title, 'Execution 17 · SSIS Dashboard');
+  denied = false;
+  dom.get('detail-refresh').dispatchEvent(new Event('click')); await flush(); await flush();
+  assert.match(dom.document.title, /^Main\.dtsx #17/);
+  view.dispose();
+  assert.equal(dom.document.title, 'Execution 17 · SSIS Dashboard');
+});
+
+const id = '9223372036854775807';
+const nb = text => text.replaceAll(' ', ' ');
+// wireTime is 2026-10-17T16:00:00Z; a 25-minute mean ends 16:25.
+const estimate = (changes = {}) => ({ method: 'mean_last_5_successful', sample_count: 5, duration_seconds: 1500,
+  ended_at: '2026-10-17T16:25:00.0000000Z', ...changes });
+const running = (value = estimate()) => {
+  const response = runningDetailResponse(id);
+  response.data.estimate = value;
+  return response;
+};
+
+test('C3: the summary shows Typical run only while active with an estimate, and hides it after the run ends', async t => {
+  const dom = detailDOM(), responses = [running(), running(null), detailResponse(id)];
+  let current = responses[0];
+  t.mock.method(globalThis, 'fetch', async url => jsonResponse(url.pathname.endsWith('/meta') ? envelope()
+    : url.pathname.endsWith('/executables') ? executablePage([]) : current));
+  const dispose = mountBootstrap(dom.root, { ready: (metadata, api, config) =>
+    mountDetail(dom.root, { metadata, api, executionId: id, appBase: config.app_base, autoRefresh: false }).dispose });
+  t.after(dispose);
+  await settle();
+  assert.equal(dom.get('active-elapsed').hidden, false);
+  assert.equal(dom.get('active-estimate').hidden, false);
+  assert.equal(dom.field('estimate').textContent, nb('25 min 00 s') + ' · ' + nb('ends 17:25:00') + ' · ' + nb('avg of 5'));
+  assert.equal(dom.field('estimate').title, 'Mean of 5 earlier successful runs · expected end 2026-10-17T16:25:00.0000000Z');
+  assert.doesNotMatch(dom.field('estimate').textContent, /%/);
+  for (const [response, elapsedHidden] of [[responses[1], false], [responses[2], true]]) {
+    current = response;
+    dom.get('detail-refresh').dispatchEvent(new Event('click'));
+    await settle(); await settle();
+    assert.equal(dom.get('active-elapsed').hidden, elapsedHidden);
+    assert.equal(dom.get('active-estimate').hidden, true);
+    assert.equal(dom.field('estimate').title, '');
+  }
+});
+
+const settleThreeTurns = async () => { for (let turn = 0; turn < 3; turn++) await new Promise(resolve => setImmediate(resolve)); };
+const click = node => { node.focus(); node.dispatchEvent(new Event('click')); };
+// Deliberate geometry, not a browser/layout claim. A sticky toolbar's natural document top is 460 px.
+function geometry(window, table, scroll, toolbar) {
+  const header = { top: -150, bottom: -120 }, calls = [];
+  window.scrollY = 700;
+  window.scrollX = 13;
+  scroll.clientWidth = 900;
+  scroll.style.setProperty = (key, value) => { scroll.style[key] = value; };
+  scroll.style.removeProperty = key => { delete scroll.style[key]; };
+  toolbar.style.position = 'sticky';
+  toolbar.getBoundingClientRect = () => {
+    const natural = 460 - window.scrollY;
+    const top = toolbar.style.position === 'static' ? natural : Math.max(0, natural);
+    return { top, bottom: top + 40, height: 40, width: 800 };
+  };
+  table.querySelector('thead').getBoundingClientRect = () => ({ ...header, height: header.bottom - header.top });
+  window.scrollTo = (x, y) => {
+    const request = typeof x === 'object' ? x : { left: x, top: y };
+    calls.push(request);
+    window.scrollX = request.left;
+    window.scrollY = request.top;
+  };
+  return { header, calls };
+}
+
+test('B3 detail paging reveals after the containing view preserves its window position, with no focus change', async t => {
+  const dom = detailDOM(), table = dom.get('executables-table');
+  const measured = geometry(dom.window, table, dom.get('executables-scroll'), dom.get('executables-toolbar'));
+  const view = mountDetail(dom.root, { metadata: timelineMetadata(), executionId: '17', appBase: '/ops/app/',
+    api: { async get(resource, { params }) {
+      return resource.endsWith('/executables')
+        ? executablePage(undefined, { ...params, has_more: true, next_cursor: 'page-two' }) : detailResponse('17');
+    } } });
+  t.after(view.dispose);
+  await settleThreeTurns();
+  assert.equal(measured.calls.length, 0);
+  const next = dom.get('executables-next');
+  click(next); await settleThreeTurns();
+  assert.equal(dom.window.scrollY, 460, 'outer position preservation must not undo the page reveal');
+  assert.deepEqual(measured.calls, [{ left: 13, top: 460, behavior: 'instant' }]);
+  assert.equal(dom.document.activeElement, next);
+  dom.get('detail-refresh').dispatchEvent(new Event('click')); await settleThreeTurns();
+  assert.equal(measured.calls.length, 1, 'full detail refresh still preserves position');
+});
+
+const clickNode = node => node.dispatchEvent(new Event('click'));
+function screen(t, { tab = 'history', read = () => historyPage(), response = () => detailResponse('17') } = {}) {
+  const dom = detailDOM(), calls = [], metadata = historyMetadata();
+  metadata.capabilities.events = true;
+  metadata.event_kinds = ['all', 'errors', 'warnings'];
+  dom.window.location.hash = `#${tab}`;
+  const view = mountDetail(dom.root, { metadata, executionId: '17', appBase: '/app/', api: {
+    async get(resource, options) {
+      calls.push({ resource, ...options });
+      return resource === 'history' || resource.endsWith('/events') ? read(resource, options) : response();
+    },
+  } });
+  t.after(view.dispose);
+  return { ...dom, calls, view };
+}
+
+test('detail status titles include the refresh mode only when the visible status omits it', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
+  const dom = screen(t, { response: () => runningDetailResponse('17') }); await flush();
+  for (const [index, mode] of ['on', 'paused', 'on'].entries()) {
+    const status = dom.get('detail-poll-status');
+    assert.equal(status.textContent, `Updated 17:00:00${mode === 'paused' ? ' · auto refresh paused' : ''}`);
+    assert.equal(status.title, (mode === 'on' ? 'Auto refresh on · ' : '') + 'Observed 2026-10-17 17:00:00');
+    if (index < 2) { clickNode(dom.get('detail-poll-toggle')); t.mock.timers.tick(0); await flush(); }
+  }
+  assert.equal(dom.calls.length, 4);
+});
+
+const bodyKeys = { executables: 'body', children: 'childBody', events: 'eventBody',
+  parameters: 'parameterBody', overrides: 'overrideBody', history: 'historyBody' };
+function settings() {
+  const value = eventMetadata();
+  value.execution_statuses = historyMetadata().execution_statuses;
+  value.capabilities.values = value.capabilities.override_values = true;
+  return value;
+}
+function reply(resource, { params }) {
+  if (resource.endsWith('/executables')) return executablePage(undefined, params);
+  if (resource.endsWith('/children')) return childPage(undefined, params);
+  if (resource.endsWith('/events')) return eventPage(undefined, params);
+  if (params?.section === 'parameters') return parameterPage(undefined, params);
+  if (params?.section === 'overrides') return overridePage(undefined, params);
+  if (resource === 'history') return historyPage(undefined, params);
+  return detailResponse('17');
+}
+
+for (const section of Object.keys(bodyKeys)) {
+  test(`${section}: a delayed scope reload reserves the former area, removes old payloads and retains controls`, async t => {
+    const dom = detailDOM(), calls = [], pending = deferred();
+    let delay = false;
+    dom.window.location.hash = `#${section}`;
+    const view = mountDetail(dom.root, { metadata: settings(), executionId: '17', appBase: '/app/',
+      api: { async get(resource, options) {
+        calls.push({ resource, ...options });
+        return delay ? pending.promise : reply(resource, options);
+      } } });
+    t.after(view.dispose);
+    await flush();
+    const body = dom[bodyKeys[section]], region = dom.get(`${section}-scroll`), oldRow = body.firstChild;
+    const status = dom.get(`${section}-status`), notice = dom.get(`${section}-notice`);
+    const children = [...dom.get(`${section}-panel`).children];
+    const limit = dom.get(`${section}-limit`);
+    region.layoutHeight = 763.2; // Injected geometry tests the reservation, not browser layout.
+    if (section === 'history') {
+      clickNode(dom.get('history-chart-toggle'));
+      dom.get('history-chart-panel').layoutHeight = 511;
+    }
+    limit.focus(); limit.value = '25'; delay = true;
+    const before = calls.length;
+    limit.dispatchEvent(new Event('change'));
+    assert.equal(calls.length, before + 1);
+    assert.equal(region.style.minHeight, '764px');
+    assert.equal(region.getAttribute('data-loading'), '');
+    assert.equal(oldRow.isConnected, false, 'An old-selection row cannot look current or remain as hidden payload');
+    assert.match(body.textContent, /Loading/);
+    assert.equal(dom.document.activeElement, limit);
+    assert.equal(dom.get(`${section}-status`), status);
+    assert.equal(dom.get(`${section}-notice`), notice);
+    assert.deepEqual(dom.get(`${section}-panel`).children, children);
+    if (section === 'history') {
+      assert.equal(dom.get('history-chart-panel').hidden, false);
+      assert.equal(dom.get('history-chart-panel').style.minHeight, '511px');
+      assert.equal(dom.get('history-chart-plot').children.length, 0);
+      assert.equal(dom.get('history-chart-selected').textContent, '');
+      assert.match(dom.get('history-status').textContent, /Loading/);
+    }
+    const request = calls.at(-1);
+    pending.resolve(reply(request.resource, request)); await flush();
+    assert.equal(region.style.minHeight, '');
+    assert.equal(region.getAttribute('data-loading'), null);
+    assert.equal(dom.document.activeElement, limit);
+    assert.equal(calls.length, before + 1);
+    assert.doesNotMatch(status.textContent, /Previous/);
+    if (section === 'history') assert.equal(dom.get('history-chart-panel').style.minHeight, '');
+    view.dispose();
+    assert.equal(region.style.minHeight, '');
+  });
+}

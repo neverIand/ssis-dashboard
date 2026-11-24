@@ -5,14 +5,16 @@ import { createDetailLoader } from '../src/detail.js';
 import { createDisplay } from '../src/display.js';
 import { historyIdentity, historyQuery, readHistoryPage } from '../src/history.js';
 import { mountDetail } from '../src/render-detail.js';
-import { deferred, wireTime } from './fixtures.js';
-import { detailDOM, detailResponse } from './detail-fixture.js';
+import { deferred, wireTime, envelope, jsonResponse } from './fixtures.js';
+import { detailDOM, detailResponse, runningDetailResponse } from './detail-fixture.js';
 import { executablePage } from './executable-fixture.js';
 import { childPage } from './child-fixture.js';
 import { eventPage } from './event-fixture.js';
 import { parameterPage } from './parameter-fixture.js';
 import { overridePage } from './override-fixture.js';
 import { historyMetadata, historyRow, historyPage, estimate } from './history-fixture.js';
+import { mountHistoryScreen } from '../src/history-screen.js';
+import { Node } from './overview-dom.js';
 
 const flush = () => new Promise(resolve=>setImmediate(resolve)), metadata = historyMetadata();
 const query = {status:'2,7',sort:'execution_id',direction:'desc',limit:50}, identity = detailResponse().data;
@@ -201,4 +203,202 @@ test('an end before its start is accepted with a NULL duration',()=>{
   const page=historyPage([historyRow('9',{ended_at:'2026-01-01T00:00:00.0000000Z',duration_seconds:null,elapsed_seconds:0})]);
   assert.equal(readHistoryPage(page,'17',query,metadata,display,identity),page);
   assert.ok(page.data[0].ended_at<page.data[0].started_at);
+});
+
+const rowsMetadata = historyMetadata();
+const settle = () => new Promise(resolve => setImmediate(resolve));
+const scoped = '?match=exact&folder=Folder&project=Project&package=Main.dtsx';
+function rowsScreen(t, search, rows = () => [historyRow('5')], storage = null) {
+  const dom = detailDOM(), extra = new Map(), calls = [];
+  const node = (key, tag = 'div') => { const value = new Node(dom.document, tag); extra.set(`[data-${key}]`, value); return value; };
+  const form = node('history-scope-form', 'form'), inputs = {};
+  for (const key of ['match', 'folder', 'project', 'package']) inputs[key] = new Node(dom.document, key === 'match' ? 'select' : 'input');
+  form.elements = { namedItem: key => inputs[key] };
+  for (const key of ['history-scope', 'history-scope-notice', 'history-poll-status', 'history-results', 'history-mode-note']) node(key);
+  for (const key of ['history-refresh', 'history-poll-toggle', 'history-load']) node(key, 'button');
+  extra.get('[data-history-results]').setAttribute('data-idle', '');
+  const query = dom.root.querySelector;
+  dom.root.querySelector = selector => extra.get(selector) ?? query(selector);
+  Object.assign(dom.window.location, { pathname: '/ops/app/history', search, assign: href => dom.opened.push(href) });
+  dom.window.history.pushState = (state, title, href) => dom.window.history.replaceState(state, title, href);
+  if (storage) dom.window.localStorage = storage;
+  t.mock.method(globalThis, 'fetch', async url => {
+    calls.push(url.pathname + url.search);
+    if (url.pathname.endsWith('/meta')) return jsonResponse(envelope(rowsMetadata));
+    if (url.pathname.endsWith('/server')) return jsonResponse(envelope({ server_name: 'Server' }));
+    const params = Object.fromEntries(url.searchParams);
+    return jsonResponse(historyPage(rows(params), { direction: params.direction, limit: Number(params.limit) }));
+  });
+  dom.opened = [];
+  const mounted = mountHistoryScreen(dom.root);
+  t.after(mounted.dispose);
+  const get = key => extra.get(`[data-${key}]`) ?? dom.get(key);
+  return { ...dom, inputs, form, calls, get, history: () => calls.filter(call => call.includes('/history')) };
+}
+
+test('H3: ended rows show the deviation from the estimate; running rows keep the expected end', async t => {
+  const dom = rowsScreen(t, scoped, () => [
+    historyRow('7', { duration_seconds: 30, estimate: estimate({ duration_seconds: 10 }) }),
+    historyRow('6', { duration_seconds: 8, estimate: estimate({ duration_seconds: 10 }) }),
+    historyRow('5', { status: { code: 2, name: 'running' }, ended_at: null, duration_seconds: null, elapsed_seconds: 3,
+      estimate: estimate({ duration_seconds: 10 }) })]);
+  await settle();
+  const [slow, fast, running] = dom.historyBody.children.map(row => row.children[5]);
+  assert.match(slow.textContent, /^10 s · avg of 5 · \+200%$/);
+  assert.equal(slow.children[3].dataset.level, 'warning');
+  assert.match(fast.textContent, /^10 s · avg of 5 · −20%$/);
+  assert.equal(fast.children[3].dataset.level, 'quiet', 'faster runs are not coloured as better');
+  assert.match(running.textContent, /^10 s · ends .* · avg of 5$/);
+  assert.equal(running.children[3].hidden, true);
+});
+
+const clickNode=node=>node.dispatchEvent(new Event('click'));
+const all='1,2,3,4,5,6,7,8,9';
+function historyScreen(t,rows,{get,restoreView}={}){
+  const dom=detailDOM(),calls=[],metadata=historyMetadata();
+  const view=mountDetail(dom.root,{metadata,executionId:'17',appBase:'/app/',restoreView,api:{async get(resource,options){
+    calls.push({resource,...options});
+    if(resource==='history')return get?get(options):historyPage(rows.filter(row=>options.params.status.split(',').includes(String(row.status.code))),{limit:options.params.limit,direction:options.params.direction});
+    if(resource.endsWith('/executables'))return executablePage();
+    const response=detailResponse('17');response.data.status={code:4,name:'failed'};return response;
+  }}});t.after(view.dispose);return {...dom,calls,view};
+}
+async function openHistory(dom,chart=false){await flush();clickNode(dom.get('history-toggle'));await flush();if(chart)clickNode(dom.get('history-chart-toggle'));}
+const preset=(dom,key)=>dom.get('history-presets').children.find(node=>node.dataset.historyPreset===key);
+
+test('D3 explicitly requests every known status and visibly marks a failed current execution',async t=>{
+  const rows=[historyRow('17',{status:{code:4,name:'failed'}}),historyRow('16'),historyRow('15',{status:{code:4,name:'failed'}})];
+  const dom=historyScreen(t,rows);await openHistory(dom);
+  assert.equal(dom.calls.at(-1).params.status,all);assert.equal(dom.historyBody.children.length,3);
+  const current=dom.historyBody.children[0];assert.equal(current.dataset.current,'true');
+  assert.equal(current.children[0].firstChild.getAttribute('aria-current'),'page');
+  assert.equal(current.children[0].textContent, '17 · current');
+  assert.equal(current.children[6].textContent, 'Failed');
+  assert.equal(current.children[6].firstChild.dataset.status, '4');
+  assert.equal(current.children[0].children.at(-1).textContent, ' · current', 'the separator is in the accessible text once');
+  assert.equal(dom.historyBody.children[1].dataset.current,'false');
+  assert.equal(dom.historyBody.children[1].children[0].textContent, '16');
+  assert.equal(!dom.get('history-status-options').matches(':popover-open'),true);assert.equal(preset(dom,'all').getAttribute('aria-pressed'),'true');
+  current.children[0].firstChild.focus();clickNode(dom.get('detail-refresh'));await flush();
+  assert.equal(dom.historyBody.children[0],current);assert.equal(dom.document.activeElement,current.children[0].firstChild);
+});
+
+test('history presets apply once, reset checkbox drafts, and leave estimates to the returned server page',async t=>{
+  const rows=[historyRow('17',{status:{code:4,name:'failed'},estimate:estimate({duration_seconds:12})}),historyRow('16'),
+    historyRow('15',{status:{code:2,name:'running'},ended_at:null,duration_seconds:null})];
+  const dom=historyScreen(t,rows);await openHistory(dom);const choices=dom.get('history-choices').children.map(label=>label.firstChild);
+  for(const [key,status] of [['succeeded','7'],['failed','4,6'],['running','2'],['all',all]]){
+    for(const input of choices)input.checked=false;
+    const count=dom.calls.length;clickNode(preset(dom,key));await flush();
+    assert.equal(dom.calls.length,count+1);assert.equal(dom.calls.at(-1).params.status,status);
+    assert.equal(preset(dom,key).getAttribute('aria-pressed'),'true');
+    assert.deepEqual(choices.filter(input=>input.checked).map(input=>input.value),status.split(','));
+    if(key==='failed')assert.match(dom.historyBody.children[0].children[5].textContent,/^12 s · avg of 5 · [+−]?\d+%$/);
+    clickNode(preset(dom,key));await flush();assert.equal(dom.calls.length,count+1,'Reapplying the same preset adds no read');
+  }
+});
+
+test('busy history presets cannot send reads or change applied status and retain keyboard focus',async t=>{
+  const wait=deferred();let slow=false;
+  const dom=historyScreen(t,[],{get:()=>slow?wait.promise:historyPage()});await openHistory(dom);
+  const button=preset(dom,'failed');button.focus();slow=true;clickNode(dom.get('detail-refresh'));await flush();
+  const count=dom.calls.length;clickNode(button);clickNode(button);
+  assert.equal(dom.calls.length,count);assert.equal(button.getAttribute('aria-disabled'),'true');
+  assert.equal(preset(dom,'all').getAttribute('aria-pressed'),'true');
+  wait.resolve(historyPage());await flush();assert.equal(dom.document.activeElement,button);
+});
+
+test('secondary history choices and a preset focus restore after fresh reads without persisting rows',async t=>{
+  const rows=[historyRow('17',{status:{code:4,name:'failed'}})];
+  const dom=historyScreen(t,rows);await openHistory(dom);clickNode(preset(dom,'failed'));await flush();
+  clickNode(dom.get('history-custom'));dom.get('history-choices').children[0].firstChild.focus();
+  const saved=dom.view.checkpoint();assert.doesNotMatch(JSON.stringify(saved),/Main\.dtsx|duration_seconds|sample_count/);dom.view.dispose();
+  const restored=historyScreen(t,rows,{restoreView:saved});await flush();
+  assert.equal(restored.calls.length,2);assert.equal(restored.calls.at(-1).params.status,'4,6');
+  assert.equal(!restored.get('history-status-options').matches(':popover-open'),false);assert.equal(restored.document.activeElement,restored.get('history-choices').children[0].firstChild);
+});
+
+function dispatch(node, type, target, key) {
+  const event = new Event(type, { cancelable: true });
+  Object.defineProperty(event, 'target', { value: target });
+  if (key) Object.defineProperty(event, 'key', { value: key });
+  node.dispatchEvent(event); return event;
+}
+function historyTabScreen(t, { tab = 'history', read = () => historyPage(), response = () => detailResponse('17') } = {}) {
+  const dom = detailDOM(), calls = [], metadata = historyMetadata();
+  metadata.capabilities.events = true;
+  metadata.event_kinds = ['all', 'errors', 'warnings'];
+  dom.window.location.hash = `#${tab}`;
+  const view = mountDetail(dom.root, { metadata, executionId: '17', appBase: '/app/', api: {
+    async get(resource, options) {
+      calls.push({ resource, ...options });
+      return resource === 'history' || resource.endsWith('/events') ? read(resource, options) : response();
+    },
+  } });
+  t.after(view.dispose);
+  return { ...dom, calls, view };
+}
+const chooseStatuses = (dom, codes) => {
+  for (const label of dom.get('history-choices').children) label.firstChild.checked = codes.includes(label.firstChild.value);
+};
+
+test('Custom status popover applies exactly once on close; Escape cancels and restores the applied checks', async t => {
+  const dom = historyTabScreen(t); await flush(); const count = dom.calls.length;
+  clickNode(dom.get('history-custom')); chooseStatuses(dom, ['4', '7']);
+  assert.equal(String(dom.get('history-status-options').matches(':popover-open')), 'true');
+  assert.equal(dom.calls.length, count);
+  dom.get('history-status-options').hidePopover(); await flush();
+  assert.equal(dom.calls.length, count + 1);
+  assert.equal(dom.calls.at(-1).params.status, '4,7');
+  assert.equal(dom.get('history-custom').getAttribute('aria-pressed'), 'true');
+  assert.equal(dom.document.activeElement, dom.get('history-custom'));
+  clickNode(dom.get('history-custom')); chooseStatuses(dom, ['2']);
+  const event = dispatch(dom.get('history-status-options'), 'keydown', dom.document.activeElement, 'Escape');
+  assert.equal(event.defaultPrevented, true); assert.equal(dom.calls.length, count + 1);
+  assert.equal(!dom.get('history-status-options').matches(':popover-open'), true);
+  assert.equal(dom.document.activeElement, dom.get('history-custom'));
+  assert.deepEqual(dom.get('history-choices').children.filter(label => label.firstChild.checked).map(label => label.firstChild.value), ['4', '7']);
+});
+
+test('Custom commits on focus leaving, ignores unchanged closes, and rejects an empty selection locally', async t => {
+  const dom = historyTabScreen(t); await flush(); let count = dom.calls.length;
+  clickNode(dom.get('history-custom'));
+  dispatch(dom.document, 'focusin', dom.get('history-limit')); await flush();
+  assert.equal(dom.calls.length, count);
+  clickNode(dom.get('history-custom')); chooseStatuses(dom, ['4']);
+  dispatch(dom.document, 'focusin', dom.get('history-limit')); await flush();
+  assert.equal(dom.calls.length, ++count); assert.equal(dom.calls.at(-1).params.status, '4');
+  clickNode(dom.get('history-custom')); chooseStatuses(dom, []);
+  dom.get('history-filters').dispatchEvent(new Event('submit')); await flush();
+  assert.equal(dom.calls.length, count); assert.match(dom.get('history-notice').textContent, /at least one/);
+  assert.equal(!dom.get('history-status-options').matches(':popover-open'), true);
+});
+
+test('a preset consumes an open Custom draft without an intermediate request', async t => {
+  const dom = historyTabScreen(t); await flush(); const count = dom.calls.length;
+  clickNode(dom.get('history-custom')); chooseStatuses(dom, ['4', '7']);
+  const running = dom.get('history-presets').children.find(button => button.dataset.historyPreset === 'running');
+  assert.equal(dispatch(dom.document, 'pointerdown', running).defaultPrevented, false);
+  dom.get('history-status-options').hidePopover();
+  assert.equal(dom.calls.length, count, 'Native dismissal before preset activation cannot send an intermediate read');
+  clickNode(running); dispatch(dom.document, 'click', running); await flush();
+  assert.equal(dom.calls.length, count + 1); assert.equal(dom.calls.at(-1).params.status, '2');
+  assert.equal(dom.document.activeElement, running); assert.equal(!dom.get('history-status-options').matches(':popover-open'), true);
+});
+
+test('busy refresh preserves icon names/focus, and closing Custom cannot dispatch while busy', async t => {
+  const wait = deferred(); let slow = false;
+  const dom = historyTabScreen(t, { response: () => runningDetailResponse('17'), read: () => slow ? wait.promise : historyPage() }); await flush();
+  clickNode(dom.get('history-custom')); chooseStatuses(dom, ['4']);
+  const refresh = dom.get('detail-refresh'); refresh.focus(); slow = true; clickNode(refresh); await flush();
+  const count = dom.calls.length;
+  assert.equal(refresh.getAttribute('aria-disabled'), 'true'); assert.equal(dom.document.activeElement, refresh);
+  assert.equal(dom.get('detail-poll-toggle').getAttribute('aria-label'), 'Pause auto refresh');
+  dom.get('history-status-options').hidePopover(); clickNode(dom.get('history-custom'));
+  assert.equal(dom.calls.length, count); assert.equal(!dom.get('history-status-options').matches(':popover-open'), true);
+  wait.resolve(historyPage()); await flush();
+  assert.equal(refresh.getAttribute('aria-disabled'), 'false');
+  clickNode(dom.get('detail-poll-toggle'));
+  assert.equal(dom.get('detail-poll-toggle').getAttribute('aria-label'), 'Resume auto refresh');
+  assert.equal(dom.get('detail-poll-toggle').title, 'Resume auto refresh');
 });

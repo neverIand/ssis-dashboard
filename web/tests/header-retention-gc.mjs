@@ -1,4 +1,4 @@
-// Run by ux-batch-b1.test.js in a child started with --expose-gc (full review of 19 November 2026, R-03).
+// Run by detail-event-summary.test.js in a child started with --expose-gc (full review of 19 November 2026, R-03).
 // After the Errors excerpt is shown, a 50-row Warnings page is read, then Executables opens: the page, its rows
 // and the full error message must all become collectible while the header keeps its bounded excerpt.
 import assert from 'node:assert/strict';

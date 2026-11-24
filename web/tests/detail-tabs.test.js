@@ -6,7 +6,7 @@ import { mountDetail } from '../src/render-detail.js';
 import { detailTabs, detailFragment, readDetailFragment, defaultDetailTab, executionHref, readOverviewReturn } from '../src/detail-navigation.js';
 import { defaultSelection } from '../src/selection.js';
 import { detailDOM, detailResponse, runningDetailResponse } from './detail-fixture.js';
-import { deferred } from './fixtures.js';
+import { deferred, metadata } from './fixtures.js';
 import { executablePage } from './executable-fixture.js';
 import { childPage } from './child-fixture.js';
 import { eventMetadata, eventPage, eventRow } from './event-fixture.js';
@@ -373,4 +373,37 @@ test('tab loader selects the newest fragment even before the first base detail r
   pending.resolve(detailResponse('17')); await loading;
   assert.deepEqual(calls, ['executions/17','executions/17/events']);
   assert.equal(states.at(-1).events.query.kind, 'warnings');
+});
+
+function mount(dom, settings, get) {
+  return mountDetail(dom.root, { metadata: settings, executionId: '17', appBase: '/app/', api: { get } });
+}
+const sectionReply = resource => resource.endsWith('/executables') ? executablePage()
+  : resource.endsWith('/children') ? childPage() : detailResponse('17');
+
+test('H-05: one visible line names disabled sections; enabled capabilities show none', async t => {
+  const off = detailDOM(), view = mount(off, metadata(), async resource => sectionReply(resource));
+  t.after(view.dispose); await flush();
+  assert.equal(off.get('tab-notes').hidden, false);
+  assert.equal(off.get('tab-notes').textContent, 'Disabled for this application: Events, Parameters, Overrides');
+  const on = detailDOM(), settings = metadata();
+  Object.assign(settings.capabilities, { events: true, values: true, override_values: true });
+  const enabled = mount(on, settings, async resource => sectionReply(resource));
+  t.after(enabled.dispose); await flush();
+  assert.equal(on.get('tab-notes').hidden, true);
+  assert.equal(on.get('tab-notes').textContent, '');
+});
+
+test('H-06: selecting a tab outside a narrow strip scrolls only the strip', async t => {
+  const dom = detailDOM(), list = dom.get('history-toggle').parentElement;
+  list.getBoundingClientRect = () => ({ left: 0, right: 345 });
+  dom.get('history-toggle').getBoundingClientRect = () => ({ left: 500, right: 580 });
+  dom.window.location.hash = '#history';
+  const view = mount(dom, metadata(), async resource => resource === 'history'
+    ? { data: [], meta: { generated_at: detailResponse().meta.generated_at, has_next: false, next_cursor: null, limit: 50 } }
+    : sectionReply(resource));
+  t.after(view.dispose); await flush();
+  assert.equal(dom.get('history-toggle').getAttribute('aria-selected'), 'true');
+  assert.equal(list.scrollLeft, 235);
+  assert.equal(dom.window.scrollY, 0);
 });

@@ -3,8 +3,10 @@ import test from 'node:test';
 import { ApiError } from '../src/api.js';
 import { createDetailLoader } from '../src/detail.js';
 import { deferred, metadata } from './fixtures.js';
-import { detailResponse, runningDetailResponse } from './detail-fixture.js';
+import { detailResponse, runningDetailResponse, detailDOM } from './detail-fixture.js';
 import { executablePage } from './executable-fixture.js';
+import { mountDetail } from '../src/render-detail.js';
+import { childPage } from './child-fixture.js';
 
 const flush = () => new Promise(resolve => setImmediate(resolve));
 function setup(t, get, options = {}) {
@@ -320,4 +322,31 @@ test('selecting a running execution after an ended execution restores normal sch
   await run.owner.select('18');
   assert.equal(run.state.terminal, false);
   assert.equal(run.state.poll.nextAt, 1000);
+});
+
+const click = node => node.dispatchEvent(new Event('click'));
+function mount(dom, settings, get) {
+  return mountDetail(dom.root, { metadata: settings, executionId: '17', appBase: '/app/', api: { get } });
+}
+const reply = resource => resource.endsWith('/executables') ? executablePage()
+  : resource.endsWith('/children') ? childPage() : detailResponse('17');
+
+test('H-02: after a failed base refresh a newly opened section offers Retry, which reloads the base first', async t => {
+  const dom = detailDOM(), calls = []; let fail = false;
+  dom.window.location.hash = '#executables';
+  const view = mount(dom, metadata(), async resource => {
+    calls.push(resource);
+    if (fail) throw new ApiError('network');
+    return reply(resource);
+  });
+  t.after(view.dispose); await flush();
+  fail = true; click(dom.get('detail-refresh')); await flush();
+  click(dom.get('children-toggle')); await flush();
+  assert.match(dom.get('children-status').textContent, /Unable to connect/);
+  assert.equal(dom.get('children-retry').hidden, false);
+  fail = false; calls.length = 0;
+  click(dom.get('children-retry')); await flush();
+  assert.deepEqual(calls, ['executions/17', 'executions/17/children']);
+  assert.equal(dom.get('children-retry').hidden, true);
+  assert.equal(dom.childBody.children.length, 1);
 });

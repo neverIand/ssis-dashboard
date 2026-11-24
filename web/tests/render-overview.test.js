@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { ApiError } from '../src/api.js';
 import { mountOverview } from '../src/render-overview.js';
 import { mountDetail } from '../src/render-detail.js';
-import { defaultSelection, parseSelection } from '../src/selection.js';
+import { defaultSelection, parseSelection, validateSelection } from '../src/selection.js';
 import { deferred, envelope, metadata, requestId, wireTime } from './fixtures.js';
 import { detailDOM, detailResponse } from './detail-fixture.js';
 import { overviewDOM } from './overview-dom.js';
 import { executable, executablePage } from './executable-fixture.js';
+import { overviewPage, timelineFrom, timelineMetadata, timelinePage, timelineSummary } from './timeline-fixture.js';
 
 const settings = metadata();
 const from = '2026-10-17T00:00:00.0000001Z', to = '2026-10-17T18:00:00.1234567Z';
@@ -449,3 +451,302 @@ for (const appBase of ['/app/', '/ops/monitor/app/']) {
     assert.equal(context.direction, 'desc');
   });
 }
+
+const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
+const failedSettings = metadata();
+const failedItem = (id, code, packageName) => ({ execution_id: id, folder_name: 'Sales', project_name: 'Orders',
+  package_name: packageName, status: { code, name: code === 4 ? 'failed' : 'succeeded' }, created_at: wireTime,
+  started_at: wireTime, ended_at: wireTime, duration_seconds: 1, elapsed_seconds: null, estimate: null, warning_count: 0,
+  error_count: code === 4 ? 2 : 0 });
+const failedPage = rows => ({ ...envelope(rows), meta: { ...envelope().meta, from, to, as_of: wireTime, upper_id: '9',
+  consistency: 'live', sort: 'execution_id', direction: 'desc', limit: 50, has_more: false, next_cursor: null } });
+const failedSummary = () => ({ ...envelope({ total: 2, by_status: [{ code: 4, name: 'failed', count: 1 },
+  { code: 7, name: 'succeeded', count: 1 }] }), meta: { ...envelope().meta, from, to, status_scope: 'all' } });
+
+test('O2/O9: overview rows expose status for the failed-row marker and render breakable package names', async () => {
+  const dom = overviewDOM();
+  const view = mountOverview(dom.root, { metadata: failedSettings, appBase: '/app/',
+    api: { get: async resource => resource === 'executions'
+      ? failedPage([failedItem('2', 4, 'Load_Fact.dtsx'), failedItem('1', 7, 'Probe.dtsx')]) : failedSummary() } });
+  await view.apply(defaultSelection(failedSettings));
+  assert.deepEqual(dom.body.children.map(row => row.dataset.status), ['4', '7']);
+  const packageLink = dom.body.children[0].children[2].firstChild;
+  assert.equal(packageLink.textContent, 'Load_Fact.dtsx');
+  assert.ok(packageLink.children.some(child => child.tag === 'wbr'));
+  const created = dom.body.children[0].children[3].firstChild;
+  assert.equal(created.tag, 'time');
+  assert.deepEqual(created.children.map(child => child.tag), ['span', '#text', 'span'], 'date and time wrap as whole parts');
+  assert.equal(created.textContent.split(' ').length, 2);
+  view.dispose();
+});
+
+test('O1/O2/O8: count links inherit level colour; failed rows have a non-colour-only edge; mid widths keep right columns', () => {
+  const css = source('../src/styles.css');
+  assert.ok(css.includes('.number-cell[data-level] a { color: inherit; }'));
+  assert.ok(css.includes('[data-execution-table] tr:is([data-status="4"], [data-status="6"]) > td:first-child'));
+  assert.match(css, /td:first-child \{ box-shadow: inset 3px 0 var\(--sd-status-failed\); \}/);
+  assert.match(css, /@media \(forced-colors: active\) \{[^}]*border-left: 3px solid CanvasText;/);
+  assert.match(css, /@media \(max-width: 66\.6667rem\) \{\s*\/\*[^*]*\*\/\s*\[data-execution-table\] \{ min-width: 44rem; \}\s*\[data-execution-table\] \.time-cell \{ min-width: 5\.6rem; white-space: normal; \}\s*\[data-execution-table\] \.time-cell span \{ white-space: nowrap; \}/);
+  assert.match(css, /\.summary-card \{\s*display: flex;\s*flex-wrap: wrap;/);
+  assert.match(css, /\.summary-card \{ flex-direction: column; align-items: flex-start;/);
+});
+
+const timelineSettings = timelineMetadata();
+const selection = () => validateSelection(defaultSelection(timelineSettings), timelineSettings);
+const row = (id, code) => ({ execution_id: id, folder_name: 'Folder', project_name: 'Project', package_name: 'Main.dtsx',
+  status: { code, name: { 1: 'created', 2: 'running', 4: 'failed', 7: 'succeeded' }[code] }, created_at: timelineFrom,
+  started_at: null, ended_at: null, duration_seconds: null, elapsed_seconds: null, estimate: null, warning_count: 0, error_count: 0 });
+const listPage = rows => ({ ...overviewPage(), data: rows });
+function screen(t, { list = () => overviewPage(), summary = () => timelineSummary(), timeline = () => timelinePage() } = {}) {
+  const dom = overviewDOM(), selected = [], calls = [];
+  const view = mountOverview(dom.root, { metadata: timelineSettings, appBase: '/ops/app/', onSelect: changes => selected.push(changes),
+    api: { async get(resource, options) {
+      calls.push(resource);
+      return resource === 'executions' ? list(options) : resource === 'metrics/summary' ? summary(options) : timeline(options);
+    } } });
+  t.after(view.dispose);
+  return { ...dom, view, selected, calls };
+}
+
+test('O10: a same-page refresh marks new and status-changed rows only; the first load marks none', async t => {
+  let refreshed = false;
+  const dom = screen(t, { list: () => listPage(refreshed ? [row('4', 2), row('3', 7), row('2', 2)] : [row('3', 2), row('2', 2)]) });
+  await dom.view.apply(selection());
+  assert.deepEqual(dom.body.children.map(node => node.dataset.changed), [undefined, undefined]);
+  refreshed = true;
+  await dom.view.refresh();
+  const marks = Object.fromEntries(dom.body.children.map(node => [node.dataset.executionId, node.dataset.changed]));
+  assert.ok(marks['4'] !== undefined, 'new row');
+  assert.ok(marks['3'] !== undefined, 'running → succeeded');
+  assert.equal(marks['2'], undefined, 'unchanged');
+  await dom.view.refresh();
+  assert.ok(dom.body.children.every(node => node.dataset.changed === undefined), 'marks clear when nothing changes');
+});
+
+test('O5/K2: the Other card names its parts; package links leave the Tab order to the equivalent ID link', async t => {
+  const dom = screen(t, { summary: () => ({ ...timelineSummary(), data: { total: 13, by_status: [
+    { code: 1, name: 'created', count: 2 }, { code: 2, name: 'running', count: 5 }, { code: 4, name: 'failed', count: 2 },
+    { code: 7, name: 'succeeded', count: 4 }] } }) });
+  await dom.view.apply(selection());
+  const other = dom.root.querySelector('[data-status-card="other"]');
+  assert.equal(other.getAttribute('aria-label'), '2 Other: Created 2');
+  assert.match(other.title, /^Other: Created 2\. Filter selects Created/);
+  const [id, , pkg] = [dom.body.children[0].children[0].firstChild, null, dom.body.children[0].children[2].firstChild];
+  assert.equal(pkg.tabIndex, -1);
+  assert.notEqual(id.tabIndex, -1);
+  assert.equal(pkg.getAttribute('href'), id.getAttribute('href'));
+});
+
+test('R1-4: rows appearing on a refresh after an empty page are marked new', async t => {
+  let refreshed = false;
+  const dom = screen(t, { list: () => listPage(refreshed ? [row('9', 2)] : []) });
+  await dom.view.apply(selection());
+  refreshed = true;
+  await dom.view.refresh();
+  assert.notEqual(dom.body.children[0].dataset.changed, undefined);
+});
+
+test('G4: overview Started shows only its time on the Created date, keeping the full value in title', async t => {
+  const settings = timelineMetadata(), dom = overviewDOM();
+  const sameDay = { ...overviewPage().data[0], execution_id: '2', created_at: '2026-10-17T10:00:00.0000000Z',
+    started_at: '2026-10-17T10:00:34.0000000Z' };
+  const nextDay = { ...sameDay, execution_id: '1', created_at: '2026-10-17T22:59:00.0000000Z',
+    started_at: '2026-10-17T23:00:30.0000000Z' };
+  const view = mountOverview(dom.root, { metadata: settings, appBase: '/app/', api: { async get(resource) {
+    const bounds = { from: '2026-10-17T00:00:00.0000000Z', to: '2026-10-18T00:00:00.0000000Z' };
+    return resource === 'executions' ? { ...overviewPage(bounds), data: [sameDay, nextDay] } : timelineSummary(bounds);
+  } } });
+  t.after(view.dispose);
+  await view.apply(validateSelection(defaultSelection(settings), settings));
+  const [first, second] = dom.body.children.map(row => row.children[4].firstChild);
+  assert.equal(first.textContent, '11:00:34');
+  assert.equal(first.title, sameDay.started_at);
+  assert.equal(second.title, nextDay.started_at);
+  assert.equal(second.textContent, '2026-10-18 00:00:30', 'a run that starts after midnight keeps its date');
+  assert.equal(dom.body.children[0].children[3].firstChild.textContent, '2026-10-17 11:00:00');
+});
+
+const estimateSettings = metadata();
+// wireTime is 2026-10-17T16:00:00Z; a 25-minute typical run ends 16:25.
+const estimate = (changes = {}) => ({ method: 'mean_last_5_successful', sample_count: 5, duration_seconds: 1500,
+  ended_at: '2026-10-17T16:25:00.0000000Z', ...changes });
+const estimateItem = (id, changes = {}) => ({ execution_id: id, folder_name: 'Folder', project_name: 'Project',
+  package_name: 'Probe.dtsx', status: { code: 2, name: 'running' }, created_at: wireTime, started_at: wireTime,
+  ended_at: null, duration_seconds: null, elapsed_seconds: 600, estimate: estimate(), warning_count: 0, error_count: 0,
+  ...changes });
+const estimateSummary = () => ({ ...envelope({ total: 3, by_status: [{ code: 2, name: 'running', count: 3 }] }),
+  meta: { ...envelope().meta, from, to, status_scope: 'all' } });
+const nb = text => text.split(' · ').map(part => part.replaceAll(' ', '\u00a0')).join(' · ');
+
+test('C4: running rows compare elapsed with the typical duration, flag an overrun and never show a percentage', async t => {
+  const dom = overviewDOM();
+  let rows = [estimateItem('3'), estimateItem('2', { elapsed_seconds: 1800 }), estimateItem('1', { estimate: null })];
+  const view = mountOverview(dom.root, { metadata: estimateSettings, appBase: '/app/',
+    api: { get: async resource => resource === 'executions' ? page(rows) : estimateSummary() } });
+  t.after(() => view.dispose());
+  await view.apply(defaultSelection(estimateSettings));
+  const detail = index => dom.body.children[index].children[5].children.at(-1);
+  assert.equal(detail(0).textContent, nb('Elapsed: 10 min 00 s · typical 25 min 00 s'));
+  assert.equal(detail(0).dataset.estimate, 'within');
+  assert.equal(detail(0).title, 'Typical: mean of 5 earlier successful runs · expected end 2026-10-17 17:25:00');
+  assert.equal(detail(1).dataset.estimate, 'over');
+  assert.equal(detail(2).textContent, nb('Elapsed: 10 min 00 s'));
+  assert.equal(detail(2).dataset.estimate, undefined);
+  for (const index of [0, 1, 2]) assert.doesNotMatch(dom.body.children[index].children[5].textContent, /%/);
+  // A refresh that changes only the estimate redraws the cell; an ended row shows its duration without a comparison.
+  rows = [estimateItem('3', { estimate: estimate({ duration_seconds: 300 }) }), estimateItem('2', { status: { code: 7, name: 'succeeded' },
+    ended_at: wireTime, duration_seconds: 1800, elapsed_seconds: 1800, estimate: null }), estimateItem('1', { estimate: null })];
+  await view.apply(defaultSelection(estimateSettings), { restore: true });
+  assert.equal(detail(0).textContent, nb('Elapsed: 10 min 00 s · typical 5 min 00 s'));
+  assert.equal(detail(0).dataset.estimate, 'over');
+  assert.equal(dom.body.children[1].children[5].textContent, '30 min 00 s');
+});
+
+const settle = async () => { for (let turn = 0; turn < 3; turn++) await new Promise(resolve => setImmediate(resolve)); };
+const click = node => { node.focus(); node.dispatchEvent(new Event('click')); };
+// Deliberate geometry, not a browser/layout claim. A sticky toolbar's natural document top is 460 px.
+function geometry(window, table, scroll, toolbar) {
+  const header = { top: -150, bottom: -120 }, calls = [];
+  window.scrollY = 700;
+  window.scrollX = 13;
+  scroll.clientWidth = 900;
+  scroll.style.setProperty = (key, value) => { scroll.style[key] = value; };
+  scroll.style.removeProperty = key => { delete scroll.style[key]; };
+  toolbar.style.position = 'sticky';
+  toolbar.getBoundingClientRect = () => {
+    const natural = 460 - window.scrollY;
+    const top = toolbar.style.position === 'static' ? natural : Math.max(0, natural);
+    return { top, bottom: top + 40, height: 40, width: 800 };
+  };
+  table.querySelector('thead').getBoundingClientRect = () => ({ ...header, height: header.bottom - header.top });
+  window.scrollTo = (x, y) => {
+    const request = typeof x === 'object' ? x : { left: x, top: y };
+    calls.push(request);
+    window.scrollX = request.left;
+    window.scrollY = request.top;
+  };
+  return { header, calls };
+}
+function overview(t, saved = null) {
+  const dom = overviewDOM(), table = dom.root.querySelector('[data-execution-table]');
+  const measured = geometry(dom.window, table, dom.scroll, dom.root.querySelector('.executions-toolbar'));
+  let held = null;
+  const reads = [];
+  const view = mountOverview(dom.root, { metadata: timelineMetadata(), appBase: '/app/',
+    retainedPaths: saved?.paths, restoreView: saved?.view,
+    api: { async get(resource, { params }) {
+      reads.push(resource);
+      if (resource !== 'executions') return timelineSummary();
+      const response = overviewPage({ limit: params.limit, sort: params.sort, direction: params.direction,
+        has_more: true, next_cursor: 'page-two' });
+      if (held) { const waiting = held; held = null; await waiting.promise; }
+      return response;
+    } } });
+  t.after(view.dispose);
+  return { ...dom, ...measured, view, reads, hold() { held = deferred(); return held; } };
+}
+const pagingSelection = changes => validateSelection({ ...defaultSelection(timelineMetadata()), ...changes }, timelineMetadata());
+
+test('B3 Overview: Next/Previous/First/Rows wait for the new page; refresh, sort and filters leave the window alone', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
+  const dom = overview(t);
+  await dom.view.apply(pagingSelection());
+  assert.equal(dom.calls.length, 0);
+  const wait = dom.hold(), next = dom.get('executions-next');
+  click(next); await settle();
+  assert.equal(dom.calls.length, 0);
+  wait.resolve(); await settle();
+  assert.deepEqual(dom.calls, [{ left: 13, top: 460, behavior: 'instant' }]);
+  assert.equal(dom.document.activeElement, next);
+
+  Object.assign(dom.header, { top: 40, bottom: 70 });
+  click(dom.get('executions-previous')); await settle();
+  assert.equal(dom.calls.length, 1);
+  Object.assign(dom.header, { top: -15, bottom: 15 });
+  click(dom.get('executions-latest')); await settle();
+  assert.equal(dom.calls.length, 2);
+  await dom.view.apply(pagingSelection({ limit: 25 }));
+  assert.equal(dom.calls.length, 3);
+  await dom.view.refresh();
+  click(dom.get('overview-refresh')); await settle();
+  const beforePoll = dom.reads.filter(resource => resource === 'executions').length;
+  t.mock.timers.tick(30000); await settle();
+  assert.equal(dom.reads.filter(resource => resource === 'executions').length, beforePoll + 1);
+  await dom.view.apply(pagingSelection({ limit: 25, sort: 'created_at' }));
+  await dom.view.apply(pagingSelection({ limit: 25, folder: 'Another folder' }));
+  assert.equal(dom.calls.length, 3, 'manual/automatic refresh, sort and same-size filters never reveal');
+});
+
+test('B3 Overview: retained-page restore keeps its saved window position', async t => {
+  const first = overview(t);
+  await first.view.apply(pagingSelection());
+  click(first.get('executions-next')); await settle();
+  first.window.scrollY = 310;
+  const saved = first.view.checkpoint();
+  first.view.dispose();
+  const restored = overview(t, saved);
+  await restored.view.apply(pagingSelection(), { restore: true });
+  assert.deepEqual(restored.calls, [{ left: 13, top: 310 }]);
+  assert.equal(restored.window.scrollY, 310);
+});
+
+const flush = () => new Promise(resolve => setImmediate(resolve));
+const clickNode = node => node.dispatchEvent(new Event('click'));
+
+test('overview keeps the open timeline and both reserved areas through a delayed selection change without old counts', async t => {
+  const dom = overviewDOM(), metadata = timelineMetadata(), calls = [], list = deferred(), timeline = deferred();
+  let delay = false;
+  const view = mountOverview(dom.root, { metadata, appBase: '/app/', api: { async get(resource, options) {
+    calls.push({ resource, ...options });
+    if (resource === 'executions') return delay ? list.promise : overviewPage();
+    if (resource === 'metrics/summary') return timelineSummary();
+    return delay ? timeline.promise : timelinePage();
+  } } });
+  t.after(view.dispose);
+  await view.apply(defaultSelection(metadata)); clickNode(dom.get('timeline-toggle')); await flush();
+  dom.scroll.layoutHeight = 821; dom.get('timeline-panel').layoutHeight = 671;
+  dom.get('timeline-scroll').layoutHeight = 300;
+  const status = dom.get('summary-status'), panelChildren = [...dom.get('timeline-panel').children];
+  const row = dom.body.firstChild;
+  delay = true;
+  const applied = view.apply({ ...defaultSelection(metadata), status: [2] });
+  assert.equal(dom.scroll.style.minHeight, '821px');
+  assert.equal(dom.get('timeline-panel').style.minHeight, '671px');
+  assert.equal(dom.get('timeline-scroll').style.minHeight, '300px');
+  assert.equal(dom.get('timeline-panel').hidden, false);
+  assert.deepEqual(dom.get('timeline-panel').children, panelChildren);
+  assert.equal(dom.get('timeline-chart').children.length, 0);
+  assert.equal(dom.get('timeline-selected').textContent, '');
+  assert.equal(row.isConnected, false);
+  assert.equal(dom.root.querySelector('[data-count="total"]').textContent, '—');
+  assert.equal(dom.get('cohort-tip-window').textContent, '');
+  assert.equal(dom.get('summary-status'), status);
+  list.resolve(overviewPage()); await flush();
+  assert.equal(dom.get('timeline-panel').style.minHeight, '671px');
+  timeline.resolve(timelinePage(undefined, { selected_statuses: [2] })); await applied;
+  assert.equal(dom.scroll.style.minHeight, '');
+  assert.equal(dom.get('timeline-panel').style.minHeight, '');
+  assert.equal(dom.get('timeline-scroll').style.minHeight, '');
+  assert.deepEqual(calls.map(call => call.resource), ['executions', 'metrics/summary', 'metrics/timeline',
+    'executions', 'metrics/summary', 'metrics/timeline']);
+});
+
+test('overview refresh keeps keyed rows while announcing previous counts, then clears denied payloads and reservations', async t => {
+  const dom = overviewDOM(), metadata = timelineMetadata(), list = deferred();
+  let delay = false;
+  const view = mountOverview(dom.root, { metadata, appBase: '/app/', api: { async get(resource) {
+    return resource === 'executions' ? delay ? list.promise : overviewPage() : timelineSummary();
+  } } });
+  t.after(view.dispose);
+  await view.apply(defaultSelection(metadata));
+  const row = dom.body.firstChild, status = dom.get('summary-status');
+  delay = true; const refresh = view.refresh();
+  assert.equal(dom.body.firstChild, row);
+  assert.equal(status.textContent, 'Updated 17:00:00');
+  assert.match(status.title, /Previous counts shown/);
+  assert.equal(dom.scroll.getAttribute('data-loading'), null);
+  list.reject(new ApiError('forbidden', { status: 403 })); await refresh;
+  assert.equal(row.isConnected, false);
+  assert.equal(dom.scroll.style.minHeight ?? '', '');
+  assert.equal(dom.get('cohort-tip-window').textContent, '');
+});

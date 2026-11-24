@@ -136,3 +136,119 @@ test('base execution denial clears chart data and selection together with the wh
   denied=true;click(dom,'detail-refresh');await flush();assert.equal(groups(dom).length,0);assert.equal(dom.get('history-chart-panel').hidden,true);
   assert.equal(groups(dom).length,0);assert.equal(view.checkpoint().historyView.chart.selected,null);
 });
+
+const clickNode=node=>node.dispatchEvent(new Event('click'));
+const stamp=day=>`2026-10-${String(day).padStart(2,'0')}T00:00:00.0000000Z`;
+function interaction(svg,type,target,key){
+  const event=new Event(type,{cancelable:true});Object.defineProperty(event,'target',{value:target});
+  if(key!==undefined)Object.defineProperty(event,'key',{value:key});
+  svg.dispatchEvent(event);return event;
+}
+function historyScreen(t,rows,{get,restoreView}={}){
+  const dom=detailDOM(),calls=[],metadata=historyMetadata();
+  const view=mountDetail(dom.root,{metadata,executionId:'17',appBase:'/app/',restoreView,api:{async get(resource,options){
+    calls.push({resource,...options});
+    if(resource==='history')return get?get(options):historyPage(rows.filter(row=>options.params.status.split(',').includes(String(row.status.code))),{limit:options.params.limit,direction:options.params.direction});
+    if(resource.endsWith('/executables'))return executablePage();
+    const response=detailResponse('17');response.data.status={code:4,name:'failed'};return response;
+  }}});t.after(view.dispose);return {...dom,calls,view};
+}
+async function openHistory(dom,chart=false){await flush();clickNode(dom.get('history-toggle'));await flush();if(chart)clickNode(dom.get('history-chart-toggle'));}
+
+test('history plots chronological creation order independently of table order, with labels, status and estimate markers',async t=>{
+  const rows=[historyRow('19',{created_at:stamp(16),duration_seconds:10,status:{code:4,name:'failed'},estimate:estimate({duration_seconds:20})}),
+    historyRow('17',{created_at:stamp(15),duration_seconds:0}),historyRow('16',{created_at:stamp(17),duration_seconds:40})];
+  const dom=historyScreen(t,rows);await openHistory(dom,true);const plot=dom.get('history-chart-plot'),groups=plot.children;
+  assert.deepEqual(groups.map(row=>row.dataset.executionId),['17','19','16']);
+  assert.deepEqual(dom.historyBody.children.map(row=>row.dataset.historyId),['19','17','16']);
+  assert.equal(selected(dom),'16');assert.equal(groups[1].getAttribute('data-status'),'4');
+  const marker=groups[1].children[2];assert.equal(marker.tag,'line');assert.equal(marker.getAttribute('y1'),'85');assert.equal(marker.getAttribute('y2'),'85');
+  assert.equal(groups[1].children[1].getAttribute('height'),'37.5');assert.equal(groups[0].children[3].getAttribute('display'),'inline');
+  assert.deepEqual(dom.get('history-chart-y-axis').children.map(node=>node.textContent),['40 s','20 s','0 ms']);
+  // Short projections use compact ID labels; each label's title keeps the full creation time.
+  assert.deepEqual(dom.get('history-chart-x-axis').children.map(node=>node.textContent),['#17','#19','#16']);
+  assert.equal(dom.get('history-chart-x-axis').children[0].title, '2026-10-15 01:00:00 · #17');
+  assert.equal(groups[1].firstChild.textContent, '#19 · 2026-10-16 01:00:00 · Failed · 10 s (estimate 20 s)');
+  assert.equal(groups[1].getAttribute('aria-label'), groups[1].firstChild.textContent);
+  assert.equal(dom.get('history-chart-scale').textContent,'Duration');
+  assert.equal(groups.filter(row=>row.getAttribute('tabindex')==='0').length,1);
+});
+
+test('a status 6 history row reads Ended unexpectedly in the table and the chart',async t=>{
+  const rows=[historyRow('19',{status:{code:6,name:'halted'},duration_seconds:10})];
+  const dom=historyScreen(t,rows);await openHistory(dom,true);
+  const row=dom.historyBody.children[0],group=dom.get('history-chart-plot').children[0];
+  assert.ok(row.children.some(cell=>cell.textContent.includes('Ended unexpectedly')));
+  assert.match(group.firstChild.textContent,/ · Ended unexpectedly · /);
+  assert.equal(group.getAttribute('aria-label'),group.firstChild.textContent);
+  assert.equal(group.getAttribute('data-status'),'6');
+});
+
+test('history chart x labels show creation dates once seven executions give the axis room',async t=>{
+  const rows=Array.from({length:7},(_,index)=>historyRow(String(30-index),{created_at:stamp(10+index),duration_seconds:index+1}));
+  const dom=historyScreen(t,rows);await openHistory(dom,true);
+  assert.match(dom.get('history-chart-x-axis').textContent,/2026-10-10.*#30.*2026-10-16.*#24/s);
+});
+
+test('history click and keyboard expose values without requests; keyed plot focus survives refresh and removal falls back',async t=>{
+  let rows=[historyRow('18',{duration_seconds:20}),historyRow('17',{duration_seconds:5})];
+  const dom=historyScreen(t,rows,{get:()=>historyPage(rows)});await openHistory(dom,true);
+  const plot=dom.get('history-chart-plot'),count=dom.calls.length,first=plot.children[0],last=plot.children[1];
+  interaction(plot,'click',first.children[1]);assert.equal(selected(dom),'17');
+  interaction(plot,'mouseover',last.children[1]);assert.equal(selected(dom),'17'); // hover does not replace a selection
+  assert.equal(dom.get('history-chart-selected').textContent, '#17 · 2026-10-17 17:00:00 · Succeeded · 5 s');
+  first.focus();interaction(plot,'focusin',first);assert.equal(first.getAttribute('aria-selected'),'true');
+  assert.equal(interaction(plot,'keydown',first,'ArrowRight').defaultPrevented,true);
+  assert.equal(dom.document.activeElement,last);assert.equal(selected(dom),'18');
+  interaction(plot,'keydown',last,'Home');assert.equal(dom.document.activeElement,first);
+  interaction(plot,'keydown',first,'End');assert.equal(dom.document.activeElement,last);
+  const opened=[];dom.window.location.assign=href=>opened.push(href);
+  interaction(plot,'keydown',last,'Enter');assert.equal(dom.calls.length,count);
+  assert.deepEqual(opened,[dom.historyBody.children.find(row=>row.dataset.historyId==='18').firstChild.firstChild.getAttribute('href')]);
+  clickNode(dom.get('detail-refresh'));await flush();assert.equal(plot.children[1],last);assert.equal(dom.document.activeElement,last);
+  rows=[rows[1]];clickNode(dom.get('detail-refresh'));await flush();
+  assert.equal(selected(dom),'17');assert.equal(dom.document.activeElement,plot.children[0]);
+});
+
+test('history keeps exact high IDs for chronological ties, and missing actuals remain absent beside estimate markers',async t=>{
+  const rows = [historyRow('9223372036854775807', { ended_at: null, duration_seconds: null, elapsed_seconds: null,
+    status: { code: 2, name: 'running' }, estimate: estimate({ duration_seconds: 20 }) }), historyRow('9007199254740993')];
+  const dom=historyScreen(t,rows);await openHistory(dom,true);const groups=dom.get('history-chart-plot').children;
+  assert.deepEqual(groups.map(row=>row.dataset.executionId),['9007199254740993','9223372036854775807']);
+  assert.equal(selected(dom),'9223372036854775807');
+  assert.equal(groups[1].children[1].getAttribute('display'),'none');assert.equal(groups[1].children[2].getAttribute('display'),'inline');
+  assert.equal(groups[1].getAttribute('aria-label'), '#9223372036854775807 · 2026-10-17 17:00:00 · Running · Unavailable (estimate 20 s)');
+});
+
+function historyTabScreen(t, { tab = 'history', read = () => historyPage(), response = () => detailResponse('17') } = {}) {
+  const dom = detailDOM(), calls = [], metadata = historyMetadata();
+  metadata.capabilities.events = true;
+  metadata.event_kinds = ['all', 'errors', 'warnings'];
+  dom.window.location.hash = `#${tab}`;
+  const view = mountDetail(dom.root, { metadata, executionId: '17', appBase: '/app/', api: {
+    async get(resource, options) {
+      calls.push({ resource, ...options });
+      return resource === 'history' || resource.endsWith('/events') ? read(resource, options) : response();
+    },
+  } });
+  t.after(view.dispose);
+  return { ...dom, calls, view };
+}
+
+for (const count of [1, 2]) test(`history caps the centered bar projection for ${count} execution(s)`, async t => {
+  const dom = historyTabScreen(t, { read: () => historyPage(Array.from({ length: count }, (_, i) => historyRow(String(count - i)))) });
+  await flush(); const toggle = dom.get('history-chart-toggle');
+  assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+  assert.equal(toggle.getAttribute('aria-pressed'), null);
+  clickNode(toggle);
+  assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+  assert.equal(toggle.getAttribute('aria-pressed'), null);
+  assert.equal(dom.get('history-chart-plot').style.maxWidth, `${count * 48}px`);
+  assert.equal(dom.get('history-chart-x-axis').style.maxWidth, `${count * 48}px`);
+  assert.equal(dom.get('history-chart-plot').children.filter(node => node.getAttribute('tabindex') === '0').length, 1);
+  assert.equal(dom.calls.length, 2);
+  clickNode(toggle);
+  assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+  assert.equal(toggle.getAttribute('aria-pressed'), null);
+  assert.equal(dom.calls.length, 2);
+});
