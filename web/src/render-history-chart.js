@@ -165,8 +165,8 @@ export function mountHistoryChart(root, { metadata, restoreView = null, remember
     attribute(toggle, 'aria-expanded', active);
     panel.hidden = !active;
     attribute(svg, 'aria-busy', busy);
-    if (!active || !page) clear();
-    else if (page !== rendered) {
+    if (!page) clear();
+    else if (active && page !== rendered) {
       paint(page);
       rendered = page;
     }

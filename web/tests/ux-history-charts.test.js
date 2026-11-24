@@ -119,11 +119,12 @@ test('history chart x labels show creation dates once seven executions give the 
   assert.match(dom.get('history-chart-x-axis').textContent,/2026-10-10.*#30.*2026-10-16.*#24/s);
 });
 
-test('history hover and keyboard expose values without requests; keyed plot focus survives refresh and removal falls back',async t=>{
+test('history click and keyboard expose values without requests; keyed plot focus survives refresh and removal falls back',async t=>{
   let rows=[historyRow('18',{duration_seconds:20}),historyRow('17',{duration_seconds:5})];
   const dom=historyScreen(t,rows,{get:()=>historyPage(rows)});await openHistory(dom,true);
   const plot=dom.get('history-chart-plot'),count=dom.calls.length,first=plot.children[0],last=plot.children[1];
-  interaction(plot,'mouseover',first.children[1]);assert.equal(selected(dom),'17');
+  interaction(plot,'click',first.children[1]);assert.equal(selected(dom),'17');
+  interaction(plot,'mouseover',last.children[1]);assert.equal(selected(dom),'17'); // hover does not replace a selection
   assert.equal(dom.get('history-chart-selected').textContent, '#17 · 2026-10-17 17:00:00 · Succeeded · 5 s');
   first.focus();interaction(plot,'focusin',first);assert.equal(first.getAttribute('aria-selected'),'true');
   assert.equal(interaction(plot,'keydown',first,'ArrowRight').defaultPrevented,true);
@@ -148,14 +149,23 @@ test('history keeps exact high IDs for chronological ties, and missing actuals r
   assert.equal(groups[1].getAttribute('aria-label'), '#9223372036854775807 · 2026-10-17 17:00:00 · Running · Unavailable (estimate 20 s)');
 });
 
-async function timelineScreen(t,rows){
-  const dom=overviewDOM(),calls=[],metadata=timelineMetadata(),bounds={from:rows[0].start,to:rows.at(-1).end};
+async function timelineScreen(t,rows,metadata=timelineMetadata()){
+  const dom=overviewDOM(),calls=[],bounds={from:rows[0].start,to:rows.at(-1).end};
   const view=mountOverview(dom.root,{metadata,appBase:'/app/',api:{async get(resource,options){
     calls.push({resource,...options});return resource==='executions'?overviewPage(bounds):resource==='metrics/summary'?timelineSummary(bounds):timelinePage(rows,{...bounds,bucket:options.params.bucket});
   }}});t.after(view.dispose);await view.apply(defaultSelection(metadata));click(dom.get('timeline-toggle'));await flush();
   return {...dom,calls,view};
 }
 const emptyBucket=(day)=>timelineBucket(stamp(day),stamp(day+1),{created_count:0,started_count:0,succeeded_count:0,failed_count:0});
+
+test('zero markers show up to 31 buckets and stop at 32',async t=>{
+  const at=i=>new Date(Date.UTC(2026,9,1+i)).toISOString().replace('.000Z','.0000000Z');
+  const rows=n=>Array.from({length:n},(_,i)=>timelineBucket(at(i),at(i+1),i?{created_count:0,started_count:0,succeeded_count:0,failed_count:0}:{}));
+  const markers=dom=>[...dom.get('timeline-chart').children].map(group=>[...group.children].find(node=>node.dataset.zero).getAttribute('display'));
+  const month=markers(await timelineScreen(t,rows(31)));assert.equal(month.length,31);assert.equal(month.filter(value=>value==='inline').length,30);
+  const wide=timelineMetadata();wide.limits.max_range_hours=2000;
+  const longer=markers(await timelineScreen(t,rows(32),wide));assert.equal(longer.length,32);assert.ok(longer.every(value=>value==='none'));
+});
 
 test('timeline shows succeeded/failed/other stacks, chronological labels and the latest non-empty default',async t=>{
   const rows=[emptyBucket(14),timelineBucket(stamp(15),stamp(16),{created_count:10,started_count:9,succeeded_count:6,failed_count:3}),
@@ -185,10 +195,11 @@ test('timeline counts ended-unexpectedly runs (halted_count) with Failed in the 
   assert.match(group.firstChild.textContent,/ · 10 created: 6 succeeded, 3 failed, 1 other$/);
 });
 
-test('timeline hover and keyboard select complete bucket values locally and keep focused keyed groups on refresh',async t=>{
+test('timeline click and keyboard select complete bucket values locally and keep focused keyed groups on refresh',async t=>{
   const rows=[timelineBucket(stamp(15),stamp(16)),timelineBucket(stamp(16),stamp(17),{created_count:20,started_count:10})];
   const dom=await timelineScreen(t,rows),plot=dom.get('timeline-chart'),first=plot.children[0],last=plot.children[1],count=dom.calls.length;
-  interaction(plot,'mouseover',first.children[2]);assert.equal(dom.get('timeline-choice').value,stamp(15));
+  interaction(plot,'click',first.children[2]);assert.equal(dom.get('timeline-choice').value,stamp(15));
+  interaction(plot,'mouseover',last.children[2]);assert.equal(dom.get('timeline-choice').value,stamp(15)); // hover keeps the clicked bucket
   assert.match(dom.get('timeline-selected').textContent,/ · 10 created: 3 succeeded, 2 failed, 5 other, 2 not started$/);
   first.focus();interaction(plot,'focusin',first);interaction(plot,'keydown',first,'ArrowRight');
   assert.equal(dom.document.activeElement,last);assert.equal(last.getAttribute('aria-selected'),'true');

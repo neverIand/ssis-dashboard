@@ -3,7 +3,8 @@ import { createCatalogSearch } from './catalog-search.js';
 import { executionHref, readDetailFragment } from './detail-navigation.js';
 import { mountRangeEditor } from './range-editor.js';
 import { readRefreshPause, refreshPauseState, saveRefreshPause } from './refresh-pause.js';
-import { catalogName, createSelectionSession, packageNameUnits, SelectionError, selectionSearch, validateSelection }
+import { catalogName, createSelectionSession, packageNameUnits, SelectionError, selectionSearch, validateSelection,
+  withPackageExtension }
   from './selection.js';
 import { rangeLabel } from './time-range.js';
 import { positionPopover } from './ui.js';
@@ -145,7 +146,7 @@ export function mountFilters(root, { metadata, api, appBase, onApplied = () => {
   // A single-line box drops CR/LF. Keep the exact name on an unedited, nonempty Apply.
   let packageEdited = false;
   function applyPackage() {
-    const name = packageEdited ? packageName.value : session.applied.package;
+    const name = packageEdited ? withPackageExtension(packageName.value) : session.applied.package;
     chooseScope('package', packageName.value ? name : null);
   }
   listen(get('[data-apply-package]'), 'click', applyPackage);

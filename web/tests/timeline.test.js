@@ -53,7 +53,42 @@ test('timeline is lazy and joins one serial list-summary-timeline refresh using 
   const start=run.calls.length;await run.owner.refresh();assert.deepEqual(run.calls.slice(start).map(c=>c.resource),['executions','metrics/summary','metrics/timeline']);assert.equal(peak,1);
   assert.equal(run.calls.at(-2).params.status,undefined);assert.equal(run.calls.at(-1).params.status,'2');
   await run.owner.setTimelineBucket('hour');assert.equal(run.calls.at(-1).params.bucket,'hour');assert.equal(run.calls.length,start+4);
-  await run.owner.toggleTimeline();await run.owner.refresh();assert.equal(run.calls.at(-1).resource,'metrics/summary');assert.equal(run.state.timeline.page,null);
+  const kept=run.state.timeline.page;await run.owner.toggleTimeline();assert.equal(run.state.timeline.page,kept);
+  await run.owner.refresh();assert.equal(run.calls.at(-1).resource,'metrics/summary');assert.equal(run.state.timeline.page,kept);
+  // Reopening after the list moved on shows the kept chart as stale and reads the timeline once.
+  const before=run.calls.length;await run.owner.toggleTimeline();assert.equal(run.calls.length,before+1);assert.equal(run.calls.at(-1).resource,'metrics/timeline');
+  // Reopening with nothing new since the last read makes no request.
+  await run.owner.toggleTimeline();await run.owner.toggleTimeline();assert.equal(run.calls.length,before+1);assert.equal(run.state.timeline.stale,false);
+});
+
+test('a kept timeline stays stale until a read succeeds: reopening after the list moved on or after a failed read',async t=>{
+  let fail=false,wait=null;const run=setup(t,async(resource,options)=>{
+    if(resource==='metrics/timeline'){if(wait)await wait.promise;if(fail)throw new ApiError('http',{status:503});}
+    return response(resource,options);});
+  await run.owner.apply(selection());await run.owner.toggleTimeline();const kept=run.state.timeline.page;assert.notEqual(kept,null);
+  await run.owner.toggleTimeline();await run.owner.refresh();
+  wait=deferred();const reopening=run.owner.toggleTimeline();await flush();
+  assert.equal(run.state.timeline.page,kept);assert.equal(run.state.timeline.stale,true);assert.equal(run.calls.at(-1).resource,'metrics/timeline');
+  wait.resolve();wait=null;await reopening;assert.equal(run.state.timeline.stale,false);
+  // A failed read of the same list page keeps its error and stale chart across close and reopen, and reopening reads again.
+  fail=true;await run.owner.retryTimeline();assert.equal(run.state.timeline.error?.status,503);assert.equal(run.state.timeline.stale,true);
+  await run.owner.toggleTimeline();assert.equal(run.state.timeline.error?.status,503);assert.equal(run.state.timeline.stale,true);
+  fail=false;const before=run.calls.length;await run.owner.toggleTimeline();
+  assert.equal(run.calls.length,before+1);assert.equal(run.state.timeline.error,null);assert.equal(run.state.timeline.stale,false);
+});
+
+test('a list refresh that failed while the timeline was hidden: reopening keeps the stale chart and reads the list first',async t=>{
+  let failList=false,list=null;const run=setup(t,async(resource,options)=>{
+    if(resource==='executions'){if(list)await list.promise;if(failList)throw new ApiError('http',{status:503});}
+    return response(resource,options);});
+  await run.owner.apply(selection());await run.owner.toggleTimeline();const kept=run.state.timeline.page;
+  await run.owner.toggleTimeline();failList=true;await run.owner.refresh();assert.equal(run.state.pageStale,true);
+  failList=false;list=deferred();const before=run.calls.length;const reopening=run.owner.toggleTimeline();await flush();
+  assert.equal(run.state.timeline.page,kept);assert.equal(run.state.timeline.stale,true);
+  assert.deepEqual(run.calls.slice(before).map(call=>call.resource),['executions']);
+  list.resolve();list=null;await reopening;
+  assert.deepEqual(run.calls.slice(before).map(call=>call.resource),['executions','metrics/summary','metrics/timeline']);
+  assert.equal(run.state.timeline.stale,false);assert.equal(run.state.pageStale,false);
 });
 
 test('opening during list work queues timeline; closing before summary completes skips it',async t=>{
@@ -122,6 +157,15 @@ test('a window longer than the hour-bucket cap disables Hour and reads Day inste
     const hour=dom.get('timeline-bucket').querySelector('option[value="hour"]');assert.equal(hour.disabled,disabled);
     assert.equal(hour.title,disabled ? 'Hour needs a creation range of 18 hours or less.' : '');
   }
+});
+
+test('a lone bucket keeps a narrow, centred bar instead of filling the plot',async t=>{
+  const one=timelinePage([timelineBucket()]);
+  const dom=screen(t,async(resource,options)=>resource==='metrics/timeline'?one:response(resource,options));await dom.view.apply(selection());
+  click(dom,'timeline-toggle');await flush();
+  const group=dom.get('timeline-chart').children[0],bars=[...group.children].filter(node=>node.dataset.chartStatus);
+  assert.equal(bars.length,3);for(const bar of bars){assert.equal(bar.getAttribute('width'),'60');assert.equal(bar.getAttribute('x'),'470');}
+  const hit=[...group.children].find(node=>node.dataset.chartHit);assert.equal(hit.getAttribute('x'),'0');assert.equal(hit.getAttribute('width'),'1000');
 });
 
 test('zero buckets have a chart, keyboard selector and complete data table without inventing missing data',async t=>{

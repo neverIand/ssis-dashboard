@@ -120,7 +120,8 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, reta
   let generation = 0;
   let active = null;
   let disposed = false;
-  let timelineAfter = 'ready';
+  // timelineFor is the serial of the list page the kept timeline was read for, so no old page is held.
+  let timelineAfter = 'ready', timelineFor = null, pageSerial = 0;
   const busy = () => ['loading-list', 'loading-summary', 'loading-timeline'].includes(state.phase);
   const show = (poll) => {
     publish({ ...state, poll, busy: busy(), pageNumber: (context?.index ?? 0) + 1,
@@ -130,8 +131,10 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, reta
   const loop = createRefreshLoop({ refresh, publish: show, paused: !autoRefresh, visible,
     intervalMs: pollIntervalMs, maxIntervalMs: maxPollIntervalMs });
   const emit = (changes) => {
+    if ('page' in changes && changes.page !== state.page) pageSerial++;
     state = { ...state, ...changes };
     if (state.page === null) state = {...state, timeline:{...state.timeline, page:null, scope:null, error:null, stale:false}};
+    if (state.timeline.page === null) timelineFor = null;
     const errors = [state.error, state.timeline.open ? state.timeline.error : null].filter(Boolean);
     show(loop.update({ busy: busy(), eligible: state.selection !== null,
       failed: errors.length > 0,
@@ -177,8 +180,10 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, reta
   async function summary(current, selection, page) {
     const previous = state.summary?.meta.from === page.meta.from && state.summary.meta.to === page.meta.to
       ? state.summary : null;
-    if (state.timeline.scope !== timelineScope(selection,page)) state = {...state,
-      timeline:{...state.timeline, page:null, error:null, stale:false, scope:null}};
+    if (state.timeline.scope !== timelineScope(selection,page)) {
+      state = {...state, timeline:{...state.timeline, page:null, error:null, stale:false, scope:null}};
+      timelineFor = null;
+    }
     let afterPhase = 'ready';
     emit({ phase: 'loading-summary', page, pageStale: false, summary: previous, summaryStale: previous !== null, error: null });
     try {
@@ -214,6 +219,7 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, reta
       const response = await request('metrics/timeline',timelineParams(selection,page,bucket));
       if (disposed || current !== generation) return;
       const result = readTimeline(response,selection,page,bucket,metadata,display);
+      timelineFor = state.page === page ? pageSerial : null;
       emit({phase:afterPhase,timeline:{...state.timeline,page:result,error:null,stale:false}});
     } catch (error) {
       if (disposed || current !== generation) return;
@@ -306,10 +312,16 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, reta
     if (disposed || !state.page) return;
     const open = !state.timeline.open;
     if (!open && state.phase === 'loading-timeline') { cancel(); state = {...state,phase:timelineAfter}; }
-    state = {...state,timeline:{...state.timeline,open,page:null,scope:null,error:null,stale:false}};
+    // Hiding keeps a same-scope chart; reopening shows it at once and reads again only if the list moved on meanwhile.
+    const kept = state.timeline.scope === timelineScope(state.selection,state.page) ? state.timeline.page : null;
+    const current = kept !== null && timelineFor === pageSerial && !state.pageStale && !state.timeline.stale
+      && state.timeline.error === null;
+    state = {...state,timeline:{...state.timeline,open,page:kept,scope:kept ? state.timeline.scope : null,
+      error:kept ? state.timeline.error : null,stale:kept !== null && !current}};
     if (!open && !state.error) loop.reset();
     emit({});
-    if (open && !busy()) return retryTimeline();
+    // retryTimeline refreshes the list first when the list itself is stale.
+    if (open && !busy() && !current) return retryTimeline();
   }
 
   return {

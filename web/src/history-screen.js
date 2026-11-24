@@ -2,7 +2,7 @@ import { mountBootstrap } from './bootstrap.js';
 import { mountHistory } from './render-history.js';
 import { createHistoryLoader } from './history-loader.js';
 import { historyHref, historySelection, parseHistorySelection, scopedHistorySelection } from './history-navigation.js';
-import { defaultSelection } from './selection.js';
+import { defaultSelection, withPackageExtension } from './selection.js';
 import { inlineStatus, pollingButton } from './ui.js';
 import { createDisplay, observationTitle, refreshStatus } from './display.js';
 import { readRefreshPause, refreshPauseState, saveRefreshPause } from './refresh-pause.js';
@@ -78,8 +78,12 @@ export function mountHistoryScreen(root, saved = null) {
         refresh.setAttribute('aria-disabled', String(state.busy));
       } });
     const submit = event => {
-      event.preventDefault(); select({ ...selection, ...Object.fromEntries(Object.entries(controls).map(([key, input]) =>
-        [key, input.value])) });
+      event.preventDefault();
+      const draft = Object.fromEntries(Object.entries(controls).map(([key, input]) => [key, input.value]));
+      // Only an edited exact name gets the extension; a name restored from a link is kept as it was.
+      const unchanged = selection.match === 'exact' && draft.package === selection.package;
+      if (draft.match === 'exact' && !unchanged) draft.package = withPackageExtension(draft.package);
+      select({ ...selection, ...draft });
     };
     // Without a valid scope, offer an empty Exact form and wait for Load history. URLs without match= keep meaning LIKE.
     const pop = event => {

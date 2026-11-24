@@ -15,18 +15,32 @@ function screen(t,get=async()=>historyPage(),options={}){
 }
 const click=(dom,key)=>dom.get(key).dispatchEvent(new Event('click'));
 const selected=dom=>dom.view.checkpoint().historyView.chart.selected;
-const choose=(dom,id)=>{const event=new Event('mouseover');Object.defineProperty(event,'target',{value:group(dom,id)});plot(dom).dispatchEvent(event);};
+const choose=(dom,id)=>{const event=new Event('click');Object.defineProperty(event,'target',{value:group(dom,id)});plot(dom).dispatchEvent(event);};
 async function open(dom){await flush();click(dom,'history-toggle');await flush();click(dom,'history-chart-toggle');}
 const plot=dom=>dom.get('history-chart-plot'),groups=dom=>plot(dom).children;
 const group=(dom,id)=>groups(dom).find(node=>node.dataset.executionId===id);
 
-test('duration chart uses only the loaded history page; opening, selecting and closing add no request',async t=>{
+test('a hidden duration chart keeps its nodes; a refresh while hidden repaints them on reopen and a denial clears them',async t=>{
+  let rows=[historyRow('3',{duration_seconds:5}),historyRow('2',{duration_seconds:7})],denied=false;
+  const dom=screen(t,async()=>{if(denied)throw new ApiError('http',{status:403});return historyPage(rows);});await open(dom);
+  choose(dom,'2');const kept=group(dom,'2');click(dom,'history-chart-toggle');assert.equal(dom.get('history-chart-panel').hidden,true);
+  rows=[historyRow('4',{duration_seconds:9}),historyRow('3',{duration_seconds:5}),historyRow('2',{duration_seconds:11})];
+  click(dom,'detail-refresh');await flush();assert.equal(groups(dom).length,2);
+  click(dom,'history-chart-toggle');assert.equal(groups(dom).length,3);assert.equal(group(dom,'2'),kept);
+  assert.match(dom.get('history-chart-selected').textContent,/#2 · .* · 11 s/);
+  click(dom,'history-chart-toggle');denied=true;click(dom,'detail-refresh');await flush();
+  assert.equal(groups(dom).length,0);assert.equal(dom.get('history-chart-selected').textContent,'');
+});
+
+test('duration chart uses only the loaded history page; opening, selecting and closing add no request and keep the drawing',async t=>{
   const dom=screen(t,async()=>historyPage([historyRow('3'),historyRow('2')]));await flush();assert.equal(dom.calls.length,2);
   assert.equal(dom.get('history-chart-toggle').disabled,true);click(dom,'history-toggle');await flush();assert.equal(dom.calls.length,3);
   assert.equal(groups(dom).length,0);click(dom,'history-chart-toggle');assert.equal(groups(dom).length,2);
   choose(dom,'2');assert.match(dom.get('history-chart-selected').textContent,/#2 ·/);
   assert.match(dom.get('history-status').textContent,/Page 1 · 2 executions/);
-  group(dom,selected(dom)).focus();click(dom,'history-chart-toggle');assert.equal(groups(dom).length,0);
+  group(dom,selected(dom)).focus();click(dom,'history-chart-toggle');assert.equal(dom.get('history-chart-panel').hidden,true);
+  const kept=[...groups(dom)];assert.equal(kept.length,2);click(dom,'history-chart-toggle');
+  assert.deepEqual([...groups(dom)],kept);assert.match(dom.get('history-chart-selected').textContent,/#2 ·/);click(dom,'history-chart-toggle');
   assert.equal(dom.document.activeElement,dom.get('history-chart-toggle'));assert.equal(dom.calls.length,3);
 });
 

@@ -602,6 +602,7 @@ tbody tr:hover { background: var(--sd-subtle); }
 .chart-frame [data-zero] { fill: var(--sd-surface); stroke: var(--chart-color); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .chart-frame [data-chart-hit] { fill: transparent; stroke: transparent; vector-effect: non-scaling-stroke; }
 .chart-frame g[data-selected="true"] [data-chart-hit], .chart-frame g:focus [data-chart-hit] { stroke: var(--sd-text); stroke-width: 2; }
+.chart-frame g:not([data-selected="true"]):hover [data-chart-hit] { stroke: var(--sd-secondary); stroke-width: 1; stroke-dasharray: 3 2; }
 .duration-legend { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; font-size: 0.8667rem; }
 [data-duration-key]::before { content: ''; display: inline-block; width: 0.7rem; height: 0.7rem; margin-right: 0.4rem; }
 [data-duration-key="actual"]::before { background: var(--sd-secondary); }

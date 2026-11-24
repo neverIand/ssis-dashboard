@@ -49,7 +49,8 @@ export function mountChartInteraction(svg, { field, keys, node, select }) {
     else return;
     event.preventDefault(); select(order[next]); node(order[next])?.focus({ preventScroll: true });
   };
-  const listeners = [['click', pointed], ['mouseover', pointed], ['focusin', pointed], ['keydown', keydown]];
+  // Hover only previews (outline and native title); a click, focus or key selects, so it is not replaced on the way out.
+  const listeners = [['click', pointed], ['focusin', pointed], ['keydown', keydown]];
   for (const [event, handler] of listeners) svg.addEventListener(event, handler);
   return () => { for (const [event, handler] of listeners) svg.removeEventListener(event, handler); };
 }

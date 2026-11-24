@@ -11,6 +11,9 @@ function invalid(message) { throw new SelectionError(message); }
 
 // Folder and project names hold up to 128 UTF-16 units; package names up to 260.
 export const packageNameUnits = 260;
+// Catalog packages are .dtsx files; an exact name typed without the extension gets it.
+// The extension goes before trailing spaces, which SQL Server ignores in the comparison.
+export const withPackageExtension = name => !name?.trim() || /\.dtsx *$/i.test(name) ? name : name.replace(/ *$/, '.dtsx$&');
 
 export function catalogName(value, units = 128) {
   if (typeof value !== 'string' || !value || value.length > units || value.includes('\0')

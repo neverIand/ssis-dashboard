@@ -146,6 +146,39 @@ test('loading a scope from the form names it in the title; an invalid scope is r
   await settle();
   assert.equal(dom.history().length, 1);
   assert.equal(dom.document.title, 'History · Main.dtsx · SSIS Dashboard');
+  // An exact name typed without the extension gets .dtsx; a LIKE pattern is left as typed.
+  dom.inputs.package.value = 'Other';
+  dom.form.dispatchEvent(new Event('submit', { cancelable: true }));
+  await settle();
+  assert.equal(dom.document.title, 'History · Other.dtsx · SSIS Dashboard');
+  assert.equal(dom.inputs.package.value, 'Other.dtsx');
+  dom.inputs.match.value = 'like'; dom.inputs.package.value = 'Oth%';
+  dom.form.dispatchEvent(new Event('submit', { cancelable: true }));
+  await settle();
+  assert.equal(dom.document.title, 'History · Oth% · SSIS Dashboard');
+});
+
+test('History adds .dtsx when a loaded LIKE name is switched to Exact unchanged', async t => {
+  const dom = screen(t, '?' + new URLSearchParams({ match: 'like', folder: 'Folder', project: 'Project', package: 'Load' }));
+  await settle();
+  dom.inputs.match.value = 'exact';
+  dom.form.dispatchEvent(new Event('submit', { cancelable: true }));
+  await settle();
+  const params = new URLSearchParams(dom.window.location.search);
+  assert.equal(params.get('package'), 'Load.dtsx'); assert.equal(params.get('match'), 'exact');
+  const request = new URLSearchParams(dom.calls.filter(call => call.includes('/history')).at(-1).split('?')[1]);
+  assert.equal(request.get('package'), 'Load.dtsx'); assert.equal(request.get('match'), 'exact');
+});
+
+test('History keeps an exact package name from a link when only the folder changes', async t => {
+  const dom = screen(t, '?' + new URLSearchParams({ match: 'exact', folder: 'Folder', project: 'Project', package: 'Legacy' }));
+  await settle();
+  assert.equal(dom.inputs.package.value, 'Legacy');
+  dom.inputs.folder.value = 'Other folder';
+  dom.form.dispatchEvent(new Event('submit', { cancelable: true }));
+  await settle();
+  assert.equal(dom.document.title, 'History · Legacy · SSIS Dashboard');
+  assert.equal(new URLSearchParams(dom.window.location.search).get('package'), 'Legacy');
 });
 
 test('Refresh, Next, Previous, Latest and Retry each do their own read', async t => {

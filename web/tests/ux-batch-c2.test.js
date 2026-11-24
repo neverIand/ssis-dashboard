@@ -149,7 +149,25 @@ test('C2 r1: Enter that confirms an input-method candidate does not apply the pa
     assert.equal(dom.get('[data-filter-panel="package"]').hidden, false);
   }
   input.dispatchEvent(key('Enter'));
-  assert.equal(dom.applied.at(-1).package, '東京');
+  assert.equal(dom.applied.at(-1).package, '東京.dtsx');
+});
+
+test('A package name from a link is applied unchanged; only an edited name gets .dtsx', t => {
+  const dom = setup(t, '?' + new URLSearchParams({ package: 'Legacy' }));
+  assert.equal(dom.applied.at(-1).package, 'Legacy');
+  dom.open('package'); dom.click('[data-apply-package]');
+  assert.equal(dom.applied.at(-1).package, 'Legacy');
+  assert.equal(new URLSearchParams(dom.window.location.search).get('package'), 'Legacy');
+});
+
+test('An exact package name gets .dtsx unless it already ends with it in any case', t => {
+  const dom = setup(t);
+  dom.open('package'); dom.edit('#package-name', 'Load.DTSX  '); dom.click('[data-apply-package]');
+  assert.equal(dom.applied.at(-1).package, 'Load.DTSX  ');
+  for (const [typed, applied] of [['Load', 'Load.dtsx'], ['Load  ', 'Load.dtsx  '], ['Load.DTSX', 'Load.DTSX'], ['a.dtsx.bak', 'a.dtsx.bak.dtsx']]) {
+    dom.open('package'); dom.edit('#package-name', typed); dom.click('[data-apply-package]');
+    assert.equal(dom.applied.at(-1).package, applied);
+  }
 });
 
 test('C2 r1: an unedited Apply keeps CR/LF in the applied package name; an edit replaces it', t => {

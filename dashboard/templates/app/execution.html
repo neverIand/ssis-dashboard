@@ -17,7 +17,7 @@
             </div>
         </div>
         <p class="resource-status" data-overview-return-notice hidden></p>
-        <p class="resource-status" data-ended-unexpectedly hidden>SSISDB recorded that this execution ended unexpectedly, for example because the SSIS server restarted or its process was ended. The log may have no error message that explains why.</p>
+        <p class="resource-status" data-ended-unexpectedly hidden>SSISDB recorded that this execution ended unexpectedly, for example because the SSIS server restarted or its process crashed. The SSIS log may not say why: around the end time, check the SQL Server error log of the instance that hosts SSISDB, and the Windows Application and System event logs on the machine that ran the package.</p>
         <div class="detail-grid" data-execution-detail hidden aria-busy="false">
             <section class="panel detail-strip" aria-label="Execution summary">
                 <dl class="detail-fields">

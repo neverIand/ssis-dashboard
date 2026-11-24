@@ -58,7 +58,7 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
     svg.replaceChildren();
     xAxis.replaceChildren();
     yAxis.replaceChildren();
-    get('selected').textContent = get('scale').textContent = '';
+    get('selected').textContent = get('selected').title = get('scale').textContent = '';
     get('zero').hidden = true;
     hideDrill();
   }
@@ -90,7 +90,8 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
   });
   function plot() {
     const maximum = Math.max(0, ...[...rows.values()].map((row) => row.item.created_count));
-    const step = 1e3 / Math.max(1, rows.size);
+    // Bars stay at most 60 of 1000 units wide, and zero markers show only up to a month of buckets.
+    const step = 1e3 / Math.max(1, rows.size), width = Math.min(step * .85, 60), markZero = rows.size <= 31;
     let index = 0;
     for (const start of order) {
       const row = rows.get(start);
@@ -102,13 +103,13 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
       ]) {
         cumulative += value;
         const height = maximum === 0 ? 0 : value / maximum * 150, y = 160 - (maximum === 0 ? 0 : cumulative / maximum * 150);
-        for (const [key, value] of Object.entries({ x: (index + .075) * step, y, width: step * .85, height })) attribute(bar, key, value);
+        for (const [key, value] of Object.entries({ x: (index + .5) * step - width / 2, y, width, height })) attribute(bar, key, value);
       }
       for (const [key, value] of Object.entries({
         cx: (index + .5) * step,
         cy: 160,
         r: 2,
-        display: row.item.created_count === 0 ? 'inline' : 'none'
+        display: markZero && row.item.created_count === 0 ? 'inline' : 'none'
       })) attribute(row.zero, key, value);
       for (const [key, value] of Object.entries({ x: index * step, y: 0, width: step, height: 170 })) attribute(row.hit, key, value);
       text(row.title, describe(row));
@@ -248,9 +249,10 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
       retry.setAttribute('aria-disabled', String(busy));
       retry.hidden = state.error === null;
       svg.setAttribute('aria-busy', String(busy));
-      const response = panel.hidden ? null : state.page;
-      choice.disabled = response === null;
-      if (response !== rendered) {
+      // A hidden panel keeps what it painted; it repaints only for new data while shown, and clears with the data.
+      const response = state.page;
+      choice.disabled = panel.hidden || response === null;
+      if (response !== rendered && (!panel.hidden || response === null)) {
         if (response) paint(response);
         else clear();
         rendered = response;
