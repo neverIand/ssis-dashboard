@@ -8,7 +8,7 @@ import { executable, executablePage } from './executable-fixture.js';
 import { childPage } from './child-fixture.js';
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
-const paths = row => row.children[1].children[2];
+const paths = row => row.children[1].children[1];
 function mount(t, get, restoreView) {
   const dom = detailDOM(), calls = [];
   const screen = mountDetail(dom.root, { metadata: metadata(), executionId: '17', appBase: '/ops/app/', restoreView,
@@ -31,7 +31,7 @@ test('default observations load once; keyed rows preserve literal paths, expansi
   // Separate one-line Started and Ended cells. The secondary line names the parent container; the entry
   // package is not repeated, and package plus executable ID stay in Paths (UX batch B4, D4).
   assert.equal(row.children.length, 6);
-  assert.equal(row.children[1].children[1].textContent, 'in Package');
+  assert.equal(row.children[1].children[2].textContent, 'in Package');
   assert.match(paths(row).textContent, /PackageMain\.dtsxExecutable ID2/);
   assert.equal(row.children[2].firstChild.attributes.get('datetime'), '2026-10-17T16:00:00.1234567Z');
   assert.equal(row.children[3].textContent, '—');
@@ -125,16 +125,16 @@ test('D4: executable rows name their parent container, and the package only for 
     executable('2', { execution_path: '\\Main\\Load City Dimension\\Get Lineage Key', name: 'Get Lineage Key' }),
     executable('1', { execution_path: '\\Main\\Run Child\\Probe\\ProbeWork', name: 'ProbeWork', package_name: 'Probe.dtsx' })]));
   await flush(); await flush();
-  const lines = dom.body.children.map(row => row.children[1].children[1].textContent);
+  const lines = dom.body.children.map(row => row.children[1].children[2].textContent);
   assert.deepEqual(lines, ['', 'in Load City Dimension', 'in Probe · package Probe.dtsx']);
-  assert.ok(dom.body.children.every(row => !/Executable ID: /.test(row.children[1].children[1].textContent)));
+  assert.ok(dom.body.children.every(row => !/Executable ID: /.test(row.children[1].children[2].textContent)));
 });
 
 test('R1-1: a NULL execution path renders a row without a parent line instead of clearing the page', async t => {
   const dom = detail(t, detailResponse('17'), () => executablePage([executable('1', { execution_path: null })]));
   await flush(); await flush();
   assert.equal(dom.body.children.length, 1);
-  assert.equal(dom.body.children[0].children[1].children[1].textContent, '');
+  assert.equal(dom.body.children[0].children[1].children[2].textContent, '');
   assert.equal(dom.get('execution-detail').hidden, false);
 });
 

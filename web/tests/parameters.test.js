@@ -318,7 +318,7 @@ test('parameter UI renders literal types/flags and distinct redacted, NULL, empt
   dom.get('parameters-toggle').dispatchEvent(new Event('click')); await flush(); const text = dom.parameterBody.textContent;
   for (const value of ['Decimal(18,4)', 'NULL (unredacted)', '(empty)', 'Redacted (sensitive)', 'Redacted (policy)', 'Unknown (32767)', 'Truncated to 16384 characters.']) assert.ok(text.includes(value));
   const first = dom.parameterBody.children[0]; assert.equal(first.children[0].children[0].textContent, rows[0].name);
-  assert.equal(first.children[3].children[2].children[1].textContent, rows[0].value);
+  assert.equal(first.children[3].children[1].children[1].textContent, rows[0].value);
   assert.deepEqual(first.children[4].children[0].children.filter(node => !node.hidden).map(node => node.textContent), ['Required', 'Value set']);
   assert.equal(first.title, 'Parameter ID: 1'); assert.equal(first.children[0].children.length, 1);
 });
@@ -356,8 +356,8 @@ test('parameter rows expose scope hooks and mark values by state even when raw t
     assert.equal(row.dataset.parameterId, item.execution_parameter_id);
     const kind = [0, 1, 2, 7].includes(index) ? 'raw' : 'marker';
     assert.equal(cell.children[0].dataset.valueKind, kind);
-    assert.equal(cell.children[2].children[1].dataset.valueKind, kind);
-    if (kind === 'marker') assert.equal(cell.children[2].children[1].textContent, '');
+    assert.equal(cell.children[1].children[1].dataset.valueKind, kind);
+    if (kind === 'marker') assert.equal(cell.children[1].children[1].textContent, '');
   });
 });
 
@@ -366,7 +366,7 @@ test('a keyed value becoming redacted clears expanded raw text and moves hidden-
   const dom = screen(t, async resource => resource.endsWith('/values') ? parameterPage([parameterRow('1', redacted
     ? { value: null, sensitive: true, redacted: true, redaction_reason: 'sensitive' } : { value: 'private-ordinary-value '.repeat(20) })]) : response(resource));
   await flush(); dom.get('parameters-toggle').dispatchEvent(new Event('click')); await flush();
-  const row = dom.parameterBody.children[0], value = row.children[3].children[2], flags = row.children[4].children[0];
+  const row = dom.parameterBody.children[0], value = row.children[3].children[1], flags = row.children[4].children[0];
   value.open = true; dom.get('parameters-scroll').scrollLeft = 120; dom.get('parameters-scroll').scrollTop = 75;
   redacted = true; dom.get('detail-refresh').dispatchEvent(new Event('click')); value.children[0].focus(); await flush();
   assert.equal(dom.parameterBody.children[0], row); assert.equal(value.open, false); assert.equal(row.children[4].children[0], flags);
@@ -392,7 +392,7 @@ test('invalid redaction clears all parameter DOM text and 404 clears the visible
 test('parameter checkpoints keep only IDs/view state and disabled or changed metadata revalidates before restoration', async t => {
   const dom = screen(t, async resource => resource.endsWith('/values') ? parameterPage([parameterRow('1', { name: 'private-name-canary', value: 'private-value-canary '.repeat(20) })]) : response(resource));
   await flush(); dom.get('parameters-toggle').dispatchEvent(new Event('click')); await flush();
-  const value = dom.parameterBody.children[0].children[3].children[2]; value.open = true; value.children[0].focus();
+  const value = dom.parameterBody.children[0].children[3].children[1]; value.open = true; value.children[0].focus();
   const checkpoint = dom.mounted.checkpoint(); assert.doesNotMatch(JSON.stringify(checkpoint), /private-name-canary|private-value-canary|sql_type|redaction_reason/);
   dom.mounted.dispose();
   const blocked = screen(t, async resource => response(resource), { metadata: parameterMetadata(false), restoreView: checkpoint }); await flush();

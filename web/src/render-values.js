@@ -57,14 +57,16 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
       cells[0].append(name);
       if (!parameter) cells[0].append(identityLabel);
       const preview = element('p', undefined, 'value-preview'), truncated = element('p', undefined, 'cell-detail');
-      const value = element('details'), valueSummary = element('summary', 'View value'), full = element('p', undefined,
+      const value = element('details', undefined, 'row-disclosure'), valueSummary = element('summary'), full = element('p', undefined,
         'value-body bounded-detail');
       full.tabIndex = 0;
       full.setAttribute('role', 'region');
       full.setAttribute('aria-label', 'Full value');
+      valueSummary.append(element('span', 'View value', 'visually-hidden'));
       value.append(valueSummary, full);
-      cells[valueColumn].append(preview, truncated, value);
-      const details = parameter ? null : element('details'), summary = parameter ? null : element('summary', 'View path');
+      cells[valueColumn].append(preview, value, truncated);
+      const details = parameter ? null : element('details', undefined, 'row-disclosure'), summary = parameter ? null : element('summary');
+      summary?.append(element('span', 'View path', 'visually-hidden'));
       const values = {}, fullPath = parameter ? null : element('p', undefined, 'override-path bounded-detail');
       let noFlags = null;
       if (parameter) {
@@ -82,7 +84,7 @@ function mountValueTable(root, { metadata, actions, restoreView = null }, resour
         fullPath.setAttribute('role', 'region');
         fullPath.setAttribute('aria-label', 'Property path');
         details.append(summary, fullPath);
-        cells[0].append(details);
+        cells[0].insertBefore(details, identityLabel);
       }
       node.append(...cells);
       row = {

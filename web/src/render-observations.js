@@ -37,7 +37,8 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
       const source = element('dd'), sourceType = element('dd'), callPath = element('span', undefined, 'cell-detail call-path');
       cells[columns.name].className = child ? 'observation-name package-call' : 'observation-name';
       cells[columns.name].append(name);
-      const paths = element('details'), summary = element('summary', child ? 'Details' : 'Paths');
+      const paths = element('details', undefined, 'row-disclosure'), summary = element('summary');
+      summary.append(element('span', child ? 'Details' : 'Paths', 'visually-hidden'));
       const pathFields = element('dl', undefined, 'observation-paths bounded-detail');
       pathFields.tabIndex = 0;
       pathFields.setAttribute('role', 'region');
@@ -49,8 +50,9 @@ export function mountObservationTable(root, { metadata, actions, restoreView = n
       else pathFields.append(element('dt', 'Package'), packageField, element('dt', 'Executable ID'), executableId);
       pathFields.append(element('dt', 'Package path'), packagePath, element('dt', 'Execution path'), executionPath);
       paths.append(summary, pathFields);
-      if (child) cells[0].append(callPath, paths);
-      else cells[1].append(packageName, paths);
+      // The closed disclosure arrow follows the name; the secondary line comes after it.
+      if (child) cells[0].append(paths, callPath);
+      else cells[1].append(paths, packageName);
       const times = { started_at: cells[columns.started_at], ended_at: cells[columns.ended_at] };
       cells[columns.state].append(element('span', undefined, child ? 'observation-state' : 'result-badge'));
       row.append(...cells);

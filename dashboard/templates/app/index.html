@@ -8,14 +8,18 @@
                 <fieldset class="filter-fields" disabled aria-describedby="app-status">
                     <legend class="visually-hidden">Execution filters</legend>
                     <div class="page-heading">
-                        <div class="scope-path" aria-label="Execution scope and current page">
-                            {% for kind in ['folder', 'project', 'package'] %}
-                            {% if kind != 'folder' %}<span class="scope-separator" aria-hidden="true">/</span>{% endif %}
-                            <button type="button" class="scope-trigger" data-open-filter="{{ kind }}" aria-haspopup="dialog" popovertarget="{{ kind }}-picker">
-                                <span data-filter-label="{{ kind }}">All {{ kind }}s</span><span class="chevron" aria-hidden="true">⌄</span>
-                            </button>
-                            {% endfor %}
-                            <span class="scope-current"><span class="scope-separator" aria-hidden="true">/</span><h1 aria-current="page">Overview</h1></span>
+                        <div class="scope-heading">
+                            <div class="scope-path" role="group" aria-label="Execution scope">
+                                {% for kind in ['folder', 'project', 'package'] %}
+                                <span class="scope-crumb">
+                                    {% if kind != 'folder' %}<span class="scope-separator" aria-hidden="true">/</span>{% endif %}
+                                    <button type="button" class="scope-trigger" data-open-filter="{{ kind }}" aria-haspopup="dialog" popovertarget="{{ kind }}-picker">
+                                        <span data-filter-label="{{ kind }}">All {{ kind }}s</span>
+                                    </button>
+                                </span>
+                                {% endfor %}
+                            </div>
+                            <h1>Overview</h1>
                         </div>
                         <div class="section-actions">
                             <p class="resource-status refresh-status" data-poll-status data-summary-status role="status"></p>

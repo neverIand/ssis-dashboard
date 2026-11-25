@@ -92,21 +92,23 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
       cells[0].append(time);
       cells[1].className = 'event-name';
       cells[1].append(name, source);
-      const preview = element('p', undefined, 'event-preview'), message = element('details');
-      const messageSummary = element('summary', 'View message'), full = element('p', undefined, 'event-body bounded-detail');
+      const preview = element('p', undefined, 'event-preview'), message = element('details', undefined, 'row-disclosure');
+      const messageSummary = element('summary'), full = element('p', undefined, 'event-body bounded-detail');
       full.tabIndex = 0;
       full.setAttribute('role', 'region');
       full.setAttribute('aria-label', 'Event message');
       const truncated = element('p', undefined, 'cell-detail');
+      messageSummary.append(element('span', 'View message', 'visually-hidden'));
       message.append(messageSummary, full);
       const copy = clipboard?.writeText ? element('button', 'Copy', 'copy-message') : null;
-      cells[2].append(preview, truncated, message);
+      cells[2].append(preview, message, truncated);
       if (copy) {
         copy.type = 'button';
         copy.addEventListener('click', () => { void copyMessage(row); });
         cells[2].append(copy);
       }
-      const details = element('details'), summary = element('summary', 'Details');
+      const details = element('details', undefined, 'row-disclosure'), summary = element('summary');
+      summary.append(element('span', 'Details', 'visually-hidden'));
       const list = element('dl', undefined, 'observation-paths bounded-detail'), values = {};
       list.tabIndex = 0;
       list.setAttribute('role', 'region');
@@ -116,7 +118,7 @@ export function mountEvents(root, { metadata, actions, restoreView = null }) {
         list.append(element('dt', title), values[key]);
       }
       details.append(summary, list);
-      cells[1].append(details);
+      cells[1].insertBefore(details, source);
       node.append(...cells);
       row = {
         node,

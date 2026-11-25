@@ -261,10 +261,14 @@ main {
 
 #overview-filters { position: relative; }
 .overview-selection { min-width: 0; }
-.scope-path { display: flex; align-items: center; flex-wrap: nowrap; gap: 0.4rem; min-width: 0; }
-.scope-current { display: flex; align-items: center; gap: 0.8rem; flex-shrink: 0; }
-.scope-separator { color: var(--sd-secondary); padding-inline: 0.2rem; }
-.scope-trigger { display: flex; align-items: center; gap: 0.5rem; max-width: 24rem; color: var(--sd-secondary); border-color: transparent; background: transparent; padding-inline: 0.4rem; }
+.scope-heading { min-width: 0; }
+/* Small breadcrumbs above the heading, as on the execution page; each opens its picker. */
+.scope-path { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.5333rem; min-width: 0; margin: 0 0 0.3rem; font-size: 0.8667rem; }
+/* A separator wraps with the crumb after it. */
+.scope-crumb { display: inline-flex; align-items: center; gap: 0.5333rem; min-width: 0; max-width: 100%; }
+.scope-separator { color: var(--sd-secondary); }
+.scope-trigger { display: inline-flex; align-items: center; max-width: 24rem; min-height: 0; padding: 0; border: 0; background: transparent; color: var(--sd-action); font-size: inherit; text-decoration: underline; text-underline-offset: 0.2em; }
+.scope-trigger:hover:enabled:not([aria-disabled="true"]) { background: transparent; color: var(--sd-action-hover); }
 .chevron { flex-shrink: 0; color: var(--sd-secondary); font-size: 0.8rem; }
 .filter-bar { display: flex; align-items: center; gap: 0.8rem; margin-top: 0.4rem; min-width: 0; }
 .filter-inline { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
@@ -492,10 +496,19 @@ tbody tr:hover { background: var(--sd-subtle); }
   white-space: pre-wrap;
   overflow-wrap: break-word;
 }
-.package-call-name { display: block; font-weight: 600; }
+.package-call-name { font-weight: 600; }
 .call-path { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; margin: 0.15rem 0; }
 .observation-paths dt { color: var(--sd-secondary); font-size: 0.8667rem; margin-top: 0.8rem; }
 .observation-section summary { cursor: pointer; }
+/* Table disclosures show one arrow without a visible label; the label stays for assistive technology. */
+/* The arrow stays on the end of the name or text line, open or closed; opened content follows below. */
+/* The summary is one box, so a wrap never splits its 24 px target; negative block margins keep the line height. */
+.row-disclosure, .event-preview:not([data-full="true"]), .value-preview { display: inline; }
+.row-disclosure > summary { position: relative; display: inline-block; list-style: none; padding: 0.3rem 0.4rem; margin-block: -0.3rem; color: var(--sd-secondary); line-height: 1; }
+.row-disclosure > summary::-webkit-details-marker { display: none; }
+.row-disclosure > summary::before { content: '▸' / ''; font-size: 1.05rem; }
+.row-disclosure[open] > summary::before { content: '▾' / ''; }
+.row-disclosure > summary:hover { color: var(--sd-action); }
 [data-events-table] tr[data-severity="error"] :is(.event-preview, .event-body), [data-first-error-message] { font-family: var(--sd-font-mono); }
 .event-search { flex: 1; min-width: 7rem; }
 [data-events-q] { width: 12rem; }
@@ -719,8 +732,6 @@ td > :is(.status-badge, .result-badge) { vertical-align: top; line-height: 1lh; 
   .filter-inline .filter-trigger { width: auto; flex: 1; }
   .filter-popover { max-height: 75vh; }
   .scope-trigger { max-width: 100%; }
-  /* Folder, project and package wrap rather than truncate to a few characters each. */
-  .scope-path { flex-wrap: wrap; row-gap: 0; }
   [data-status-choices] { grid-template-columns: minmax(0, 1fr); }
   .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .summary-card:nth-child(odd) { border-left: 0; }
@@ -779,10 +790,4 @@ td > :is(.status-badge, .result-badge) { vertical-align: top; line-height: 1lh; 
 /* Execution page: an ended run has no Pause button; executable rows take two lines, with the
    Paths disclosure beside the parent container instead of on its own line. */
 .page-heading > .section-actions:has(> [data-detail-poll-toggle][hidden]) { grid-template-columns: minmax(0, 1fr) 2.2rem; }
-[data-executables-table] .observation-name > .cell-detail { display: inline; }
-[data-executables-table] .observation-name > .cell-detail:not(:empty)::after { content: " "; }
-[data-executables-table] .observation-name > details { display: inline; margin-top: 0; }
-[data-executables-table] .observation-name > details[open] { display: block; }
-/* A closed summary stays on the parent line; 'inline list-item' keeps its disclosure marker. */
-[data-executables-table] .observation-name > details:not([open]) > summary { display: inline list-item; }
-[data-executables-table] .observation-name > span:first-child { display: block; }
+[data-executables-table] .observation-name > details { margin-top: 0; }

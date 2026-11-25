@@ -185,11 +185,11 @@ test('override UI shows only property, value and sensitivity with exact path exp
   await flush(); assert.equal(dom.get('overrides-panel').hidden, true); click(dom, 'overrides-toggle'); await flush();
   const first = dom.overrideBody.children[0]; assert.equal(first.children.length, 3);
   assert.equal(first.children[0].children[0].textContent, [...path].slice(0,160).join('') + '…');
-  assert.equal(first.children[0].children[2].children[1].textContent, path);
-  assert.equal(first.children[1].children[2].children[1].textContent, rows[0].value);
+  assert.equal(first.children[0].children[1].children[1].textContent, path);
+  assert.equal(first.children[1].children[1].children[1].textContent, rows[0].value);
   for (const value of ['NULL (unredacted)', '(empty)', 'Redacted (sensitive)', 'Redacted (policy)', 'Truncated to 16384 characters.']) assert.ok(dom.overrideBody.textContent.includes(value));
   assert.equal(dom.get('overrides-policy').hidden, true);
-  for (const index of [1,2,3,4]) assert.equal(dom.overrideBody.children[index].children[1].children[2].hidden, true);
+  for (const index of [1,2,3,4]) assert.equal(dom.overrideBody.children[index].children[1].children[1].hidden, true);
 });
 
 test('override previews and full values use state hooks for raw text and all marker states', async t => {
@@ -204,8 +204,8 @@ test('override previews and full values use state hooks for raw text and all mar
     const row = dom.overrideBody.children[index], cell = row.children[1], kind = index < 3 ? 'raw' : 'marker';
     assert.equal(row.dataset.propertyId, item.property_id); assert.equal(row.dataset.scope, undefined);
     assert.equal(cell.children[0].dataset.valueKind, kind);
-    assert.equal(cell.children[2].children[1].dataset.valueKind, kind);
-    assert.equal(cell.children[2].children[1].textContent, kind === 'raw' ? item.value : '');
+    assert.equal(cell.children[1].children[1].dataset.valueKind, kind);
+    assert.equal(cell.children[1].children[1].textContent, kind === 'raw' ? item.value : '');
   });
 });
 
@@ -213,7 +213,7 @@ test('policy-hidden values keep paths available while redaction clears old expan
   let redacted = false;
   const dom = screen(t, async (resource, options) => options.params?.section === 'overrides' ? overridePage([overrideRow('1', redacted
     ? { redacted: true, redaction_reason: 'policy', value: null } : { value: 'private-override-canary '.repeat(20) })]) : response(resource, options));
-  await flush(); click(dom, 'overrides-toggle'); await flush(); const row = dom.overrideBody.children[0], path = row.children[0].children[2], value = row.children[1].children[2];
+  await flush(); click(dom, 'overrides-toggle'); await flush(); const row = dom.overrideBody.children[0], path = row.children[0].children[1], value = row.children[1].children[1];
   path.open = value.open = true; dom.get('overrides-scroll').scrollLeft = 120; dom.get('overrides-scroll').scrollTop = 75;
   redacted = true; click(dom, 'detail-refresh'); value.children[0].focus(); await flush();
   assert.equal(dom.overrideBody.children[0], row); assert.equal(path.open, true); assert.equal(value.open, false);
@@ -228,15 +228,15 @@ test('override checkpoints contain IDs and cursors only; metadata policy is reva
   const dom = screen(t, async (resource, options) => options.params?.section === 'overrides' ? overridePage([overrideRow('1',
     { property_path: 'private-path-canary', value: 'private-value-canary '.repeat(20) })]) : response(resource, options));
   await flush(); click(dom, 'overrides-toggle'); await flush(); const row = dom.overrideBody.children[0];
-  row.children[0].children[2].open = row.children[1].children[2].open = true; row.children[1].children[2].children[0].focus();
+  row.children[0].children[1].open = row.children[1].children[1].open = true; row.children[1].children[1].children[0].focus();
   const checkpoint = dom.mounted.checkpoint(); assert.doesNotMatch(JSON.stringify(checkpoint), /private-path-canary|private-value-canary|property_path|redaction_reason/);
   dom.mounted.dispose(); const blocked = screen(t, undefined, { metadata: overrideMetadata(false), restoreView: checkpoint }); await flush();
   assert.equal(blocked.calls.length, 2); assert.equal(blocked.get('overrides-toggle').disabled, true);
   const policy = screen(t, async (resource, options) => options.params?.section === 'overrides' ? overridePage([overrideRow('1',
     { redacted: true, redaction_reason: 'policy', value: null })]) : response(resource, options), { metadata: overrideMetadata(true,false), restoreView: checkpoint });
   await flush(); assert.equal(policy.get('overrides-policy').hidden, false); assert.equal(policy.get('overrides-toggle').disabled, false);
-  assert.equal(policy.overrideBody.children[0].children[0].children[2].open, true);
-  assert.equal(policy.overrideBody.children[0].children[1].children[2].open, false); assert.equal(policy.document.activeElement, policy.get('overrides-scroll'));
+  assert.equal(policy.overrideBody.children[0].children[0].children[1].open, true);
+  assert.equal(policy.overrideBody.children[0].children[1].children[1].open, false); assert.equal(policy.document.activeElement, policy.get('overrides-scroll'));
   const enabled = screen(t, undefined, { restoreView: policy.mounted.checkpoint() }); await flush();
   assert.equal(enabled.get('overrides-policy').hidden, true); assert.ok(enabled.overrideBody.textContent.includes('1.2300'));
 });
