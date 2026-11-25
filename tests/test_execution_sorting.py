@@ -6,6 +6,7 @@ import json
 import unittest
 from unittest.mock import Mock, patch
 
+from dashboard.db import execute_query as real_execute_query
 from dashboard import create_app, cursors
 from dashboard.execution_order import CALCULATED_SORTS, EXECUTION_SORTS, encode_key, seek_values
 from dashboard.timestamps import Timestamp, as_timestamp, parse_timestamp
@@ -42,7 +43,7 @@ class ExecutionSortingTests(unittest.TestCase):
     def setUp(self):
         self.connect = self.enterContext(patch('pyodbc.connect', side_effect=AssertionError('Unexpected SQL')))
         self.enterContext(patch('dashboard.executions.utc_now', return_value=pages.NOW))
-        self.query = self.enterContext(patch('dashboard.executions.execute_query', side_effect=self.query_fixture))
+        self.query = self.enterContext(patch('dashboard.db.execute_query', side_effect=self.query_fixture))
         self.app = create_app({'TESTING': True, 'LOG_LEVEL': 'ERROR'})
         self.client = self.app.test_client()
         start = parse_timestamp('2026-10-15T11:00:00.0000000Z')
@@ -192,7 +193,7 @@ class ExecutionSortingTests(unittest.TestCase):
         self.assertEqual(self.chain('duration_seconds',limit='1',first=response),[2,1])
 
     def test_all_sort_resources_bind_their_real_sql_and_close_owned_connections(self):
-        from dashboard.db import execute_query
+        execute_query = real_execute_query
 
         self.query.side_effect = execute_query
         row = {**self.rows[0], 'logging_rows': 1}

@@ -5,6 +5,7 @@ import unittest
 
 import pyodbc
 
+from dashboard.db import execute_query as real_execute_query
 from dashboard import create_app
 from dashboard.timestamps import parse_timestamp
 from tests import test_api_contract as contract_tests
@@ -25,7 +26,7 @@ class SummaryTests(unittest.TestCase):
     def setUp(self):
         self.connect = self.enterContext(patch('pyodbc.connect', side_effect=AssertionError('Unexpected SQL')))
         self.enterContext(patch('dashboard.metrics.utc_now', return_value=NOW))
-        self.query = self.enterContext(patch('dashboard.metrics.execute_query', return_value=[]))
+        self.query = self.enterContext(patch('dashboard.db.execute_query', return_value=[]))
         self.app = create_app({'TESTING': True, 'LOG_LEVEL': 'ERROR',
                                'CONNECTION_STRING': {'main': 'private-connection-canary'}})
         self.client = self.app.test_client()
@@ -85,7 +86,7 @@ class SummaryTests(unittest.TestCase):
                           {'folder_pattern': r'A*\*%_', 'project_pattern': r'P\\*'}):
             with self.subTest(selectors=selectors):
                 with patch('dashboard.executions.utc_now', return_value=NOW), patch(
-                        'dashboard.executions.execute_query', return_value={'upper_id':None}) as execution_query:
+                        'dashboard.db.execute_query', return_value={'upper_id':None}) as execution_query:
                     response = self.client.get('/api/v1/executions', query_string={**selectors, 'status':'7'})
                 self.assertEqual(response.status_code, 200)
                 bounds = {name: response.json['meta'][name] for name in ('from', 'to')}
@@ -166,7 +167,7 @@ class SummaryTests(unittest.TestCase):
         self.assertNotIn('data', response.json)
 
     def test_real_query_boundary_binds_types_owns_cleanup_and_only_reads_executions(self):
-        from dashboard.db import execute_query
+        execute_query = real_execute_query
         self.query.side_effect = execute_query
         cursor = Mock()
         cursor.description = [('status_code',), ('execution_count',)]

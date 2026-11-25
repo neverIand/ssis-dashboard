@@ -10,6 +10,7 @@ from urllib.parse import quote
 import pyodbc
 from werkzeug.exceptions import NotFound
 
+from dashboard.db import execute_query as real_execute_query
 from dashboard import create_app, cursors
 from dashboard.timestamps import Timestamp, TICKS_PER_SECOND, parse_timestamp
 from dashboard.values import SECTIONS
@@ -39,7 +40,7 @@ class ValueTests(unittest.TestCase):
         self.connect = self.enterContext(patch('pyodbc.connect', side_effect=AssertionError('Unexpected SQL')))
         self.clock = self.enterContext(patch('dashboard.values.utc_now', return_value=NOW))
         self.visible = self.enterContext(patch('dashboard.values.visible_execution', return_value={'logging_level':None}))
-        self.query = self.enterContext(patch('dashboard.values.execute_query', side_effect=self.query_fixture))
+        self.query = self.enterContext(patch('dashboard.db.execute_query', side_effect=self.query_fixture))
         self.app = create_app({'TESTING':True, 'LOG_LEVEL':'ERROR', 'EXECUTION_COUNT':1,
                                'API_VALUES_ENABLED':True, 'CONNECTION_STRING':{'main':'private-connection-canary'}})
         self.client = self.app.test_client()
@@ -390,7 +391,7 @@ class ValueTests(unittest.TestCase):
                 self.assertEqual(self.query.call_args.args[1][-1], 0)
 
     def test_native_boundary_binds_section_policy_and_closes_owned_connections(self):
-        from dashboard.db import execute_query
+        execute_query = real_execute_query
         from dashboard.inspection import visible_execution
         self.visible.side_effect = visible_execution
         self.query.side_effect = execute_query

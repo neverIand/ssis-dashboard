@@ -1,12 +1,9 @@
 """Bounded invocation starts and conservative, path-specific observed end times."""
 
-from werkzeug.exceptions import NotFound
-
-from dashboard import api_validation as inputs, cursors, serialization as wire
-from dashboard.db import execute_query
+from dashboard import api_validation as inputs, cursors, paging, serialization as wire
+from dashboard.db import catalog_query
 from dashboard.inspection import visible_execution
-from dashboard.observability import record_query
-from dashboard.timestamps import parse_timestamp, sql_timestamp, utc_now
+from dashboard.timestamps import sql_timestamp, utc_now
 from dashboard.validation import InvalidInput
 
 
@@ -53,76 +50,41 @@ def _serialize(row, identifier, upper):
 
 def child_page(value, values, config):
     now = utc_now()
-    try:
+    with paging.cursor_inputs(values):
         identifier = inputs.identifier(value)
         selection = {'execution_id': value, 'limit': inputs.integer(values['limit']) if 'limit' in values else 50,
                      'sort': values.get('sort', 'started_at'), 'direction': values.get('direction', 'asc')}
         if selection['sort'] not in ('started_at', 'observation_id') or selection['direction'] not in ('asc', 'desc'):
             raise InvalidInput('Unsupported child order.')
         selection_digest, scope = cursors.digest(selection), cursors.scope_digest(config)
-        state = None
-        if 'cursor' in values:
-            state = cursors.open_cursor(values['cursor'], resource='v1/children', selection=selection_digest,
-                                         scope=scope, now=now)
-            upper, last = inputs.identifier(state['upper_id']), inputs.identifier(state['last_id'])
-            if last > upper:
-                raise cursors.InvalidCursor()
+        state, upper, last, as_of = paging.continuation(values, resource='v1/children', selection=selection_digest,
+                                                        scope=scope, now=now)
         last_time = _seek(state, selection['sort'])
-    except cursors.InvalidCursor:
-        raise
-    except InvalidInput:
-        if 'cursor' in values:
-            raise cursors.InvalidCursor() from None
-        raise
 
     execution = visible_execution(value, config, as_of=now)
-
-    def query(resource, parameters, *, one_row=False):
-        return execute_query(resource, parameters, connection_string=config['CONNECTION_STRING']['main'],
-                             one_row=one_row, login_timeout=config['DB_LOGIN_TIMEOUT_SECONDS'],
-                             query_timeout=config['DB_QUERY_TIMEOUT_SECONDS'],
-                             typed_timestamps=True, declared_parameters=True, on_complete=record_query)
-
-    as_of = now if state is None else parse_timestamp(state['as_of'])
+    query = catalog_query(config)
     if state is None:
-        fence = query('api-children-fence.sql', (identifier,), one_row=True)
-        if not fence:
-            raise NotFound()
-        upper, last = fence['upper_id'], None
-        unidentified = wire.boolean(fence['has_unidentified_starts'])
-        if upper is not None:
-            wire.bigint(upper)
+        upper, unidentified = paging.fence(query, 'api-children-fence.sql', (identifier,), scoped=True,
+                                           flag='has_unidentified_starts')
     rows = []
     if upper is not None:
-        rows = query('api-children-page.sql', (identifier, selection['limit'] + 1, upper, last, last_time,
-                     int(selection['sort'] == 'started_at'), int(selection['direction'] == 'desc')))
-        if not rows:
-            raise NotFound()
-        unidentified = wire.boolean(rows[0]['has_unidentified_starts'])
-        if (len(rows) > selection['limit'] + 1
-                or any(wire.bigint(row['execution_id']) != value
-                       or wire.boolean(row['has_unidentified_starts']) != unidentified for row in rows)):
-            raise ValueError('Unexpected child page.')
-        if any(wire.boolean(row['page_empty']) for row in rows):
-            if len(rows) != 1 or rows[0]['observation_id'] is not None:
-                raise ValueError('Unexpected empty child page.')
-            rows = []
-    serialized = [_serialize(row, value, upper) for row in rows]
-    if len({row['observation_id'] for row in serialized}) != len(serialized):
-        raise ValueError('Duplicate child observation ID.')
+        rows, unidentified = paging.observation_rows(
+            query('api-children-page.sql', (identifier, selection['limit'] + 1, upper, last, last_time,
+                  int(selection['sort'] == 'started_at'), int(selection['direction'] == 'desc'))),
+            limit=selection['limit'], execution_id=value, identity='observation_id', label='child',
+            flag='has_unidentified_starts')
+    serialized = paging.unique([_serialize(row, value, upper) for row in rows], 'observation_id',
+                               'Duplicate child observation ID.')
     has_more = len(serialized) > selection['limit']
     data = serialized[:selection['limit']]
     token = None
     if has_more:
         key = data[-1]['started_at'] if selection['sort'] == 'started_at' else data[-1]['observation_id']
-        token = cursors.seal({'v': 2, 'resource': 'v1/children', 'selection': selection_digest, 'scope': scope,
-                              'as_of': as_of.isoformat(), 'upper_id': wire.bigint(upper), 'last_id': data[-1]['observation_id'],
-                              'sort_key': [key], 'sort_nulls': [False]})
+        token = paging.next_cursor(resource='v1/children', selection=selection_digest, scope=scope, as_of=as_of,
+                                   upper=upper, last_id=data[-1]['observation_id'], key=[key], nulls=[False])
     logging = execution['logging_level']
     availability = ('unknown' if unidentified else 'available' if data else
                     'not-recorded' if logging is not None and logging['code'] == 0 else 'unknown')
-    return data, {'from': None, 'to': None, 'limit': selection['limit'], 'sort': selection['sort'],
-                  'direction': selection['direction'], 'as_of': as_of.isoformat(),
-                  'upper_id': None if upper is None else wire.bigint(upper), 'next_cursor': token,
-                  'has_more': has_more, 'consistency': 'live', 'availability': availability,
-                  'has_unidentified_starts': unidentified}
+    return data, paging.page_meta(limit=selection['limit'], sort=selection['sort'], direction=selection['direction'],
+                                  as_of=as_of, upper=upper, token=token, has_more=has_more,
+                                  availability=availability, has_unidentified_starts=unidentified)

@@ -11,6 +11,7 @@ from urllib.parse import quote
 import pyodbc
 from werkzeug.exceptions import NotFound
 
+from dashboard.db import execute_query as real_execute_query
 from dashboard import create_app, cursors
 from dashboard.timestamps import Timestamp, TICKS_PER_SECOND, parse_timestamp
 from tests import test_api_contract as contract_tests
@@ -54,7 +55,7 @@ class ChildTests(unittest.TestCase):
         self.clock = self.enterContext(patch('dashboard.children.utc_now',return_value=NOW))
         self.visible = self.enterContext(patch('dashboard.children.visible_execution',return_value={
             'logging_level':{'code':1,'name':'basic'}}))
-        self.query = self.enterContext(patch('dashboard.children.execute_query',side_effect=self.query_fixture))
+        self.query = self.enterContext(patch('dashboard.db.execute_query',side_effect=self.query_fixture))
         self.app = create_app({'TESTING':True,'LOG_LEVEL':'ERROR','EXECUTION_COUNT':1,
                                'CONNECTION_STRING':{'main':'private-connection-canary'}})
         self.client = self.app.test_client()
@@ -270,7 +271,7 @@ class ChildTests(unittest.TestCase):
         self.assertNotIn('private-',str(page)+'\n'.join(logged.output))
 
     def test_native_boundary_binds_typed_ids_and_time_and_closes_three_connections(self):
-        from dashboard.db import execute_query
+        execute_query = real_execute_query
         from dashboard.inspection import visible_execution
         self.visible.side_effect = visible_execution
         self.query.side_effect = execute_query

@@ -1,12 +1,9 @@
 """Bounded value sections with SQL and independent serializer redaction."""
 
-from werkzeug.exceptions import NotFound
-
-from dashboard import api_validation as inputs, cursors, serialization as wire
-from dashboard.db import execute_query
+from dashboard import api_validation as inputs, cursors, paging, serialization as wire
+from dashboard.db import catalog_query
 from dashboard.inspection import visible_execution
-from dashboard.observability import record_query
-from dashboard.timestamps import parse_timestamp, utc_now
+from dashboard.timestamps import utc_now
 from dashboard.validation import InvalidInput
 
 
@@ -55,7 +52,7 @@ def value_page(value, values, config):
     if 'scope' in values and (section != 'parameters' or parameter_scope not in PARAMETER_SCOPES):
         raise InvalidInput('Unsupported parameter scope.')
     object_type = PARAMETER_SCOPES.get(parameter_scope)
-    try:
+    with paging.cursor_inputs(values):
         identifier = inputs.identifier(value)
         if section not in SECTIONS:
             raise InvalidInput('Unsupported value section.')
@@ -67,14 +64,13 @@ def value_page(value, values, config):
                 bound_selection['scope'] = parameter_scope
         selection = cursors.digest(bound_selection)
         scope = cursors.scope_digest(config)
-        state = None
+        state, upper, last, as_of = paging.continuation(values, resource='v1/values', selection=selection,
+                                                        scope=scope, now=now)
         last_type = None
-        if 'cursor' in values:
-            state = cursors.open_cursor(values['cursor'], resource='v1/values', selection=selection, scope=scope, now=now)
-            upper, last = inputs.identifier(state['upper_id']), inputs.identifier(state['last_id'])
+        if state is not None:
             key, nulls = state['sort_key'], state['sort_nulls']
             width = 2 if section == 'parameters' else 1
-            if (last > upper or type(key) is not list or len(key) != width or key[-1] != state['last_id']
+            if (type(key) is not list or len(key) != width or key[-1] != state['last_id']
                     or type(nulls) is not list or len(nulls) != width or any(flag is not False for flag in nulls)):
                 raise cursors.InvalidCursor()
             if section == 'parameters':
@@ -82,28 +78,11 @@ def value_page(value, values, config):
                 if (type(last_type) is not int or not -32768 <= last_type <= 32767
                         or object_type is not None and last_type != object_type):
                     raise cursors.InvalidCursor()
-    except cursors.InvalidCursor:
-        raise
-    except InvalidInput:
-        if 'cursor' in values:
-            raise cursors.InvalidCursor() from None
-        raise
 
     visible_execution(value, config, as_of=now)
-
-    def query(resource, parameters, *, one_row=False):
-        return execute_query(resource, parameters, connection_string=config['CONNECTION_STRING']['main'], one_row=one_row,
-                             login_timeout=config['DB_LOGIN_TIMEOUT_SECONDS'], query_timeout=config['DB_QUERY_TIMEOUT_SECONDS'],
-                             typed_timestamps=True, declared_parameters=True, on_complete=record_query)
-
-    as_of = now if state is None else parse_timestamp(state['as_of'])
+    query = catalog_query(config)
     if state is None:
-        fence = query('api-values-' + section + '-fence.sql', (identifier,), one_row=True)
-        if not fence:
-            raise NotFound()
-        upper, last = fence['upper_id'], None
-        if upper is not None:
-            wire.bigint(upper)
+        upper, _ = paging.fence(query, 'api-values-' + section + '-fence.sql', (identifier,), scoped=True)
     rows = []
     identity = SECTIONS[section]
     if upper is not None:
@@ -112,30 +91,20 @@ def value_page(value, values, config):
             parameters += (last_type, last, object_type)
         if section == 'overrides':
             parameters += (last, int(config['API_OVERRIDE_VALUES_ENABLED']))
-        rows = query('api-values-' + section + '-page.sql', parameters)
-        if not rows:
-            raise NotFound()
-        if len(rows) > limit + 1 or any(wire.bigint(r['execution_id']) != value for r in rows):
-            raise ValueError('Unexpected values page.')
-        if any(wire.boolean(r['page_empty']) for r in rows):
-            if len(rows) != 1 or rows[0][identity] is not None:
-                raise ValueError('Unexpected empty values page.')
-            rows = []
+        rows, _ = paging.observation_rows(query('api-values-' + section + '-page.sql', parameters), limit=limit,
+                                          execution_id=value, identity=identity, label='values')
     if object_type is not None and any(row['object_type'] != object_type for row in rows):
         raise ValueError('Unexpected parameter scope.')
-    serialized = [_serialize(row, section, upper, config) for row in rows]
-    if len({row[identity] for row in serialized}) != len(serialized):
-        raise ValueError('Duplicate value ID.')
+    serialized = paging.unique([_serialize(row, section, upper, config) for row in rows], identity,
+                               'Duplicate value ID.')
     has_more = len(serialized) > limit
     data = serialized[:limit]
     token = None
     if has_more:
         last_id = data[-1][identity]
         key = [data[-1]['object_type']['code'], last_id] if section == 'parameters' else [last_id]
-        token = cursors.seal({'v': 2, 'resource': 'v1/values', 'selection': selection, 'scope': scope,
-                             'as_of': as_of.isoformat(), 'upper_id': wire.bigint(upper), 'last_id': last_id,
-                             'sort_key': key, 'sort_nulls': [False] * len(key)})
-    return data, {'from': None, 'to': None, 'limit': limit,
-                  'sort': 'object_type' if section == 'parameters' else identity, 'direction': 'asc',
-                  'as_of': as_of.isoformat(), 'upper_id': None if upper is None else wire.bigint(upper),
-                  'next_cursor': token, 'has_more': has_more, 'consistency': 'live', 'section': section}
+        token = paging.next_cursor(resource='v1/values', selection=selection, scope=scope, as_of=as_of,
+                                   upper=upper, last_id=last_id, key=key, nulls=[False] * len(key))
+    return data, paging.page_meta(limit=limit, sort='object_type' if section == 'parameters' else identity,
+                                  direction='asc', as_of=as_of, upper=upper, token=token, has_more=has_more,
+                                  section=section)

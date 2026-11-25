@@ -5,8 +5,7 @@ import xml.etree.ElementTree as ET
 from zoneinfo import ZoneInfo
 
 from dashboard import api_validation as inputs, serialization as wire
-from dashboard.db import execute_query
-from dashboard.observability import record_query
+from dashboard.db import catalog_query
 from dashboard.timestamps import Timestamp, TICKS_PER_SECOND, as_timestamp, sql_timestamp, utc_now
 from dashboard.validation import InvalidInput
 
@@ -108,14 +107,11 @@ def execution_timeline(values, config, *, fixed_to):
     for index, (left, right) in enumerate(bounds):
         ET.SubElement(intervals, 'b', i=str(index), s=sql_timestamp(left), e=sql_timestamp(right))
     status = selection['status']
-    rows = execute_query('api-metrics-timeline.sql', (
+    rows = catalog_query(config)('api-metrics-timeline.sql', (
         ET.tostring(intervals, encoding='unicode'), sql_timestamp(start), sql_timestamp(end),
         selection['folder'], selection['project'], selection['package'],
         selection['folder_pattern'], selection['project_pattern'],
-        *status, *([None] * (9 - len(status)))),
-        connection_string=config['CONNECTION_STRING']['main'],
-        login_timeout=config['DB_LOGIN_TIMEOUT_SECONDS'], query_timeout=config['DB_QUERY_TIMEOUT_SECONDS'],
-        typed_timestamps=True, declared_parameters=True, on_complete=record_query)
+        *status, *([None] * (9 - len(status)))))
     if len(rows) != len(bounds):
         raise ValueError('Unexpected timeline bucket count.')
     data = []

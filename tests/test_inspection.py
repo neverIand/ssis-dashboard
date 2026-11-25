@@ -8,6 +8,7 @@ import unittest
 
 import pyodbc
 
+from dashboard.db import execute_query as real_execute_query
 from dashboard import create_app
 from dashboard.timestamps import parse_timestamp
 from tests import test_api_contract as contract_tests
@@ -28,7 +29,7 @@ class ExecutionDetailTests(unittest.TestCase):
     def setUp(self):
         self.connect = self.enterContext(patch('pyodbc.connect',side_effect=AssertionError('Unexpected SQL')))
         self.enterContext(patch('dashboard.inspection.utc_now',return_value=NOW))
-        self.query = self.enterContext(patch('dashboard.inspection.execute_query',side_effect=self.query_fixture))
+        self.query = self.enterContext(patch('dashboard.db.execute_query',side_effect=self.query_fixture))
         self.row = execution(42,logging_rows=1)
         self.counts = dict(COUNTS)
         # The estimate row repeats the target's identity and start unless a test overrides them; None = no row.
@@ -201,7 +202,7 @@ class ExecutionDetailTests(unittest.TestCase):
         self.assertEqual(self.detail()['event_counts']['all'],2**53-1)
 
     def test_bound_odbc_queries_register_converters_and_close_both_connections(self):
-        from dashboard.db import execute_query
+        execute_query = real_execute_query
         self.query.side_effect = execute_query
         connections,cursors = [],[]
         for record in (self.row,self.counts,self.query_fixture('api-execution-estimate.sql',(42,))):

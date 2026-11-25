@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 
 import pyodbc
 
+from dashboard.db import execute_query as real_execute_query
 from dashboard import create_app, cursors
 from dashboard.api_validation import catalog_pattern, fixed_as_of
 from dashboard.timestamps import Timestamp, TICKS_PER_SECOND, parse_timestamp
@@ -44,7 +45,7 @@ class ExecutionAPITests(unittest.TestCase):
     def setUp(self):
         self.connect = self.enterContext(patch('pyodbc.connect', side_effect=AssertionError('Unexpected SQL')))
         self.clock = self.enterContext(patch('dashboard.executions.utc_now', return_value=NOW))
-        self.query = self.enterContext(patch('dashboard.executions.execute_query', side_effect=self.query_fixture))
+        self.query = self.enterContext(patch('dashboard.db.execute_query', side_effect=self.query_fixture))
         self.rows = [execution(i) for i in range(1, 252)]
         self.estimates = []  # rows returned by api-executions-estimates.sql
         self.app = create_app({'TESTING': True, 'LOG_LEVEL': 'ERROR', 'EXECUTION_COUNT': 1,
@@ -449,7 +450,7 @@ class ExecutionAPITests(unittest.TestCase):
 
     def test_real_query_boundary_binds_exact_types_and_closes_both_queries(self):
         self.query.side_effect = None
-        from dashboard.db import execute_query
+        execute_query = real_execute_query
         self.query.side_effect = execute_query
         self.enable_estimates()
         row = execution(42)

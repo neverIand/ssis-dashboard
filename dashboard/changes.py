@@ -17,8 +17,7 @@ untracked IDs are past their gap window. Terminal executions are assumed not to 
 from dataclasses import dataclass
 
 from dashboard import serialization as wire
-from dashboard.db import execute_query
-from dashboard.observability import record_query
+from dashboard.db import catalog_query, tracked_xml
 
 # created, running, pending, stopping: statuses that SSIS still moves to another state.
 ACTIVE_STATUSES = frozenset({1, 2, 5, 8})
@@ -251,25 +250,11 @@ def poll_parameters(state, limits, requested):
 
 def read_seed(config, limits, carry=()):
     """The seed query; `carry` is the replaced state's unexpired gap IDs (at most limits.gaps)."""
-    return execute_query(
-        'detector-seed.sql', seed_parameters(limits, carry), connection_string=config['CONNECTION_STRING']['main'],
-        login_timeout=config['DB_LOGIN_TIMEOUT_SECONDS'], query_timeout=config['DB_QUERY_TIMEOUT_SECONDS'],
-        typed_timestamps=True, declared_parameters=True, on_complete=record_query)
-
-
-def tracked_xml(ids):
-    """Integers only, so the XML cannot carry markup from anywhere else."""
-    if any(type(i) is not int or not 1 <= i <= _BIGINT_MAX for i in ids):
-        raise ValueError('Tracked IDs must be positive BIGINT values.')
-    return '<t>' + ''.join(f'<i>{i}</i>' for i in ids) + '</t>'
+    return catalog_query(config)('detector-seed.sql', seed_parameters(limits, carry))
 
 
 def read_poll(config, state, limits):
     """One bounded poll query. Returns (rows, requested IDs)."""
     requested = state.tracked()
-    rows = execute_query(
-        'detector-poll.sql', poll_parameters(state, limits, requested),
-        connection_string=config['CONNECTION_STRING']['main'],
-        login_timeout=config['DB_LOGIN_TIMEOUT_SECONDS'], query_timeout=config['DB_QUERY_TIMEOUT_SECONDS'],
-        typed_timestamps=True, declared_parameters=True, on_complete=record_query)
+    rows = catalog_query(config)('detector-poll.sql', poll_parameters(state, limits, requested))
     return rows, requested

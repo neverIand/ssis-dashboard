@@ -8,13 +8,16 @@ policy define the scope for every browser user; no browser identity participates
 """
 
 from collections import OrderedDict
+from decimal import Decimal
 from threading import Lock
 from time import monotonic
 
 from dashboard import serialization as wire
-from dashboard.changes import tracked_xml
+from dashboard.db import tracked_xml
+from dashboard.timestamps import TICKS_PER_SECOND, Timestamp, as_timestamp, parse_timestamp
 
 MAX_ENTRIES = 4096
+_MAX_DURATION_TICKS = parse_timestamp('9999-12-31T23:59:59.9999999Z').utc_ticks
 _MISSING = object()
 
 
@@ -65,8 +68,32 @@ def _active(item):
     return item['started_at'] is not None and item['ended_at'] is None
 
 
+def serialize_estimate(row):
+    """Keep the rational mean until JSON/100-ns timestamp rounding is required."""
+    count, total = wire.count(row['estimate_sample_count']), row['estimate_total_ticks']
+    if count > 5 or (count == 0 and total is not None):
+        raise ValueError('Invalid history estimate aggregate.')
+    if count == 0:
+        return None
+    if (row['started_at'] is None or type(total) is not Decimal or not total.is_finite()
+            or total < 0 or total > count * _MAX_DURATION_TICKS or total != total.to_integral_value()):
+        raise ValueError('Invalid history estimate aggregate.')
+    total = int(total)
+    if total == 0:
+        return None
+    # Nonnegative half ticks round up; duration retains the unrounded mean.
+    mean_ticks = (2 * total + count) // (2 * count)
+    start_ticks = as_timestamp(row['started_at']).utc_ticks
+    try:
+        end = Timestamp(start_ticks + mean_ticks)
+    except ValueError:
+        # A valid catalog instant plus a valid duration can exceed year 9999.
+        return None
+    return {'method': 'mean_last_5_successful', 'sample_count': count,
+            'duration_seconds': total / (count * TICKS_PER_SECOND), 'ended_at': end.isoformat()}
+
+
 def _checked(row, expected_started_at):
-    from dashboard.history import serialize_estimate  # history imports the execution serializer
     if row['started_at'] is None or wire.utc_timestamp(row['started_at']) != expected_started_at:
         raise ValueError('Unexpected execution estimate row.')
     return serialize_estimate(row)

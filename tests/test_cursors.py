@@ -33,7 +33,7 @@ class CursorSecretTests(unittest.TestCase):
         self.enterContext(patch.object(cursors, '_KEY', cursors._KEY))
         self.connect = self.enterContext(patch('pyodbc.connect', side_effect=AssertionError('Unexpected SQL access')))
         self.enterContext(patch('dashboard.navigation.utc_now', return_value=NOW))
-        self.enterContext(patch('dashboard.navigation.execute_query', side_effect=folders_fixture))
+        self.enterContext(patch('dashboard.db.execute_query', side_effect=folders_fixture))
 
     def tearDown(self):
         self.connect.assert_not_called()

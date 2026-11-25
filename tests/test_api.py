@@ -358,7 +358,7 @@ class APIConfigurationTests(unittest.TestCase):
             ({'AS_OF_DATE': '2026-06-12T12:00:00Z', 'API_MAX_RANGE_HOURS': WINDOW_HOURS}, '2026-06-11T12:00:00.0000000Z'),
         ]
         for config, start in valid:
-            with self.subTest(config=config), patch('dashboard.executions.execute_query', return_value={'upper_id': None}):
+            with self.subTest(config=config), patch('dashboard.db.execute_query', return_value={'upper_id': None}):
                 client = create_app({'LOG_LEVEL': 'ERROR', **config}).test_client()
                 limits = client.get('/api/v1/meta').json['data']['limits']
                 self.assertTrue(all(value <= 2**53 - 1 for value in limits.values() if type(value) is int))

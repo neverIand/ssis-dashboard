@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 import pyodbc
 
+from dashboard.db import execute_query as real_execute_query
 from dashboard import create_app
 from dashboard.timeline import bucket_bounds, _datetime
 from dashboard.timestamps import parse_timestamp, TICKS_PER_SECOND
@@ -36,7 +37,7 @@ class TimelineTests(unittest.TestCase):
     def setUp(self):
         self.connect = self.enterContext(patch('pyodbc.connect',side_effect=AssertionError('Unexpected SQL')))
         self.enterContext(patch('dashboard.timeline.utc_now',return_value=NOW))
-        self.query = self.enterContext(patch('dashboard.timeline.execute_query',side_effect=self.zero_rows))
+        self.query = self.enterContext(patch('dashboard.db.execute_query',side_effect=self.zero_rows))
         self.app = create_app({'TESTING':True,'LOG_LEVEL':'ERROR',
                                'CONNECTION_STRING':{'main':'private-connection-canary'}})
         self.client = self.app.test_client()
@@ -120,7 +121,7 @@ class TimelineTests(unittest.TestCase):
                           {'folder':"O'Brien/+#\\東京",'project':'😀'*64},
                           {'folder_pattern':r'A*\*%_[','project_pattern':'P*'}):
             with self.subTest(selectors=selectors):
-                with patch('dashboard.metrics.utc_now',return_value=NOW), patch('dashboard.metrics.execute_query',return_value=[]) as summary_query:
+                with patch('dashboard.metrics.utc_now',return_value=NOW), patch('dashboard.db.execute_query',return_value=[]) as summary_query:
                     response = self.client.get('/api/v1/metrics/summary',query_string={**selectors,'status':'7'})
                 self.assertEqual(response.status_code,200)
                 effective = {k:response.json['meta'][k] for k in ('from','to')}
@@ -211,7 +212,7 @@ class TimelineTests(unittest.TestCase):
                 self.contract.validator('Problem').validate(response.json)
 
     def test_native_query_boundary_binds_intervals_and_owns_typed_cleanup(self):
-        from dashboard.db import execute_query
+        execute_query = real_execute_query
         self.query.side_effect = execute_query
         cursor = Mock()
         cursor.description = [('bucket_id',),('created_count',),('started_count',),('succeeded_count',),('failed_count',),

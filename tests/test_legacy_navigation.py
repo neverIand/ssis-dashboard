@@ -360,7 +360,7 @@ class LegacyBookmarkTests(unittest.TestCase):
     def test_mapping_does_not_lookup_missing_or_revoked_execution_visibility(self):
         for prefix in PREFIXES:
             self.assert_redirect('/execution/42?native=1', '/app/executions/42', prefix)
-            with patch('dashboard.inspection.execute_query', return_value={}) as query:
+            with patch('dashboard.db.execute_query', return_value={}) as query:
                 response = self.clients[prefix].get(prefix + '/api/v1/executions/42')
                 self.assertEqual(response.status_code, 404)
                 self.assertEqual(query.call_count, 1)
@@ -376,7 +376,7 @@ class LegacyBookmarkTests(unittest.TestCase):
             metadata = self.clients[prefix].get(prefix + '/api/v1/meta').json['data']['capabilities']
             self.assertEqual(metadata, {'events': False, 'values': True, 'override_values': False,
                                         'active_estimates': False})
-            with patch('dashboard.values.visible_execution'), patch('dashboard.values.execute_query',
+            with patch('dashboard.values.visible_execution'), patch('dashboard.db.execute_query',
                     side_effect=lambda resource, *args, **kwargs: {'upper_id': 1}
                     if resource.endswith('fence.sql') else [row('overrides', value='private-value-canary')]) as query:
                 response = self.clients[prefix].get(prefix + '/api/v1/executions/42/values?section=overrides')

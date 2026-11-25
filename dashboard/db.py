@@ -6,6 +6,11 @@ from time import perf_counter
 
 import pyodbc
 
+from dashboard.observability import record_query
+
+
+_BIGINT_MAX = 2 ** 63 - 1
+
 
 def validate_timeouts(login_timeout, query_timeout):
     """Reject unbounded or invalid timeout settings before opening a connection."""
@@ -134,3 +139,23 @@ def execute_query(query_file, parameters=(), *, connection_string, one_row=False
                     # errors are best effort; cancellation on success propagates.
                     if outcome == 'ok' and not isinstance(error, Exception):
                         raise
+
+
+def catalog_query(config, *, declared_parameters=True):
+    """Bind API reads to the configured connection, timeouts, typed timestamps and query observer.
+
+    The returned query(resource, parameters=(), *, one_row=False) passes everything else to execute_query.
+    """
+    def query(resource, parameters=(), *, one_row=False):
+        return execute_query(resource, parameters, connection_string=config['CONNECTION_STRING']['main'],
+                             one_row=one_row, login_timeout=config['DB_LOGIN_TIMEOUT_SECONDS'],
+                             query_timeout=config['DB_QUERY_TIMEOUT_SECONDS'], typed_timestamps=True,
+                             declared_parameters=declared_parameters, on_complete=record_query)
+    return query
+
+
+def tracked_xml(ids):
+    """An ID-list parameter. Integers only, so the XML cannot carry markup from anywhere else."""
+    if any(type(i) is not int or not 1 <= i <= _BIGINT_MAX for i in ids):
+        raise ValueError('Tracked IDs must be positive BIGINT values.')
+    return '<t>' + ''.join(f'<i>{i}</i>' for i in ids) + '</t>'

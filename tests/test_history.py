@@ -9,6 +9,7 @@ import unittest
 
 import pyodbc
 
+from dashboard.db import execute_query as real_execute_query
 from dashboard import create_app, cursors
 from dashboard.timestamps import Timestamp, TICKS_PER_SECOND, parse_timestamp
 from tests import test_api_contract as contract_tests
@@ -33,7 +34,7 @@ class HistoryTests(unittest.TestCase):
     def setUp(self):
         self.connect = self.enterContext(patch('pyodbc.connect', side_effect=AssertionError('Unexpected SQL')))
         self.clock = self.enterContext(patch('dashboard.history.utc_now', return_value=NOW))
-        self.query = self.enterContext(patch('dashboard.history.execute_query', side_effect=self.query_fixture))
+        self.query = self.enterContext(patch('dashboard.db.execute_query', side_effect=self.query_fixture))
         self.app = create_app({'TESTING':True, 'LOG_LEVEL':'ERROR', 'EXECUTION_COUNT':1,
                                'CONNECTION_STRING':{'main':'private-connection-canary'}})
         self.client = self.app.test_client()
@@ -385,7 +386,7 @@ class HistoryTests(unittest.TestCase):
         self.assertIsNone(page['data'][0]['estimate'])
 
     def test_native_boundary_binds_names_statuses_and_closes_both_connections(self):
-        from dashboard.db import execute_query
+        execute_query = real_execute_query
         self.query.side_effect = execute_query
         connections, cursors_used = [], []
         for record in ({'upper_id':1}, history()):

@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 
 import pyodbc
 
+from dashboard.db import execute_query as real_execute_query
 from dashboard import create_app, cursors
 from dashboard.timestamps import Timestamp, TICKS_PER_SECOND, parse_timestamp
 from tests import test_api_contract as contract_tests
@@ -26,7 +27,7 @@ class NavigationTests(unittest.TestCase):
     def setUp(self):
         self.connect = self.enterContext(patch('pyodbc.connect', side_effect=AssertionError('Unexpected SQL')))
         self.clock = self.enterContext(patch('dashboard.navigation.utc_now', return_value=NOW))
-        self.query = self.enterContext(patch('dashboard.navigation.execute_query', side_effect=self.query_fixture))
+        self.query = self.enterContext(patch('dashboard.db.execute_query', side_effect=self.query_fixture))
         self.app = create_app({'TESTING': True, 'LOG_LEVEL': 'ERROR', 'EXECUTION_COUNT': 1,
                                'CONNECTION_STRING': {'main': 'private-connection-canary'}})
         self.client = self.app.test_client()
@@ -263,7 +264,7 @@ class NavigationTests(unittest.TestCase):
 
     def test_query_boundary_uses_bound_values_unique_aliases_typed_ids_and_cleanup(self):
         self.query.side_effect = None
-        from dashboard.db import execute_query
+        execute_query = real_execute_query
         self.query.side_effect = execute_query
         connections, sql_cursors = [], []
         row = {'project_id': 42, 'folder_id': 7, 'folder_name': 'Exact', 'name':'Child', 'description':None}

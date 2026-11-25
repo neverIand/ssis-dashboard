@@ -3,18 +3,14 @@
 from werkzeug.exceptions import NotFound
 
 from dashboard import api_validation as inputs, serialization as wire
-from dashboard.db import execute_query
+from dashboard.db import catalog_query
 from dashboard.executions import serialize_execution
 from dashboard.estimates import MISSING, detail_estimate
-from dashboard.observability import record_query
 from dashboard.timestamps import utc_now
 
 
 def _query(resource, identifier, config):
-    return execute_query(resource, (identifier,), connection_string=config['CONNECTION_STRING']['main'],
-                         one_row=True, login_timeout=config['DB_LOGIN_TIMEOUT_SECONDS'],
-                         query_timeout=config['DB_QUERY_TIMEOUT_SECONDS'], typed_timestamps=True,
-                         on_complete=record_query)
+    return catalog_query(config, declared_parameters=False)(resource, (identifier,), one_row=True)
 
 
 def visible_execution(value, config, *, as_of):
