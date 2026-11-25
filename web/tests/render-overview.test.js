@@ -238,7 +238,8 @@ test('transient refresh errors retain and label existing DOM; denial removes it 
   assert.equal(dom.get('app-status').textContent, '');
   await view.refresh();
   assert.equal(row.isConnected, false);
-  assert.equal(dom.root.querySelector('[data-count="total"]').textContent, '—');
+  assert.equal(dom.root.querySelector('[data-count="total"]').textContent, 'Not loaded');
+  assert.equal(dom.root.querySelector('[data-count="total"]').getAttribute('data-empty'), 'true');
   assert.doesNotMatch(dom.get('executions-status').textContent, /Previous results shown/);
   assert.equal(dom.get('poll-status').textContent, '⚠ Executions unavailable · Auto refresh stopped');
   assert.equal(dom.get('overview-refresh').disabled, false);
@@ -693,7 +694,60 @@ test('B3 Overview: retained-page restore keeps its saved window position', async
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const clickNode = node => node.dispatchEvent(new Event('click'));
 
-test('overview keeps the open timeline and both reserved areas through a delayed selection change without old counts', async t => {
+test('a folder change clears the counts while a refresh spins the Refresh button without Refreshing… text', async t => {
+  const dom = overviewDOM(), metadata = timelineMetadata();
+  let waiting = null;
+  const view = mountOverview(dom.root, { metadata, appBase: '/app/', api: { async get(resource) {
+    if (resource === 'executions') return waiting ? waiting.promise : overviewPage();
+    return resource === 'metrics/summary' ? timelineSummary() : timelinePage();
+  } } });
+  t.after(view.dispose);
+  await view.apply(defaultSelection(metadata));
+  const refresh = dom.get('overview-refresh'), total = dom.root.querySelector('[data-count="total"]');
+  assert.equal(refresh.getAttribute('data-refreshing'), 'false');
+  waiting = deferred(); const refreshing = view.refresh(); await flush();
+  assert.equal(refresh.getAttribute('data-refreshing'), 'true');
+  assert.doesNotMatch(dom.get('executions-status').textContent, /Refreshing/);
+  assert.equal(total.textContent, '10');
+  waiting.resolve(overviewPage()); waiting = null; await refreshing; await flush();
+  assert.equal(refresh.getAttribute('data-refreshing'), 'false');
+  // A selection change during a refresh ends the refresh cycle: the icon stops with it.
+  waiting = deferred(); view.refresh(); await flush(); assert.equal(refresh.getAttribute('data-refreshing'), 'true');
+  const replaced = waiting; waiting = deferred(); const changed = view.apply({ ...defaultSelection(metadata), status: [7] }); await flush();
+  assert.equal(refresh.getAttribute('data-refreshing'), 'false');
+  replaced.resolve(overviewPage()); waiting.resolve(overviewPage()); waiting = null; await changed; await flush();
+  // A different folder is a different count scope: its counts are not carried.
+  waiting = deferred(); const changing = view.apply({ ...defaultSelection(metadata), folder: 'Other' }); await flush();
+  assert.equal(total.textContent, 'Not loaded'); assert.equal(total.getAttribute('data-empty'), 'true');
+  assert.equal(refresh.getAttribute('data-refreshing'), 'false');
+  waiting.resolve(overviewPage()); waiting = null; await changing; await flush();
+});
+
+test('carried counts are not actionable while loading and leave as soon as a page for a moved window arrives', async t => {
+  const dom = overviewDOM(), metadata = timelineMetadata(), selected = [];
+  let list = null, summary = null, bounds = {};
+  const view = mountOverview(dom.root, { metadata, appBase: '/app/', onSelect: changes => selected.push(changes), api: { async get(resource) {
+    if (resource === 'executions') return list ? list.promise : overviewPage(bounds);
+    if (resource === 'metrics/summary') { if (summary) await summary.promise; return timelineSummary(bounds); }
+    return timelinePage();
+  } } });
+  t.after(view.dispose);
+  await view.apply(defaultSelection(metadata));
+  const total = dom.root.querySelector('[data-count="total"]'), failed = dom.root.querySelector('[data-status-card="failed"]');
+  // A status change keeps the counts on view; activating a card meanwhile does nothing.
+  list = deferred(); const changing = view.apply({ ...defaultSelection(metadata), status: [2] }); await flush();
+  assert.equal(total.textContent, '10'); assert.equal(failed.getAttribute('aria-disabled'), 'true');
+  const enter = new Event('click', { cancelable: true }); failed.dispatchEvent(enter);
+  assert.equal(enter.defaultPrevented, true); assert.deepEqual(selected, []);
+  // The list comes back for a moved window: the old window's counts go before its own counts arrive.
+  bounds = { from: '2026-10-17T00:00:30.0000000Z', to: '2026-10-17T18:00:30.0000000Z' }; summary = deferred();
+  list.resolve(overviewPage(bounds)); list = null; await flush(); await flush();
+  assert.equal(total.textContent, 'Not loaded'); assert.equal(total.getAttribute('data-empty'), 'true');
+  summary.resolve(); summary = null; await changing; await flush();
+  assert.equal(total.getAttribute('data-empty'), 'false');
+});
+
+test('overview keeps the open timeline, both reserved areas and the all-status counts through a delayed status change', async t => {
   const dom = overviewDOM(), metadata = timelineMetadata(), calls = [], list = deferred(), timeline = deferred();
   let delay = false;
   const view = mountOverview(dom.root, { metadata, appBase: '/app/', api: { async get(resource, options) {
@@ -718,7 +772,9 @@ test('overview keeps the open timeline and both reserved areas through a delayed
   assert.equal(dom.get('timeline-chart').children.length, 0);
   assert.equal(dom.get('timeline-selected').textContent, '');
   assert.equal(row.isConnected, false);
-  assert.equal(dom.root.querySelector('[data-count="total"]').textContent, '—');
+  // The counts cover every status of the same scope and window, so a status change keeps them on view, not actionable.
+  assert.equal(dom.root.querySelector('[data-count="total"]').textContent, '10');
+  assert.equal(dom.root.querySelector('[data-status-card="total"]').getAttribute('aria-disabled'), 'true');
   assert.equal(dom.get('cohort-tip-window').textContent, '');
   assert.equal(dom.get('summary-status'), status);
   list.resolve(overviewPage()); await flush();

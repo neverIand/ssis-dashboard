@@ -114,8 +114,7 @@ h2 {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.8rem;
-  margin-left: auto;
-  flex-shrink: 1;
+  flex: 1 1 auto;
   max-width: 100%;
   font-size: 0.9333rem;
 }
@@ -127,7 +126,7 @@ main {
 }
 
 .connection-state {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   color: var(--sd-secondary);
   font-size: 0.8667rem;
@@ -176,6 +175,10 @@ main {
 [data-execution-scroll][data-loading] { min-height: 48rem; }
 .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 2.2rem; min-width: 2.2rem; height: 2.2rem; padding: 0; }
 .icon-button svg, .info-trigger svg { display: block; flex-shrink: 0; }
+/* A running refresh turns the Refresh icon; reduced motion dims it instead. */
+.icon-button[data-refreshing="true"] svg { animation: sd-spin 0.9s linear infinite; }
+@keyframes sd-spin { to { rotate: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .icon-button[data-refreshing="true"] svg { animation: none; opacity: 0.5; } }
 .info-tip, .info-label { display: inline-flex; align-items: center; flex: 0 0 auto; }
 .info-tip { vertical-align: middle; }
 .info-label { white-space: pre; }
@@ -395,6 +398,10 @@ input:disabled, select:disabled, button:disabled, button[aria-disabled="true"] {
   font-weight: 600;
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
+}
+.summary-card strong[data-empty="true"] { position: relative; width: 1.2em; height: 1.25em; }
+.summary-card strong[data-empty="true"]::after {
+  content: ""; position: absolute; inset-inline: 0; top: calc(50% - 1px); border-top: 2px solid var(--sd-secondary);
 }
 
 .executions { min-width: 0; }
@@ -732,13 +739,17 @@ td > :is(.status-badge, .result-badge) { vertical-align: top; line-height: 1lh; 
   [data-execution-table] .name-cell { min-width: 10rem; }
 }
 .history-scope { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; border: 0; padding: .75rem 0; }
-.history-scope label { display: flex; flex: 1; flex-direction: column; min-width: min(12rem, 100%); gap: .25rem; }
+.history-scope > label, .history-match { display: flex; flex: 1; flex-direction: column; min-width: min(12rem, 100%); gap: .25rem; }
+.history-match-label { display: flex; align-items: center; gap: .2rem; }
 .history-scope input, .history-scope select { width: 100%; }
 .history-identity { display: block; font-size: .8rem; overflow-wrap: anywhere; max-width: 24rem; }
 .server-label { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Connection context reads as one labelled group, separate from the navigation links. */
-.header-meta { display: flex; align-items: center; gap: 0.5rem; min-width: 0; padding: 0.1rem 0.5rem; border: 1px solid var(--sd-border); border-radius: 4px; color: var(--sd-secondary); font-size: 0.8667rem; }
+.header-meta { display: flex; align-items: center; gap: 0.5rem; min-width: 0; padding: 0.1rem 0.5rem; border: 1px solid var(--sd-border); border-radius: 4px; background: var(--sd-subtle); color: var(--sd-secondary); font-size: 0.8667rem; }
+/* A startup or error status takes its own line below the navigation. */
+.header-content:has(.connection-state > [data-app-status]:not([hidden])) .connection-state, :root[data-browser-unsupported] .connection-state { flex-basis: 100%; }
 .header-meta:not(:has(> p:not([hidden]))) { display: none; }
+.header-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.8rem; min-width: 0; margin-left: auto; }
 .header-meta .server-label { color: var(--sd-text); }
 /* History: deviation from the estimate, chart scope and mixed-package note. */
 .deviation[data-level="warning"] { color: var(--sd-warning); font-weight: 600; }

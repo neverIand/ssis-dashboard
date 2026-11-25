@@ -233,6 +233,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       || (refreshing && state.busy)));
     refresh.disabled = state.selection === null;
     refresh.setAttribute('aria-disabled', String(state.busy));
+    refresh.setAttribute('data-refreshing', String(state.refreshing === true));
     autoPaused = state.poll.paused;
     pollToggle.disabled = state.selection === null;
     pollingButton(pollToggle, autoPaused);
@@ -264,7 +265,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
     listStatus.title = [observed, error, previousCounts].filter(Boolean).join(' · ');
     listStatus.textContent = error
       ? [error, previousResults, previousCounts, pageDetails].filter(Boolean).join(' ')
-      : state.pageStale ? `Refreshing… Previous results shown. ${pageDetails}`
+      : state.pageStale ? pageDetails
       : state.phase === 'loading-list' ? 'Loading executions…' : pageDetails || 'No selection';
     const stale = state.pageStale || state.summaryStale;
     const observation = state.phase === 'summary-error' && state.summary ? state.summary : page;
@@ -283,13 +284,15 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
       failed: failedCodes.reduce((total, code) => total + (counts[code] ?? 0), 0),
       other: state.summary.data.by_status.filter(item => !carded.includes(item.code)).reduce((total,item) => total + item.count,
         0) } : null;
-    summaryAvailable = values !== null;
+    // Counts carried through a reload stay visible but not actionable until the new counts arrive.
+    summaryAvailable = values !== null && !(state.summaryStale && state.busy);
     for (const [key, node] of Object.entries(cards)) {
-      node.textContent = values ? display.count(values[key]) : '—';
-      if (values) node.removeAttribute('aria-label');
-      else node.setAttribute('aria-label', 'Not loaded');
+      // An unloaded count has visually hidden text; the stylesheet draws a decorative bar level with the dots.
+      if (values) node.textContent = display.count(values[key]);
+      else if (node.getAttribute('data-empty') !== 'true') node.replaceChildren(element('span', 'Not loaded', 'visually-hidden'));
+      node.setAttribute('data-empty', String(!values));
       const link = cardLinks[key];
-      const available = values !== null && (key === 'total' || statusSets[key].length > 0);
+      const available = summaryAvailable && (key === 'total' || statusSets[key].length > 0);
       link.setAttribute('aria-disabled', String(!available));
       // Keep a disabled link focusable while its summary reloads. The click
       // guard above prevents activation until fresh counts are available.

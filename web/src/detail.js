@@ -164,13 +164,16 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
       throw error;
     }
   }
+  // A base read that failed after a refresh keeps that kind, so the next Refresh of the same execution turns too.
+  let failedRefresh = false;
   async function run({ base = true, only = null, index, keep = true, pending = [] } = {}) {
     if (disposed || active) return;
     const current = ++generation, previous = state.response;
     const job = { controller: null, timer: null, section: null, reset: new Set(),
       queue: new Set(only ? [only, ...pending] : base ? keys.filter(key => state[key].open) : pending) };
     active = job;
-    emit({ phase: 'loading', error: null, stale: base && previous !== null,
+    const refreshing = base && (previous !== null || failedRefresh);
+    emit({ phase: 'loading', error: null, stale: base && previous !== null, refreshing,
       operation: base ? state.operation : 'section', sectionBusy: only });
     try {
       if (base) {
@@ -213,7 +216,10 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
         if (disposed || current !== generation) return;
         job.section = null;
       }
-      if (!disposed && current === generation) emit({ phase: 'ready', operation: 'refresh', sectionBusy: null });
+      if (!disposed && current === generation) {
+        if (base) failedRefresh = false;
+        emit({ phase: 'ready', operation: 'refresh', sectionBusy: null, refreshing: false });
+      }
     } catch (error) {
       if (!disposed && current === generation) {
         const failure = error instanceof ApiError ? error : new ApiError('invalid_response');
@@ -223,8 +229,9 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
           if (!retained) paths[key] = emptyPath();
           updateSection(key, { page, phase: page ? 'error' : 'idle', error: retained ? failure : null, stale: page !== null });
         }
+        if (base) failedRefresh = refreshing;
         emit({ phase: 'error', response: retained ? previous : null, error: failure, stale: retained,
-          operation: 'refresh', sectionBusy: null });
+          operation: 'refresh', sectionBusy: null, refreshing: false });
       }
     } finally {
       clearTimeout(job.timer);
@@ -338,6 +345,7 @@ export function createDetailLoader({ api, executionId, metadata, publish, timeou
       if (id === state.executionId) return load();
       cancel(); loop.reset(); tabInitialized = false;
       paths = Object.fromEntries(keys.map(key => [key, emptyPath()]));
+      failedRefresh = false;
       state = { phase: 'idle', executionId: id, response: null, terminal: false, error: null, stale: false, operation: 'select',
         sectionBusy: null,
         ...Object.fromEntries(keys.map(key => [key, { ...initialSection(key), open: state[key].open }])) };

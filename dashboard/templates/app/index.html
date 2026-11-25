@@ -115,7 +115,7 @@
             <div class="panel summary-grid">
                 {% for key, label in [('total', 'Total'), ('running', 'Running'), ('succeeded', 'Succeeded'), ('failed', 'Failed'), ('other', 'Other')] %}
                 <a class="summary-card" data-status-card="{{ key }}" data-selection-link aria-disabled="true"{% if key == 'other' %} hidden{% elif key == 'failed' %} title="Failed or ended unexpectedly"{% endif %}>
-                    <strong data-count="{{ key }}" aria-label="Not loaded">—</strong><span class="metric-{{ key }}">{{ label }}</span>
+                    <strong data-count="{{ key }}" data-empty="true"><span class="visually-hidden">Not loaded</span></strong><span class="metric-{{ key }}">{{ label }}</span>
                 </a>
                 {% endfor %}
             </div>

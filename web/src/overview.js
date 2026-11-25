@@ -121,10 +121,12 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, reta
   let active = null;
   let disposed = false;
   // timelineFor is the serial of the list page the kept timeline was read for, so no old page is held.
-  let timelineAfter = 'ready', timelineFor = null, pageSerial = 0;
+  // failedRefresh remembers that the failed list read belonged to a refresh, through an expired-cursor fallback.
+  let timelineAfter = 'ready', timelineFor = null, pageSerial = 0, refreshCycle = false, failedRefresh = false;
   const busy = () => ['loading-list', 'loading-summary', 'loading-timeline'].includes(state.phase);
   const show = (poll) => {
-    publish({ ...state, poll, busy: busy(), pageNumber: (context?.index ?? 0) + 1,
+    if (!busy()) refreshCycle = false;
+    publish({ ...state, poll, busy: busy(), refreshing: refreshCycle && busy(), pageNumber: (context?.index ?? 0) + 1,
       hasPrevious: !busy() && Boolean(context?.index),
       hasNext: !busy() && Boolean(state.page?.meta.has_more) });
   };
@@ -178,7 +180,8 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, reta
   }
 
   async function summary(current, selection, page) {
-    const previous = state.summary?.meta.from === page.meta.from && state.summary.meta.to === page.meta.to
+    // Carried counts cover the list's load only; counts of another window never stand beside the new page.
+    const previous = state.summary?.meta.from === page.meta.from && state.summary?.meta.to === page.meta.to
       ? state.summary : null;
     if (state.timeline.scope !== timelineScope(selection,page)) {
       state = {...state, timeline:{...state.timeline, page:null, error:null, stale:false, scope:null}};
@@ -196,6 +199,7 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, reta
       if (!disposed && current === generation) {
         if ([401, 403].includes(error.status)) {
           denied();
+          failedRefresh = refreshCycle;
           emit({ phase: 'list-error', page: null, summary: null, pageStale: false, summaryStale: false, error });
           return;
         }
@@ -224,15 +228,17 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, reta
     } catch (error) {
       if (disposed || current !== generation) return;
       if ([401,403].includes(error.status)) {
-        denied(); emit({phase:'list-error',page:null,summary:null,pageStale:false,summaryStale:false,error});
+        denied(); failedRefresh = refreshCycle;
+        emit({phase:'list-error',page:null,summary:null,pageStale:false,summaryStale:false,error});
       } else emit({phase:afterPhase,timeline:{...state.timeline,error,page:transient(error) ? previous : null,
         stale:transient(error) && previous !== null}});
     }
   }
 
-  async function load(index, { notice = '', operation = 'page' } = {}) {
+  async function load(index, { notice = '', operation = 'page', carrySummary = false } = {}) {
     const previousPage = operation === 'refresh' ? state.page : null;
-    const previousSummary = operation === 'refresh' ? state.summary : null;
+    // Counts cover all statuses of the scope and window, so a status, sort or size change keeps them on view while reloading.
+    const previousSummary = operation === 'refresh' || carrySummary ? state.summary : null;
     cancel();
     const current = generation;
     const selection = state.selection;
@@ -269,10 +275,11 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, reta
         contexts.delete(key(selection));
         context = { entries: [null], index: 0, cohort: null };
         // This fallback has no cursor, so a second failure cannot reset again.
-        return load(0, { notice: 'The page link expired or is no longer valid. Reset to page one.' });
+        return load(0, { notice: 'The page link expired or is no longer valid. Reset to page one.', carrySummary });
       }
       if ([401, 403].includes(error.status)) denied();
       const keep = transient(error) && previousPage !== null;
+      failedRefresh = refreshCycle;
       emit({ phase: 'list-error', page: keep ? previousPage : null, summary: keep ? previousSummary : null,
         pageStale: keep, summaryStale: keep && previousSummary !== null, error });
     }
@@ -285,6 +292,7 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, reta
     remember();
     cancel();
     loop.reset();
+    refreshCycle = failedRefresh = false;
     if (selection === null) {
       context = null;
       emit({ phase: 'idle', selection: null, page: null, summary: null, error: null, notice: '',
@@ -292,13 +300,18 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, reta
       return;
     }
     const saved = restore ? contexts.get(key(selection)) : null;
+    const counted = ['folder', 'project', 'package', 'created', 'from', 'to'];
+    const carrySummary = state.summary !== null && state.selection !== null
+      && counted.every(field => state.selection[field] === selection[field]);
     context = saved ? { ...saved, entries: [...saved.entries] } : { entries: [null], index: 0, cohort: null };
     state = { ...state, selection };
-    return load(context.index);
+    return load(context.index, { carrySummary });
   }
 
   function refresh() {
-    if (!disposed && !busy() && state.selection !== null) return load(context.index, { operation: 'refresh' });
+    if (disposed || busy() || state.selection === null) return;
+    refreshCycle = true;
+    return load(context.index, { operation: 'refresh' });
   }
 
   function retryTimeline() {
@@ -354,6 +367,7 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, reta
     },
     retryList() {
       if (!disposed && !busy() && state.phase === 'list-error') {
+        refreshCycle = failedRefresh;
         return load(context.index, { notice: state.notice, operation: state.operation });
       }
     },
@@ -361,6 +375,7 @@ export function createOverview({ api, metadata, publish, timeoutMs = 30000, reta
       if (disposed || busy() || state.phase !== 'summary-error') return;
       cancel();
       state = { ...state, operation: 'summary-retry' };
+      refreshCycle = true;
       return summary(generation, state.selection, state.page);
     },
     dispose() {

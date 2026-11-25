@@ -211,7 +211,12 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
   listen(svg, 'dblclick', activate);
   listen(drill, 'click', () => showBucket(selected));
   listen(toggle, 'click', actions.toggle);
-  listen(retry, 'click', actions.retry);
+  // A Retry click keeps the button and names the wait until that read ends.
+  let retrying = false, retryScope = null;
+  listen(retry, 'click', () => {
+    if (retry.getAttribute('aria-disabled') !== 'true') { retrying = true; retryScope = current?.scope ?? null; }
+    actions.retry();
+  });
   listen(bucket, 'change', () => {
     if (busy) {
       if (current) bucket.value = current.bucket;
@@ -247,7 +252,8 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
       bucket.disabled = retry.disabled = panel.hidden;
       bucket.setAttribute('aria-disabled', String(busy));
       retry.setAttribute('aria-disabled', String(busy));
-      retry.hidden = state.error === null;
+      if (!isBusy || state.scope !== retryScope) retrying = false;
+      retry.hidden = state.error === null && !retrying;
       svg.setAttribute('aria-busy', String(busy));
       // A hidden panel keeps what it painted; it repaints only for new data while shown, and clears with the data.
       const response = state.page;
@@ -263,7 +269,8 @@ export function mountTimeline(root, { metadata, actions, restoreView = null }) {
         : [observationTitle(display, response?.meta.generated_at), errorText].filter(Boolean).join(' · ');
       status.textContent = panel.hidden ? '' : state.error
         ? errorText + (state.stale ? ' Previous timeline shown.' : '')
-        : state.stale ? `${busy ? 'Refreshing… ' : ''}Previous timeline shown.`
+        : retrying ? `Retrying…${state.stale ? ' Previous timeline shown.' : ''}`
+        : state.stale && !busy ? 'Previous timeline shown.'
           : response ? `${display.count(response.data.length)} calendar ${response.data.length === 1 ? 'bucket' : 'buckets'}`
             : 'Loading timeline…';
       scope.title = panel.hidden || !page ? ''

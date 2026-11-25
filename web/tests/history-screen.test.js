@@ -225,6 +225,8 @@ test('while a read is in flight the page is marked busy and Refresh says so', as
   assert.equal(dom.history().length, 1);
   assert.equal(dom.get('history-refresh').getAttribute('aria-disabled'), 'true');
   assert.equal(dom.get('history-table').getAttribute('aria-busy'), 'true');
+  // The first read of a scope is a load, not a refresh: the Refresh icon does not turn.
+  assert.notEqual(dom.get('history-refresh').getAttribute('data-refreshing'), 'true');
   gate.resolve();
   await settle();
   assert.equal(dom.get('history-refresh').getAttribute('aria-disabled'), 'false');

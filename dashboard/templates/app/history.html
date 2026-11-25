@@ -15,13 +15,12 @@
     <form data-history-scope-form>
         <fieldset class="history-scope" data-history-scope disabled>
             <legend class="visually-hidden">History scope</legend>
-            <label>Match<select name="match"><option value="exact">Exact names</option><option value="like">LIKE patterns</option></select></label>
             <label>Folder<input name="folder" required maxlength="512" autocomplete="off"></label>
             <label>Project<input name="project" required maxlength="512" autocomplete="off"></label>
             <label>Package<input name="package" required maxlength="512" autocomplete="off"></label>
+            <div class="history-match"><span class="history-match-label"><label for="history-match">Match</label>{% call tip('history-match-tip', 'About matching', '') %}<span data-history-mode-note>LIKE patterns: * or % matches any text, _ matches one character, [abc] matches a set. All creation dates.</span>{% endcall %}</span><select id="history-match" name="match"><option value="exact">Exact names</option><option value="like">LIKE patterns</option></select></div>
             <button type="submit" data-history-load>Load history</button>
         </fieldset>
-        <p class="detail-note" data-history-mode-note>LIKE patterns: * or % matches any text, _ matches one character, [abc] matches a set. All creation dates.</p>
         <p class="inline-notice" data-history-scope-notice role="status"></p>
     </form>
 </section>

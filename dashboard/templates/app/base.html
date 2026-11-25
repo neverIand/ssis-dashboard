@@ -20,6 +20,15 @@
     <header class="page-header">
         <div class="header-content">
             <p class="brand">SSIS Dashboard <span>v{{ app_version }}</span></p>
+            <nav aria-label="Dashboard navigation">
+                <a href="{{ url_for('frontend.overview') }}">Overview</a>
+                <a href="{{ url_for('frontend.history') }}">History</a>
+                {% block navigation %}<a href="{{ url_for('packages') }}" aria-label="Legacy dashboard">Legacy</a>{% endblock %}
+                <div class="header-tools">
+                    <div class="header-meta"><p class="server-label" role="group" data-server-name hidden></p><p data-display-timezone hidden></p></div>
+                    <select class="theme-choice" data-theme-choice aria-label="Theme" title="Theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select>
+                </div>
+            </nav>
             <section class="connection-state" aria-label="Connection status">
                 <p id="app-status" role="status" aria-live="polite" data-app-status>Starting dashboard. If this message remains, reload the page or use the legacy dashboard.</p>
                 <p class="browser-notice" data-browser-notice hidden>This browser is older than the supported versions (Edge or Chrome 143, Firefox 146, Safari 26.2). Update it if a control does not work.</p>
@@ -27,13 +36,6 @@
                 <p data-request-id hidden></p>
                 <noscript><p>Enable JavaScript to use this page, or open the legacy dashboard.</p></noscript>
             </section>
-            <nav aria-label="Dashboard navigation">
-                <a href="{{ url_for('frontend.overview') }}">Overview</a>
-                <a href="{{ url_for('frontend.history') }}">History</a>
-                {% block navigation %}<a href="{{ url_for('packages') }}" aria-label="Legacy dashboard">Legacy</a>{% endblock %}
-                <div class="header-meta"><p class="server-label" role="group" data-server-name hidden></p><p data-display-timezone hidden></p></div>
-                <select class="theme-choice" data-theme-choice aria-label="Theme" title="Theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select>
-            </nav>
         </div>
     </header>
     <main id="main-content" tabindex="-1">

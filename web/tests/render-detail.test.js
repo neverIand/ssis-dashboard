@@ -29,16 +29,40 @@ test('a running detail keeps its update clock during refresh and its observation
   } });
   t.after(screen.dispose); await settle();
   const status = dom.get('detail-poll-status');
+  assert.equal(dom.get('detail-refresh').getAttribute('data-refreshing'), 'false');
   assert.equal(status.textContent, 'Updated 17:00:00');
   assert.equal(status.title, 'Auto refresh on · Observed 2026-10-17 17:00:00');
   delayed = true;
   dom.get('detail-refresh').dispatchEvent(new Event('click'));
+  assert.equal(dom.get('detail-refresh').getAttribute('data-refreshing'), 'true');
   assert.equal(status.textContent, 'Updated 17:00:00');
   assert.equal(status.title, 'Auto refresh on · Observed 2026-10-17 17:00:00 · Previous observation shown.');
   pending.reject(new ApiError('http', { status: 503, requestId })); await settle();
+  assert.equal(dom.get('detail-refresh').getAttribute('data-refreshing'), 'false');
   assert.equal(status.textContent, '⚠ Refresh failed · Updated 17:00:00 · retry scheduled');
   assert.match(status.title, /Previous observation shown/);
   assert.ok(status.title.includes(requestId));
+});
+
+test('after a refresh is denied, the next Refresh of the same execution still turns the icon', async t => {
+  const dom = detailDOM();
+  let mode = 'ok', pending = null;
+  const screen = mountDetail(dom.root, { metadata: metadata(), executionId: '17', appBase: '/app/', api: {
+    async get(resource) {
+      if (resource.endsWith('/executables')) return observations('17');
+      if (mode === 'deny') throw new ApiError('http', { status: 403, requestId });
+      if (pending) return pending.promise;
+      return runningDetailResponse('17');
+    },
+  } });
+  t.after(screen.dispose); await settle();
+  const refresh = dom.get('detail-refresh');
+  mode = 'deny'; refresh.dispatchEvent(new Event('click')); await settle();
+  assert.equal(refresh.getAttribute('data-refreshing'), 'false');
+  mode = 'ok'; pending = deferred(); refresh.dispatchEvent(new Event('click')); await settle();
+  assert.equal(refresh.getAttribute('data-refreshing'), 'true');
+  pending.resolve(runningDetailResponse('17')); pending = null; await settle();
+  assert.equal(refresh.getAttribute('data-refreshing'), 'false');
 });
 
 test('detail bootstrap needs no overview controls and requests metadata, detail and its default tab', async t => {

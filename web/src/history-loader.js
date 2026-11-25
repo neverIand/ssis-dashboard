@@ -9,9 +9,9 @@ const empty = () => ({ open: true, phase: 'idle', page: null, error: null, stale
 export function createHistoryLoader({ api, metadata, selection, publish, paused = false, visible = true, timeoutMs = 30000 }) {
   const display = createDisplay({ timeZone: metadata.display_timezone });
   let query = historySelection(selection, metadata), path = [null], index = 0, cohort = null;
-  let active = null, generation = 0, disposed = false, valid = true;
+  let active = null, generation = 0, disposed = false, valid = true, refreshing = false, failedRefresh = false;
   let state = empty();
-  const notify = () => publish({ ...state, query, busy: active !== null, pageNumber: index + 1,
+  const notify = () => publish({ ...state, query, busy: active !== null, refreshing: active !== null && refreshing, pageNumber: index + 1,
     hasPrevious: index > 0, hasNext: state.page?.meta.has_more === true, poll: loop.snapshot() });
   const loop = createRefreshLoop({ paused, visible, refresh: () => run(), publish: notify });
   const emit = changes => {
@@ -28,6 +28,8 @@ export function createHistoryLoader({ api, metadata, selection, publish, paused 
     if (disposed || active || !valid) return;
     const current = ++generation, controller = new AbortController();
     let timedOut = false, previous = reset ? null : state.page;
+    // Retrying a failed refresh is a refresh, even after a failed expired-cursor fallback cleared the page.
+    refreshing = !reset && target === index && (state.page !== null || failedRefresh && state.phase === 'error');
     const job = { controller, timer: setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs) };
     active = job;
     emit({ phase: 'loading', page: previous, error: null, stale: previous !== null, notice: '' });
@@ -55,9 +57,11 @@ export function createHistoryLoader({ api, metadata, selection, publish, paused 
       if (page.meta.has_more) path.push(page.meta.next_cursor);
       cohort = { as_of: page.meta.as_of, upper_id: page.meta.upper_id };
       state = { ...state, phase: 'ready', page, error: null, stale: false };
+      failedRefresh = false;
     } catch (error) {
       if (disposed || current !== generation) return;
       const failure = timedOut ? new ApiError('timeout') : error instanceof ApiError ? error : new ApiError('invalid_response');
+      failedRefresh = refreshing;
       state = { ...state, phase: 'error', error: failure, page: retryable(failure) ? previous : null,
         stale: retryable(failure) && previous !== null };
       if (!retryable(failure)) { path = [null]; index = 0; cohort = null; }

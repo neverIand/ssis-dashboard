@@ -181,6 +181,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     if (state.terminal && focused === toggle) refresh.focus({ preventScroll: true });
     focusTargets.toggle = state.terminal ? refresh : toggle;
     refresh.setAttribute('aria-disabled', String(state.busy));
+    refresh.setAttribute('data-refreshing', String(state.busy && state.refreshing === true));
     autoPaused = state.poll.paused;
     pollingButton(toggle, autoPaused, state.terminal);
     const generatedAt = state.response?.meta.generated_at;

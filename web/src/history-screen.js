@@ -76,6 +76,7 @@ export function mountHistoryScreen(root, saved = null) {
         pollingButton(toggle, state.poll.paused);
         paused = state.poll.paused;
         refresh.setAttribute('aria-disabled', String(state.busy));
+        refresh.setAttribute('data-refreshing', String(state.refreshing === true));
       } });
     const submit = event => {
       event.preventDefault();

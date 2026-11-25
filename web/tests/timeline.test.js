@@ -160,6 +160,24 @@ test('a window longer than the hour-bucket cap disables Hour and reads Day inste
   }
 });
 
+test('a timeline Retry keeps its button and says Retrying… until the read ends',async t=>{
+  let fail=true,wait=null;const dom=screen(t,async(resource,options)=>{
+    if(resource==='metrics/timeline'){if(wait)await wait.promise;if(fail)throw new ApiError('http',{status:503});}
+    return response(resource,options);});
+  await dom.view.apply(selection());click(dom,'timeline-toggle');await flush();
+  const retry=dom.get('timeline-retry'),status=dom.get('timeline-status');assert.equal(retry.hidden,false);
+  fail=false;wait=deferred();click(dom,'timeline-retry');await flush();
+  assert.equal(retry.hidden,false);assert.match(status.textContent,/^Retrying…/);
+  wait.resolve();wait=null;await flush();await flush();
+  assert.equal(retry.hidden,true);assert.doesNotMatch(status.textContent,/Retrying/);
+  // A Retry replaced by a new selection ends with it: the new read does not say Retrying….
+  fail=true;await dom.view.refresh();await flush();assert.equal(retry.hidden,false);
+  fail=false;wait=deferred();click(dom,'timeline-retry');await flush();assert.match(status.textContent,/^Retrying…/);
+  const changing=dom.view.apply(selection({folder:'Other'}));await flush();
+  assert.doesNotMatch(status.textContent,/Retrying/);
+  wait.resolve();wait=null;await changing;await flush();assert.doesNotMatch(status.textContent,/Retrying/);
+});
+
 test('a lone bucket keeps a narrow, centred bar instead of filling the plot',async t=>{
   const one=timelinePage([timelineBucket()]);
   const dom=screen(t,async(resource,options)=>resource==='metrics/timeline'?one:response(resource,options));await dom.view.apply(selection());

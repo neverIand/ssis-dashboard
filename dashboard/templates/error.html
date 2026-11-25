@@ -18,7 +18,7 @@
         <p>{{ detail }}</p>
         {% if legacy_url %}
         <p><a href="{{ legacy_url }}">Open legacy page</a></p>
-        <p><a href="{{ home_url }}">Open native overview</a></p>
+        <p><a href="{{ home_url }}">Open the new dashboard</a></p>
         {% else %}
         <p><a href="{{ home_url or url_for('packages') }}">Return to the dashboard</a></p>
         {% endif %}

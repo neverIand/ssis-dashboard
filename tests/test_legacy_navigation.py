@@ -2,7 +2,7 @@
 
 from html.parser import HTMLParser
 from unittest.mock import Mock, patch
-from urllib.parse import parse_qs, quote, urljoin, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 import unittest
 
 from flask import Flask
@@ -213,12 +213,9 @@ class LegacyBookmarkTests(unittest.TestCase):
                         self.assertEqual(response.headers['Cache-Control'], 'no-store')
                         links = LinkReader(response.get_data(as_text=True)).links
                         self.assertEqual(links['Open legacy page'], '?')
-                        self.assertEqual(links['Open native overview'], prefix + '/app/')
-                        # Clearing the query preserves the original encoded legacy path.
-                        original = 'http://localhost' + prefix + path + '?native=1'
-                        fallback = urlsplit(urljoin(original, links['Open legacy page']))
-                        self.assertEqual(fallback.path, prefix + path)
-                        self.assertEqual(fallback.query, '')
+                        self.assertEqual(links['Open the new dashboard'], prefix + '/app/')
+                        # "?" keeps the encoded legacy path and clears the query (RFC 3986 section 5.2.2). The test no
+                        # longer resolves it with urljoin, which gave 'native=1' in the office Python 3.14.
         self.monitor.assert_not_called()
 
     def test_independent_history_preserves_actual_legacy_status_scope(self):
@@ -294,9 +291,9 @@ class LegacyBookmarkTests(unittest.TestCase):
                             self.assertEqual(response.data, b'')
                         else:
                             links = LinkReader(response.get_data(as_text=True)).links
-                            self.assertEqual(links['Open native'], prefix + path + '?native=1')
+                            self.assertEqual(links['Open in new dashboard'], prefix + path + '?native=1')
                             self.monitor.reset_mock()
-                            converted = self.clients[prefix].get(links['Open native'])
+                            converted = self.clients[prefix].get(links['Open in new dashboard'])
                             self.assertEqual(converted.status_code, 302)
                             self.monitor.assert_not_called()
 
@@ -309,18 +306,18 @@ class LegacyBookmarkTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(instance.folder_name, 'A%2FB')
             self.assertEqual(instance.status, 'all')
-            self.assertNotIn('Open native', LinkReader(response.get_data(as_text=True)).links)
+            self.assertNotIn('Open in new dashboard', LinkReader(response.get_data(as_text=True)).links)
         response = self.get('/?ignored=1')
-        self.assertEqual(LinkReader(response.get_data(as_text=True)).links['Open native'], '/?native=1')
+        self.assertEqual(LinkReader(response.get_data(as_text=True)).links['Open in new dashboard'], '/?native=1')
 
     def test_unsupported_pages_cannot_reuse_a_previous_requests_native_link(self):
         with self.app.app_context():
             response = self.get('/')
-            self.assertIn('Open native', LinkReader(response.get_data(as_text=True)).links)
+            self.assertIn('Open in new dashboard', LinkReader(response.get_data(as_text=True)).links)
             for path in ('/folder/A*B', '/history/A%5CB/project/Load/status/all/package/Load.dtsx'):
                 response = self.get(path)
                 self.assertEqual(response.status_code, 200)
-                self.assertNotIn('Open native', LinkReader(response.get_data(as_text=True)).links)
+                self.assertNotIn('Open in new dashboard', LinkReader(response.get_data(as_text=True)).links)
 
     def test_unmarked_raw_query_bytes_keep_legacy_behavior_but_marked_bytes_are_strict(self):
         response = self.get('/', environ_overrides={'QUERY_STRING': 'ignored=\xff'})

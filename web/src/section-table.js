@@ -38,7 +38,10 @@ export function mountSectionTable(root, { metadata, actions, restoreView = null 
     node.addEventListener(event, handler);
     listeners.push([node, event, handler]);
   };
+  // A Retry click names its wait in the status line until that read ends.
+  let retrying = false, retryQuery = null;
   for (const key of ['toggle', 'retry', 'previous', 'next', 'latest']) listen(controls[key], 'click', event => {
+    if (key === 'retry' && !busy && retry.getAttribute('aria-disabled') !== 'true') { retrying = true; retryQuery = state?.query ?? null; }
     if (['previous', 'next', 'latest'].includes(key) && !busy && !panel.hidden
         && controls[key].getAttribute('aria-disabled') !== 'true') viewport.pageChange();
     actions[key](event);
@@ -139,7 +142,9 @@ export function mountSectionTable(root, { metadata, actions, restoreView = null 
           const info = page ? view.pageInfo(page, state) : '';
           status.textContent = panel.hidden ? '' : error
             ? `${errorText}${state.stale ? ` ${view.previousPage} ` : ' '}${info}`
-            : state.stale ? `Refreshing… ${view.previousPage} ${info}` : state.phase === 'loading' ? view.loading : info;
+            : retrying && busy && state.query === retryQuery ? `Retrying… ${state.stale ? `${view.previousPage} ` : ''}${info}`.trim()
+            : state.stale ? info : state.phase === 'loading' ? view.loading : info;
+          if (!busy || state.query !== retryQuery) retrying = false;
           // Errors wrap instead of truncating, so the request ID stays readable and selectable.
           if (error && !panel.hidden) status.dataset.error = ''; else delete status.dataset.error;
           view.afterStatus?.();
