@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { expectStyle, loadStylesheet } from './css-rules.js';
 import { mountOverview } from '../src/render-overview.js';
 import { defaultSelection, validateSelection } from '../src/selection.js';
 import { overviewDOM } from './overview-dom.js';
@@ -8,7 +8,6 @@ import { overviewPage, timelineMetadata, timelinePage, timelineSummary } from '.
 import { mountTableViewport } from '../src/table-viewport.js';
 import { wireTime } from './fixtures.js';
 
-const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 const metadata = timelineMetadata();
 const selection = () => validateSelection(defaultSelection(metadata), metadata);
 function screen(t, { list = () => overviewPage(), summary = () => timelineSummary(), timeline = () => timelinePage() } = {}) {
@@ -30,8 +29,31 @@ test('R1-2: header stickiness and clipping depend on a measured fit, never on wi
   dom.scroll.clientWidth = 700;
   await dom.view.refresh();
   assert.equal(dom.scroll.dataset.fits, undefined, 'a wider table keeps its horizontal scroll');
-  assert.match(source('../src/styles.css'), /\[data-sticky-table\]\[data-fits\] \{ overflow-x: clip; \}/);
-  assert.doesNotMatch(source('../src/styles.css'), /^\s*\[data-sticky-table\] \{ overflow-x: clip; \}/m, 'no width-only clip');
+  const sheet = await loadStylesheet();
+  await expectStyle(assert, sheet, '[data-sticky-table][data-fits]', 'overflow-x', 'clip', { width: 1400 });
+  for (const width of [420, 600, 1400]) {
+    assert.equal(await sheet.get('[data-sticky-table]', 'overflow-x', { width }), undefined, 'no width-only clip');
+  }
+  // Every horizontal clip in the sheet (overflow-x, or the first value of the overflow shorthand), at any width or
+  // condition, depends on a measured fit: its selector requires [data-fits] outside any :not().
+  const clips = [...sheet.setting('overflow-x', value => value.startsWith('clip')),
+    ...sheet.setting('overflow', value => value.startsWith('clip'))];
+  assert.ok(clips.length);
+  const positive = selector => { let text = selector, before; do { before = text; text = text.replace(/:not\([^()]*\)/g, ''); } while (text !== before); return text; };
+  // Each :is() branch on its own must still require the fit.
+  for (const { selector, branches } of clips) {
+    for (const branch of branches) assert.match(positive(branch), /\[data-fits\]/, `${selector} → ${branch}`);
+  }
+  // The scroll region scrolls sideways at every width and never on the vertical axis, so a sticky header row
+  // keeps the page as its scroll container; a fitted table clips sideways instead.
+  for (const width of [420, 900, 1400]) {
+    await expectStyle(assert, sheet, '.table-scroll', 'overflow-x', 'auto', { width });
+    for (const selector of ['.table-scroll', '[data-sticky-table]', '[data-sticky-table][data-fits]']) {
+      assert.equal(await sheet.get(selector, 'overflow-y', { width }), undefined, `${selector} ${width} px`);
+    }
+  }
+  // A fitted table's header row sticks below the toolbar on wider screens.
+  await expectStyle(assert, sheet, '[data-sticky-table][data-fits] thead th', 'position', 'sticky', { width: 1400 });
 });
 
 // Deliberate geometry, not a browser/layout claim. A sticky toolbar's natural document top is 460 px.

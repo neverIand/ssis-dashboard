@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { expectStyle, loadStylesheet } from './css-rules.js';
 import { mountDetail } from '../src/render-detail.js';
 import { detailDOM, detailResponse } from './detail-fixture.js';
 import { deferred, wireTime } from './fixtures.js';
@@ -244,13 +244,19 @@ test('a newly recorded execution start updates cached table labels without repla
   assert.equal(historicalRow.children[2].firstChild, historicalStart);
 });
 
-const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 
-test('H-04 (R1-F001): observation Started/Ended cells never wrap and get room for a full cross-day timestamp', () => {
-  const css = source('../src/styles.css');
-  assert.match(css, /\[data-executables-table\] \.time-cell, \[data-children-table\] \.time-cell \{ white-space: nowrap; \}/);
-  assert.match(css, /\[data-executables-table\] col:nth-child\(3\), \[data-executables-table\] col:nth-child\(4\),\s*\[data-children-table\] col:nth-child\(2\), \[data-children-table\] col:nth-child\(3\) \{ width: 12\.5rem; \}/);
-  for (const [table, width] of [['executables', '58rem'], ['children', '56rem']]) {
-    assert.ok(css.includes(`[data-${table}-table] { min-width: ${width}; }`), table);
+test('H-04 (R1-F001): observation Started/Ended cells never wrap and get room for a full cross-day timestamp', async () => {
+  const sheet = await loadStylesheet();
+  for (const width of [600, 1400]) {
+    for (const table of ['executables', 'children']) {
+      await expectStyle(assert, sheet, `[data-${table}-table] .time-cell`, 'white-space', 'nowrap', { width });
+    }
+    for (const column of ['[data-executables-table] col:nth-child(3)', '[data-executables-table] col:nth-child(4)',
+      '[data-children-table] col:nth-child(2)', '[data-children-table] col:nth-child(3)']) {
+      await expectStyle(assert, sheet, column, 'width', '12.5rem', { width });
+    }
+    for (const [table, minimum] of [['executables', '58rem'], ['children', '56rem']]) {
+      await expectStyle(assert, sheet, `[data-${table}-table]`, 'min-width', minimum, { width });
+    }
   }
 });

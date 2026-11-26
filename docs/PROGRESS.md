@@ -17,6 +17,74 @@ Updated 20 November 2026. Development base: `dev-next`. [Roadmap](roadmap.md) ow
 
 ## Next actions
 
+- [x] **40. CSS improvement pass, 26 November.** The user chose the CSS pass from the later list. After a read-only survey (`.local/reports/frontend/20261126-css-survey/survey.md`) they chose batches A to D with no visible change ("A to D, no visible change"). Claude implemented; Codex gpt-6.2-sol at max effort accepted it in round 7, after six rounds that hardened the tests (the stylesheet is unchanged since round 3); its three P4s are fixed; reviews in `.local/reports/reviews/20261126-css-pass-sol/`. Round 1 requested changes:
+  - the breakpoint rewrite moved two width bands;
+  - the `0.2rem` result-badge radius lost its font scaling as a 3 px token;
+  - the helper took the last declaration instead of the cascade winner;
+  - the parser was blind to braces in strings and to range or nested media;
+  - the clip, selection and aria-pressed assertions could be bypassed;
+  - `.page-heading` still took two overridden flex declarations;
+  - the record had wrong counts.
+
+  Round 2 requested changes:
+  - a wide-screen test whose regex received selector objects, so it could not fail;
+  - the helper missed `:nth-child(… of S)` specificity and nested `:is()` branches;
+  - it dropped `@layer` and comment markers inside strings;
+  - the chip contrast test ignored the cascade;
+  - the clip check missed `:not([data-fits])` and the `overflow` shorthand;
+  - G2 missed `-webkit-user-select`, and the `aria-pressed` check missed `[data-…-toggle=""]`;
+  - the breakpoint test did not check both bounds of each gap;
+  - two `source` helpers were left unused.
+
+  Round 3 requested changes, for realistic stylesheet edits that would change the screen and still pass:
+  - the table checks missed the `overflow` shorthand, a clip through an `:is()` branch and the fitted header's `position`;
+  - the chip contrast check skipped the Other family and `background-color`;
+  - nothing checked the zero-dot fill at every width;
+  - the forced-colours lookup ignored top-level rules;
+  - the observation-table check sampled three widths instead of every media rule.
+
+  Round 4 requested changes:
+  - declaration order inside one rule was not a tie-break;
+  - a shorthand and its longhand did not compete (`border-left` against `border-left-width`, `overflow` against the axes);
+  - the forced-colours lookup could not be combined with a width;
+  - contrast was checked at one width;
+  - the scroll axes of the table region were unchecked;
+  - new or more specific fill rules and shared detail-table column rules could slip past;
+  - unused code remained.
+
+  Round 5 requested changes:
+  - a forced-colours query combined with a width was not evaluated;
+  - the reduced-motion row highlight was unchecked;
+  - the History media exemption was too broad;
+  - the procedure said to restart Flask, but the shell reads the manifest on each request.
+
+  Round 6 requested changes:
+  - the reduced-motion Refresh icon and the touch-screen 16 px picker inputs were unchecked;
+  - the column guard also caught the Package calls tab button;
+  - the record did not list the emulated conditions the browser comparison skipped.
+
+  The tests now pin the four selectors allowed to set `fill`, and they reject any media rule that names a detail-table column. Element matching and layout stay with the browser procedure, now in [frontend acceptance](FRONTEND_ACCEPTANCE.md#stylesheet-refactors-computed-style-comparison).
+
+  | Batch | Change | Status |
+  | --- | --- | --- |
+  | A (N-07) | `web/tests/css-rules.js` parses `styles.css` through Vite's Lightning CSS for the supported browsers, with nesting always flattened, so selectors, media conditions and values each print one way. It skips strings and comments (keeping comment markers inside strings). It throws on statement at-rules, on block at-rules other than `@media` and `@keyframes`, and on media syntax it does not evaluate. Specificity follows Selectors Level 4, including the `of S` argument of `:nth-child()`, and nested `:is()` branches are aliases. `get(selector or selectors, property, { width \| media })` returns the cascade winner (importance, then specificity, then source order) among rules that list a selector or have it as an `:is()` branch. Top-level rules are always in scope; `width` adds the media rules that hold at that viewport width, and `media` adds the rules under one feature condition. `width` and `media` combine, and each condition of a combined query is judged on its own. Declaration order inside a rule breaks ties, and shorthands compete with their longhands: `overflow` for each axis, `background` with `background-color`, and `border-left`/`border-width`/`border-style`/`border` for the left border's width and style. Width is evaluated with the browser's initial font size, 16 px by default, as a media-query rem, so the breakpoints are about 501, 789/790 and 1067 px. The assertions in seven test files that matched the stylesheet text now ask which value applies: `design-system`, `detail-tables`, `filters`, `render-overview`, `table-viewport`, `timeline` and `value-styling`. `css-rules.test.js` tests the helper itself. The chip contrast test uses the cascade winner over the base and family rules. Only the F2-1 token rules still read the source text, because they are about how tokens are written. Two mutation sets fail tests: seven removed or altered rules, and 38 cascade and bypass mutations from six review rounds, plus a harmless control that must pass (`.local/tmp/css-pass-20261126-01/mutate_tests.py`) | Complete |
+  | B (N-09) | The rules appended per batch rejoin their areas: header group and tools; overview table cells, over-estimate note and row-change animation; filter meta row; executables Paths; History scope form, suggestions and notes; chart selection row. Real duplicates merged: sort-header buttons for the overview and detail tables; `.chart-frame svg`; the narrow-screen copy of the startup-status flex basis; `.page-heading`'s overridden flex declarations. Breakpoints use range syntax with their exact old bounds (`width <= 31.3333rem`, `<= 49.3333rem`, `>= 49.4rem`, `<= 66.6667rem`, `>= 66.67rem`). A comment records the two old gaps, 789.33–790.4 px and 1066.67–1066.72 px. In each, neither query of that pair matches (narrow and sticky toolbar; mid and wide), while the other queries still apply. A test checks both bounds of each gap. One number style (`0.75rem`) | Complete |
+  | C | Tokens with the same values: `--sd-font-s`/`-xs`/`-2xs` (14, 13 and 12 px) replace 39 literal font sizes; `--sd-radius-small` (4 px) and `--sd-radius-chip` (3 px) replace six fixed radii. The result badge keeps `0.2rem`, which scales with the root font size. One status mapping sets `--sd-tone`/`--sd-tone-soft` per code. Status badges, summary dots, chart groups with their bars and dots, timeline bars and legend swatches read it; before, 10 status selectors in four places set these colours | Complete |
+  | D (R1-F004) | Shallow nesting for the chart frame (plot, empty state, groups, zero dots, hit targets) and both axes. The History plot series rules come before the chart frame block, so a zero-duration dot keeps its surface fill; a test checks that order | Complete |
+
+  Validation (26 November):
+  - Tests and build: Node 679; Python 577 (32 native skipped); the build passes.
+  - Comparison method: a computed-style A/B in the in-app browser (Chrome engine). For every element and its `::before`/`::after`, all standard properties, the new sheet was compared with the `ac854f0` build, swapped in synchronously, with a positive control.
+  - Coverage, each in light and dark:
+    - the Overview at 420, 700, 790, 1024, 1067 and 1400 px, with the timeline, all disclosures and the Status popover open;
+    - execution 17 (failed) on every tab at 1400 px with every disclosure open, plus Events and History with its chart at 420 px;
+    - Package calls and Executables of execution 18, with 14 result badges;
+    - the standalone History page at 420 and 1400 px, with a loaded scope, the chart and a suggestion list open.
+  - Result: no difference except one accepted case. The History legend spans for statuses 2 and 5 gain a `fill` colour, which has no effect on HTML text.
+  - On the way, the comparison found that nesting had moved the `[data-zero]` rule, so zero-duration dots took the status colour. That is fixed.
+  - Not covered by the comparison: hover, focus, fractional widths, and the reduced-motion, forced-colours and touch (`pointer: coarse`) conditions, which the in-app browser cannot emulate. The parsed-rule tests check the rules under those conditions: in [`render-overview.test.js`](../web/tests/render-overview.test.js), the O1/O2/O8 test asserts the failed-row edge in forced colours at 420 and 1400 px, the reduced-motion row highlight and Refresh icon, and the 16 px picker controls on touch screens; the review checked hover and focus statically, and the [browser procedure](FRONTEND_ACCEPTANCE.md#stylesheet-refactors-computed-style-comparison) lists the emulated passes for the next run.
+  - Size: authored JS+CSS 327,264 → 326,767 bytes (−497); packaged gzip 58,042 → 58,023 of 65,536 (−19).
+
 - [x] **39. Authored-size trim and budget decision, 26 November.** With 7 bytes of authored headroom left, the user asked for easy savings first. `api.js` now exports `badResponse(response)` (moved from `overview.js`) and `record`; the seven readers that built the same `invalid_response` error, and `bootstrap.js`'s copy of `record`, use them. No behaviour change. Validation: Node 675; Python 577 (32 native skipped); build. Authored JS+CSS 327,264 of 327,680 bytes (−409); packaged gzip 58,042 of 65,536 (−69). Nothing else is low-risk: the medium candidates of the 17 November survey (C5, C6, J2, D2, about 1.3 KB) need N-07 test rewrites and a computed-style browser comparison. Decision D6/Q3 (26 November): the user dropped the authored ceiling and kept its report ("Drop it, keep the report"), because only the packaged size reaches users. `tests.test_frontend_assets` now enforces only the 64 KiB packaged gzip ceiling; `tests/source_size.py` measures both totals and prints them with `python -m tests.source_size`. The packaged ceiling has 7,494 bytes left; per-screen splitting is the roadmap answer as it approaches. Codex gpt-6.2-sol at max effort accepted it in round 1; its one P4 (two plural "ceilings" in MODERNIZATION_PLAN) is fixed; review in `.local/reports/reviews/20261126-size-budget-sol/`.
 
 - [x] **38. History name suggestions, 26 November (office item F2).** The user chose F2 ("Start F2"). Claude implemented; Codex gpt-6.2-sol at max effort accepted it in round 8; reviews in `.local/reports/reviews/20261126-history-suggestions-sol/`. Round 1 requested changes: a stale highlighted name chosen during the typing delay, visibility checked in a separate statement from the package read, Search more showing more than five new names, a focused button hidden during its own read, input-method keys, scale figures, two weak tests and combobox attributes in LIKE mode. Round 2 requested changes: a list left choosable during an input-method composition and Safari's composition key, macOS Safari closing the list before a click on Load more, focus left on a hidden button after a choice, a native test that could not see a change between the two statements, and these counts and sizes. Round 3 requested changes: an extra Tab stop on the scrolling list, late events reopening the list after leaving the field, native tests that assumed a case-insensitive collation, and the usage note on draft requests. Round 4: two tests that could not fail (a chain oracle that reused the tested fence, a dispose test without a pending read). Round 5: modified arrow keys taken from text editing, and an empty list announced as expanded. Round 6: a list cleared by typing or a composition still announced as expanded, and a test title naming Enter without testing it. Round 7: a composition in LIKE mode set `aria-expanded` on the plain text box; a composition now closes the list.
@@ -143,9 +211,9 @@ The 4 November queue, the UX review batches inserted into it and the fixes for t
 
 - **Decisions:** a loopback-only P5.2 stream prototype; one estimate SQL shape or four (D2, R-15); stabilising the local SQL Server for measurements (D7, R-05); keeping the retained-document checkpoint code (Q2, see CACHE-01 below); Fetch Metadata tightening for API routes (Q7, N-11); keeping full-project reviews independent of memory notes (Q9); what a NULL executable result means (UX review D5, 5 November). The two review reports hold the options: `.local/reports/reviews/20261109-full-review-claude-opus-5-5/decisions.md` and `.local/reports/reviews/20261110-full-review-claude-fable-5-2/decisions.md`.
 - **Held by the user:** N-10 (status line as a live region) until a screen reader is available.
-- **Later requests (user, 18 and 25 November):** a lightweight chart library (on hold, see Next action 34, J5); a CSS improvement pass; code splitting, after a considered decision on the frontend bundle size; an accessibility batch that handles high-contrast colours, a screen-reader announcement of refresh progress and the other complicated accessibility checks together. The Overview paging time (Next action 24, batch E) stays deferred.
+- **Later requests (user, 18 and 25 November):** a lightweight chart library (on hold, see Next action 34, J5); a CSS improvement pass (Next action 40); code splitting, after a considered decision on the frontend bundle size; an accessibility batch that handles high-contrast colours, a screen-reader announcement of refresh progress and the other complicated accessibility checks together. The Overview paging time (Next action 24, batch E) stays deferred.
 - **Later, from the 19 November review (batch D round 2):** the browser's display formatter and the end-date cap still fail at the very ends of the wire calendar (a Tokyo timestamp in year 10000 local makes a valid list response invalid; an inclusive end of 31 December 9999 in Tokyo is rejected although its UTC bound fits). Both predate batch D and arise only for windows deliberately selected at the ends of the wire calendar, including windows with no executions.
-- **Later improvements (user, 16 November):** from the Baseline 2025 survey (contract task `20261116-baseline-2025`). R1-F004: shallow native CSS nesting for the chart-axis and chart-group selectors, done when those rules are next edited and not as a syntax-only rewrite; compare computed styles and both budgets. R1-F003: `dvh`/`svh` for the 70/50/60/75vh height caps of pickers and expanded values; verify on real mobile Safari/Chrome with the address bar shown and hidden, since headless widths cannot close it.
+- **Later improvements (user, 16 November):** from the Baseline 2025 survey (contract task `20261116-baseline-2025`). R1-F004 (shallow CSS nesting for the chart rules) is done with Next action 40. R1-F003: `dvh`/`svh` for the 70/50/60/75vh height caps of pickers and expanded values; verify on real mobile Safari/Chrome with the address bar shown and hidden, since headless widths cannot close it.
 - **Needs the office environment:** the rest of R-08 (permission-denied login, offline or restoring database) and the volume and reader checks listed under [remaining acceptance](#remaining-acceptance).
 
 - [x] **22. Documentation compaction: complete locally, 15 November.** User decision D3 option A, with R-21 and R-22. Documents 535 KB → 410 KB (Progress 95 → 40 KB, API acceptance 124 → 60 KB). The full text stays at `6180174`.
@@ -447,7 +515,7 @@ Layered reviews under [the review process](PROJECT_REVIEW.md), both of `72e673a`
 
 The second review missed 12 of the first review's 24 findings and added 10 of its own, two of them P3 behaviour bugs at the API/browser boundary. Four of its items had been seen in a memory note opened before the process was read; they are counted as KNOWN.
 
-Disposition as of 25 November (R = 9 November, N = 10 November). Each fix was reviewed by Codex before commit; see Next actions 6 to 22.
+Disposition as of 26 November (R = 9 November, N = 10 November). Each fix was reviewed by Codex before commit; see Next actions 6 to 22.
 
 | Findings | Disposition |
 | --- | --- |
@@ -472,7 +540,8 @@ Disposition as of 25 November (R = 9 November, N = 10 November). Each fix was re
 | R-15 | Open: four estimate SQL implementations (D2); the review recommends keeping them for now |
 | N-11 | Open: Fetch Metadata tightening for API routes (Q7) |
 | R-05 | Open: plan eviction on the local instance, an environment question first (D7) |
-| R-20, N-07, N-09 | No dedicated task: fold into the next change of the affected tests or stylesheet |
+| R-20 | No dedicated task: fold into the next change of the affected tests |
+| N-07, N-09 | Fixed with Next action 40 (parsed stylesheet lookups; duplicates merged) |
 | R-24 | Previously declined (5 November UX review O8); no action |
 
 ## Evidence and documentation maintenance

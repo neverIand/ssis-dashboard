@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { expectStyle, loadStylesheet } from './css-rules.js';
 import { mountFilters } from '../src/filters.js';
 import { deferred, envelope, metadata } from './fixtures.js';
 import { filtersDOM } from './filters-dom.js';
@@ -619,15 +620,18 @@ test('B5 empty custom range reports the concise error and never applies it', t =
   assert.equal(dom.get('[data-created-preset="custom"]').getAttribute('aria-pressed'), 'true');
 });
 
-test('B4 the capped 180-day preset leaves the flow while the remaining presets keep their order', t => {
+test('B4 the capped 180-day preset leaves the flow while the remaining presets keep their order', async t => {
   const dom = mount(t, 24, 744);
   const buttons = dom.form.querySelectorAll('[data-created-preset]');
   assert.deepEqual(buttons.filter(button => !button.hidden).map(button => button.dataset.createdPreset),
     ['today', '24h', '7d', '30d', 'custom']);
   assert.equal(dom.get('[data-created-preset="180d"]').disabled, true);
-  const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
-  assert.match(css, /\.creation-presets \{ display: grid; grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, max\(10rem, calc\(\(100% - 0\.4rem\) \/ 2\)\)\), 1fr\)\); gap: 0\.4rem; \}/);
-  assert.match(css, /\.creation-presets > button \{ white-space: nowrap; \}/);
-  assert.match(css, /\.catalog-choice\[aria-pressed="true"\] \{[^}]*background: var\(--sd-action-soft\)/);
-  assert.match(css, /\[hidden\] \{ display: none !important; \}/);
+  const sheet = await loadStylesheet();
+  await expectStyle(assert, sheet, '.creation-presets', 'display', 'grid');
+  await expectStyle(assert, sheet, '.creation-presets', 'grid-template-columns',
+    'repeat(auto-fit, minmax(min(100%, max(10rem, calc((100% - 0.4rem) / 2))), 1fr))');
+  await expectStyle(assert, sheet, '.creation-presets', 'gap', '0.4rem');
+  await expectStyle(assert, sheet, '.creation-presets > button', 'white-space', 'nowrap');
+  await expectStyle(assert, sheet, '.catalog-choice[aria-pressed="true"]', 'background', 'var(--sd-action-soft)');
+  await expectStyle(assert, sheet, '[hidden]', 'display', 'none !important');
 });

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { expectStyle, loadStylesheet } from './css-rules.js';
 import { ApiError } from '../src/api.js';
 import { mountOverview } from '../src/render-overview.js';
 import { mountDetail } from '../src/render-detail.js';
@@ -453,7 +453,6 @@ for (const appBase of ['/app/', '/ops/monitor/app/']) {
   });
 }
 
-const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 const failedSettings = metadata();
 const failedItem = (id, code, packageName) => ({ execution_id: id, folder_name: 'Sales', project_name: 'Orders',
   package_name: packageName, status: { code, name: code === 4 ? 'failed' : 'succeeded' }, created_at: wireTime,
@@ -481,16 +480,44 @@ test('O2/O9: overview rows expose status for the failed-row marker and render br
   view.dispose();
 });
 
-test('O1/O2/O8: count links inherit level colour; failed rows have a non-colour-only edge; mid widths keep right columns', () => {
-  const css = source('../src/styles.css');
-  assert.ok(css.includes('.number-cell[data-level] a { color: inherit; }'));
-  assert.ok(css.includes('[data-execution-table] tr:is([data-status="4"], [data-status="6"]) > td:first-child'));
-  assert.match(css, /td:first-child \{ box-shadow: inset 3px 0 var\(--sd-status-failed\); \}/);
-  assert.match(css, /@media \(forced-colors: active\) \{[^}]*border-left: 3px solid CanvasText;/);
-  assert.match(css, /@media \(max-width: 66\.6667rem\) \{\s*\/\*[^*]*\*\/\s*\[data-execution-table\] \{ min-width: 44rem; \}\s*\[data-execution-table\] \.time-cell \{ min-width: 5\.6rem; white-space: normal; \}\s*\[data-execution-table\] \.time-cell span \{ white-space: nowrap; \}/);
-  assert.match(css, /\.summary-card \{\s*display: flex;\s*flex-wrap: wrap;/);
-  assert.match(css, /\.summary-card \{ flex-direction: column; align-items: flex-start;/);
+test('O1/O2/O8: count links inherit level colour; failed rows have a non-colour-only edge; mid widths keep right columns', async () => {
+  const sheet = await loadStylesheet();
+  await expectStyle(assert, sheet, '.number-cell[data-level] a', 'color', 'inherit');
+  for (const status of [4, 6]) {
+    const edge = `[data-execution-table] tr[data-status="${status}"] > td:first-child`;
+    await expectStyle(assert, sheet, edge, 'box-shadow', 'inset 3px 0 var(--sd-status-failed)');
+    await expectStyle(assert, sheet, edge, 'border-left', '3px solid CanvasText', { media: '(forced-colors: active)' });
+    // At phone and wide widths too, no shorthand or longhand removes the edge in forced colours.
+    for (const width of [420, 1400]) {
+      const options = { media: '(forced-colors: active)', width };
+      await expectStyle(assert, sheet, edge, 'border-left-width', '3px', options);
+      await expectStyle(assert, sheet, edge, 'border-left-style', 'solid', options);
+    }
+  }
+  // Reduced motion: a changed row keeps a static highlight instead of the two-second flash, for both markers.
+  for (const marker of ['0', '1']) {
+    await expectStyle(assert, sheet, [`[data-execution-table] tr[data-changed="${marker}"]`, '[data-execution-table] tr[data-changed]'],
+      'animation', 'none', { media: '(prefers-reduced-motion: reduce)' });
+  }
+  // Reduced motion: a running refresh dims the Refresh icon instead of turning it.
+  await expectStyle(assert, sheet, '.icon-button[data-refreshing="true"] svg', 'animation', 'none',
+    { media: '(prefers-reduced-motion: reduce)' });
+  // Touch screens: picker inputs keep a 16 px font, so mobile browsers do not zoom into them.
+  for (const control of ['.filter-popover input', '.filter-popover select']) {
+    await expectStyle(assert, sheet, control, 'font-size', '16px', { media: '(pointer: coarse)', width: 420 });
+  }
+  // Between the narrow and wide layouts (900 px): dates wrap above times; above 1067 px they stay on one line.
+  await expectStyle(assert, sheet, '[data-execution-table]', 'min-width', '44rem', { width: 900 });
+  await expectStyle(assert, sheet, '[data-execution-table] .time-cell', 'min-width', '5.6rem', { width: 900 });
+  await expectStyle(assert, sheet, '[data-execution-table] .time-cell', 'white-space', 'normal', { width: 900 });
+  await expectStyle(assert, sheet, '[data-execution-table] .time-cell span', 'white-space', 'nowrap', { width: 900 });
+  await expectStyle(assert, sheet, '[data-execution-table] .time-cell', 'white-space', 'nowrap', { width: 1400 });
+  await expectStyle(assert, sheet, '.summary-card', 'display', 'flex', { width: 1400 });
+  await expectStyle(assert, sheet, '.summary-card', 'flex-wrap', 'wrap', { width: 1400 });
+  await expectStyle(assert, sheet, '.summary-card', 'flex-direction', 'column', { width: 900 });
+  await expectStyle(assert, sheet, '.summary-card', 'align-items', 'flex-start', { width: 900 });
 });
+
 
 const timelineSettings = timelineMetadata();
 const selection = () => validateSelection(defaultSelection(timelineSettings), timelineSettings);

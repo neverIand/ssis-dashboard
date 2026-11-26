@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { expectStyle, loadStylesheet } from './css-rules.js';
 import {ApiError} from '../src/api.js';
 import {readMetadata} from '../src/bootstrap.js';
 import {createDisplay} from '../src/display.js';
@@ -437,9 +438,10 @@ test('rolling refresh with moved bounds clears old timeline counts inside a rese
   assert.equal(choiceBox.style.minWidth, '');
   assert.equal(panel.getAttribute('data-loading'), null);
   assert.notEqual(dom.get('timeline-chart').children.length, 0);
-  const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
-  assert.match(css, /\.timeline-panel\[data-loading\]:not\(\[hidden\]\) \{ display: flex; flex-direction: column; \}/);
-  assert.match(css, /\.timeline-panel\[data-loading\] > details \{ margin-top: auto; \}/);
+  const sheet = await loadStylesheet();
+  await expectStyle(assert, sheet, '.timeline-panel[data-loading]:not([hidden])', 'display', 'flex');
+  await expectStyle(assert, sheet, '.timeline-panel[data-loading]:not([hidden])', 'flex-direction', 'column');
+  await expectStyle(assert, sheet, '.timeline-panel[data-loading] > details', 'margin-top', 'auto');
 });
 
 for (const scenario of ['empty retained start', 'non-empty retained start', 'all zero']) {

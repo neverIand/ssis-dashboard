@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { loadStylesheet } from './css-rules.js';
 
-const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
-const declarations = block => Object.fromEntries([...block.matchAll(/([\w-]+):\s*([^;]+);/g)]
-  .map(([, name, value]) => [name, value.trim()]));
-const rule = selector => declarations(css.slice(css.indexOf(selector)).match(/\{([^}]+)\}/)[1]);
+const sheet = await loadStylesheet();
+// The properties one selector gets at the top level, as the stylesheet prints them.
+const rule = selector => Object.fromEntries(sheet.rules
+  .filter(item => item.media === '' && item.selectors.some(entry => entry.text === selector))
+  .flatMap(item => item.declarations.map(declaration => [declaration.property, declaration.value])));
 // Each colour token is light-dark(light, dark): split the root block into the two themes.
-const theme = index => Object.fromEntries(Object.entries(rule(':root {')).map(([name, value]) =>
+const theme = index => Object.fromEntries(Object.entries(rule(':root')).map(([name, value]) =>
   [name, value.match(/^light-dark\(([^,]+), ([^,]+)\)$/)?.[index + 1] ?? value]));
 const themes = [theme(0), theme(1)];
 const luminance = hex => {
@@ -21,12 +22,16 @@ const contrast = (foreground, background) => {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 };
 
-test('all six type chip families have at least 4.5:1 text contrast in both themes', t => {
+test('all six type chip families have at least 4.5:1 text contrast in both themes', async t => {
   let minimum = Infinity;
-  for (const theme of themes) {
+  for (const [theme, width] of themes.flatMap(item => [[item, undefined], [item, 420]])) {
     const resolve = value => theme[value.match(/^var\((--[\w-]+)\)$/)[1]];
     for (const family of ['text', 'integer', 'decimal', 'boolean', 'datetime', 'other']) {
-      const style = { ...rule('.type-chip {'), ...family === 'other' ? {} : rule(`.type-chip[data-family="${family}"]`) };
+      // The cascade winner over the base and the family rule, as a chip element matches both (background and
+      // background-color compete in the helper).
+      const selectors = ['.type-chip', `.type-chip[data-family="${family}"]`];
+      const options = width === undefined ? undefined : { width };
+      const style = { color: await sheet.get(selectors, 'color', options), background: await sheet.get(selectors, 'background', options) };
       const ratio = contrast(resolve(style.color), resolve(style.background));
       assert.ok(ratio >= 4.5, `${family}: ${ratio.toFixed(2)}:1`);
       minimum = Math.min(minimum, ratio);
