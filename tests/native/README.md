@@ -13,6 +13,9 @@ an independent Python pairing, including distant, ambiguous, time-reversed and
 unidentified neighbors. `test_history_queries.py` pages the package-history SQL in several
 status scopes and both directions and compares every estimate with the five
 latest prior visible successes, including ties on the sampling floor.
+`test_navigation_queries.py` pages the package-list SQL (History suggestions) in both sorts and directions at
+several page sizes and compares each chain with an independent query under the catalog collation, including
+case and trailing-space ties, wide names, same-named projects in other folders and the ID fence.
 `test_change_queries.py` runs the P5.1 detector seed and poll SQL over a
 connection-local catalog and checks that a replica built from the emitted events
 equals the source after inserts, late lower IDs, status transitions, deletions

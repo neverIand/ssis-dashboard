@@ -1,6 +1,9 @@
 import { ApiError } from './api.js';
 import { formatId } from './display.js';
-import { catalogName } from './selection.js';
+import { catalogName, packageNameUnits } from './selection.js';
+
+// The identity field of each catalog list: folder_id, project_id or package_id.
+export const navigationId = kind => `${kind.slice(0, -1)}_id`;
 
 export function readNavigation(response, kind, limit) {
   const invalid = () => { throw new ApiError('invalid_response', { requestId: response?.meta?.request_id }); };
@@ -10,19 +13,19 @@ export function readNavigation(response, kind, limit) {
       || typeof meta.has_more !== 'boolean'
       || (meta.has_more ? typeof meta.next_cursor !== 'string' || !meta.next_cursor || !data.length
         : meta.next_cursor !== null)) invalid();
-  const ids = new Set();
+  const ids = new Set(), parents = kind === 'packages' ? ['project', 'folder'] : kind === 'projects' ? ['folder'] : [];
   try {
     for (const row of data) {
-      const id = row[kind === 'folders' ? 'folder_id' : 'project_id'];
+      const id = row[navigationId(kind)];
       if (typeof id !== 'string' || ids.has(id)) invalid();
       formatId(id);
       ids.add(id);
-      catalogName(row.name);
+      catalogName(row.name, kind === 'packages' ? packageNameUnits : undefined);
       if (row.description !== null && (typeof row.description !== 'string' || row.description.length > 1024)) invalid();
-      if (kind === 'projects') {
-        if (typeof row.folder_id !== 'string') invalid();
-        formatId(row.folder_id);
-        catalogName(row.folder_name);
+      for (const parent of parents) {
+        if (typeof row[`${parent}_id`] !== 'string') invalid();
+        formatId(row[`${parent}_id`]);
+        catalogName(row[`${parent}_name`]);
       }
     }
   } catch { invalid(); }

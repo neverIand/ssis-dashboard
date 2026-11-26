@@ -9,7 +9,7 @@ import { mountParameters, mountOverrides } from './render-values.js';
 import { mountHistory } from './render-history.js';
 import { clippedText } from './observation-page.js';
 import { defaultSelection, selectionSearch } from './selection.js';
-import { inlineStatus, pollingButton } from './ui.js';
+import { inlineStatus, modified, pollingButton } from './ui.js';
 import { readHistoryReturn } from './history-navigation.js';
 import { readRefreshPause, saveRefreshPause } from './refresh-pause.js';
 
@@ -70,7 +70,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
   // Keep only the header's label and excerpt; pages are remembered weakly so an inactive Events page can be freed.
   let earliestError = null, inspected = new WeakSet();
   const followErrors = event => {
-    if ((event.button ?? 0) !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    if ((event.button ?? 0) !== 0 || modified(event)) return;
     event.preventDefault();
     tabView.follow({ tab: 'events', kind: 'errors' }, { focus: true });
   };
@@ -79,7 +79,7 @@ export function mountDetail(root, { api, metadata, executionId, appBase, restore
     const kind = link.dataset.eventCountLink;
     const click = event => {
       if (!metadata.capabilities.events) return;
-      if ((event.button ?? 0) !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      if ((event.button ?? 0) !== 0 || modified(event)) return;
       event.preventDefault();
       if (link.getAttribute('href') !== null) tabView.follow({ tab: 'events', kind }, { focus: true });
     };

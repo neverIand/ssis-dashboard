@@ -1,6 +1,6 @@
 # Read-only API contract
 
-All 14 Stage C GET operations and the separate G02 operational server-label GET are implemented (15 operations in the current inventory). [OpenAPI](openapi.yaml) is the field/schema/example reference (`1.0.0-draft.1`); this document defines semantic rules and local access policy. [Acceptance](API_ACCEPTANCE.md) records evidence; [progress](PROGRESS.md) records unfinished gates. The production stream belongs to phase 5.
+All 14 Stage C GET operations, the separate G02 operational server-label GET and the package list for History suggestions (F2) are implemented (16 operations in the current inventory). [OpenAPI](openapi.yaml) is the field/schema/example reference (`1.0.0-draft.1`); this document defines semantic rules and local access policy. [Acceptance](API_ACCEPTANCE.md) records evidence; [progress](PROGRESS.md) records unfinished gates. The production stream belongs to phase 5.
 
 ## Transport and local access
 
@@ -35,6 +35,7 @@ Folder/project/environment names allow 128 UTF-16 units and packages 260. OpenAP
 | `/meta` | No query parameters |
 | `/folders` | `limit,cursor,sort,direction`; visible folders with at least one visible project; default name/ascending |
 | `/projects` | Required exact `folder`, plus navigation paging; default name/ascending |
+| `/packages` | Required exact `folder` and `project`, plus navigation paging; packages of the project's current deployed version; default name/ascending |
 | `/executions` | Optional `folder,project,package,folder_pattern,project_pattern,from,to,status`, plus paging; default execution ID/descending. `package` is an exact name only (no package pattern) and combines with any folder/project selector. Rows that have started and not ended carry the History `estimate`; others carry NULL |
 | `/metrics/summary` | Same cohort inputs; validates status but counts all statuses; no paging |
 | `/metrics/timeline` | Same cohort inputs plus `bucket=day|hour` (default day); selected statuses apply |
@@ -46,7 +47,7 @@ Folder/project/environment names allow 128 UTF-16 units and packages 260. OpenAP
 | `/history` | Required `folder,project,package`; optional `match,status,limit,cursor,sort,direction`; exact by default, explicit `match=like` accepts SQL LIKE patterns; default statuses 2/7 and execution ID/descending; no overview dates |
 | `/server` | No query parameters; one read of the legacy display label (`@@SERVERNAME`, or `DEMO` for its SQL Azure edition branch), driver login/query caps at five seconds. No login/service/connection/credential fields; metadata remains database-free. |
 
-Navigation ignores overview scope and returns actual folder/project IDs with unique aliases. Missing/hidden/empty named navigation and history scopes give equivalent empty 200 collections. Descriptions preserve NULL/empty text and allow 1024 UTF-16 units.
+Navigation ignores overview scope and returns actual folder/project/package IDs with unique aliases. Missing/hidden/empty named navigation and history scopes give equivalent empty 200 collections. Descriptions preserve NULL/empty text and allow 1024 UTF-16 units. Packages are listed under the same project and folder visibility as the project list. A deployment replaces a project's package IDs, so a continuation started before a redeployment omits the new version's packages; a fresh first page lists them.
 
 `status` is a comma-separated set of known codes 1–9, without spaces, duplicates, empty elements, `0` or `all`. Omission on list/timeline means every status, including future unknown output codes. Canonicalize selections for cursor binding. Unknown output codes retain their numeric value and name `unknown`; execution status and executable result use separate vocabularies.
 
@@ -73,7 +74,7 @@ All sorts are global, with unique ID tie-breakers in the selected direction. NUL
 | Collection | Allowed sort keys |
 | --- | --- |
 | Executions | `execution_id,created_at,started_at,ended_at,project_name,package_name,environment,status,logging_level,duration_seconds,warning_count,error_count` |
-| Folders / projects | `name` or `folder_id` / `project_id` respectively |
+| Folders / projects / packages | `name` or `folder_id` / `project_id` / `package_id` respectively |
 | Executables | `started_at,statistics_id` |
 | Children | `started_at,observation_id` |
 | Events | `message_time,event_id` |

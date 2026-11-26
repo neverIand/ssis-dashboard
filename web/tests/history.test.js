@@ -12,7 +12,7 @@ import { childPage } from './child-fixture.js';
 import { eventPage } from './event-fixture.js';
 import { parameterPage } from './parameter-fixture.js';
 import { overridePage } from './override-fixture.js';
-import { historyMetadata, historyRow, historyPage, estimate } from './history-fixture.js';
+import { historyMetadata, historyRow, historyPage, estimate, suggestionNodes } from './history-fixture.js';
 import { mountHistoryScreen } from '../src/history-screen.js';
 import { Node } from './overview-dom.js';
 
@@ -210,6 +210,7 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
 const scoped = '?match=exact&folder=Folder&project=Project&package=Main.dtsx';
 function rowsScreen(t, search, rows = () => [historyRow('5')], storage = null) {
   const dom = detailDOM(), extra = new Map(), calls = [];
+  suggestionNodes(Node, dom.document, extra);
   const node = (key, tag = 'div') => { const value = new Node(dom.document, tag); extra.set(`[data-${key}]`, value); return value; };
   const form = node('history-scope-form', 'form'), inputs = {};
   for (const key of ['match', 'folder', 'project', 'package']) inputs[key] = new Node(dom.document, key === 'match' ? 'select' : 'input');

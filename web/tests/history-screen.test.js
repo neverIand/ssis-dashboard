@@ -4,7 +4,7 @@ import test from 'node:test';
 import { mountHistoryScreen } from '../src/history-screen.js';
 import { detailDOM } from './detail-fixture.js';
 import { deferred, envelope, jsonResponse, trackStorageWrites } from './fixtures.js';
-import { historyMetadata, historyPage, historyRow } from './history-fixture.js';
+import { historyMetadata, historyPage, historyRow, suggestionNodes } from './history-fixture.js';
 import { Node } from './overview-dom.js';
 
 const metadata = historyMetadata();
@@ -70,6 +70,7 @@ test('standalone History keeps the update clock visible during a pending refresh
 // The standalone History page on the detail double: wiring evidence only, no browser, focus or layout claims.
 function screen(t, search, { saved = null, respond = null, hidden = false, state = null } = {}) {
   const dom = detailDOM(), extra = new Map(), calls = [], held = [];
+  suggestionNodes(Node, dom.document, extra);
   const node = (key, tag = 'div') => { const value = new Node(dom.document, tag); extra.set(`[data-${key}]`, value); return value; };
   const form = node('history-scope-form', 'form'), inputs = {};
   for (const key of ['match', 'folder', 'project', 'package']) inputs[key] = new Node(dom.document, key === 'match' ? 'select' : 'input');
@@ -370,6 +371,7 @@ const rowsMetadata = historyMetadata();
 const settleOnce = () => new Promise(resolve => setImmediate(resolve));
 function rowsScreen(t, search, rows = () => [historyRow('5')], storage = null) {
   const dom = detailDOM(), extra = new Map(), calls = [];
+  suggestionNodes(Node, dom.document, extra);
   const node = (key, tag = 'div') => { const value = new Node(dom.document, tag); extra.set(`[data-${key}]`, value); return value; };
   const form = node('history-scope-form', 'form'), inputs = {};
   for (const key of ['match', 'folder', 'project', 'package']) inputs[key] = new Node(dom.document, key === 'match' ? 'select' : 'input');

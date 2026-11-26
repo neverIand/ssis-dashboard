@@ -5,7 +5,7 @@ import { selectionParams, selectionSearch } from './selection.js';
 import { mountTimeline } from './render-timeline.js';
 import { reserveLoadingSpace } from './loading-space.js';
 import { readRefreshPause, saveRefreshPause } from './refresh-pause.js';
-import { breakableText, inlineStatus, pollingButton } from './ui.js';
+import { breakableText, inlineStatus, modified, pollingButton } from './ui.js';
 import { mountTableViewport } from './table-viewport.js';
 
 export function mountOverview(root, { api, metadata, appBase, retainedPaths, restoreView = null,
@@ -88,7 +88,7 @@ export function mountOverview(root, { api, metadata, appBase, retainedPaths, res
   }
 
   function intercept(event, changes) {
-    if ((event.button ?? 0) !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    if ((event.button ?? 0) !== 0 || modified(event)) return;
     event.preventDefault();
     if (appliedSelection) onSelect(changes);
   }

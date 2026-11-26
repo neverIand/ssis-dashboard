@@ -22,3 +22,14 @@ test('navigation validates identities and page metadata without rewriting exact 
     assert.throws(() => readNavigation(response, 'folders', 2), (error) => error.kind === 'invalid_response');
   }
 });
+
+test('package rows allow 260-unit names and carry valid project and folder identities', () => {
+  const pkg = (changes = {}) => ({ package_id: '3', name: 'p'.repeat(260), description: null, project_id: '2',
+    project_name: 'Load', folder_id: '1', folder_name: 'Finance', ...changes });
+  assert.equal(readNavigation(page([pkg()]), 'packages', 2)[0].name.length, 260);
+  for (const changes of [{ name: 'p'.repeat(261) }, { project_id: null }, { project_name: '' }, { folder_id: 1 },
+    { folder_name: 'x'.repeat(129) }, { package_id: '01' }]) {
+    assert.throws(() => readNavigation(page([pkg(changes)]), 'packages', 2), (error) => error.kind === 'invalid_response',
+      JSON.stringify(changes));
+  }
+});

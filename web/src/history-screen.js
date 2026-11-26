@@ -1,6 +1,7 @@
 import { mountBootstrap } from './bootstrap.js';
 import { mountHistory } from './render-history.js';
 import { createHistoryLoader } from './history-loader.js';
+import { mountSuggestions } from './history-suggestions.js';
 import { historyHref, historySelection, parseHistorySelection, scopedHistorySelection } from './history-navigation.js';
 import { defaultSelection, withPackageExtension } from './selection.js';
 import { inlineStatus, pollingButton } from './ui.js';
@@ -40,6 +41,9 @@ export function mountHistoryScreen(root, saved = null) {
       notice.textContent = changed ? 'Scope changes are not applied yet. Choose Load history.'
         : literal ? 'Exact names treat * and % as literal characters.' : persistent;
     };
+    // Exact mode suggests catalog names; a project needs the folder field and a package both fields.
+    const suggestions = ['folder', 'project', 'package'].map(key => mountSuggestions({ api, metadata, key, controls,
+      panel: root.querySelector(`[data-history-suggestions="${key}"]`), changed: describeDraft }));
     // The tab names the loaded package scope; idle and invalid pages use the plain title.
     const showTitle = () => {
       document.title = loaded ? `History · ${selection.package} · SSIS Dashboard` : 'History · SSIS Dashboard';
@@ -78,8 +82,10 @@ export function mountHistoryScreen(root, saved = null) {
         refresh.setAttribute('aria-disabled', String(state.busy));
         refresh.setAttribute('data-refreshing', String(state.refreshing === true));
       } });
+    const hideSuggestions = () => { for (const suggestion of suggestions) suggestion.hide(); };
     const submit = event => {
       event.preventDefault();
+      hideSuggestions();
       const draft = Object.fromEntries(Object.entries(controls).map(([key, input]) => [key, input.value]));
       // Only an edited exact name gets the extension; a name restored from a link is kept as it was.
       const unchanged = selection.match === 'exact' && draft.package === selection.package;
@@ -90,6 +96,7 @@ export function mountHistoryScreen(root, saved = null) {
     const pop = event => {
       // The live pause outlasts scope changes; record it on the entry Back or Forward landed on.
       if (event) saveRefreshPause(window, paused);
+      hideSuggestions();
       const search = window.location.search;
       // A fragment-only history entry keeps the same query: nothing to reload.
       if (event && search === shown) return;
@@ -108,10 +115,13 @@ export function mountHistoryScreen(root, saved = null) {
         controls.match.value = 'exact';
         for (const key of ['folder', 'project', 'package']) controls[key].value = '';
       }
+      // The restored Match mode decides whether the fields are comboboxes.
+      hideSuggestions();
       describeDraft();
     };
     // Switching to Exact drops pure wildcards so a stray * does not become a literal name.
     const modeChanged = () => {
+      hideSuggestions();
       if (controls.match.value === 'exact') {
         for (const key of ['folder', 'project', 'package']) if (['*', '%'].includes(controls[key].value)) controls[key].value = '';
       }
@@ -130,6 +140,7 @@ export function mountHistoryScreen(root, saved = null) {
     pop();
     return () => {
       owner.dispose(); view.dispose(); checkpoint = () => null;
+      for (const suggestion of suggestions) suggestion.dispose();
       form.removeEventListener('submit', submit); refresh.removeEventListener('click', update);
       form.removeEventListener('input', describeDraft); controls.match.removeEventListener('change', modeChanged);
       toggle.removeEventListener('click', pause); window.removeEventListener('popstate', pop);

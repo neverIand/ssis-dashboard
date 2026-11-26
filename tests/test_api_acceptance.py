@@ -20,6 +20,7 @@ OPERATIONS = {
     '/readyz': ('ReadinessResponse', {}),
     '/api/v1/folders': ('FoldersResponse', {}),
     '/api/v1/projects': ('ProjectsResponse', {'folder':'Folder'}),
+    '/api/v1/packages': ('PackagesResponse', {'folder':'Folder', 'project':'Project'}),
     '/api/v1/executions': ('ExecutionsResponse', WINDOW),
     '/api/v1/metrics/summary': ('SummaryResponse', WINDOW),
     '/api/v1/metrics/timeline': ('TimelineResponse', WINDOW),

@@ -254,6 +254,13 @@ def projects():
     return resource_response(data, meta=meta)
 
 
+@blueprint.get('/packages', merge_slashes=False)
+@query_parameters('folder', 'project', *NAVIGATION_PARAMETERS)
+def packages():
+    data, meta = navigation_page('packages', g.api_query, current_app.config)
+    return resource_response(data, meta=meta)
+
+
 @blueprint.get('/metrics/summary', merge_slashes=False)
 @query_parameters(*COHORT_PARAMETERS)
 def summary():

@@ -27,12 +27,15 @@ export function breakableText(node, value) {
     index ? [document.createElement('wbr'), document.createTextNode(part)] : [document.createTextNode(part)]));
 }
 
+// A key or click with Ctrl, Meta, Shift or Alt belongs to the browser (new tab, text selection, caret moves).
+export const modified = event => event.ctrlKey || event.metaKey || event.shiftKey || event.altKey;
+
 // Move focus to the main region without changing the fragment, which the screens read as navigation state.
 export function mountSkipLink(root) {
   const link = root.querySelector('.skip-link'), target = root.ownerDocument.getElementById('main-content');
   if (!link || !target) return () => {};
   const skip = event => {
-    if ((event.button ?? 0) !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    if ((event.button ?? 0) !== 0 || modified(event)) return;
     event.preventDefault(); target.focus();
   };
   link.addEventListener('click', skip);

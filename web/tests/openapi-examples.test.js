@@ -28,6 +28,7 @@ const readers = {
   MetaResponse: response => readMetadata(response.data, response.meta.request_id),
   FoldersResponse: response => readNavigation(response, 'folders', response.meta.limit),
   ProjectsResponse: response => readNavigation(response, 'projects', response.meta.limit),
+  PackagesResponse: response => readNavigation(response, 'packages', response.meta.limit),
   ExecutionsResponse: response => readExecutionPage(response, {
     ...section(response), from: response.meta.from, to: response.meta.to, status: [], folder: null, project: null, package: null,
   }, metadata, display),
@@ -71,6 +72,7 @@ test('the readers reject an example whose identity field is damaged', () => {
     EventsResponse: r => { r.data[0].event_id = null; }, ParametersResponse: r => { r.data[0].sensitive = 'yes'; },
     OverridesResponse: r => { r.data[0].property_id = null; }, HistoryResponse: r => { r.data[0].created_at = null; },
     FoldersResponse: r => { r.data[0].name = null; }, ProjectsResponse: r => { r.data[0].folder_id = null; },
+    PackagesResponse: r => { r.data[0].project_id = null; },
     SummaryResponse: r => { r.data.total = -1; }, TimelineResponse: r => { r.data[0].created_count = -1; },
     MetaResponse: r => { r.data.limits.max_limit = '200'; },
   };

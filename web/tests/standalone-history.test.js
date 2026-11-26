@@ -3,7 +3,7 @@ import test from 'node:test';
 import { ApiError } from '../src/api.js';
 import { createHistoryLoader } from '../src/history-loader.js';
 import { historyExecutionHref, historySearch, parseHistorySelection, readHistoryReturn } from '../src/history-navigation.js';
-import { historyMetadata, historyPage, historyRow } from './history-fixture.js';
+import { historyMetadata, historyPage, historyRow, suggestionNodes } from './history-fixture.js';
 import { deferred, envelope, jsonResponse, wireTime } from './fixtures.js';
 import { mountHistory } from '../src/render-history.js';
 import { mountHistoryScreen } from '../src/history-screen.js';
@@ -220,6 +220,7 @@ test('standalone rows show their package identity and provide a validated page-o
 
 function screenDOM(t, search) {
   const dom = detailDOM(), extra = new Map(), calls = [];
+  const suggestions = suggestionNodes(Node, dom.document, extra);
   const node = (key, tag = 'div') => { const value = new Node(dom.document, tag); extra.set(`[data-${key}]`, value); return value; };
   const form = node('history-scope-form', 'form'), inputs = {};
   for (const key of ['match', 'folder', 'project', 'package']) inputs[key] = new Node(dom.document, 'input');
@@ -234,9 +235,14 @@ function screenDOM(t, search) {
     calls.push(url.pathname + url.search);
     if (url.pathname.endsWith('/meta')) return jsonResponse(envelope(metadata));
     if (url.pathname.endsWith('/server')) return jsonResponse(envelope({ server_name: 'Server' }));
+    if (url.pathname.endsWith('/folders')) {
+      return jsonResponse({ ...envelope([{ folder_id: '1', name: 'Finance', description: null }]),
+        meta: { ...envelope().meta, from: null, to: null, limit: Number(url.searchParams.get('limit')), sort: 'name',
+          direction: 'asc', has_more: false, next_cursor: null } });
+    }
     return jsonResponse(page(Object.fromEntries(url.searchParams)));
   });
-  return { ...dom, inputs, form, calls, notice: extra.get('[data-history-scope-notice]'), extra,
+  return { ...dom, inputs, form, calls, notice: extra.get('[data-history-scope-notice]'), extra, suggestions,
     history: () => calls.filter(call => call.startsWith('/ops/api/v1/history')) };
 }
 
@@ -348,4 +354,28 @@ test('named legacy links keep LIKE for unnamed fields and explicit wildcard link
       assert.deepEqual(scopeOf(dom.history()[1]), scope);
     });
   }
+});
+
+test('a folder suggestion fills the field as an unapplied draft; LIKE mode closes the list', async t => {
+  const dom = screenDOM(t, '');
+  const screen = mountHistoryScreen(dom.root);
+  t.after(screen.dispose);
+  await settle();
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { panel, list } = dom.suggestions.folder;
+  dom.inputs.folder.focus();
+  dom.inputs.folder.value = 'fin';
+  dom.inputs.folder.dispatchEvent(new Event('input'));
+  t.mock.timers.tick(250); await settle();
+  assert.equal(dom.calls.filter(call => call.startsWith('/ops/api/v1/folders')).length, 1);
+  assert.deepEqual(list.children.map(option => option.textContent), ['Finance']);
+  list.children[0].dispatchEvent(new Event('click'));
+  assert.equal(dom.inputs.folder.value, 'Finance');
+  assert.equal(panel.hidden, true);
+  assert.equal(dom.history().length, 0, 'Choosing a name does not load history');
+  dom.inputs.folder.dispatchEvent(new Event('pointerup')); await settle();
+  assert.equal(panel.hidden, false);
+  dom.inputs.match.value = 'like';
+  dom.inputs.match.dispatchEvent(new Event('change'));
+  assert.equal(panel.hidden, true);
 });

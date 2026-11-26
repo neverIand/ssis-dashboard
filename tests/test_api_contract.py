@@ -12,7 +12,7 @@ from openapi_spec_validator import OpenAPIV31SpecValidator
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 STAGE_C_PATHS = {
-    '/api/v1/meta', '/api/v1/server', '/api/v1/folders', '/api/v1/projects',
+    '/api/v1/meta', '/api/v1/server', '/api/v1/folders', '/api/v1/projects', '/api/v1/packages',
     '/api/v1/metrics/summary', '/api/v1/metrics/timeline', '/api/v1/executions',
     '/api/v1/executions/{id}', '/api/v1/executions/{id}/executables',
     '/api/v1/executions/{id}/children', '/api/v1/executions/{id}/events',
@@ -71,7 +71,7 @@ class APIContractTests(unittest.TestCase):
                 operation = item['get']
                 self.assertIn(operation['x-implementation-status'], {'planned', 'implemented'})
                 self.assertTrue(operation['x-milestone'].startswith('C') or
-                                (path == '/api/v1/server' and operation['x-milestone'] == 'G02'))
+                                (path, operation['x-milestone']) in {('/api/v1/server', 'G02'), ('/api/v1/packages', 'F2')})
                 self.assertNotIn('requestBody', operation)
                 operations.append(operation['operationId'])
                 parameters = [self.resolve(p['$ref']) if '$ref' in p else p for p in operation['parameters']]

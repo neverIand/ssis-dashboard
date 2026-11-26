@@ -18,7 +18,7 @@ from tests.test_db import ConnectionFixture
 NOW = parse_timestamp('2026-10-16T12:00:00.1234567Z')
 
 
-class NavigationTests(unittest.TestCase):
+class NavigationFixture(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         contract_tests.APIContractTests.setUpClass()
@@ -40,18 +40,33 @@ class NavigationTests(unittest.TestCase):
         self.folders += [{'folder_id': 1000, 'name': 'Empty', 'description': '', 'visible': True},
                          {'folder_id': 1001, 'name': 'Hidden', 'description': None, 'visible': False}]
         self.projects.append({'project_id': 10000, 'folder_id': 1001, 'name': 'Hidden', 'description': None, 'visible': True})
+        # Project 1 ('Project 251' in Folder 001) has 251 packages; each 'Shared' project has one Probe.dtsx.
+        self.packages = [{'package_id': i, 'project_id': 1, 'name': f'Package {252-i:03}.dtsx',
+                          'description': None, 'visible': True} for i in range(1, 252)]
+        # Package, project and folder IDs all differ, so a swapped identity field shows.
+        self.packages += [{'package_id': 5000+i, 'project_id': 1000+i, 'name': 'Probe.dtsx',
+                           'description': 'Probe', 'visible': True} for i in range(2, 252)]
+        self.packages.append({'package_id': 10000, 'project_id': 10000, 'name': 'Hidden.dtsx', 'description': None,
+                              'visible': True})
 
     def query_fixture(self, resource, parameters, **settings):
-        kind = 'projects' if resource.startswith('api-projects-') else 'folders'
+        kind = resource.split('-')[1]
         folders = {f['folder_id']: f for f in self.folders if f['visible']}
         projects = [p for p in self.projects if p['visible'] and p['folder_id'] in folders]
         if kind == 'folders':
             candidates = [f for f in folders.values() if any(p['folder_id'] == f['folder_id'] for p in projects)]
-        else:
+        elif kind == 'projects':
             folder, *parameters = parameters
             candidates = [{**p, 'folder_name': folders[p['folder_id']]['name']} for p in projects
                           if folders[p['folder_id']]['name'] == folder]
-        id_field = 'folder_id' if kind == 'folders' else 'project_id'
+        else:
+            folder, project, *parameters = parameters
+            parents = {p['project_id']: p for p in projects
+                       if folders[p['folder_id']]['name'] == folder and p['name'] == project}
+            candidates = [{**k, 'project_name': parents[k['project_id']]['name'],
+                           'folder_id': parents[k['project_id']]['folder_id'], 'folder_name': folder}
+                          for k in self.packages if k['visible'] and k['project_id'] in parents]
+        id_field = kind[:-1] + '_id'
         if resource.endswith('-fence.sql'):
             return {'upper_id': max((r[id_field] for r in candidates), default=None)}
         take, upper, last, last_name, by_name, descending = parameters
@@ -68,7 +83,7 @@ class NavigationTests(unittest.TestCase):
     def page(self, kind='folders', **values):
         response = self.get(kind, values)
         self.assertEqual(response.status_code, 200, response.json)
-        self.contract.validator('FoldersResponse' if kind == 'folders' else 'ProjectsResponse').validate(response.json)
+        self.contract.validator(kind.capitalize() + 'Response').validate(response.json)
         self.assertEqual(response.headers['Cache-Control'], 'no-store')
         self.assertEqual(response.json['meta']['request_id'], response.headers['X-Request-ID'])
         self.assertIsNone(response.json['meta']['from'])
@@ -94,6 +109,8 @@ class NavigationTests(unittest.TestCase):
         self.assertIn(response.json['code'], ('invalid_cursor', 'cursor_expired'))
         self.assertEqual(self.query.call_count, calls)
 
+
+class NavigationTests(NavigationFixture):
     def test_default_page_is_bounded_and_folders_require_visible_projects(self):
         page = self.page()
         self.assertEqual(len(page['data']), 50)
@@ -306,3 +323,78 @@ class NavigationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 504)
         self.assertNotIn('private-', response.get_data(as_text=True)+'\n'.join(logs.output))
         self.query.assert_called_once()
+
+
+class PackageNavigationTests(NavigationFixture):
+    """The package list (History suggestions, F2) shares the navigation paging with folders and projects."""
+    SCOPE = {'folder': 'Folder 001', 'project': 'Project 251'}
+
+    def test_packages_traverse_the_whole_project_by_name_and_id_in_both_directions(self):
+        for sort in ('name', 'package_id'):
+            for direction in ('asc', 'desc'):
+                with self.subTest(sort=sort, direction=direction):
+                    rows = self.chain('packages', {**self.SCOPE, 'limit': '200', 'sort': sort, 'direction': direction})
+                    descending = (direction == 'desc') != (sort == 'name')
+                    self.assertEqual([int(row['package_id']) for row in rows],
+                                     sorted(range(1, 252), reverse=descending))
+                    self.assertEqual(self.query.call_args.args[1][:3], ('Folder 001', 'Project 251', 201))
+
+    def test_folder_and_project_are_both_required_before_sql(self):
+        for values in ({}, {'folder': 'Folder 001'}, {'project': 'Project 251'}, {**self.SCOPE, 'project': ''},
+                       {**self.SCOPE, 'project': 'x'*129}, {**self.SCOPE, 'folder': '😀'*65},
+                       {**self.SCOPE, 'package': 'Probe.dtsx'}, {**self.SCOPE, 'sort': 'project_id'}):
+            with self.subTest(values=values):
+                self.assertEqual(self.get('packages', values).status_code, 400)
+        self.query.assert_not_called()
+
+    def test_package_project_and_folder_identities_stay_distinct(self):
+        for identifier in (2, 3):
+            row = self.page('packages', folder=f'Folder {identifier:03}', project='Shared')['data'][0]
+            self.assertEqual(row, {'package_id': str(5000+identifier), 'project_id': str(1000+identifier),
+                                   'project_name': 'Shared', 'folder_id': str(identifier),
+                                   'folder_name': f'Folder {identifier:03}', 'name': 'Probe.dtsx',
+                                   'description': 'Probe'})
+
+    def test_hidden_missing_and_other_project_scopes_are_empty_collections(self):
+        for folder, project in (('Hidden', 'Hidden'), ('Folder 001', 'Missing'), ('Folder 002', 'Project 251'),
+                                ('Missing', 'Shared')):
+            with self.subTest(folder=folder, project=project):
+                self.query.reset_mock()
+                page = self.page('packages', folder=folder, project=project)
+                self.assertEqual(page['data'], [])
+                self.assertIsNone(page['meta']['upper_id'])
+                self.query.assert_called_once()
+
+    def test_package_names_allow_260_units_in_rows_and_cursors(self):
+        names = ['😀'*130, 'p'*260]
+        self.packages = [{'package_id': i + 1, 'project_id': 1, 'name': name, 'description': None, 'visible': True}
+                         for i, name in enumerate(names)]
+        first = self.page('packages', **self.SCOPE, limit='1')
+        self.assertEqual(first['data'][0]['name'], 'p'*260)
+        second = self.page('packages', **self.SCOPE, limit='1', cursor=first['meta']['next_cursor'])
+        self.assertEqual(second['data'][0]['name'], '😀'*130)
+        state = self.token(first)
+        self.assert_invalid_cursor('packages', {**self.SCOPE, 'limit': '1',
+                                                'cursor': cursors.seal({**state, 'sort_key': ['x'*261]})})
+        self.packages[1]['name'] = 'x'*261
+        with self.assertLogs(self.app.logger, level='ERROR'):
+            self.assertEqual(self.get('packages', {**self.SCOPE, 'limit': '1'}).status_code, 500)
+
+    def test_cursor_is_bound_to_the_project_and_resource(self):
+        first = self.page('packages', **self.SCOPE, limit='1')
+        base = {**self.SCOPE, 'limit': '1', 'cursor': first['meta']['next_cursor']}
+        for changes in ({'project': 'Shared'}, {'folder': 'Folder 002'}, {'sort': 'package_id'}):
+            self.assert_invalid_cursor('packages', {**base, **changes})
+        self.assert_invalid_cursor('projects', {'folder': 'Folder 001', 'limit': '1', 'cursor': base['cursor']})
+        # A validly sealed cursor that differs only in its resource fails before SQL.
+        self.assert_invalid_cursor('packages', {**base, 'cursor': cursors.seal({**self.token(first),
+                                                                                'resource': 'v1/projects'})})
+
+    def test_insert_fence_excludes_a_redeployed_version_until_a_fresh_first_page(self):
+        first = self.page('packages', **self.SCOPE, limit='200', sort='package_id')
+        self.packages = [{**k, 'visible': False} if k['project_id'] == 1 else k for k in self.packages]
+        self.packages.append({'package_id': 99999, 'project_id': 1, 'name': 'New.dtsx', 'description': None,
+                              'visible': True})
+        rest = self.page('packages', **self.SCOPE, limit='200', sort='package_id', cursor=first['meta']['next_cursor'])
+        self.assertEqual(rest['data'], [])
+        self.assertEqual(self.page('packages', **self.SCOPE)['data'][0]['package_id'], '99999')

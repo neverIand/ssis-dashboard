@@ -15,9 +15,17 @@
     <form data-history-scope-form>
         <fieldset class="history-scope" data-history-scope disabled>
             <legend class="visually-hidden">History scope</legend>
-            <label>Folder<input name="folder" required maxlength="512" autocomplete="off"></label>
-            <label>Project<input name="project" required maxlength="512" autocomplete="off"></label>
-            <label>Package<input name="package" required maxlength="512" autocomplete="off"></label>
+            {%- for key, label in (('folder', 'Folder'), ('project', 'Project'), ('package', 'Package')) %}
+            <div class="history-field">
+                <label for="history-{{ key }}">{{ label }}</label>
+                <input id="history-{{ key }}" name="{{ key }}" required maxlength="512" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="history-{{ key }}-suggestions">
+                <div class="suggestions" data-history-suggestions="{{ key }}" hidden>
+                    <ul id="history-{{ key }}-suggestions" role="listbox" aria-label="{{ label }} names" tabindex="-1" data-suggestion-list></ul>
+                    <p class="inline-status" data-suggestion-status role="status"></p>
+                    <button type="button" class="button-quiet" data-suggestion-more hidden>Load more</button>
+                </div>
+            </div>
+            {%- endfor %}
             <div class="history-match"><span class="history-match-label"><label for="history-match">Match</label>{% call tip('history-match-tip', 'About matching', '') %}<span data-history-mode-note>LIKE patterns: * or % matches any text, _ matches one character, [abc] matches a set. All creation dates.</span>{% endcall %}</span><select id="history-match" name="match"><option value="exact">Exact names</option><option value="like">LIKE patterns</option></select></div>
             <button type="submit" data-history-load>Load history</button>
         </fieldset>

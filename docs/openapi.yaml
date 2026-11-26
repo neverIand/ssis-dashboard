@@ -96,6 +96,40 @@ paths:
         '500': {$ref: '#/components/responses/InternalError'}
         '503': {$ref: '#/components/responses/DatabaseUnavailable'}
         '504': {$ref: '#/components/responses/DatabaseTimeout'}
+  /api/v1/packages:
+    get:
+      operationId: listPackages
+      summary: Visible packages in one exact project
+      description: Implemented for History suggestions (F2). Packages of the project's current deployed version, under the
+        project list's visibility. Exact folder and project equality follows catalog collation; unknown/hidden/empty scopes
+        return an empty page. Missing folder or project input returns 400. A redeployment replaces package IDs, so a
+        continuation started before it omits the new version's packages.
+      x-implementation-status: implemented
+      x-milestone: F2
+      parameters:
+      - {$ref: '#/components/parameters/RequiredFolder'}
+      - {$ref: '#/components/parameters/RequiredProject'}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      - {$ref: '#/components/parameters/PackageSort'}
+      - {$ref: '#/components/parameters/AscendingDirection'}
+      responses:
+        '200':
+          description: Successful documented resource; empty visible collections remain successful.
+          headers:
+            X-Request-ID: {$ref: '#/components/headers/RequestId'}
+            Cache-Control: {$ref: '#/components/headers/NoStore'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PackagesResponse'}
+              examples:
+                synthetic: {$ref: '#/components/examples/PackagesResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '503': {$ref: '#/components/responses/DatabaseUnavailable'}
+        '504': {$ref: '#/components/responses/DatabaseTimeout'}
   /api/v1/metrics/summary:
     get:
       operationId: getSummary
@@ -1246,6 +1280,21 @@ components:
           anyOf:
           - {type: string, maxLength: 1024}
           - {type: 'null'}
+    CatalogPackage:
+      type: object
+      additionalProperties: false
+      required: [package_id, project_id, project_name, folder_id, folder_name, name, description]
+      properties:
+        package_id: {$ref: '#/components/schemas/Id'}
+        project_id: {$ref: '#/components/schemas/Id'}
+        project_name: {$ref: '#/components/schemas/Name128'}
+        folder_id: {$ref: '#/components/schemas/Id'}
+        folder_name: {$ref: '#/components/schemas/Name128'}
+        name: {$ref: '#/components/schemas/PackageName'}
+        description:
+          anyOf:
+          - {type: string, maxLength: 1024}
+          - {type: 'null'}
     StatusCount:
       type: object
       additionalProperties: false
@@ -1712,6 +1761,16 @@ components:
           items: {$ref: '#/components/schemas/Project'}
           maxItems: 200
         meta: {$ref: '#/components/schemas/PageMeta'}
+    PackagesResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: {$ref: '#/components/schemas/CatalogPackage'}
+          maxItems: 200
+        meta: {$ref: '#/components/schemas/PageMeta'}
     ExecutionsResponse:
       type: object
       additionalProperties: false
@@ -2091,6 +2150,15 @@ components:
         type: string
         enum: [name, project_id]
         default: name
+    PackageSort:
+      name: sort
+      in: query
+      required: false
+      description: Catalog name order with a same-direction package-ID tie-breaker, or package ID alone. Names are non-NULL.
+      schema:
+        type: string
+        enum: [name, package_id]
+        default: name
     ExecutableSort:
       name: sort
       in: query
@@ -2335,6 +2403,15 @@ components:
         data:
         - {project_id: '2', folder_id: '1', folder_name: Sample % folder, name: Sample project, description: Synthetic
             project}
+        meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z', from: null,
+          to: null, limit: 50, sort: name, direction: asc, as_of: '2026-10-15T11:00:00.1234567Z', upper_id: '9007199254740993',
+          next_cursor: null, has_more: false, consistency: live}
+    PackagesResponse:
+      summary: Synthetic target response; not live output
+      value:
+        data:
+        - {package_id: '3', project_id: '2', project_name: Sample project, folder_id: '1', folder_name: Sample % folder,
+          name: Probe.dtsx, description: null}
         meta: {request_id: 0123456789abcdef0123456789abcdef, generated_at: '2026-10-15T11:00:00.1234567Z', from: null,
           to: null, limit: 50, sort: name, direction: asc, as_of: '2026-10-15T11:00:00.1234567Z', upper_id: '9007199254740993',
           next_cursor: null, has_more: false, consistency: live}
