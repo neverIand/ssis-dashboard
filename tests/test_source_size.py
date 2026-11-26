@@ -1,4 +1,4 @@
-"""Lexical cases for the authored source budget."""
+"""Lexical cases for the authored-size report (comments excluded)."""
 
 import unittest
 

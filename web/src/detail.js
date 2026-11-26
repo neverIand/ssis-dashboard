@@ -1,4 +1,4 @@
-import { ApiError, safeRequestId, transient } from './api.js';
+import { ApiError, badResponse, safeRequestId, transient } from './api.js';
 import { createDisplay, formatCode, formatId, formatText } from './display.js';
 import { createRefreshLoop } from './refresh-loop.js';
 import { executableQuery, readExecutablePage } from './executables.js';
@@ -56,7 +56,7 @@ export function readExecutionDetail(response, executionId, display) {
     if (data.estimate === undefined || (data.estimate !== null && data.ended_at !== null)) throw new TypeError();
     if (data.estimate !== null) readEstimate(data.estimate, data.started_at, display);
     return response;
-  } catch { throw new ApiError('invalid_response', { requestId: response?.meta?.request_id }); }
+  } catch { throw badResponse(response); }
 }
 
 export function createDetailLoader({ api, executionId, metadata, publish, timeoutMs = 30000,

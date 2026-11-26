@@ -1,6 +1,16 @@
-"""Strip ordinary comments for the authored JS/CSS byte budget."""
+"""Frontend JS/CSS size: authored bytes without ordinary comments (reported) and packaged gzip-9 bytes (budgeted).
 
+Run `python -m tests.source_size` from the repository root, after `npm --prefix web run build`, to print both totals.
+"""
+
+import gzip
+from pathlib import Path
 import re
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SOURCE_ROOT = ROOT / 'web/src'
+ASSET_ROOT = ROOT / 'dashboard/static/app'
 
 
 _JS_LINE_END = re.compile(r'[\r\n\u2028\u2029]')
@@ -216,3 +226,31 @@ def strip_comments(source: str, suffix: str) -> str:
         raise ValueError(f'Unsupported source suffix: {suffix}')
     stripper.parts.append(source[stripper.kept_from:])
     return ''.join(stripper.parts)
+
+
+def _sources(root):
+    return [path for path in root.rglob('*') if path.suffix in {'.js', '.css'} and path.is_file()]
+
+
+def authored_bytes(root=SOURCE_ROOT):
+    """UTF-8 bytes of all JS/CSS under `web/src`, without ordinary comments; whitespace and legal comments count."""
+    total = 0
+    for path in _sources(root):
+        try:
+            total += len(strip_comments(path.read_bytes().decode('utf-8'), path.suffix).encode('utf-8'))
+        except ValueError as error:
+            raise ValueError(f'{path}: {error}') from error
+    return total
+
+
+def packaged_gzip_bytes(root=ASSET_ROOT):
+    """Sum of per-file deterministic gzip-9 sizes (`mtime=0`) of all built JS/CSS."""
+    return sum(len(gzip.compress(path.read_bytes(), compresslevel=9, mtime=0)) for path in _sources(root))
+
+
+if __name__ == '__main__':
+    print(f'Authored JS+CSS without comments: {authored_bytes():,} bytes')
+    if _sources(ASSET_ROOT):
+        print(f'Packaged gzip-9 JS+CSS: {packaged_gzip_bytes():,} of 65,536 bytes')
+    else:
+        print('Packaged JS/CSS is not built; run npm --prefix web run build')

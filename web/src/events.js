@@ -1,4 +1,4 @@
-import { ApiError } from './api.js';
+import { badResponse } from './api.js';
 import { formatId } from './display.js';
 import { codePointCount, observationQuery, readObservationMeta, observationText } from './observation-page.js';
 
@@ -38,5 +38,5 @@ export function readEventPage(response, executionId, query, metadata, display) {
           (row.message === null || codePointCount(row.message) !== metadata.limits.max_text_characters))) throw new TypeError();
     }
     return response;
-  } catch { throw new ApiError('invalid_response', { requestId: response?.meta?.request_id }); }
+  } catch { throw badResponse(response); }
 }

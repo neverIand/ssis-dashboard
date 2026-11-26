@@ -1,4 +1,4 @@
-import { ApiError } from './api.js';
+import { badResponse } from './api.js';
 import { formatCode, formatId } from './display.js';
 import { observationText, readObservationMeta } from './observation-page.js';
 import { timestampTicks } from './selection.js';
@@ -56,5 +56,5 @@ export function readHistoryPage(response, _executionId, query, metadata, display
       if (row.estimate !== null) readEstimate(row.estimate, row.started_at, display);
     }
     return response;
-  } catch { throw new ApiError('invalid_response', { requestId: response?.meta?.request_id }); }
+  } catch { throw badResponse(response); }
 }

@@ -1,4 +1,4 @@
-import { ApiError } from './api.js';
+import { badResponse } from './api.js';
 import { formatId } from './display.js';
 import { codePointCount, observationText, readObservationMeta } from './observation-page.js';
 
@@ -73,7 +73,7 @@ function readValuePage(response, query, metadata, display, section) {
       }
     }
     return response;
-  } catch { throw new ApiError('invalid_response', { requestId: response?.meta?.request_id }); }
+  } catch { throw badResponse(response); }
 }
 export const readParameterPage = (response, _executionId, query, metadata, display) => readValuePage(response, query, metadata, display,
   'parameters');

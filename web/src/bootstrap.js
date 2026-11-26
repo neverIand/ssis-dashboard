@@ -1,7 +1,5 @@
-import { ApiError, createApi } from './api.js';
+import { ApiError, createApi, record } from './api.js';
 import { createDisplay } from './display.js';
-
-const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 export function readMetadata(data, requestId = null) {
   const invalid = () => { throw new ApiError('invalid_metadata', { requestId }); };

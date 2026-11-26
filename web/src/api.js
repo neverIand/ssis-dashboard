@@ -35,7 +35,8 @@ export function safeRequestId(value) {
   return typeof value === 'string' && requestIdPattern.test(value) ? value : null;
 }
 
-const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+export const badResponse = (response) => new ApiError('invalid_response', { requestId: response?.meta?.request_id });
+export const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const cancelled = () => new DOMException('Request cancelled.', 'AbortError');
 
 export function createApi(apiBase, { origin = globalThis.location?.origin, fetchImpl = globalThis.fetch } = {}) {

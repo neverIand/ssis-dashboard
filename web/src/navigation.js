@@ -1,4 +1,4 @@
-import { ApiError } from './api.js';
+import { badResponse } from './api.js';
 import { formatId } from './display.js';
 import { catalogName, packageNameUnits } from './selection.js';
 
@@ -6,7 +6,7 @@ import { catalogName, packageNameUnits } from './selection.js';
 export const navigationId = kind => `${kind.slice(0, -1)}_id`;
 
 export function readNavigation(response, kind, limit) {
-  const invalid = () => { throw new ApiError('invalid_response', { requestId: response?.meta?.request_id }); };
+  const invalid = () => { throw badResponse(response); };
   const { data, meta } = response;
   if (!Array.isArray(data) || data.length > limit || meta?.limit !== limit
       || meta.sort !== 'name' || meta.direction !== 'asc' || meta.from !== null || meta.to !== null

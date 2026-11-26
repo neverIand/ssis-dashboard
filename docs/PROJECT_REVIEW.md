@@ -45,7 +45,7 @@ Follow the [local artifact rules](installation.md#local-artifacts).
 2. Build the coverage ledger from `git ls-files`.
 3. Run and record:
    - Python discovery (run, passed, skipped) and the opt-in [native suite](../tests/native/README.md); a native skip is NOT RUN;
-   - `npm --prefix web ci`, `run build` and `test`, then `tests.test_frontend_assets` (authored and packaged bytes);
+   - `npm --prefix web ci`, `run build` and `test`, then `tests.test_frontend_assets` (packaged ceiling) and `python -m tests.source_size` (authored and packaged bytes);
    - `.local/tools/check-docs.py`.
 
    Commands: [test and diagnose](installation.md#test-and-diagnose), [build](installation.md#build-the-browser-assets).

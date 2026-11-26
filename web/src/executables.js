@@ -1,4 +1,4 @@
-import { ApiError } from './api.js';
+import { badResponse } from './api.js';
 import { formatId } from './display.js';
 import { observationQuery, readObservationMeta, observationText as text } from './observation-page.js';
 
@@ -32,5 +32,5 @@ export function readExecutablePage(response, executionId, query, metadata, displ
       }
     }
     return response;
-  } catch { throw new ApiError('invalid_response', { requestId: response?.meta?.request_id }); }
+  } catch { throw badResponse(response); }
 }
