@@ -4,7 +4,8 @@ Start with [current status and the next actions](PROGRESS.md#next-actions). Use 
 
 | Task | Canonical document |
 | --- | --- |
-| Install, configure, build, run and manage local artifacts | [Local development](installation.md) |
+| Install, configure, build, run, test and manage local artifacts | [Installation](installation.md) |
+| Use the native screens | [Using the dashboard](usage.md) |
 | Understand scope, delivery phases and budgets | [Roadmap](roadmap.md) |
 | Understand ownership, lifecycle, hosting and rollback | [Modernization plan](MODERNIZATION_PLAN.md) |
 | Find completion status, accepted reviews, evidence and open gates | [Progress](PROGRESS.md) |

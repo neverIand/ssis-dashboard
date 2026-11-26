@@ -2,6 +2,27 @@
 
 Release notes and container commands below describe historical upstream releases. Use [installation](installation.md) for `dev-next`. The checked-in Ubuntu 16.04/Python 3.6 container recipe does not support the current runtime pins; a new container and production startup remain deferred B5c work in [progress](PROGRESS.md).
 
+## Legacy platforms
+
+The legacy dashboard (the pages at `/`) was built for these environments. This list is historical: the current requirements are in [installation](installation.md#requirements).
+
+* SQL Server 2012
+* SQL Server 2014
+* SQL Server 2016
+* SQL Server 2017
+* SSIS on Azure Data Factory V2 (https://docs.microsoft.com/en-us/azure/data-factory/)
+
+It was built with:
+
+* Python 3.6: https://www.python.org/
+* Flask 0.12.2: https://pypi.org/project/Flask/0.12.2/
+* PyODBC 4.0.17: https://github.com/mkleehammer/pyodbc
+* SB Admin 2 Template: http://startbootstrap.com/template-overviews/sb-admin-2/
+
+The original project was built in Visual Studio 2017, which is why the repository has `runserver.py` and the Visual Studio project files, and later also in Visual Studio Code.
+
+![Legacy dashboard screenshot](https://cloud.githubusercontent.com/assets/2612362/4003128/76e6869e-2973-11e4-9629-2bf45acd1141.png)
+
 ## Release notes
 
 ### v 0.6.7 Beta

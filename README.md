@@ -1,52 +1,45 @@
 ssis-dashboard-next v 0.6.8 Beta
 =========================================
 
-The purpose of this project is to provide a web-based, user-friendly, useful and nice looking SQL Server Integration Services Dashboard and a set of REST API to monitor execution of SQL Server Integration Services Packages.
+A web dashboard and a read-only REST API for monitoring SQL Server Integration Services (SSIS) package executions in the SSIS catalog (SSISDB).
 
-![Sample Screenshot](https://cloud.githubusercontent.com/assets/2612362/4003128/76e6869e-2973-11e4-9629-2bf45acd1141.png)
+The `dev-next` branch adds a new dashboard at `/app/` (overview, execution detail and package history) and a versioned API under `/api/v1/`. The legacy dashboard stays available at `/` until the new one replaces it.
 
-## Legacy Supported Environments
+## Requirements
 
-* SQL Server 2012
-* SQL Server 2014
-* SQL Server 2016
-* SQL Server 2017
-* SSIS on Azure Data Factory V2 (https://docs.microsoft.com/en-us/azure/data-factory/)
+* SQL Server 2016 or later (the minimum engine version for the native queries) with the SSIS catalog (SSISDB)
+* Standard CPython 3.14.10 or a later 3.14 maintenance release, and a SQL Server ODBC driver of the same architecture
+* Node 22.12.0 or a later 22.x release with npm 10, only to build the browser assets (`npm ci` enforces this range)
+* A current browser: Chrome or Edge 143, Firefox 146, Safari 26.2 or later
 
-## Documentation
+Validated and observed versions, and the other details, are in [installation](docs/installation.md#requirements).
 
-* [Install, configure and run](docs/installation.md)
-* [Documentation index](docs/README.md)
-* [Roadmap and scope](docs/roadmap.md)
-* [Current progress and review](docs/PROGRESS.md)
-* [Read-only API contract](docs/API_CONTRACT.md) and [OpenAPI](docs/openapi.yaml)
+## Quick start
 
-## Development on dev-next
+From the repository root in PowerShell, with Python 3.14 selected by its path. The example assumes `.venv` does not exist; for an existing environment, remove it first or use the same new path in both the creation and activation commands:
 
-Create and activate a fresh virtual environment from standard CPython 3.14.10 or a later 3.14 maintenance release (see [installation](docs/installation.md#create-an-environment)), upgrade pip, then install the runtime dependencies and run locally:
-
-```sh
+```powershell
+& 'C:\Path\To\Python314\python.exe' -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+npm --prefix web ci
+npm --prefix web run build
+```
+
+Put the SSISDB connection in a `config.cfg` file in the repository root ([configure](docs/installation.md#configure)), then run:
+
+```powershell
 python -m flask --app dashboard:create_app run --host=127.0.0.1
 ```
 
-Run the database-free tests with the standard library test runner:
+Open http://127.0.0.1:5000/app/ for the new dashboard or http://127.0.0.1:5000/ for the legacy one.
 
-```sh
-python -m pip install -r requirements-dev.txt
-python -m unittest discover -s tests -v
-```
+## Documentation
 
-See [installation](docs/installation.md) for configuration and environment setup. Python 3.14.10 on Windows x64 passes the database-free suite and recorded local SSISDB checks. Remaining API workload/reader acceptance and deferred production hosting are tracked in progress.
-
-## Legacy Platforms & Tools
-
-The legacy dashboard was built using:
-
-* Python 3.6: https://www.python.org/ 
-* Flask 0.12.2: http://flask.pocoo.org/ 
-* PyODBC 4.0.17: https://github.com/mkleehammer/pyodbc
-* SB Admin 2 Template: http://startbootstrap.com/template-overviews/sb-admin-2/
-
-The IDE used to build the project is Visual Studio 2017 (that's why you can see the `runserver.py` file), though now I'm also using Visual Studio Code
+* [Installation](docs/installation.md): requirements, environment, configuration, build, run and tests
+* [Using the dashboard](docs/usage.md)
+* [Documentation index](docs/README.md)
+* [Roadmap](docs/roadmap.md) and [progress](docs/PROGRESS.md)
+* [API contract](docs/API_CONTRACT.md) and [OpenAPI](docs/openapi.yaml)
+* [Legacy reference](docs/legacy.md): legacy platforms, release notes and Docker image
